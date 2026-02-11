@@ -2,21 +2,15 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey,
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
-from Backend.schemas import UserRole, PropertyType, LeaseType, GenderPreference, ListingStatus, FlagStatus
+from Schemas.userSchema import UserRole
+from Schemas.restSchemas import PropertyType, LeaseType, GenderPreference, ListingStatus, FlagStatus
 import os
+from config import settings
 from dotenv import load_dotenv
 
 load_dotenv()
 
-HG_USER=os.getenv("HGUSER")
-HG_PASSWORD=os.getenv("HGPASSWORD")
-HG_DB=os.getenv("HGDB")
-HG_HOST=os.getenv("HGHOST")
-HG_PORT = os.getenv("HGPORT")
-
-db_url = f"postgresql://{HG_USER}:{HG_PASSWORD}@{HG_HOST}:{HG_PORT}/{HG_DB}"
-
-engine = create_engine(db_url)
+engine = create_engine(settings.DATABASE_URL)
 Local_Session = sessionmaker(bind=engine)
 Base = declarative_base()
 
@@ -38,9 +32,9 @@ class User(Base):
     saved_listings = relationship("SavedListing", back_populates="student")
     flags = relationship("Flag", back_populates="reporter")
 
-    #  __table_args__ = (
-    #     CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
-    # )
+    __table_args__ = (
+        CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
+    )
 
 class Landlord(Base):
     __tablename__ = "landlords"
