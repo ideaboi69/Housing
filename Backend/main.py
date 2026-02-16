@@ -5,6 +5,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.responses import HTMLResponse
 from Routes.user import user_router
+from Routes.landlord import landlord_router
+from Routes.admin import admin_router
 import asyncio
 from dataclasses import dataclass
 
@@ -36,8 +38,8 @@ app.add_middleware(
 )
 
 app.include_router(user_router, prefix="/api/users", tags=["Users"])
-# app.include_router(products_router, prefix="/products", tags=["Products"])
-# app.include_router(portfolio_router, tags=["Portfolio"])
+app.include_router(landlord_router, prefix="/api/landlords", tags=["Landlords"])
+app.include_router(admin_router, prefix="/api/admin", tags=["Admin"])
 # app.include_router(poem_router, tags=["Pic & Poem"])
 # app.include_router(orders_router, tags=["Orders"])
 # app.include_router(payment_router, tags=["Payment"])

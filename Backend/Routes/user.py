@@ -127,7 +127,7 @@ def delete_me(db: Session = Depends(get_db), current_user: User = Depends(get_cu
     db.delete(current_user)
     db.commit()
 
-    return None
+    return {"message": "Account has been deleted successfully"}
 
 # Get user by ID
 @user_router.get("/{user_id}", response_model=UserResponse)

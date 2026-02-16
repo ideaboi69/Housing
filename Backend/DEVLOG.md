@@ -1,6 +1,6 @@
 # Dev Log — Student Housing Platform
 
-## February 11, 2025
+## February 16, 2025
 
 1. **Project Structure** 
 
@@ -10,82 +10,119 @@ Backend/
 ├── main.py              # FastAPI entry point
 ├── config.py            # Environment variables via pydantic-settings
 ├── tables.py            # Database tables
+├── helpers.py 
 ├── .env 
 ├── utils/
 │   └── security.py      # Password hashing, JWT, auth dependencies
 ├── Schemas/
-    └── restSchemas.py   # Enums and schemas for the rest of the .py's
-│   └── userSchemas.py   # Enums and schemas for user.py
+│   ├── userSchema.py    # Schemas relating to users
+│   ├── landlordSchema.py # Schemas relating to landlords
+│   └── adminSchema.py    # Schemas relating to admins
 └── Routes/
-    └── user.py          # All user-related API endpoints
+|   └── user.py          # All user-related API endpoints
+│   ├── landlord.py      # All landlord-related API endpoints 
+│   └── admin.py         # All admin-related API endpoints
+└── Tests/
+    ├── conftest.py      # Info related to tests  
+    ├── constants.py     # Constants related to tests
+    ├── test_user.py     # All user-related tests 
+    ├── test_landlord.py # All landlord-related tests
+    └── test_admin.py    # All admin-related tests
 ```
 
-**2. Database Setup**
+**2. Landlord Schemas**
 
-- Connected to PostgreSQL via SQLAlchemy
-- Session management handled through FastAPI's dependency injection (`get_db`)
-- Tables auto-create on app startup via `Base.metadata.create_all()`
+Created request/response schemas for the landlord system:
 
-**3. Database Tables Created**
+- `LandlordUpdate` — partial profile updates (company_name, phone)
+- `LandlordResponse` — full profile returned to the landlord themselves
+- `LandlordPublicResponse` — what students see (includes computed avg ratings, would_rent_again %, property/review counts, landlord first/last name pulled from users table)
+- `LandlordPropertyResponse` — property info for the landlord's properties endpoint
+- `LandlordReviewResponse` — review info for the landlord's reviews endpoint
 
-- `users` — students, landlords, and admins all in one table with a role enum
-- `landlords` — extends users with landlord-specific fields (company, phone, verification)
-- `properties` — physical addresses with coordinates, amenities, campus distance
-- `listings` — rent details, lease type, sublet support, status tracking
-- `listing_images` — image URLs tied to listings with display ordering
-- `reviews` — structured 1-5 ratings across 4 categories + "would rent again" boolean
-- `housing_health_scores` — cached composite scores per listing (price vs market, landlord rep, maintenance, lease clarity)
-- `flags` — moderation reports on listings or reviews
-- `saved_listings` — student bookmarks
+**3. Landlord Endpoints — Complete**
+
+| Method | Endpoint | Who | What It Does |
+|--------|----------|-----|-------------|
+| GET | `/api/landlords/me` | Landlord | View own landlord profile |
+| PATCH | `/api/landlords/me` | Landlord | Update company name / phone |
+| POST | `/api/landlords/me/verify` | Landlord | Request identity verification |
+| DELETE | `/api/landlords/me` | Landlord | Delete landlord profile, revert to student |
+| GET | `/api/landlords/{id}` | Anyone | Public profile + avg ratings + stats |
+| GET | `/api/landlords/{id}/properties` | Anyone | List landlord's properties |
+| GET | `/api/landlords/{id}/reviews` | Anyone | List reviews on landlord |
 
 Key design decisions:
-- Shared `users` table for auth (students and landlords use the same login flow)
-- Landlord profile is a separate linked table created on role switch
-- Unique constraints to prevent duplicate reviews and duplicate saves
+- `require_landlord` dependency blocks students from landlord-only endpoints
+- `compute_landlord_stats` helper calculates avg ratings from the reviews table on the fly
+- Public profile pulls first/last name through the `Landlord → User` relationship
+- Self-delete cascades all properties → listings → images/scores/saves/flags, but keeps user account as student
 
-**4. Pydantic Schemas**
+**4. Admin Schemas**
 
-Created request/response schemas for the user system:
+- `AdminUserResponse` — full user info for admin user management
+- `AdminLandlordResponse` — landlord info with linked user name/email
+- `AdminListingResponse` — listing summary for admin listing management
+- `AdminStatsResponse` — platform-wide counts (users, landlords, properties, listings, reviews, pending flags)
 
-- `UserCreate` — registration payload with @uoguelph.ca email validation and password min length
-- `UserLogin` — email + password
-- `UserUpdate` — partial profile updates (name, email)
-- `PasswordChange` — current + new password with validation
-- `RoleSwitch` — uses the `UserRole` enum directly, includes optional landlord fields (company_name, phone)
-- `UserResponse` — what gets sent back to the client (no password hash)
-- `TokenResponse` — JWT + user data on login/register
+**5. Admin Endpoints — Complete**
 
-**5. Security Layer**
-
-- Passwords hashed with bcrypt
-- JWT tokens with configurable expiry (default 30 min)
-- `get_current_user` dependency extracts user from Authorization header
-- `require_role` dependency for future role-gated endpoints
-
-**6. User Endpoints — Complete**
-
-All user-related endpoints are done:
+All endpoints gated behind `require_admin` dependency:
 
 | Method | Endpoint | What It Does |
 |--------|----------|-------------|
-| POST | `/api/users/register` | Create account (defaults to student role) |
-| POST | `/api/users/login` | Authenticate, returns JWT |
-| GET | `/api/users/me` | Get current user profile |
-| PATCH | `/api/users/me` | Update name or email |
-| PATCH | `/api/users/me/password` | Change password (requires current password) |
-| PATCH | `/api/users/me/role` | Switch between student and landlord |
-| DELETE | `/api/users/me` | Delete account + associated landlord profile |
-| GET | `/api/users/{user_id}` | View a user's public profile |
+| GET | `/api/admin/stats` | Platform dashboard counts |
+| GET | `/api/admin/users` | List all users |
+| GET | `/api/admin/users/{id}` | View specific user |
+| DELETE | `/api/admin/users/{id}` | Delete user + cascade everything (cannot delete other admins) |
+| GET | `/api/admin/landlords` | List all landlords with user info |
+| DELETE | `/api/admin/landlords/{id}` | Delete landlord, cascade properties/listings, revert user to student |
+| PATCH | `/api/admin/landlords/{id}/verify` | Approve identity verification |
+| PATCH | `/api/admin/landlords/{id}/unverify` | Revoke identity verification |
+| GET | `/api/admin/listings` | List all listings |
+| DELETE | `/api/admin/listings/{id}` | Delete listing + images/scores/saves/flags |
+| DELETE | `/api/admin/reviews/{id}` | Delete review + associated flags |
+| GET | `/api/admin/flags` | List all pending flags |
+| PATCH | `/api/admin/flags/{id}/resolve` | Mark flag as resolved |
+| PATCH | `/api/admin/flags/{id}/dismiss` | Mark flag as reviewed/dismissed |
 
-Role switch behavior:
-- Student → Landlord: creates a landlord profile row if one doesn't exist
-- Landlord → Student: changes role but keeps landlord profile in DB for future re-activation
+Key design decisions:
+- `cascade_delete_landlord` shared helper handles the full teardown chain (used by both admin delete and landlord self-delete)
+- Admin deleting a landlord keeps the user account (reverts to student)
+- Admin deleting a user nukes everything including landlord profile
+- Admins cannot delete other admins (protection against accidental lockout)
+- Admin accounts can only be created directly in the DB, no signup endpoint
 
----
+**6. Test Infrastructure Refactor**
 
-### Up Next
+Moved from duplicated boilerplate in each test file to a shared setup:
 
-- Landlord routes (profile management, identity verification)
-- Property + Listing CRUD (landlord-only creation, public browsing)
-- Review system (student-only creation, public reading)
-- Listing filters and search
+- `conftest.py` — single source for DB engine, session, FastAPI app, TestClient, all fixtures and helper functions. Pytest auto-discovers fixtures without explicit imports.
+- `constants.py` — all URLs, status codes, test users, passwords, emails, role payloads, and expected messages in one place. Change a value once, every test updates.
+- Test files are now pure test logic — no DB setup, no app creation, no duplicate helpers.
+
+Shared helpers created:
+- `register_user`, `login_user`, `register_and_get_token` — auth flow
+- `get_me`, `update_me`, `change_password`, `switch_role`, `delete_me` — user actions
+- `make_landlord`, `get_landlord_id` — landlord setup
+- `make_admin` — creates admin directly in DB (bypasses signup)
+- `seed_property`, `seed_listing`, `seed_review`, `seed_flag` — DB seeding for tests that need pre-existing data
+- `db` fixture — direct DB session for assertion queries
+
+**7. Test Coverage**
+
+| File | Tests | What's Covered |
+|------|-------|---------------|
+| test_user.py | 30 | Register, login, profile CRUD, password change, role switch, delete, get by ID |
+| test_landlord.py | 20 | Profile view/update, verification, self-delete + cascade, public profiles, properties, reviews |
+| test_admin.py | 24 | Dashboard stats, user/landlord/listing/review CRUD, verification management, flag resolve/dismiss, role gating |
+| **Total** | **74** | |
+
+**8. Bug Fixes Along the Way**
+
+- Test file naming: renamed from `userTest.py` → `test_user.py` (pytest convention `test_*.py`)
+- Relative imports: removed `.` prefix from test imports (no `__init__.py` needed in Tests/)
+- `seed_property`: added missing NOT NULL fields (`walk_time_minutes`, `bus_time_minutes`, `utilities_included`)
+- `seed_listing`: changed `move_in_date` from string to `date` object (SQLite requirement)
+- Flag status: changed raw string assignment to `FlagStatus` enum in admin resolve/dismiss endpoints
+- Session conflicts: saved entity IDs before cascade deletes to avoid `ObjectDeletedError`
