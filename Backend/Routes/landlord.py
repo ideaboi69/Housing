@@ -4,7 +4,7 @@ from sqlalchemy import func as sql_func
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
 from Schemas.landlordSchema import (LandlordUpdate, LandlordResponse, LandlordPublicResponse, LandlordPropertyResponse, LandlordReviewResponse)
 from Schemas.userSchema import UserRole
-from utils.security import get_current_user
+from Utils.security import get_current_user
 from helpers import require_landlord, get_landlord_profile, compute_landlord_stats
 
 landlord_router = APIRouter()

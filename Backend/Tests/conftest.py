@@ -154,7 +154,7 @@ def seed_review(student_id, property_id, landlord_id, db, would_rent_again=True)
 
 def make_admin(db):
     """Create an admin user directly in the DB and return a token."""
-    from utils.security import hash_password, create_access_token
+    from Utils.security import hash_password, create_access_token
 
     user = User(
         email=ADMIN_USER["email"],

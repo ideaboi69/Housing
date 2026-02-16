@@ -5,7 +5,7 @@ from Schemas.adminSchema import (AdminUserResponse, AdminLandlordResponse, Admin
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordUpdate, LandlordResponse
 from helpers import require_admin, cascade_delete_landlord
-from utils.security import get_current_user
+from Utils.security import get_current_user
 
 admin_router = APIRouter()
 

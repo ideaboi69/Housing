@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from sqlalchemy import text
 from tables import get_db, User, Landlord, Property, Review
 from Schemas.userSchema import UserRole
-from utils.security import get_current_user
+from Utils.security import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 

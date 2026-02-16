@@ -4,7 +4,7 @@ from tables import get_db
 from tables import User, Landlord
 from Schemas.userSchema import (UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange, RoleSwitch)
 from helpers import check_uoguelph_email
-from utils.security import (hash_password, verify_password, create_access_token, get_current_user)
+from Utils.security import (hash_password, verify_password, create_access_token, get_current_user)
 
 user_router = APIRouter()
 
