@@ -9,6 +9,14 @@ from Routes.user import user_router
 from Routes.landlord import landlord_router
 from Routes.admin import admin_router
 from Schemas.userSchema import UserRole
+from Schemas.listingSchema import ListingStatus
+from Schemas.flagSchema import FlagStatus
+from Routes.property import property_router
+from Routes.listing import listing_router
+from Routes.review import review_router
+from Routes.healthscore import health_score_router
+from Routes.saved import saved_router
+from Routes.flag import flag_router
 from constants import *
 from datetime import date
 
@@ -28,6 +36,12 @@ app = FastAPI()
 app.include_router(user_router, prefix="/api/users")
 app.include_router(landlord_router, prefix="/api/landlords")
 app.include_router(admin_router, prefix="/api/admin")
+app.include_router(property_router, prefix="/api/properties")
+app.include_router(listing_router, prefix="/api/listings")
+app.include_router(review_router, prefix="/api/reviews")
+app.include_router(flag_router, prefix="/api/flags")
+app.include_router(saved_router, prefix="/api/saved")
+app.include_router(health_score_router, prefix="/api/health-scores")
 app.dependency_overrides[get_db] = override_get_db
 
 client = TestClient(app)
@@ -48,7 +62,9 @@ def db():
     yield session
     session.close()
 
-# Authentication helpers
+# ──────────────────────────────────────────────
+# Authentication Helpers
+# ──────────────────────────────────────────────
 def auth_header(token):
     return {"Authorization": f"Bearer {token}"}
 
@@ -65,13 +81,11 @@ def register_and_get_token(user_data=None):
     res = register_user(user_data)
     return res.json()["access_token"]
 
-
 # ──────────────────────────────────────────────
 # User Helpers
 # ──────────────────────────────────────────────
 def get_me(token):
     return client.get(ME_URL, headers=auth_header(token))
-
 
 def update_me(token, payload):
     return client.patch(ME_URL, json=payload, headers=auth_header(token))
@@ -151,7 +165,6 @@ def seed_review(student_id, property_id, landlord_id, db, would_rent_again=True)
 # ──────────────────────────────────────────────
 # Admin Helper
 # ──────────────────────────────────────────────
-
 def make_admin(db):
     """Create an admin user directly in the DB and return a token."""
     from Utils.security import hash_password, create_access_token
@@ -171,7 +184,6 @@ def make_admin(db):
     token = create_access_token({"user_id": user.id, "role": user.role.value})
     return token
 
-
 def seed_listing(property_id, db):
     """Insert a listing directly into the DB."""
     listing = Listing(
@@ -181,13 +193,12 @@ def seed_listing(property_id, db):
         lease_type="12_month",
         move_in_date=date(2025, 9, 1),
         is_sublet=False,
-        status="active",
+        status=ListingStatus.ACTIVE,
     )
     db.add(listing)
     db.commit()
     db.refresh(listing)
     return listing
-
 
 def seed_flag(reporter_id, db, listing_id=None, review_id=None):
     """Insert a flag directly into the DB."""
@@ -196,9 +207,89 @@ def seed_flag(reporter_id, db, listing_id=None, review_id=None):
         listing_id=listing_id,
         review_id=review_id,
         reason="Suspicious listing, possible scam.",
-        status="pending",
+        status=FlagStatus.PENDING,
     )
     db.add(flag)
     db.commit()
     db.refresh(flag)
     return flag
+
+# ──────────────────────────────────────────────
+# Property Helpers
+# ──────────────────────────────────────────────
+def create_property_api(token, data=None):
+    """Create a property via the API."""
+    return client.post(PROPERTIES_URL, json=data or PROPERTY_ONE, headers=auth_header(token))
+
+def create_property_and_get_id(token, data=None):
+    """Create a property and return just the ID."""
+    res = create_property_api(token, data)
+    return res.json()["id"]
+
+# ──────────────────────────────────────────────
+# Listing Helpers
+# ──────────────────────────────────────────────
+def create_listing_api(token, property_id, data=None):
+    """Create a listing via the API."""
+    listing_data = dict(data or LISTING_ONE)
+    listing_data["property_id"] = property_id
+    return client.post(LISTINGS_URL, json=listing_data, headers=auth_header(token))
+
+
+def create_listing_and_get_id(token, property_id, data=None):
+    """Create a listing and return just the ID."""
+    res = create_listing_api(token, property_id, data)
+    return res.json()["id"]
+
+# ──────────────────────────────────────────────
+# Review Helpers
+# ──────────────────────────────────────────────
+def make_verified_student(user_data=None):
+    """Register a student and manually verify their email. Returns token."""
+    token = register_and_get_token(user_data)
+    # manually verify in DB
+    db = TestSession()
+    user = db.query(User).filter(User.email == (user_data or STUDENT_ONE)["email"]).first()
+    user.email_verified = True
+    db.commit()
+    db.close()
+    return token
+
+def create_review_api(token, property_id, data=None):
+    """Create a review via the API."""
+    review_data = dict(data or REVIEW_ONE)
+    review_data["property_id"] = property_id
+    return client.post(REVIEWS_URL, json=review_data, headers=auth_header(token))
+
+# ──────────────────────────────────────────────
+# Saved Helpers
+# ──────────────────────────────────────────────
+def save_listing_api(token, listing_id):
+    return client.post(SAVED_LISTING_URL.format(listing_id=listing_id), headers=auth_header(token))
+
+
+def unsave_listing_api(token, listing_id):
+    return client.delete(SAVED_LISTING_URL.format(listing_id=listing_id), headers=auth_header(token))
+
+
+# ──────────────────────────────────────────────
+# Flag Helpers
+# ──────────────────────────────────────────────
+def create_flag_api(token, listing_id=None, review_id=None, reason="Suspicious content."):
+    payload = {"reason": reason}
+    if listing_id:
+        payload["listing_id"] = listing_id
+    if review_id:
+        payload["review_id"] = review_id
+    return client.post(FLAGS_URL, json=payload, headers=auth_header(token))
+
+
+# ──────────────────────────────────────────────
+# Healthscore Helpers
+# ──────────────────────────────────────────────
+def compute_health_score_api(listing_id):
+    return client.post(HEALTH_SCORE_COMPUTE_URL.format(listing_id=listing_id))
+
+
+def get_health_score_api(listing_id):
+    return client.get(HEALTH_SCORE_URL.format(listing_id=listing_id))

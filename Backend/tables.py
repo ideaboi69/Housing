@@ -3,7 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 from Schemas.userSchema import UserRole
-from Schemas.restSchemas import PropertyType, LeaseType, GenderPreference, ListingStatus, FlagStatus
+from Schemas.propertySchema import PropertyType 
+from Schemas.listingSchema import LeaseType, GenderPreference, ListingStatus
+from Schemas.reviewSchema import FlagStatus
 import os
 from config import settings
 from dotenv import load_dotenv

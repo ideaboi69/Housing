@@ -1,6 +1,6 @@
 # Dev Log — Student Housing Platform
 
-## February 16, 2025
+## February 17, 2025
 
 1. **Project Structure** 
 
@@ -12,117 +12,283 @@ Backend/
 ├── tables.py            # Database tables
 ├── helpers.py 
 ├── .env 
-├── utils/
+├── Utils/
 │   └── security.py      # Password hashing, JWT, auth dependencies
 ├── Schemas/
 │   ├── userSchema.py    # Schemas relating to users
 │   ├── landlordSchema.py # Schemas relating to landlords
 │   └── adminSchema.py    # Schemas relating to admins
+│   ├── propertySchema.py
+│   ├── listingSchema.py
+│   ├── reviewSchema.py
+│   ├── savedSchema.py
+│   ├── flagSchema.py
+│   └── healthscoreSchema.py
 └── Routes/
 |   └── user.py          # All user-related API endpoints
 │   ├── landlord.py      # All landlord-related API endpoints 
 │   └── admin.py         # All admin-related API endpoints
+│   ├── property.py
+│   ├── listing.py
+│   ├── review.py
+│   ├── saved.py
+│   ├── flag.py
+│   └── healthscore.py
 └── Tests/
     ├── conftest.py      # Info related to tests  
     ├── constants.py     # Constants related to tests
     ├── test_user.py     # All user-related tests 
     ├── test_landlord.py # All landlord-related tests
     └── test_admin.py    # All admin-related tests
+    ├── test_property.py
+    ├── test_listing.py
+    ├── test_review.py
+    ├── test_saved.py
+    ├── test_flag.py
+    └── test_healthscore.py
 ```
 
-**2. Landlord Schemas**
+# Dev Log — Student Housing Platform
 
-Created request/response schemas for the landlord system:
+## February 17, 2025
 
-- `LandlordUpdate` — partial profile updates (company_name, phone)
-- `LandlordResponse` — full profile returned to the landlord themselves
-- `LandlordPublicResponse` — what students see (includes computed avg ratings, would_rent_again %, property/review counts, landlord first/last name pulled from users table)
-- `LandlordPropertyResponse` — property info for the landlord's properties endpoint
-- `LandlordReviewResponse` — review info for the landlord's reviews endpoint
+### Session 3: Property, Listing, Review, Saved, Flag & Health Score Systems
 
-**3. Landlord Endpoints — Complete**
+---
+
+**1. Updated Project Structure**
+
+```
+Backend/
+├── main.py
+├── config.py
+├── tables.py
+├── helpers.py           # Shared scoring logic for health scores
+├── .env
+├── Utils/
+│   └── security.py
+├── Schemas/
+│   ├── userSchema.py
+│   ├── landlordSchema.py
+│   ├── adminSchema.py
+│   ├── propertySchema.py
+│   ├── listingSchema.py
+│   ├── reviewSchema.py
+│   ├── savedSchema.py
+│   ├── flagSchema.py
+│   └── healthscoreSchema.py
+├── Routes/
+│   ├── user.py
+│   ├── landlord.py
+│   ├── admin.py
+│   ├── property.py
+│   ├── listing.py
+│   ├── review.py
+│   ├── saved.py
+│   ├── flag.py
+│   └── healthscore.py
+└── Tests/
+    ├── conftest.py
+    ├── constants.py
+    ├── test_user.py
+    ├── test_landlord.py
+    ├── test_admin.py
+    ├── test_property.py
+    ├── test_listing.py
+    ├── test_review.py
+    ├── test_saved.py
+    ├── test_flag.py
+    └── test_healthscore.py
+```
+
+**2. Property Schemas**
+
+- `PropertyCreate` — full property details (title, address, coords, type, rooms, amenities, distance info)
+- `PropertyUpdate` — all fields optional for partial updates
+- `PropertyResponse` — full property info with timestamps
+
+**3. Property Endpoints — Complete**
 
 | Method | Endpoint | Who | What It Does |
 |--------|----------|-----|-------------|
-| GET | `/api/landlords/me` | Landlord | View own landlord profile |
-| PATCH | `/api/landlords/me` | Landlord | Update company name / phone |
-| POST | `/api/landlords/me/verify` | Landlord | Request identity verification |
-| DELETE | `/api/landlords/me` | Landlord | Delete landlord profile, revert to student |
-| GET | `/api/landlords/{id}` | Anyone | Public profile + avg ratings + stats |
-| GET | `/api/landlords/{id}/properties` | Anyone | List landlord's properties |
-| GET | `/api/landlords/{id}/reviews` | Anyone | List reviews on landlord |
+| POST | `/api/properties/` | Landlord | Create a property |
+| GET | `/api/properties/` | Anyone | Browse all properties |
+| GET | `/api/properties/me/all` | Landlord | View own properties only |
+| GET | `/api/properties/{id}` | Anyone | View single property |
+| PATCH | `/api/properties/{id}` | Landlord (owner) | Update property fields |
+| DELETE | `/api/properties/{id}` | Landlord (owner) | Delete + cascade listings/reviews |
 
 Key design decisions:
-- `require_landlord` dependency blocks students from landlord-only endpoints
-- `compute_landlord_stats` helper calculates avg ratings from the reviews table on the fly
-- Public profile pulls first/last name through the `Landlord → User` relationship
-- Self-delete cascades all properties → listings → images/scores/saves/flags, but keeps user account as student
+- `get_property_owned_by` helper verifies ownership before update/delete
+- `/me/all` route placed before `/{id}` to avoid FastAPI matching "me" as an integer
+- Delete cascades: listings → images, scores, saves, flags + reviews on the property
 
-**4. Admin Schemas**
+**4. Listing Schemas**
 
-- `AdminUserResponse` — full user info for admin user management
-- `AdminLandlordResponse` — landlord info with linked user name/email
-- `AdminListingResponse` — listing summary for admin listing management
-- `AdminStatsResponse` — platform-wide counts (users, landlords, properties, listings, reviews, pending flags)
+- `ListingCreate` — rent details, lease type, move-in date, sublet fields, gender preference
+- `ListingUpdate` — partial updates including status changes (active/rented/expired)
+- `SubletConvert` — dedicated schema for converting a listing to sublet
+- `ListingResponse` — basic listing info for landlord management
+- `ListingDetailResponse` — full listing with property + landlord info baked in (what students see when browsing)
 
-**5. Admin Endpoints — Complete**
+**5. Listing Endpoints — Complete**
 
-All endpoints gated behind `require_admin` dependency:
+| Method | Endpoint | Who | What It Does |
+|--------|----------|-----|-------------|
+| POST | `/api/listings/` | Landlord | Create listing on their property |
+| GET | `/api/listings/` | Anyone | Browse with full filters + sort + pagination |
+| GET | `/api/listings/me/all` | Landlord | View own listings |
+| GET | `/api/listings/{id}` | Anyone | View listing detail (increments view count) |
+| PATCH | `/api/listings/{id}` | Landlord (owner) | Update listing fields |
+| PATCH | `/api/listings/{id}/sublet` | Landlord (owner) | Convert to sublet |
+| DELETE | `/api/listings/{id}` | Landlord (owner) | Delete + cascade images/scores/saves/flags |
 
-| Method | Endpoint | What It Does |
-|--------|----------|-------------|
-| GET | `/api/admin/stats` | Platform dashboard counts |
-| GET | `/api/admin/users` | List all users |
-| GET | `/api/admin/users/{id}` | View specific user |
-| DELETE | `/api/admin/users/{id}` | Delete user + cascade everything (cannot delete other admins) |
-| GET | `/api/admin/landlords` | List all landlords with user info |
-| DELETE | `/api/admin/landlords/{id}` | Delete landlord, cascade properties/listings, revert user to student |
-| PATCH | `/api/admin/landlords/{id}/verify` | Approve identity verification |
-| PATCH | `/api/admin/landlords/{id}/unverify` | Revoke identity verification |
-| GET | `/api/admin/listings` | List all listings |
-| DELETE | `/api/admin/listings/{id}` | Delete listing + images/scores/saves/flags |
-| DELETE | `/api/admin/reviews/{id}` | Delete review + associated flags |
-| GET | `/api/admin/flags` | List all pending flags |
-| PATCH | `/api/admin/flags/{id}/resolve` | Mark flag as resolved |
-| PATCH | `/api/admin/flags/{id}/dismiss` | Mark flag as reviewed/dismissed |
+Filters available on `GET /api/listings/`:
+- **Price:** `price_min`, `price_max`
+- **Property:** `property_type`, `is_furnished`, `has_parking`, `has_laundry`, `utilities_included`
+- **Distance:** `distance_max` (km from campus)
+- **Lease:** `lease_type`, `is_sublet`, `gender_preference`
+- **Date:** `move_in_before`, `move_in_after`
+- **Status:** `status` (defaults to active)
+- **Sorting:** `sort_by` (rent_per_room, distance_to_campus_km, created_at) + `sort_order` (asc/desc)
+- **Pagination:** `skip`, `limit` (max 100)
 
 Key design decisions:
-- `cascade_delete_landlord` shared helper handles the full teardown chain (used by both admin delete and landlord self-delete)
-- Admin deleting a landlord keeps the user account (reverts to student)
-- Admin deleting a user nukes everything including landlord profile
-- Admins cannot delete other admins (protection against accidental lockout)
-- Admin accounts can only be created directly in the DB, no signup endpoint
+- Flat listing structure (`/api/listings`) not nested under properties — students search listings, not properties
+- `ListingDetailResponse` joins listing + property + landlord in a single response so the frontend doesn't need multiple calls
+- View count increments on every `GET /{id}` hit
+- Ownership verified through property → landlord chain
+- Sublet conversion is a separate endpoint to keep the flow explicit
 
-**6. Test Infrastructure Refactor**
+**6. Review Schemas**
 
-Moved from duplicated boilerplate in each test file to a shared setup:
+- `ReviewCreate` — 4 ratings (1-5) + would_rent_again + optional comment, with `field_validator` for rating range
+- `ReviewUpdate` — partial updates with same validation
+- `ReviewResponse` — full review info
 
-- `conftest.py` — single source for DB engine, session, FastAPI app, TestClient, all fixtures and helper functions. Pytest auto-discovers fixtures without explicit imports.
-- `constants.py` — all URLs, status codes, test users, passwords, emails, role payloads, and expected messages in one place. Change a value once, every test updates.
-- Test files are now pure test logic — no DB setup, no app creation, no duplicate helpers.
+**7. Review Endpoints — Complete**
 
-Shared helpers created:
-- `register_user`, `login_user`, `register_and_get_token` — auth flow
-- `get_me`, `update_me`, `change_password`, `switch_role`, `delete_me` — user actions
-- `make_landlord`, `get_landlord_id` — landlord setup
-- `make_admin` — creates admin directly in DB (bypasses signup)
-- `seed_property`, `seed_listing`, `seed_review`, `seed_flag` — DB seeding for tests that need pre-existing data
-- `db` fixture — direct DB session for assertion queries
+| Method | Endpoint | Who | What It Does |
+|--------|----------|-----|-------------|
+| POST | `/api/reviews/` | Verified student | Create review (one per property) |
+| GET | `/api/reviews/` | Anyone | Browse reviews (filter by property_id or landlord_id) |
+| GET | `/api/reviews/me/all` | Logged in | View own reviews |
+| GET | `/api/reviews/{id}` | Anyone | View single review |
+| PATCH | `/api/reviews/{id}` | Owner | Update own review |
+| DELETE | `/api/reviews/{id}` | Owner | Delete own review |
 
-**7. Test Coverage**
+Key design decisions:
+- `require_verified_student` dependency blocks unverified emails from writing reviews
+- One review per student per property (unique constraint checked before insert)
+- `landlord_id` auto-linked from the property's landlord — students don't need to know it
+- Review filters support both `property_id` and `landlord_id` query params
+
+**8. Saved Listing Schemas**
+
+- `SavedListingResponse` — basic saved record (id, student_id, listing_id, timestamp)
+- `SavedListingDetailResponse` — saved record with listing + property info for the saved listings page
+
+**9. Saved Listing Endpoints — Complete**
+
+| Method | Endpoint | Who | What It Does |
+|--------|----------|-----|-------------|
+| POST | `/api/saved/{listing_id}` | Logged in | Bookmark a listing |
+| DELETE | `/api/saved/{listing_id}` | Logged in | Remove bookmark |
+| GET | `/api/saved/` | Logged in | View all saved listings with details |
+| GET | `/api/saved/{listing_id}/check` | Logged in | Check if a listing is saved (returns boolean) |
+
+Key design decisions:
+- Duplicate save prevention (409 if already saved)
+- List endpoint returns full listing + property info so the saved page renders without extra API calls
+- Check endpoint useful for frontend to toggle save/unsave button state
+
+**10. Flag Schemas**
+
+- `FlagStatus` enum — `PENDING`, `REVIEWED`, `RESOLVED` (used consistently across flag creation and admin management)
+- `FlagCreate` — listing_id and/or review_id + reason
+- `FlagResponse` — full flag info
+
+**11. Flag Endpoints — Complete**
+
+| Method | Endpoint | Who | What It Does |
+|--------|----------|-----|-------------|
+| POST | `/api/flags/` | Logged in | Report a listing or review |
+| GET | `/api/flags/me` | Logged in | View own flags |
+| GET | `/api/flags/{id}` | Logged in (owner) | View single flag |
+
+Key design decisions:
+- Must provide at least one target (listing_id or review_id) — 400 if neither
+- Duplicate flag prevention per user per target (409 if already flagged)
+- Users can only view their own flags; admin endpoints handle flag management
+- Flag status uses `FlagStatus.PENDING` enum on creation
+
+**12. Health Score Schemas**
+
+- `HealthScoreResponse` — all sub-scores + overall score + timestamp
+
+**13. Health Score Endpoints — Complete**
+
+| Method | Endpoint | Who | What It Does |
+|--------|----------|-----|-------------|
+| POST | `/api/health-scores/{listing_id}/compute` | Anyone | Compute or recompute health score |
+| GET | `/api/health-scores/{listing_id}` | Anyone | Get cached health score |
+
+Scoring logic (in `helpers.py`):
+- **Price vs Market (30%)** — compares listing's rent_per_room to market average for same property type. Cheaper = higher score.
+- **Landlord Reputation (30%)** — average of all 4 review categories for the landlord, scaled 0-100. Neutral (50) when no reviews.
+- **Maintenance (20%)** — average maintenance_speed rating, scaled 0-100. Neutral when no reviews.
+- **Lease Clarity (20%)** — completeness check across 8 fields (move-in date, lease type, rent info, sublet dates, address, distance, transit, utilities). More info = higher score.
+- **Overall** — weighted average of all four sub-scores.
+
+Key design decisions:
+- Upsert pattern: recomputing updates the existing record rather than creating duplicates
+- Scores cached in DB so they don't need recomputation on every page view
+- Public endpoints — no auth required to view scores
+- Sub-scores individually available so frontend can show breakdowns
+
+**14. Test Coverage**
 
 | File | Tests | What's Covered |
 |------|-------|---------------|
 | test_user.py | 30 | Register, login, profile CRUD, password change, role switch, delete, get by ID |
 | test_landlord.py | 20 | Profile view/update, verification, self-delete + cascade, public profiles, properties, reviews |
 | test_admin.py | 24 | Dashboard stats, user/landlord/listing/review CRUD, verification management, flag resolve/dismiss, role gating |
-| **Total** | **74** | |
+| test_property.py | 19 | Create, browse, my properties, update, delete + cascade, ownership checks |
+| test_listing.py | 38 | Create, browse, filters (price/furnished/type/lease/sublet/distance/utilities), sorting, pagination, update, sublet conversion, delete, ownership |
+| test_review.py | 24 | Create (verified only), duplicate block, rating validation, auto-link landlord, browse with filters, my reviews, update, delete, ownership |
+| test_saved.py | 12 | Save, duplicate block, unsave, list saved with details, only own saves, check status |
+| test_flag.py | 13 | Flag listing, flag review, must target something, duplicate block, my flags, view own flag, cannot view others |
+| test_healthscore.py | 11 | Compute basic, compute with reviews, recompute updates, score ranges, get cached, not computed yet, public access, lease clarity comparison, reputation reflects reviews |
+| **Total** | **191** | |
 
-**8. Bug Fixes Along the Way**
+**15. Bug Fixes Along the Way**
 
-- Test file naming: renamed from `userTest.py` → `test_user.py` (pytest convention `test_*.py`)
-- Relative imports: removed `.` prefix from test imports (no `__init__.py` needed in Tests/)
-- `seed_property`: added missing NOT NULL fields (`walk_time_minutes`, `bus_time_minutes`, `utilities_included`)
-- `seed_listing`: changed `move_in_date` from string to `date` object (SQLite requirement)
-- Flag status: changed raw string assignment to `FlagStatus` enum in admin resolve/dismiss endpoints
-- Session conflicts: saved entity IDs before cascade deletes to avoid `ObjectDeletedError`
+- Route ordering: moved `/me/all` before `/{id}` in property and listing routers to prevent FastAPI matching "me" as an integer param
+- Student collision: added `STUDENT_THREE` constant to avoid duplicate registration when tests need 3 distinct users
+- Enum consistency: switched all raw string assignments to enum values (`FlagStatus.PENDING`, `ListingStatus.ACTIVE`, etc.)
+- Router prefix typo: fixed `/api/save` → `/api/saved` in conftest
+- Health score model: removed `computed_at` keyword (column doesn't exist on `HousingHealthScore` table, uses auto `created_at`)
+- Sparse property test: added required `walk_time_minutes` and `bus_time_minutes` fields to avoid NOT NULL constraint
+- Date types: ensured `move_in_date` uses Python `date` objects not strings (SQLite requirement)
+
+---
+
+### Platform Status — All Core Features Complete
+
+**Auth & Users:** Register, login, JWT, profile CRUD, role switching, account deletion
+**Landlords:** Profile management, verification flow, public profiles with computed stats, self-delete with cascade
+**Admin Panel:** Full CRUD over users/landlords/listings/reviews/flags, verification approval, dashboard stats
+**Properties:** Landlord CRUD with ownership enforcement, public browsing
+**Listings:** Full CRUD, sublet conversion, comprehensive filters/sort/pagination, view tracking
+**Reviews:** Verified-only creation, one per property, auto-linked landlord, owner editing
+**Saved Listings:** Bookmark/unbookmark, saved page with full details, check status
+**Flags:** Report listings or reviews, duplicate prevention, admin resolution flow
+**Health Scores:** 4-component scoring system, cached computation, public access
+
+### Up Next
+
+- Image upload handling for listing photos
+- Email verification flow (send verification email on register)
+- Search endpoint (full-text search across listings and properties)
+- Rate limiting on public endpoints
+- Frontend integration

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, FlagStatus
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
 from Schemas.adminSchema import (AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse)
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordUpdate, LandlordResponse
+from Schemas.flagSchema import FlagStatus
 from helpers import require_admin, cascade_delete_landlord
 from Utils.security import get_current_user
 
@@ -18,7 +19,7 @@ def get_website_stats(db: Session = Depends(get_db), admin: User = Depends(requi
         total_properties=db.query(Property).count(),
         total_listings=db.query(Listing).count(),
         total_reviews=db.query(Review).count(),
-        total_flags_pending=db.query(Flag).filter(Flag.status == "pending").count(),
+        total_flags_pending=db.query(Flag).filter(Flag.status == FlagStatus.PENDING).count(),
     )
 
 # USER ENDPOINTS
@@ -194,7 +195,7 @@ def delete_review(review_id: int, db: Session = Depends(get_db), admin: User = D
 # FLAG ENDPOINTS
 @admin_router.get("/flags", response_model=None)
 def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    flags = db.query(Flag).filter(Flag.status == "pending").all()
+    flags = db.query(Flag).filter(Flag.status == FlagStatus.PENDING).all()
     return [
         {
             "id": f.id,
