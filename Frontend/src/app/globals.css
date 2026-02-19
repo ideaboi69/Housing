@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════
+   cribb Design System Tokens
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+  /* Brand */
+  --cribb-orange: #FF6B35;
+  --cribb-orange-hover: #e55e2e;
+  --cribb-navy: #1B2D45;
+  --cribb-warm-bg: #FAF8F4;
+  --cribb-white: #ffffff;
+
+  /* Score colors */
+  --score-great: #4ADE80;
+  --score-good: #FFB627;
+  --score-caution: #E71D36;
+
+  /* Pushpin */
+  --pushpin-red: #E71D36;
+  --pushpin-highlight: #FF4D6A;
+
+  /* Accent palette */
+  --accent-teal: #2EC4B6;
+  --accent-yellow: #FFB627;
+  --accent-purple: #6C5CE7;
+
+  /* Shadows */
+  --shadow-card: 0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-card-hover: 0 8px 30px rgba(0,0,0,0.12);
+  --shadow-orange: 0 2px 12px rgba(255,107,53,0.35);
+  --shadow-orange-lg: 0 4px 20px rgba(255,107,53,0.3);
+
+  /* Radius */
+  --radius: 0.625rem;
+
+  /* Fonts */
+  --font-size: 16px;
+}
+
+/* ── Base styles ────────────────────────────────────── */
+
+html {
+  font-size: var(--font-size);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar ──────────────────────────────────────── */
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Cork board background ──────────────────────────── */
+
+.cork-bg {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 39px,
+      rgba(27, 45, 69, 0.03) 39px,
+      rgba(27, 45, 69, 0.03) 40px
+    );
+}
