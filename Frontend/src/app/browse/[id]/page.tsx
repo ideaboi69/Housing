@@ -22,8 +22,6 @@ import {
 } from "lucide-react";
 import {
   motion,
-  useMotionValue,
-  useSpring,
   useInView,
 } from "framer-motion";
 
@@ -63,49 +61,26 @@ function AnimatedBar({ score, color }: { score: number; color: string }) {
   );
 }
 
-/* ── Magnetic CTA Button ─────────────────────────── */
-function MagneticCTA({ children, className, style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const springX = useSpring(x, { stiffness: 300, damping: 20 });
-  const springY = useSpring(y, { stiffness: 300, damping: 20 });
-
+/* ── Shimmer CTA Button ──────────────────────────── */
+function ShimmerCTA({ children, className, style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
   return (
-    <motion.button
-      className={className}
-      style={{ ...style, x: springX, y: springY }}
-      onMouseMove={(e) => {
-        const rect = e.currentTarget.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        x.set((e.clientX - cx) * 0.15);
-        y.set((e.clientY - cy) * 0.15);
-      }}
-      onMouseLeave={() => {
-        x.set(0);
-        y.set(0);
-      }}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.97 }}
+    <button
+      className={`${className} relative overflow-hidden hover:scale-[1.02] active:scale-[0.97] transition-transform`}
+      style={style}
     >
-      {/* Diagonal shimmer */}
-      <motion.div
-        className="absolute inset-0 rounded-xl pointer-events-none overflow-hidden"
-        style={{ zIndex: 1 }}
-      >
-        <motion.div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.2) 50%, transparent 60%)",
-            backgroundSize: "250% 100%",
-          }}
-          animate={{ backgroundPosition: ["200% 0", "-50% 0"] }}
-          transition={{ duration: 3, repeat: Infinity, repeatDelay: 2, ease: "easeInOut" }}
-        />
-      </motion.div>
+      {/* Diagonal shimmer — CSS animation */}
+      <div
+        className="absolute inset-0 rounded-xl pointer-events-none"
+        style={{
+          background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.2) 50%, transparent 60%)",
+          backgroundSize: "250% 100%",
+          animation: "shimmer 4s ease-in-out infinite",
+        }}
+      />
       <span className="relative z-[2]">{children}</span>
-    </motion.button>
+    </button>
+  );
+}
   );
 }
 
@@ -435,14 +410,6 @@ export default function ListingDetailPage({
                               : "Would not rent again"}
                           </div>
                         </div>
-                        {review.comment && (
-                          <p
-                            className="mt-2 text-[#1B2D45]/60"
-                            style={{ fontSize: "13px", lineHeight: 1.6 }}
-                          >
-                            {review.comment}
-                          </p>
-                        )}
                       </motion.div>
                     ))}
                   </div>
@@ -492,7 +459,7 @@ export default function ListingDetailPage({
               </div>
 
               {/* Magnetic CTA */}
-              <MagneticCTA
+              <ShimmerCTA
                 className="relative w-full mt-5 py-3 rounded-xl bg-[#FF6B35] text-white overflow-hidden"
                 style={{
                   fontSize: "15px",
@@ -501,7 +468,7 @@ export default function ListingDetailPage({
                 }}
               >
                 Contact Landlord
-              </MagneticCTA>
+              </ShimmerCTA>
 
               <motion.button
                 className="w-full mt-2 py-3 rounded-xl border border-black/[0.06] text-[#1B2D45] hover:bg-[#1B2D45]/[0.03] transition-all flex items-center justify-center gap-2"

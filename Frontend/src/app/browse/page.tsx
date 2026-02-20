@@ -85,6 +85,7 @@ export default function BrowsePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("board");
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
   const [listings, setListings] = useState<ListingDetailResponse[]>(mockListings);
+  const [healthScores, setHealthScores] = useState<Record<number, number>>(mockHealthScores);
   const [isLoading, setIsLoading] = useState(true);
   const [useMock, setUseMock] = useState(false);
   const isMobile = useIsMobile();
@@ -95,12 +96,27 @@ export default function BrowsePage() {
         const data = await api.listings.browse({ status: "active", limit: 20 });
         if (data.length > 0) {
           setListings(data);
+          // Fetch health scores for real listings
+          const scores: Record<number, number> = {};
+          await Promise.allSettled(
+            data.map(async (l) => {
+              try {
+                const hs = await api.healthScores.get(l.id);
+                if (hs?.overall_score) scores[l.id] = hs.overall_score;
+              } catch {
+                // Score not computed yet — skip
+              }
+            })
+          );
+          setHealthScores(scores);
         } else {
           setListings(mockListings);
+          setHealthScores(mockHealthScores);
           setUseMock(true);
         }
       } catch {
         setListings(mockListings);
+        setHealthScores(mockHealthScores);
         setUseMock(true);
       } finally {
         setIsLoading(false);
@@ -174,24 +190,10 @@ export default function BrowsePage() {
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className="relative px-3 py-1.5 rounded-md transition-colors"
-                style={{
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  color: viewMode === mode ? "white" : "rgba(27,45,69,0.4)",
-                }}
+                className={`px-3 py-1.5 rounded-md transition-all duration-200 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
+                style={{ fontSize: "12px", fontWeight: 600 }}
               >
-                {viewMode === mode && (
-                  <motion.div
-                    layoutId="viewToggle"
-                    className="absolute inset-0 rounded-md bg-[#FF6B35]"
-                    style={{ zIndex: 0 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <span className="relative z-[1]">
-                  {mode === "board" ? "📌 Board" : mode === "grid" ? "▦ Grid" : "🗺 Map"}
-                </span>
+                {mode === "board" ? "📌 Board" : mode === "grid" ? "▦ Grid" : "🗺 Map"}
               </button>
             ))}
           </div>
@@ -282,7 +284,7 @@ export default function BrowsePage() {
                     <div key={listing.id} style={isMobile ? undefined : { marginTop: `${(staggers[si % 3] ?? staggers[0])[i % 3] ?? 0}px` }}>
                       <PolaroidCard
                         listing={listing}
-                        healthScore={mockHealthScores[listing.id] ?? null}
+                        healthScore={healthScores[listing.id] ?? null}
                         rotation={isMobile ? (rotations[si % 3] ?? rotations[0])[i % 3] * 0.7 : (rotations[si % 3] ?? rotations[0])[i % 3] ?? 0}
                         isPinned={pinnedIds.includes(listing.id)}
                         onTogglePin={togglePin}
@@ -331,7 +333,7 @@ export default function BrowsePage() {
                 <PolaroidCard
                   key={listing.id}
                   listing={listing}
-                  healthScore={mockHealthScores[listing.id] ?? null}
+                  healthScore={healthScores[listing.id] ?? null}
                   rotation={0}
                   isPinned={pinnedIds.includes(listing.id)}
                   onTogglePin={togglePin}

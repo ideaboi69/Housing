@@ -244,7 +244,6 @@ export interface ReviewCreate {
   respect_privacy: number;
   fairness_of_charges: number;
   would_rent_again: boolean;
-  comment?: string;
 }
 
 // ── Health Score ────────────────────────────────────────
