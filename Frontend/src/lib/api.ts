@@ -263,6 +263,20 @@ export const flags = {
 export const landlords = {
   getPublicProfile: (id: number) =>
     request<LandlordPublicResponse>(`/api/landlords/${id}`),
+
+  getMyProfile: () =>
+    request<{ id: number; user_id: number; identity_verified: boolean; company_name: string | null; phone: string | null }>("/api/landlords/me"),
+
+  updateProfile: (data: { company_name?: string; phone?: string }) =>
+    request<{ id: number; user_id: number; identity_verified: boolean; company_name: string | null; phone: string | null }>("/api/landlords/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  requestVerification: () =>
+    request<{ message: string }>("/api/landlords/me/verify", {
+      method: "POST",
+    }),
 };
 
 // ── Export all as a single API object ───────────────────

@@ -58,7 +58,7 @@ const popularListings = [
 const footerColumns = [
   { title: "Browse", links: [{ label: "All Listings", to: "/browse" }, { label: "Sublets", to: "/sublets" }, { label: "Near Campus", to: "/browse" }, { label: "Downtown", to: "/browse" }] },
   { title: "Community", links: [{ label: "Roommates", to: "/roommates" }, { label: "Demand Board", to: "/demand-board" }, { label: "Reviews", to: "#" }] },
-  { title: "For Landlords", links: [{ label: "List a Property", to: "#" }, { label: "Pricing", to: "#" }, { label: "How It Works", to: "#" }] },
+  { title: "For Landlords", links: [{ label: "List a Property", to: "/landlord/onboarding" }, { label: "Dashboard", to: "/landlord" }, { label: "How It Works", to: "/landlord/onboarding" }] },
   { title: "About", links: [{ label: "Our Story", to: "#" }, { label: "Contact", to: "#" }, { label: "Privacy", to: "#" }, { label: "Terms", to: "#" }] },
 ];
 
@@ -153,9 +153,9 @@ export default function HomePage() {
                 <Link href="/browse" className="px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.35)" }}>
                   Browse Listings →
                 </Link>
-                <button className="px-7 py-3.5 rounded-xl border-2 border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all" style={{ fontSize: "16px", fontWeight: 600 }}>
+                <Link href="/landlord/onboarding" className="px-7 py-3.5 rounded-xl border-2 border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 600 }}>
                   I&apos;m a Landlord →
-                </button>
+                </Link>
               </div>
               {/* Honest tagline */}
               <div className="flex items-center gap-3 mt-8 flex-wrap">

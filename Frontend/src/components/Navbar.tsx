@@ -18,6 +18,13 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout } = useAuthStore();
 
+  const isLandlord = user?.role === "landlord";
+
+  // Add Dashboard link for landlords
+  const allNavItems = isLandlord
+    ? [{ label: "Dashboard", path: "/landlord" }, ...navItems]
+    : navItems;
+
   return (
     <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
       <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[56px] md:h-[64px]">
@@ -32,7 +39,7 @@ export function Navbar() {
 
         {/* Center nav – desktop */}
         <div className="hidden md:flex items-center gap-1">
-          {navItems.map((item) => {
+          {allNavItems.map((item) => {
             const isActive = pathname === item.path;
             return (
               <Link
@@ -58,6 +65,15 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <>
+              {!isLandlord && (
+                <Link
+                  href="/landlord/signup"
+                  className="text-[#1B2D45]/40 hover:text-[#FF6B35] transition-colors px-2"
+                  style={{ fontSize: "12px", fontWeight: 500 }}
+                >
+                  Are you a landlord?
+                </Link>
+              )}
               <span
                 className="text-[#1B2D45]/60 px-3"
                 style={{ fontSize: "14px", fontWeight: 500 }}
@@ -109,7 +125,7 @@ export function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-[56px] left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-black/[0.08] shadow-lg z-40">
           <div className="px-4 py-3 space-y-1">
-            {navItems.map((item) => {
+            {allNavItems.map((item) => {
               const isActive = pathname === item.path;
               return (
                 <Link
