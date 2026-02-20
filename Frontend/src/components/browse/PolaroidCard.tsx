@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Heart, Pin } from "lucide-react";
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
-import { formatPrice, formatPropertyType, formatLeaseType } from "@/lib/utils";
+import { formatPrice, formatPropertyType } from "@/lib/utils";
 import type { ListingDetailResponse } from "@/types";
 
 interface PolaroidCardProps {
@@ -27,9 +27,25 @@ export function PolaroidCard({
   isMobile = false,
 }: PolaroidCardProps) {
   const [saved, setSaved] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const score = healthScore ?? 0;
 
-  // Build tags from property features
+  /* ── Spring-driven hover state ────────────────── */
+  const hoverProgress = useMotionValue(0);
+  const springProgress = useSpring(hoverProgress, { stiffness: 300, damping: 24 });
+
+  const y = useTransform(springProgress, [0, 1], [0, -12]);
+  const rotate = useTransform(springProgress, [0, 1], [rotation, 0]);
+  const scale = useTransform(springProgress, [0, 1], [1, 1.02]);
+  const shadow = useTransform(
+    springProgress,
+    [0, 1],
+    [
+      "0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)",
+      "0 20px 40px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)",
+    ]
+  );
+
   const tags: string[] = [];
   if (listing.is_furnished) tags.push("Furnished");
   if (listing.has_parking) tags.push("Parking");
@@ -37,12 +53,21 @@ export function PolaroidCard({
   if (listing.utilities_included) tags.push("Utilities Incl.");
 
   return (
-    <div
+    <motion.div
       className="relative group"
-      style={{
-        transform: `rotate(${rotation}deg)`,
-        transition: "transform 0.3s ease",
+      style={{ y, rotate, scale }}
+      onHoverStart={() => {
+        hoverProgress.set(1);
+        setIsHovered(true);
       }}
+      onHoverEnd={() => {
+        hoverProgress.set(0);
+        setIsHovered(false);
+      }}
+      /* entrance stagger — parent can orchestrate via staggerChildren */
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 260, damping: 22 }}
     >
       {/* Pushpin */}
       <div
@@ -59,66 +84,94 @@ export function PolaroidCard({
       {/* Card body */}
       <Link
         href={`/browse/${listing.id}`}
-        className="bg-white rounded-sm overflow-hidden cursor-pointer hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-shadow block"
-        style={{
-          padding: "8px 8px 14px 8px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)",
-        }}
+        className="bg-white rounded-sm overflow-hidden cursor-pointer block"
+        style={{ padding: "8px 8px 14px 8px" }}
       >
-        {/* Image area */}
-        <div
-          className="relative rounded-sm overflow-hidden bg-[#f0ece6]"
-          style={{ height: isMobile ? "140px" : "180px" }}
-        >
-          {/* Placeholder — replace with listing images from API */}
-          <div className="w-full h-full bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center text-[#1B2D45]/20">
-            <span style={{ fontSize: "32px" }}>🏠</span>
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-
-          {/* Health score */}
-          {score > 0 && (
-            <div className="absolute top-2 left-2">
-              <ScoreRing score={score} size={isMobile ? 34 : 38} />
-            </div>
-          )}
-
-          {/* Save button */}
-          <div className="absolute top-2 right-2 flex items-center gap-1.5">
-            {listing.view_count > 100 && (
-              <div
-                className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-full"
-                style={{ fontSize: "9px", fontWeight: 700 }}
+        <motion.div style={{ boxShadow: shadow }} className="rounded-sm">
+          {/* Image area */}
+          <div
+            className="relative rounded-sm overflow-hidden bg-[#f0ece6]"
+            style={{ height: isMobile ? "140px" : "180px" }}
+          >
+            {/* Placeholder image */}
+            <div className="w-full h-full bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center text-[#1B2D45]/20">
+              <motion.span
+                style={{ fontSize: "32px" }}
+                animate={isHovered ? { scale: 1.15 } : { scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, damping: 18 }}
               >
-                🔥 Popular
+                🏠
+              </motion.span>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+
+            {/* Hover shimmer overlay */}
+            <motion.div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%)",
+                backgroundSize: "250% 100%",
+              }}
+              animate={isHovered ? { backgroundPosition: ["200% 0", "-50% 0"] } : {}}
+              transition={{ duration: 0.8, ease: "easeInOut" }}
+            />
+
+            {/* Health score */}
+            {score > 0 && (
+              <div className="absolute top-2 left-2">
+                <ScoreRing score={score} size={isMobile ? 34 : 38} />
               </div>
             )}
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setSaved(!saved);
-              }}
-              className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm"
-            >
-              <Heart
-                className={`w-3.5 h-3.5 ${
-                  saved ? "fill-[#E71D36] text-[#E71D36]" : "text-[#1B2D45]/40"
-                }`}
-              />
-            </button>
-          </div>
 
-          {/* Walk time pill */}
-          {listing.walk_time_minutes && (
-            <div
-              className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full"
-              style={{ fontSize: "10px", fontWeight: 600, color: "#1B2D45" }}
-            >
-              🚶 {listing.walk_time_minutes} min
+            {/* Save button + Popular badge */}
+            <div className="absolute top-2 right-2 flex items-center gap-1.5">
+              {listing.view_count > 100 && (
+                <motion.div
+                  className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-full"
+                  style={{ fontSize: "9px", fontWeight: 700 }}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.3, type: "spring", stiffness: 400 }}
+                >
+                  🔥 Popular
+                </motion.div>
+              )}
+              <motion.button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSaved(!saved);
+                }}
+                className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm"
+                whileTap={{ scale: 0.85 }}
+              >
+                <motion.div
+                  animate={saved ? { scale: [1, 1.3, 1] } : {}}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Heart
+                    className={`w-3.5 h-3.5 ${
+                      saved
+                        ? "fill-[#E71D36] text-[#E71D36]"
+                        : "text-[#1B2D45]/40"
+                    }`}
+                  />
+                </motion.div>
+              </motion.button>
             </div>
-          )}
-        </div>
+
+            {/* Walk time pill */}
+            {listing.walk_time_minutes && (
+              <div
+                className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full"
+                style={{ fontSize: "10px", fontWeight: 600, color: "#1B2D45" }}
+              >
+                🚶 {listing.walk_time_minutes} min
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         {/* Card info */}
         <div className="pt-3 px-0.5">
@@ -176,25 +229,26 @@ export function PolaroidCard({
 
           {/* Pin button */}
           {onTogglePin && (
-            <button
+            <motion.button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 onTogglePin(listing.id);
               }}
-              className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-all ${
+              className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-colors ${
                 isPinned
                   ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
                   : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]/60"
               }`}
               style={{ fontSize: "10px", fontWeight: 600 }}
+              whileTap={{ scale: 0.97 }}
             >
               <Pin className="w-3 h-3" />
               {isPinned ? "Pinned" : "Pin to board"}
-            </button>
+            </motion.button>
           )}
         </div>
       </Link>
-    </div>
+    </motion.div>
   );
 }
