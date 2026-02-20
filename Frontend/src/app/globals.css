@@ -74,3 +74,27 @@ body {
       rgba(27, 45, 69, 0.03) 40px
     );
 }
+
+/* ── Hero photo mosaic scroll animations ─────────── */
+
+@keyframes scroll-up {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+@keyframes scroll-down {
+  0% { transform: translateY(-50%); }
+  100% { transform: translateY(0); }
+}
+
+.animate-scroll-up {
+  animation: scroll-up 25s linear infinite;
+}
+
+.animate-scroll-down {
+  animation: scroll-down 28s linear infinite;
+}
+
+.animate-scroll-up-slow {
+  animation: scroll-up 32s linear infinite;
+}

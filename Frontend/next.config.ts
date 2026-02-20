@@ -3,15 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-      },
-      {
-        protocol: "https",
-        hostname: "**.amazonaws.com",
-      },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "**.amazonaws.com" },
     ],
+    // Allow <img> tags for Unsplash URLs (used in landing page)
+    unoptimized: false,
   },
   async rewrites() {
     return [
