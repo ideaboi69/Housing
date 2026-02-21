@@ -86,7 +86,7 @@ function toQueryString(params: Record<string, unknown>): string {
 
 export const auth = {
   register: (data: UserCreate) =>
-    request<TokenResponse>("/api/users/register", {
+    request<TokenResponse | { message: string; user_id: number }>("/api/users/register", {
       method: "POST",
       body: JSON.stringify(data),
     }),

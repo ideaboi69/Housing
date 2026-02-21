@@ -494,6 +494,24 @@ const filterOptions = [
   { label: "Parking 🅿️", key: "parking" },
 ];
 
+function FilterBar({ activeFilters, onToggle, availableCount }: { activeFilters: string[]; onToggle: (key: string) => void; availableCount: number }) {
+  return (
+    <div className="max-w-[1200px] mx-auto px-4 md:px-6 pb-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        {filterOptions.map((f) => {
+          const active = activeFilters.includes(f.key);
+          return (
+            <button key={f.key} onClick={() => onToggle(f.key)} className={`px-3 py-1.5 rounded-full border transition-all ${active ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]"}`} style={{ fontSize: "12px", fontWeight: active ? 600 : 500 }}>
+              {f.label}
+            </button>
+          );
+        })}
+        <span className="ml-auto text-[#1B2D45]/30" style={{ fontSize: "12px", fontWeight: 500 }}>{availableCount} available</span>
+      </div>
+    </div>
+  );
+}
+
 function TimelineLegend() {
   return (
     <div className="max-w-[1200px] mx-auto px-4 md:px-6 pb-4">
@@ -703,180 +721,12 @@ function BottomCTA() {
 
 const desktopStaggers = [0, 18, 8, 14, 4, 20];
 
-/* ════════════════════════════════════════════════════════
-   Sublet Picks Tray
-   ════════════════════════════════════════════════════════ */
-
-function SubletPicksTray({ picks, onRemove, showSheet, onCloseSheet }: { picks: SubletListing[]; onRemove: (id: string) => void; showSheet: boolean; onCloseSheet: () => void }) {
-  const isMobile = useIsMobile();
-
-  if (picks.length === 0) return null;
-
-  // Desktop: sidebar tray
-  if (!isMobile) {
-    return (
-      <div className="fixed top-[64px] right-0 w-[260px] h-[calc(100vh-64px)] bg-white/90 backdrop-blur-xl border-l border-black/[0.04] z-30 flex flex-col">
-        <div className="p-4 border-b border-black/[0.04]">
-          <h3 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>📌 My Picks ({picks.length})</h3>
-        </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {picks.map((s) => (
-            <div key={s.id} className="bg-[#FAF8F4] rounded-xl p-3 relative group">
-              <button onClick={() => onRemove(s.id)} className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/5 flex items-center justify-center text-[#1B2D45]/30 hover:text-[#E71D36] hover:bg-[#E71D36]/10 opacity-0 group-hover:opacity-100 transition-all">
-                <span style={{ fontSize: "10px" }}>✕</span>
-              </button>
-              <div className="text-[#1B2D45] truncate" style={{ fontSize: "12px", fontWeight: 600 }}>{s.title}</div>
-              <div className="text-[#1B2D45]/30 truncate" style={{ fontSize: "10px" }}>{s.street}</div>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-[#FF6B35]" style={{ fontSize: "14px", fontWeight: 800 }}>${s.subletPrice}</span>
-                <span className="text-[#1B2D45]/20 line-through" style={{ fontSize: "10px" }}>${s.originalPrice}</span>
-                <span className="ml-auto px-1.5 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 700, color: getScoreColor(s.healthScore), background: `${getScoreColor(s.healthScore)}15` }}>
-                  {s.healthScore}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Mobile: bottom sheet
-  return (
-    <AnimatePresence>
-      {showSheet && (
-        <>
-          <motion.div className="fixed inset-0 bg-black/30 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onCloseSheet} />
-          <motion.div
-            className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl z-50 max-h-[70vh] flex flex-col"
-            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          >
-            <div className="p-4 border-b border-black/[0.04] flex items-center justify-between">
-              <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>📌 My Picks ({picks.length})</h3>
-              <button onClick={onCloseSheet} className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center"><span style={{ fontSize: "14px" }}>✕</span></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {picks.map((s) => (
-                <div key={s.id} className="bg-[#FAF8F4] rounded-xl p-3 flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[#1B2D45] truncate" style={{ fontSize: "13px", fontWeight: 600 }}>{s.title}</div>
-                    <div className="text-[#FF6B35]" style={{ fontSize: "15px", fontWeight: 800 }}>${s.subletPrice}<span className="text-[#1B2D45]/20 line-through ml-1.5" style={{ fontSize: "11px", fontWeight: 400 }}>${s.originalPrice}</span></div>
-                  </div>
-                  <button onClick={() => onRemove(s.id)} className="w-7 h-7 rounded-full bg-black/5 flex items-center justify-center text-[#1B2D45]/30 hover:text-[#E71D36] shrink-0">
-                    <span style={{ fontSize: "10px" }}>✕</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
-
-/* ════════════════════════════════════════════════════════
-   Sublet Grid Card (compact, no rotation)
-   ════════════════════════════════════════════════════════ */
-
-function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { listing: SubletListing; selectedRange: [number, number]; isPinned?: boolean; onTogglePin?: (id: string) => void }) {
-  const discount = Math.round(((listing.originalPrice - listing.subletPrice) / listing.originalPrice) * 100);
-  const scoreColor = getScoreColor(listing.healthScore);
-
-  return (
-    <div className="bg-white rounded-xl border border-black/[0.04] overflow-hidden hover:shadow-md hover:border-[#FF6B35]/15 transition-all group">
-      {/* Image placeholder */}
-      <div className="h-[130px] bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center relative">
-        <span style={{ fontSize: "28px" }}>🏠</span>
-        <div className="absolute top-2 left-2">
-          <ScoreRing score={listing.healthScore} size={30} />
-        </div>
-        {discount > 0 && (
-          <div className="absolute top-2 right-2 bg-[#2EC4B6] text-white px-1.5 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 700 }}>
-            ↓ {discount}%
-          </div>
-        )}
-      </div>
-      <div className="p-3">
-        <h4 className="text-[#1B2D45] truncate" style={{ fontSize: "12px", fontWeight: 700 }}>{listing.title}</h4>
-        <p className="text-[#1B2D45]/30 truncate" style={{ fontSize: "10px" }}>{listing.street} · {listing.neighborhood}</p>
-        <div className="flex items-baseline gap-1.5 mt-1">
-          <span className="text-[#FF6B35]" style={{ fontSize: "16px", fontWeight: 800 }}>${listing.subletPrice}</span>
-          <span className="text-[#1B2D45]/20 line-through" style={{ fontSize: "10px" }}>${listing.originalPrice}</span>
-          <span className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>/mo</span>
-        </div>
-        <div className="flex flex-wrap gap-1 mt-2">
-          {listing.furnished && <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>Furnished</span>}
-          <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>{listing.bedsAvailable} bed</span>
-          <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>{listing.walkTime}</span>
-        </div>
-        {/* Availability mini-bar */}
-        <div className="flex gap-0.5 mt-2">
-          {MONTHS.map((m, idx) => (
-            <div key={m} className="flex-1 h-1.5 rounded-full" style={{ background: listing.availableMonths[idx] ? (idx >= selectedRange[0] && idx <= selectedRange[1] ? "#FF6B35" : "#FF6B35" + "40") : "#e5e5e5" }} />
-          ))}
-        </div>
-        {onTogglePin && (
-          <button onClick={() => onTogglePin(listing.id)} className={`mt-2 w-full py-1.5 rounded-lg border text-center transition-all active:scale-[0.97] ${isPinned ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/30 hover:border-[#FF6B35]/20"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
-            📌 {isPinned ? "Pinned" : "Pin"}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════
-   Sublet Map View (UofG campus)
-   ════════════════════════════════════════════════════════ */
-
-function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { listings: SubletListing[]; pinnedIds: string[]; onTogglePin: (id: string) => void; selectedRange: [number, number] }) {
-  return (
-    <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4">
-      <div className="relative w-full bg-[#f0ece6] rounded-2xl overflow-hidden border border-black/[0.04]" style={{ height: "500px" }}>
-        {/* Placeholder map — real Leaflet can be added later */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <span style={{ fontSize: "48px" }}>🗺</span>
-            <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "14px", fontWeight: 500 }}>Map view coming soon</p>
-            <p className="text-[#1B2D45]/20 mt-1" style={{ fontSize: "12px" }}>Sublet locations will appear here</p>
-          </div>
-        </div>
-        {/* Floating cards on map */}
-        <div className="absolute bottom-4 left-4 right-4 flex gap-3 overflow-x-auto no-scrollbar">
-          {listings.slice(0, 5).map((l) => (
-            <div key={l.id} className="bg-white rounded-xl p-3 shrink-0 w-[200px] shadow-lg border border-black/[0.04]">
-              <div className="text-[#1B2D45] truncate" style={{ fontSize: "12px", fontWeight: 700 }}>{l.title}</div>
-              <div className="text-[#1B2D45]/30 truncate" style={{ fontSize: "10px" }}>{l.street}</div>
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[#FF6B35]" style={{ fontSize: "14px", fontWeight: 800 }}>${l.subletPrice}/mo</span>
-                <button onClick={() => onTogglePin(l.id)} className={`text-xs ${pinnedIds.includes(l.id) ? "text-[#FF6B35]" : "text-[#1B2D45]/30"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
-                  📌 {pinnedIds.includes(l.id) ? "Pinned" : "Pin"}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════
-   Main Page
-   ════════════════════════════════════════════════════════ */
-
-type SubletViewMode = "board" | "grid" | "map";
-
 export default function SubletsPage() {
   const isMobile = useIsMobile();
   const [showListForm, setShowListForm] = useState(false);
   const [selectedRange, setSelectedRange] = useState<[number, number]>([0, 2]); // May-Jul
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
-  const [viewMode, setViewMode] = useState<SubletViewMode>("board");
-  const [showPicksSheet, setShowPicksSheet] = useState(false);
 
   const toggleFilter = (key: string) => {
     setActiveFilters((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
@@ -885,8 +735,6 @@ export default function SubletsPage() {
   const togglePin = (id: string) => {
     setPinnedIds((prev) => prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]);
   };
-
-  const pinnedListings = useMemo(() => subletListings.filter((l) => pinnedIds.includes(l.id)), [pinnedIds]);
 
   const filteredListings = useMemo(() => {
     return subletListings.filter((listing) => {
@@ -913,38 +761,10 @@ export default function SubletsPage() {
       <InsightStats />
       <ListSubletForm visible={showListForm} />
       <DateRangeSelector selectedRange={selectedRange} onChange={setSelectedRange} />
-
-      {/* View toggle + filter bar */}
-      <div className="max-w-[1200px] mx-auto px-4 md:px-6 pb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-wrap flex-1">
-          {filterOptions.map((f) => {
-            const active = activeFilters.includes(f.key);
-            return (
-              <button key={f.key} onClick={() => toggleFilter(f.key)} className={`px-3 py-1.5 rounded-full border transition-all ${active ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]"}`} style={{ fontSize: "12px", fontWeight: active ? 600 : 500 }}>
-                {f.label}
-              </button>
-            );
-          })}
-          <span className="text-[#1B2D45]/30 ml-1" style={{ fontSize: "12px", fontWeight: 500 }}>{filteredListings.length} available</span>
-        </div>
-        {/* View toggle */}
-        <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0">
-          {(["board", "grid", "map"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setViewMode(mode)}
-              className={`px-3 py-1.5 rounded-md transition-all duration-200 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
-              style={{ fontSize: "12px", fontWeight: 600 }}
-            >
-              {mode === "board" ? "📌 Board" : mode === "grid" ? "▦ Grid" : "🗺 Map"}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      <FilterBar activeFilters={activeFilters} onToggle={toggleFilter} availableCount={filteredListings.length} />
       <TimelineLegend />
 
-      {/* Content */}
+      {/* Cards grid */}
       {filteredListings.length === 0 ? (
         <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-10">
           <div className="flex flex-col items-center justify-center py-14 px-6 bg-white rounded-2xl border-2 border-dashed border-black/[0.06]">
@@ -955,8 +775,8 @@ export default function SubletsPage() {
             </p>
           </div>
         </div>
-      ) : viewMode === "board" ? (
-        <div className={`max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6 cork-bg ${pinnedIds.length > 0 && !isMobile ? "mr-[260px]" : ""}`}>
+      ) : (
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6 cork-bg">
           <div className={isMobile ? "flex flex-col gap-6" : "grid grid-cols-3 gap-6"}>
             {filteredListings.map((listing, i) => (
               <div key={listing.id} style={isMobile ? undefined : { marginTop: `${desktopStaggers[i % desktopStaggers.length]}px` }}>
@@ -965,41 +785,7 @@ export default function SubletsPage() {
             ))}
           </div>
         </div>
-      ) : viewMode === "grid" ? (
-        <div className={`max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6 ${pinnedIds.length > 0 && !isMobile ? "mr-[260px]" : ""}`}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredListings.map((listing) => (
-              <SubletGridCard key={listing.id} listing={listing} selectedRange={selectedRange} isPinned={pinnedIds.includes(listing.id)} onTogglePin={togglePin} />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <SubletMapView listings={filteredListings} pinnedIds={pinnedIds} onTogglePin={togglePin} selectedRange={selectedRange} />
       )}
-
-      {/* Picks tray — desktop sidebar or mobile sheet */}
-      <SubletPicksTray picks={pinnedListings} onRemove={togglePin} showSheet={showPicksSheet} onCloseSheet={() => setShowPicksSheet(false)} />
-
-      {/* Mobile floating picks badge */}
-      <AnimatePresence>
-        {isMobile && pinnedIds.length > 0 && !showPicksSheet && (
-          <motion.div
-            className="fixed bottom-4 right-4 z-30"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          >
-            <button
-              onClick={() => setShowPicksSheet(true)}
-              className="flex items-center gap-1.5 bg-[#FF6B35] text-white px-4 py-2 rounded-full shadow-[0_2px_12px_rgba(255,107,53,0.4)] active:scale-95 transition-transform"
-              style={{ fontSize: "13px", fontWeight: 700 }}
-            >
-              📌 {pinnedIds.length} pick{pinnedIds.length !== 1 ? "s" : ""}
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <BottomCTA />
     </div>

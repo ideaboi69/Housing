@@ -98,6 +98,7 @@ export interface PropertyResponse {
   landlord_id: number;
   title: string;
   address: string;
+  postal_code: string;
   latitude: number | null;
   longitude: number | null;
   property_type: PropertyType;
@@ -107,11 +108,12 @@ export interface PropertyResponse {
   has_parking: boolean;
   has_laundry: boolean;
   utilities_included: boolean;
-  estimated_utility_cost: number | null;
-  distance_to_campus_km: number | null;
-  walk_time_minutes: number | null;
-  bus_time_minutes: number | null;
-  nearest_bus_route: string | null;
+  estimated_utility_cost: number;
+  distance_to_campus_km: number;
+  walk_time_minutes: number;
+  drive_time_minutes: number;
+  bus_time_minutes: number;
+  nearest_bus_route: string;
   created_at: string;
   updated_at: string;
 }
@@ -119,6 +121,7 @@ export interface PropertyResponse {
 export interface PropertyCreate {
   title: string;
   address: string;
+  postal_code: string;
   latitude?: number;
   longitude?: number;
   property_type: PropertyType;
@@ -128,11 +131,12 @@ export interface PropertyCreate {
   has_parking?: boolean;
   has_laundry?: boolean;
   utilities_included?: boolean;
-  estimated_utility_cost?: number;
-  distance_to_campus_km?: number;
-  walk_time_minutes?: number;
-  bus_time_minutes?: number;
-  nearest_bus_route?: string;
+  estimated_utility_cost: number;
+  distance_to_campus_km: number;
+  walk_time_minutes: number;
+  drive_time_minutes: number;
+  bus_time_minutes: number;
+  nearest_bus_route: string;
 }
 
 // ── Listing ────────────────────────────────────────────

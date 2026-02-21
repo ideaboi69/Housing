@@ -94,7 +94,7 @@ export default function BrowsePage() {
     async function fetchListings() {
       try {
         const data = await api.listings.browse({ status: "active", limit: 20 });
-        if (data.length > 0) {
+        if (data && data.length > 0) {
           setListings(data);
           // Fetch health scores for real listings
           const scores: Record<number, number> = {};
@@ -114,7 +114,8 @@ export default function BrowsePage() {
           setHealthScores(mockHealthScores);
           setUseMock(true);
         }
-      } catch {
+      } catch (err) {
+        console.error("[cribb] Browse fetch failed, using demo data:", err);
         setListings(mockListings);
         setHealthScores(mockHealthScores);
         setUseMock(true);

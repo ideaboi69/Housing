@@ -183,7 +183,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         walk_time_minutes=prop.walk_time_minutes,
         bus_time_minutes=prop.bus_time_minutes,
         landlord_id=landlord.id,
-        landlord_name=f"{landlord.user.first_name} {landlord.user.last_name}",
+        landlord_name=f"{landlord.first_name} {landlord.last_name}",
         landlord_verified=landlord.identity_verified,
     )
 

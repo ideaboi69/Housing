@@ -10,7 +10,7 @@ interface AuthState {
 
   // Actions
   login: (data: UserLogin) => Promise<void>;
-  register: (data: UserCreate) => Promise<void>;
+  register: (data: UserCreate) => Promise<unknown>;
   logout: () => void;
   loadUser: () => Promise<void>;
   clearError: () => void;
@@ -39,8 +39,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const res = await api.auth.register(data);
-      localStorage.setItem("cribb_token", res.access_token);
-      set({ user: res.user, token: res.access_token, isLoading: false });
+      // New backend: returns { message, user_id } if email verification is required
+      // Old backend: returns { access_token, token_type, user }
+      if ("access_token" in res) {
+        localStorage.setItem("cribb_token", res.access_token);
+        set({ user: (res as { access_token: string; user: UserResponse }).user, token: res.access_token, isLoading: false });
+      } else {
+        // Email verification required — no token yet
+        set({ isLoading: false });
+      }
+      return res;
     } catch (err) {
       const message = err instanceof ApiError ? err.detail : "Registration failed";
       set({ error: message, isLoading: false });
