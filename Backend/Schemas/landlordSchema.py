@@ -1,8 +1,40 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from Schemas.propertySchema import PropertyRange
+import enum
+
+# Enums
+class IDType(str, enum.Enum):
+    DRIVERS_LICENSE = "drivers_license"
+    PASSPORT = "passport"
+    PROVINCIAL_ID = "provincial_id"
+
+class DocumentType(str, enum.Enum):
+    PROPERTY_TAX_BILL = "property_tax_bill"
+    UTILITY_BILL = "utility_bill"
+    MORTGAGE_STATEMENT = "mortgage_statement"
+    PROPERTY_MANAGEMENT_LICENSE = "property_management_license"
+
+class LandlordVerification(str, enum.Enum):
+    PENDING = "pending"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
 
 # Request 
+class LandlordCreate(BaseModel):
+    email: EmailStr
+    password: str
+    first_name: str
+    last_name: str
+    company_name: Optional[str] = None
+    phone: str
+    no_of_property: PropertyRange
+
+class LandlordLogin(BaseModel):
+    email: str
+    password: str
+
 class LandlordUpdate(BaseModel):
     company_name: Optional[str] = None
     phone: Optional[str] = None
@@ -10,13 +42,20 @@ class LandlordUpdate(BaseModel):
 # Response 
 class LandlordResponse(BaseModel):
     id: int
-    user_id: int
+    email: str
+    first_name: str
+    last_name: str
+    phone: str
+    no_of_property: PropertyRange
+    company_name: Optional[str] = None
     identity_verified: bool
-    company_name: Optional[str]
-    phone: Optional[str]
 
     class Config:
         from_attributes = True
+
+class LandlordTokenResponse(BaseModel):
+    access_token: str
+    landlord: LandlordResponse
 
 class LandlordPublicResponse(BaseModel):
     id: int

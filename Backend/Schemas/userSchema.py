@@ -61,10 +61,10 @@ class PasswordChange(BaseModel):
             raise ValueError("Password must be at least 8 characters")
         return v
 
-class RoleSwitch(BaseModel):
-    role: UserRole
-    company_name: Optional[str] = None
-    phone: Optional[str] = None
+# class RoleSwitch(BaseModel):
+#     role: UserRole
+#     company_name: Optional[str] = None
+#     phone: Optional[str] = None
  
 #Request & Response    
 class UserResponse(BaseModel):

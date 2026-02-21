@@ -17,6 +17,7 @@ def create_property(payload: PropertyCreate, db: Session = Depends(get_db), curr
         landlord_id=landlord.id,
         title=payload.title,
         address=payload.address,
+        postal_code=payload.postal_code,
         latitude=payload.latitude,
         longitude=payload.longitude,
         property_type=payload.property_type,
@@ -29,6 +30,7 @@ def create_property(payload: PropertyCreate, db: Session = Depends(get_db), curr
         estimated_utility_cost=payload.estimated_utility_cost,
         distance_to_campus_km=payload.distance_to_campus_km,
         walk_time_minutes=payload.walk_time_minutes,
+        drive_time_minutes=payload.drive_time_minutes,
         bus_time_minutes=payload.bus_time_minutes,
         nearest_bus_route=payload.nearest_bus_route,
     )

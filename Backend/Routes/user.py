@@ -1,15 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from sqlalchemy.orm import Session
 from tables import get_db
 from tables import User, Landlord
-from Schemas.userSchema import (UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange, RoleSwitch)
+from Schemas.userSchema import UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange
 from helpers import check_uoguelph_email
-from Utils.security import (hash_password, verify_password, create_access_token, get_current_user)
+from Utils.security import hash_password, verify_password, create_access_token, get_current_user
+from Utils.email_token import create_email_verification_token, decode_email_verification_token
+from Utils.email import send_verification_email
 
 user_router = APIRouter()
 
 # Register and Login
-@user_router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@user_router.post("/register", status_code=status.HTTP_201_CREATED)
 def register_users(payload: UserCreate, db: Session = Depends(get_db)):
 
     if not check_uoguelph_email(payload.email):
@@ -28,17 +30,56 @@ def register_users(payload: UserCreate, db: Session = Depends(get_db)):
         first_name=payload.first_name,
         last_name=payload.last_name,
         role=UserRole.STUDENT,
+        email_verified=False
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    token = create_access_token({"user_id": user.id, "role": user.role.value})
+    email_token = create_email_verification_token(user.email)
+    send_verification_email(user.email, user.first_name, email_token)
+
+    return {
+        "message": "Account created. Please check your email to verify your account.",
+        "user_id": user.id,
+    }
+# Verify email
+@user_router.get("/verify-email", status_code=status.HTTP_200_OK)
+def verify_email(token: str, db: Session = Depends(get_db)):
+    email = decode_email_verification_token(token)
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.email_verified:
+        return {"message": "Email already verified"}
+
+    user.email_verified = True
+    db.commit()
+
+    access_token = create_access_token({"user_id": user.id, "role": user.role.value})
 
     return TokenResponse(
-        access_token=token,
+        access_token=access_token,
         user=UserResponse.model_validate(user),
     )
+
+# Resend verification 
+@user_router.post("/resend-verification", status_code=status.HTTP_200_OK)
+def resend_verification(email: str = Form(...), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        return {"message": "A verification link has been sent."}
+
+    if user.email_verified:
+        raise HTTPException(status_code=400, detail="Email already verified")
+
+    email_token = create_email_verification_token(user.email)
+    send_verification_email(user.email, user.first_name, email_token)
+
+    return {"message": "A verification link has been sent."}
 
 @user_router.post("/login", response_model=TokenResponse)
 def user_login(payload: UserLogin, db: Session = Depends(get_db)):
@@ -90,32 +131,32 @@ def change_password(payload: PasswordChange, db: Session = Depends(get_db), curr
     return {"message": "Password updated successfully"}
 
 
-# Switch roles from student to landlord
-@user_router.patch("/me/role", response_model=UserResponse)
-def switch_role(payload: RoleSwitch, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    if payload.role == UserRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Cannot switch to admin role")
+# # Switch roles from student to landlord
+# @user_router.patch("/me/role", response_model=UserResponse)
+# def switch_role(payload: RoleSwitch, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+#     if payload.role == UserRole.ADMIN:
+#         raise HTTPException(status_code=403, detail="Cannot switch to admin role")
     
-    if payload.role == UserRole.LANDLORD:
-        current_user.role = UserRole.LANDLORD
+#     if payload.role == UserRole.LANDLORD:
+#         current_user.role = UserRole.LANDLORD
 
-        existing_profile = db.query(Landlord).filter(Landlord.user_id == current_user.id).first()
-        if not existing_profile:
-            landlord = Landlord(
-                user_id=current_user.id,
-                company_name=payload.company_name,
-                phone=payload.phone
-            )
-            db.add(landlord)
+#         existing_profile = db.query(Landlord).filter(Landlord.user_id == current_user.id).first()
+#         if not existing_profile:
+#             landlord = Landlord(
+#                 user_id=current_user.id,
+#                 company_name=payload.company_name,
+#                 phone=payload.phone
+#             )
+#             db.add(landlord)
 
-    elif payload.role == UserRole.STUDENT:
-        current_user.role = UserRole.STUDENT
-        # landlord profile stays in db — they might switch back
+#     elif payload.role == UserRole.STUDENT:
+#         current_user.role = UserRole.STUDENT
+#         # landlord profile stays in db — they might switch back
 
-    db.commit()
-    db.refresh(current_user)
+#     db.commit()
+#     db.refresh(current_user)
 
-    return UserResponse.model_validate(current_user)
+#     return UserResponse.model_validate(current_user)
 
 # Delete Account
 @user_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

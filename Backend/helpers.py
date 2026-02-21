@@ -1,25 +1,54 @@
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, APIRouter, UploadFile, File, Form
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
 from dotenv import load_dotenv
 from sqlalchemy import text, func as sql_func
-from tables import get_db, User, Landlord, Property, Review
+from tables import get_db, User, Landlord, Property, Review, LandlordDocuments
 from Schemas.userSchema import UserRole
-from Utils.security import get_current_user
+from Schemas.landlordSchema import LandlordVerification
+from Utils.security import get_current_user, decode_access_token
 from fastapi import APIRouter, Depends, HTTPException, status
 from Schemas.listingSchema import ListingDetailResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+import uuid 
+import boto3
+import os
+import resend
+import cloudinary
+import cloudinary.uploader
+
+load_dotenv()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+cloudinary.config(
+    cloud_name="cribb",
+    api_key=os.getenv("CRIBB_CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CRIBB_CLOUDINARY_API_SECRET"),
+)
 
 # UofG Email checker helper
 def check_uoguelph_email(email: str) -> bool:
     return email.lower().endswith("@uoguelph.ca")
 
 # Landlord Helpers
-def require_landlord(current_user: User = Depends(get_current_user)):
-    """Dependency that ensures the current user is a landlord."""
-    if current_user.role != UserRole.LANDLORD:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This action requires landlord role")
-    return current_user
+def require_landlord(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    payload = decode_access_token(token)
+
+    if payload.get("role") != UserRole.LANDLORD:
+        raise HTTPException(status_code=403, detail="Landlord access required")
+
+    landlord = db.query(Landlord).get(payload["user_id"])
+    if not landlord:
+        raise HTTPException(status_code=404, detail="Landlord not found")
+
+    if not landlord.identity_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Account pending verification. You cannot perform this action yet.",
+        )
+
+    return landlord
 
 def get_landlord_profile(user: User, db: Session) -> Landlord:
     """Fetch the landlord profile for a user, or 404."""
@@ -90,11 +119,6 @@ def cascade_delete_landlord(landlord: Landlord, db: Session):
     db.delete(landlord)
 
 # Property Helpers
-def require_landlord(current_user: User = Depends(get_current_user)):
-    if current_user.role != UserRole.LANDLORD:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This action requires landlord role")
-    return current_user
-
 def get_landlord_for_user(user: User, db: Session) -> Landlord:
     landlord = db.query(Landlord).filter(Landlord.user_id == user.id).first()
     if not landlord:
@@ -111,11 +135,6 @@ def get_property_owned_by(property_id: int, landlord_id: int, db: Session) -> Pr
     return prop
 
 # Listing Helpers
-def require_landlord(current_user: User = Depends(get_current_user)):
-    if current_user.role != UserRole.LANDLORD:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This action requires landlord role")
-    return current_user
-
 def get_landlord_for_user(user: User, db: Session) -> Landlord:
     landlord = db.query(Landlord).filter(Landlord.user_id == user.id).first()
     if not landlord:
@@ -270,3 +289,31 @@ def compute_overall_score(price: float, reputation: float, maintenance: float, c
         + clarity * weights["clarity"]
     )
     return round(overall, 1)
+
+# Upload to S3 helpers (Landlord)
+
+# Config
+BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+AWS_REGION = os.getenv("AWS_DEFAULT_REGION")
+s3_client = boto3.client("s3", region_name=AWS_REGION)
+
+# Response
+class S3UploadResponse(BaseModel):
+    s3_key: str
+    s3_url: str
+    filename: str
+
+# Helper
+def upload_to_s3(file: UploadFile, landlord_id: int, folder: str) -> tuple[str, str]:
+    file_ext = file.filename.split(".")[-1] if file.filename else "bin"
+    s3_key = f"documents/landlord_{landlord_id}/{folder}/{uuid.uuid4()}.{file_ext}"
+
+    s3_client.upload_fileobj(
+        file.file,
+        BUCKET_NAME,
+        s3_key,
+        ExtraArgs={"ContentType": file.content_type or "application/octet-stream"},
+    )
+
+    s3_url = f"https://{BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
+    return s3_key, s3_url

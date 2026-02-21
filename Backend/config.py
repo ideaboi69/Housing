@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    CRIBB_RESEND_API: str
+    FRONTEND_URL: str
+    EMAIL_VERIFY_EXPIRE_MINUTES: int = 60
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

@@ -13,6 +13,8 @@ from Routes.review import review_router
 from Routes.healthscore import health_score_router
 from Routes.saved import saved_router
 from Routes.flag import flag_router
+from Routes.messages import message_router
+from Routes.sublet import sublet_router
 import asyncio
 from dataclasses import dataclass
 
@@ -52,9 +54,5 @@ app.include_router(review_router, prefix="/api/reviews", tags=["Reviews"])
 app.include_router(flag_router, prefix="/api/flags", tags=["Flags"])
 app.include_router(saved_router, prefix="/api/saved", tags=["Saved"])
 app.include_router(health_score_router, prefix="/api/health-scores", tags=["Health-Scores"])
-# app.include_router(poem_router, tags=["Pic & Poem"])
-# app.include_router(orders_router, tags=["Orders"])
-# app.include_router(payment_router, tags=["Payment"])
-# app.include_router(email_router, tags=["Email"])
-# app.include_router(checkout_router, tags=["Checkout"])
-# app.include_router(shipping_router, tags=["Shipping"])
+app.include_router(message_router, prefix="/api/messages", tags=["Messages"])
+app.include_router(sublet_router, prefix="/api/sublets", tags=["Sublets"])
