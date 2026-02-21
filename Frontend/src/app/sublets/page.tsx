@@ -201,28 +201,39 @@ function ListSubletForm({ visible }: { visible: boolean }) {
   const [photos, setPhotos] = useState<File[]>([]);
 
   const [form, setForm] = useState({
+    // Basic info
+    title: "",
     address: "",
-    neighborhood: "Campus",
-    price: "",
-    originalPrice: "",
-    availableFrom: "May 2026",
-    availableUntil: "August 2026",
-    bedsAvailable: "1",
-    bedsTotal: "1",
-    furnished: false,
-    utilities: false,
-    parking: false,
-    laundry: false,
-    ac: false,
-    wifi: false,
-    backyard: false,
-    dishwasher: false,
-    negotiablePrice: false,
-    flexibleDates: false,
-    roommatesStaying: "0",
-    roommateDesc: "",
-    posterType: "",
+    postal_code: "",
+    description: "",
+    // Pricing
+    rent_per_month: "",
+    estimated_utility_cost: "",
+    // Dates
+    sublet_start_date: "",
+    sublet_end_date: "",
+    move_in_date: "",
+    // Room details
+    room_type: "private" as "private" | "shared",
+    total_rooms: "1",
+    bathrooms: "1",
+    beds_available: "1",
+    // Commute
+    distance_to_campus_km: "",
+    walk_time_minutes: "",
+    drive_time_minutes: "",
+    bus_time_minutes: "",
+    nearest_bus_route: "",
+    // Amenities (booleans)
+    is_furnished: false,
+    has_parking: false,
+    has_laundry: false,
+    utilities_included: false,
+    // Preferences
+    gender_preference: "any",
   });
+
+  const roommatesStaying = Math.max(0, Number(form.total_rooms) - Number(form.beds_available));
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -243,14 +254,10 @@ function ListSubletForm({ visible }: { visible: boolean }) {
   const labelStyle = { fontSize: "12px" as const, fontWeight: 600 as const };
 
   const amenities = [
-    { key: "furnished" as const, label: "Furnished", emoji: "🛋️" },
-    { key: "utilities" as const, label: "Utilities Incl.", emoji: "💡" },
-    { key: "parking" as const, label: "Parking", emoji: "🅿️" },
-    { key: "laundry" as const, label: "Laundry", emoji: "🧺" },
-    { key: "ac" as const, label: "A/C", emoji: "❄️" },
-    { key: "wifi" as const, label: "WiFi", emoji: "📶" },
-    { key: "backyard" as const, label: "Backyard", emoji: "🌿" },
-    { key: "dishwasher" as const, label: "Dishwasher", emoji: "🍽️" },
+    { key: "is_furnished" as const, label: "Furnished", emoji: "🛋️" },
+    { key: "utilities_included" as const, label: "Utilities Incl.", emoji: "💡" },
+    { key: "has_parking" as const, label: "Parking", emoji: "🅿️" },
+    { key: "has_laundry" as const, label: "Laundry", emoji: "🧺" },
   ];
 
   return (
@@ -294,36 +301,48 @@ function ListSubletForm({ visible }: { visible: boolean }) {
               </div>
             </div>
 
-            {/* ─── Location & Price ─── */}
+            {/* ─── Title & Location ─── */}
             <div className="border-t border-black/[0.04] pt-5 mb-5">
-              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>LOCATION & PRICE</div>
+              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>LISTING INFO</div>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                <div className={isMobile ? "" : "col-span-2"}>
+                  <label className={labelClass} style={labelStyle}>Title *</label>
+                  <input type="text" value={form.title} onChange={(e) => update("title", e.target.value)} placeholder="e.g. Furnished Room in 4BR House" className={inputClass} style={{ fontSize: "13px" }} />
+                  <p className="text-[#1B2D45]/20 mt-1" style={{ fontSize: "10px" }}>Give students a quick idea of what you&apos;re subletting</p>
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Address *</label>
+                  <input type="text" value={form.address} onChange={(e) => update("address", e.target.value)} placeholder="e.g. 78 College Ave W, Guelph" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Postal code *</label>
+                  <input type="text" value={form.postal_code} onChange={(e) => update("postal_code", e.target.value)} placeholder="e.g. N1G 2W1" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div className={isMobile ? "" : "col-span-2"}>
+                  <label className={labelClass} style={labelStyle}>Description</label>
+                  <textarea value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="Anything else students should know — vibe, move-in flexibility, etc." rows={2} className={`${inputClass} resize-none`} style={{ fontSize: "13px" }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ─── Pricing ─── */}
+            <div className="border-t border-black/[0.04] pt-5 mb-5">
+              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>PRICING</div>
               <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
                 <div>
-                  <label className={labelClass} style={labelStyle}>Your address *</label>
-                  <input type="text" value={form.address} onChange={(e) => update("address", e.target.value)} placeholder="e.g. 78 College Ave W" className={inputClass} style={{ fontSize: "13px" }} />
-                </div>
-                <div>
-                  <label className={labelClass} style={labelStyle}>Neighborhood</label>
-                  <select value={form.neighborhood} onChange={(e) => update("neighborhood", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
-                    {["Campus", "Stone Road", "Downtown", "South End", "West End", "Exhibition Park", "Other"].map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass} style={labelStyle}>Monthly sublet price *</label>
+                  <label className={labelClass} style={labelStyle}>Monthly sublet rent *</label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "13px", fontWeight: 600 }}>$</span>
-                    <input type="number" value={form.price} onChange={(e) => update("price", e.target.value)} placeholder="550" className={`${inputClass} pl-7`} style={{ fontSize: "13px" }} />
+                    <input type="number" value={form.rent_per_month} onChange={(e) => update("rent_per_month", e.target.value)} placeholder="550" className={`${inputClass} pl-7`} style={{ fontSize: "13px" }} />
                   </div>
                 </div>
                 <div>
-                  <label className={labelClass} style={labelStyle}>Original lease price</label>
+                  <label className={labelClass} style={labelStyle}>Est. monthly utilities</label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "13px", fontWeight: 600 }}>$</span>
-                    <input type="number" value={form.originalPrice} onChange={(e) => update("originalPrice", e.target.value)} placeholder="720" className={`${inputClass} pl-7`} style={{ fontSize: "13px" }} />
+                    <input type="number" value={form.estimated_utility_cost} onChange={(e) => update("estimated_utility_cost", e.target.value)} placeholder="150" className={`${inputClass} pl-7`} style={{ fontSize: "13px" }} />
                   </div>
-                  <p className="text-[#1B2D45]/20 mt-1" style={{ fontSize: "10px" }}>Shown as crossed out so students see the discount</p>
+                  <p className="text-[#1B2D45]/20 mt-1" style={{ fontSize: "10px" }}>Skip if utilities are included</p>
                 </div>
               </div>
             </div>
@@ -331,68 +350,101 @@ function ListSubletForm({ visible }: { visible: boolean }) {
             {/* ─── Dates ─── */}
             <div className="border-t border-black/[0.04] pt-5 mb-5">
               <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>AVAILABILITY</div>
-              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
                 <div>
-                  <label className={labelClass} style={labelStyle}>Available from *</label>
-                  <select value={form.availableFrom} onChange={(e) => update("availableFrom", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
-                    {["May 2026", "June 2026", "July 2026", "August 2026"].map((m) => <option key={m}>{m}</option>)}
-                  </select>
+                  <label className={labelClass} style={labelStyle}>Sublet start date *</label>
+                  <input type="date" value={form.sublet_start_date} onChange={(e) => update("sublet_start_date", e.target.value)} className={`${inputClass} bg-white`} style={{ fontSize: "13px" }} />
                 </div>
                 <div>
-                  <label className={labelClass} style={labelStyle}>Available until *</label>
-                  <select value={form.availableUntil} onChange={(e) => update("availableUntil", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
-                    {["June 2026", "July 2026", "August 2026", "September 2026"].map((m) => <option key={m}>{m}</option>)}
-                  </select>
+                  <label className={labelClass} style={labelStyle}>Sublet end date *</label>
+                  <input type="date" value={form.sublet_end_date} onChange={(e) => update("sublet_end_date", e.target.value)} className={`${inputClass} bg-white`} style={{ fontSize: "13px" }} />
                 </div>
-              </div>
-              <div className="flex gap-3 mt-3">
-                <button onClick={() => update("negotiablePrice", !form.negotiablePrice)} className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition-all ${form.negotiablePrice ? "border-[#2EC4B6]/30 bg-[#2EC4B6]/[0.06] text-[#2EC4B6]" : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#2EC4B6]/20"}`} style={{ fontSize: "12px", fontWeight: 600 }}>
-                  💬 Price Negotiable
-                </button>
-                <button onClick={() => update("flexibleDates", !form.flexibleDates)} className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border transition-all ${form.flexibleDates ? "border-[#FFB627]/30 bg-[#FFB627]/[0.06] text-[#D4990F]" : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FFB627]/20"}`} style={{ fontSize: "12px", fontWeight: 600 }}>
-                  📅 Flexible Dates
-                </button>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Move-in date *</label>
+                  <input type="date" value={form.move_in_date} onChange={(e) => update("move_in_date", e.target.value)} className={`${inputClass} bg-white`} style={{ fontSize: "13px" }} />
+                </div>
               </div>
             </div>
 
             {/* ─── Room Details ─── */}
             <div className="border-t border-black/[0.04] pt-5 mb-5">
               <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>ROOM DETAILS</div>
-              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
                 <div>
-                  <label className={labelClass} style={labelStyle}>Beds available *</label>
-                  <select value={form.bedsAvailable} onChange={(e) => update("bedsAvailable", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
-                    {["1", "2", "3", "4", "5"].map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select>
+                  <label className={labelClass} style={labelStyle}>Room type *</label>
+                  <div className="flex gap-2">
+                    {(["private", "shared"] as const).map((t) => (
+                      <button key={t} type="button" onClick={() => update("room_type", t)} className={`flex-1 py-2.5 rounded-xl border transition-all text-center ${form.room_type === t ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/15"}`} style={{ fontSize: "13px", fontWeight: form.room_type === t ? 600 : 500 }}>
+                        {t === "private" ? "🚪 Private Room" : "🛏️ Shared Room"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <label className={labelClass} style={labelStyle}>Total beds in unit</label>
-                  <select value={form.bedsTotal} onChange={(e) => update("bedsTotal", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
-                    {["1", "2", "3", "4", "5", "6"].map((n) => <option key={n} value={n}>{n}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass} style={labelStyle}>Roommates staying</label>
-                  <select value={form.roommatesStaying} onChange={(e) => update("roommatesStaying", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
-                    {["0", "1", "2", "3", "4"].map((n) => <option key={n} value={n}>{n === "0" ? "None — place will be empty" : n}</option>)}
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass} style={labelStyle}>Total rooms *</label>
+                    <select value={form.total_rooms} onChange={(e) => update("total_rooms", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
+                      {["1", "2", "3", "4", "5", "6"].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass} style={labelStyle}>Bathrooms *</label>
+                    <select value={form.bathrooms} onChange={(e) => update("bathrooms", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
+                      {["1", "2", "3", "4"].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
-              {Number(form.roommatesStaying) > 0 && (
-                <div className="mt-3">
-                  <label className={labelClass} style={labelStyle}>About the roommates</label>
-                  <input type="text" value={form.roommateDesc} onChange={(e) => update("roommateDesc", e.target.value)} placeholder="e.g. 2 upper-year science students staying for summer" className={inputClass} style={{ fontSize: "13px" }} />
+              <div className={`grid gap-4 mt-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Beds you&apos;re subletting *</label>
+                  <select value={form.beds_available} onChange={(e) => update("beds_available", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
+                    {Array.from({ length: Number(form.total_rooms) }, (_, i) => String(i + 1)).map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
                 </div>
-              )}
+                <div className="flex items-end pb-2.5">
+                  <div className={`px-4 py-2.5 rounded-xl ${roommatesStaying > 0 ? "bg-[#FFB627]/[0.08] text-[#D4990F]" : "bg-[#4ADE80]/[0.08] text-[#4ADE80]"}`} style={{ fontSize: "12px", fontWeight: 600 }}>
+                    {roommatesStaying > 0 ? `👥 ${roommatesStaying} roommate${roommatesStaying > 1 ? "s" : ""} staying` : "🏠 Place will be empty"}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className={labelClass} style={labelStyle}>Gender preference</label>
+                <div className="flex gap-2">
+                  {[{ v: "any", l: "Any" }, { v: "male", l: "Male" }, { v: "female", l: "Female" }, { v: "other", l: "Other" }].map((g) => (
+                    <button key={g.v} type="button" onClick={() => update("gender_preference", g.v)} className={`px-3.5 py-2 rounded-xl border transition-all ${form.gender_preference === g.v ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/15"}`} style={{ fontSize: "12px", fontWeight: form.gender_preference === g.v ? 600 : 500 }}>
+                      {g.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* ─── About you ─── */}
+            {/* ─── Getting to Campus ─── */}
             <div className="border-t border-black/[0.04] pt-5 mb-5">
-              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>ABOUT YOU</div>
-              <div>
-                <label className={labelClass} style={labelStyle}>Your year & program</label>
-                <input type="text" value={form.posterType} onChange={(e) => update("posterType", e.target.value)} placeholder="e.g. 4th year, Engineering" className={inputClass} style={{ fontSize: "13px" }} />
-                <p className="text-[#1B2D45]/20 mt-1" style={{ fontSize: "10px" }}>Shown on your listing so students know who they&apos;re subletting from</p>
+              <div className="text-[#1B2D45]/40 mb-1" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>GETTING TO CAMPUS</div>
+              <p className="text-[#1B2D45]/20 mb-3" style={{ fontSize: "10px" }}>Helps students compare commute times</p>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Distance to campus (km) *</label>
+                  <input type="number" step="0.1" value={form.distance_to_campus_km} onChange={(e) => update("distance_to_campus_km", e.target.value)} placeholder="1.2" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Walk time (min) *</label>
+                  <input type="number" value={form.walk_time_minutes} onChange={(e) => update("walk_time_minutes", e.target.value)} placeholder="15" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Drive time (min) *</label>
+                  <input type="number" value={form.drive_time_minutes} onChange={(e) => update("drive_time_minutes", e.target.value)} placeholder="5" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Bus time (min) *</label>
+                  <input type="number" value={form.bus_time_minutes} onChange={(e) => update("bus_time_minutes", e.target.value)} placeholder="8" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div className={isMobile ? "" : "col-span-2"}>
+                  <label className={labelClass} style={labelStyle}>Nearest bus route *</label>
+                  <input type="text" value={form.nearest_bus_route} onChange={(e) => update("nearest_bus_route", e.target.value)} placeholder="e.g. Route 99" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
               </div>
             </div>
 

@@ -38,8 +38,8 @@ const howItWorksSteps = [
 ];
 
 const founders = [
-  { name: "David", program: "4th year, Software Engineering", image: "https://images.unsplash.com/photo-1724118135481-50436d913231?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&w=400" },
-  { name: "OJ", program: "3rd year, Marketing Management", image: "https://images.unsplash.com/photo-1611181355758-089959e2cfb2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx5b3VuZyUyMGJveSUyMHN0dWRlbnQlMjBzbWlsaW5nJTIwcG9ydHJhaXR8ZW58MXx8fHwxNzcxNDA2NjQ1fDA&ixlib=rb-4.1.0&q=80&w=1080" },
+  { name: "David", program: "Computer Science", image: "/gerald.jpg" },
+  { name: "OJ", program: "Computer Science", image: "/oj.jpg" },
 ];
 
 const demands = [
@@ -58,7 +58,7 @@ const popularListings = [
 const footerColumns = [
   { title: "Browse", links: [{ label: "All Listings", to: "/browse" }, { label: "Sublets", to: "/sublets" }, { label: "Near Campus", to: "/browse" }, { label: "Downtown", to: "/browse" }] },
   { title: "Community", links: [{ label: "Roommates", to: "/roommates" }, { label: "Demand Board", to: "/demand-board" }, { label: "Reviews", to: "#" }] },
-  { title: "For Landlords", links: [{ label: "List a Property", to: "/landlord/onboarding" }, { label: "Dashboard", to: "/landlord" }, { label: "How It Works", to: "/landlord/onboarding" }] },
+  { title: "For Landlords", links: [{ label: "List a Property", to: "/landlord/signup" }, { label: "Dashboard", to: "/landlord" }, { label: "How It Works", to: "/landlord/signup" }] },
   { title: "About", links: [{ label: "Our Story", to: "#" }, { label: "Contact", to: "#" }, { label: "Privacy", to: "#" }, { label: "Terms", to: "#" }] },
 ];
 
@@ -153,7 +153,7 @@ export default function HomePage() {
                 <Link href="/browse" className="px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.35)" }}>
                   Browse Listings →
                 </Link>
-                <Link href="/landlord/onboarding" className="px-7 py-3.5 rounded-xl border-2 border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 600 }}>
+                <Link href="/landlord/signup" className="px-7 py-3.5 rounded-xl border-2 border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 600 }}>
                   I&apos;m a Landlord →
                 </Link>
               </div>
