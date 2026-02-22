@@ -4,12 +4,13 @@ from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
 from dotenv import load_dotenv
 from sqlalchemy import text, func as sql_func
-from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin, Writer
+from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin, Writer, Conversation, Message
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordVerification
 from Utils.security import get_current_user, decode_access_token
 from fastapi import APIRouter, Depends, HTTPException, status
 from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse
+from Utils.cloudinary import delete_image_from_cloudinary
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import uuid 
@@ -105,23 +106,33 @@ def require_admin(token: str = Depends(admin_oauth2), db: Session = Depends(get_
     return admin
 
 def cascade_delete_landlord(landlord: Landlord, db: Session):
-    """Delete a landlord and everything they own: properties → listings → images, health scores, saved, flags."""
+    """Delete a landlord and everything they own."""
     properties = db.query(Property).filter(Property.landlord_id == landlord.id).all()
 
     for prop in properties:
         listings = db.query(Listing).filter(Listing.property_id == prop.id).all()
 
         for listing in listings:
-            db.query(ListingImage).filter(ListingImage.listing_id == listing.id).delete()
-            db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete()
-            db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete()
-            db.query(Flag).filter(Flag.listing_id == listing.id).delete()
+            # Clean up Cloudinary images
+            for image in listing.images:
+                delete_image_from_cloudinary(image.image_url)
+
+            # Conversations and messages FIRST
+            conversation_ids = [c.id for c in db.query(Conversation.id).filter(Conversation.listing_id == listing.id).all()]
+            if conversation_ids:
+                db.query(Message).filter(Message.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
+                db.query(Conversation).filter(Conversation.listing_id == listing.id).delete(synchronize_session=False)
+
+            db.query(ListingImage).filter(ListingImage.listing_id == listing.id).delete(synchronize_session=False)
+            db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete(synchronize_session=False)
+            db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete(synchronize_session=False)
+            db.query(Flag).filter(Flag.listing_id == listing.id).delete(synchronize_session=False)
             db.delete(listing)
 
-        db.query(Review).filter(Review.property_id == prop.id).delete()
+        db.query(Review).filter(Review.property_id == prop.id).delete(synchronize_session=False)
         db.delete(prop)
 
-    db.query(Review).filter(Review.landlord_id == landlord.id).delete()
+    db.query(Review).filter(Review.landlord_id == landlord.id).delete(synchronize_session=False)
     db.delete(landlord)
 
 # Property Helpers

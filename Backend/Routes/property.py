@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation
 from Schemas.propertySchema import PropertyCreate, PropertyUpdate, PropertyResponse
 from Schemas.userSchema import UserRole
 from Utils.security import get_current_user
+from Utils.cloudinary import delete_image_from_cloudinary
 from helpers import require_landlord, get_landlord_for_user, get_property_owned_by
 
 property_router = APIRouter()
@@ -79,23 +80,31 @@ def update_property(property_id: int, payload: PropertyUpdate, db: Session = Dep
 
 # Delete Properties (landlord only, must own it). Cascades: listings → images, scores, saves, flags + reviews
 @property_router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_property(property_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
-    landlord = get_landlord_for_user(current_user, db)
-    prop = get_property_owned_by(property_id, landlord.id, db)
+def delete_property(property_id: int, db: Session = Depends(get_db), current_user: Landlord = Depends(require_landlord)):
+    prop = db.query(Property).filter(Property.id == property_id).first()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if prop.landlord_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your property")
 
-    # cascade delete listings and their children
     listings = db.query(Listing).filter(Listing.property_id == prop.id).all()
     for listing in listings:
-        db.query(ListingImage).filter(ListingImage.listing_id == listing.id).delete()
-        db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete()
-        db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete()
-        db.query(Flag).filter(Flag.listing_id == listing.id).delete()
+        # Clean up Cloudinary images
+        for image in listing.images:
+            delete_image_from_cloudinary(image.image_url)
+
+        # Conversations and messages FIRST
+        conversation_ids = [c.id for c in db.query(Conversation.id).filter(Conversation.listing_id == listing.id).all()]
+        if conversation_ids:
+            db.query(Message).filter(Message.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
+            db.query(Conversation).filter(Conversation.listing_id == listing.id).delete(synchronize_session=False)
+
+        db.query(ListingImage).filter(ListingImage.listing_id == listing.id).delete(synchronize_session=False)
+        db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete(synchronize_session=False)
+        db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete(synchronize_session=False)
+        db.query(Flag).filter(Flag.listing_id == listing.id).delete(synchronize_session=False)
         db.delete(listing)
 
-    # delete reviews on this property
-    db.query(Review).filter(Review.property_id == prop.id).delete()
-
+    db.query(Review).filter(Review.property_id == prop.id).delete(synchronize_session=False)
     db.delete(prop)
     db.commit()
-
-    return {"Message":"Property Successfully Deleted"}

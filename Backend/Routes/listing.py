@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation
 from Schemas.listingSchema import ListingCreate, ListingUpdate, ListingResponse, ListingDetailResponse, SubletConvert, ListingStatus, ListingImageResponse
 from Schemas.userSchema import UserRole
 from Utils.security import get_current_user
@@ -236,23 +236,33 @@ def convert_to_sublet(
 
 # Delete Listing (landlord only, must own it)
 @listing_router.delete("/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_listing(listing_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
-    landlord = get_landlord_for_user(current_user, db)
-    listing = get_listing_owned_by(listing_id, landlord.id, db)
+def delete_listing(listing_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
 
-    images = db.query(ListingImage).filter(ListingImage.listing_id == listing.id).all()
-    for image in images:
+    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+    if prop.landlord_id != landlord.id:
+        raise HTTPException(status_code=403, detail="Not your listing")
+
+    # Clean up images from Cloudinary
+    for image in listing.images:
         delete_image_from_cloudinary(image.image_url)
 
-    db.query(ListingImage).filter(ListingImage.listing_id == listing.id).delete()
-    db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete()
-    db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete()
-    db.query(Flag).filter(Flag.listing_id == listing.id).delete()
+    # Clean up conversations and messages FIRST
+    conversation_ids = [c.id for c in db.query(Conversation.id).filter(Conversation.listing_id == listing.id).all()]
+    if conversation_ids:
+        db.query(Message).filter(Message.conversation_id.in_(conversation_ids)).delete(synchronize_session=False)
+        db.query(Conversation).filter(Conversation.listing_id == listing.id).delete(synchronize_session=False)
+
+    # Clean up everything else
+    db.query(ListingImage).filter(ListingImage.listing_id == listing.id).delete(synchronize_session=False)
+    db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete(synchronize_session=False)
+    db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete(synchronize_session=False)
+    db.query(Flag).filter(Flag.listing_id == listing.id).delete(synchronize_session=False)
 
     db.delete(listing)
     db.commit()
-
-    return None
 
 # delete a specific image in a listing
 @listing_router.delete("/{listing_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
