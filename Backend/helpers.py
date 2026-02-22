@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
 from dotenv import load_dotenv
 from sqlalchemy import text, func as sql_func
-from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin
+from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin, Writer
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordVerification
 from Utils.security import get_current_user, decode_access_token
@@ -16,6 +16,8 @@ import uuid
 import boto3
 import os
 import resend
+import re
+import uuid
 
 load_dotenv()
 landlord_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/landlords/login", scheme_name="LandlordAuth")
@@ -324,3 +326,9 @@ def upload_to_s3(file: UploadFile, landlord_id: int, folder: str) -> tuple[str, 
 
     s3_url = f"https://{BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
     return s3_key, s3_url
+
+# Slug helper
+def generate_slug(title: str) -> str:
+    slug = re.sub(r"[^\w\s-]", "", title.lower())
+    slug = re.sub(r"[\s_]+", "-", slug).strip("-")
+    return f"{slug}-{uuid.uuid4().hex[:8]}"

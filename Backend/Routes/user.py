@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from helpers import check_uoguelph_email
 from Utils.security import hash_password, verify_password, create_access_token, get_current_user
 from Utils.email_token import create_email_verification_token, decode_email_verification_token
 from Utils.email import send_verification_email
+from config import settings
 
 user_router = APIRouter()
 
@@ -133,33 +135,34 @@ def change_password(payload: PasswordChange, db: Session = Depends(get_db), curr
 
     return {"message": "Password updated successfully"}
 
+@user_router.post("/request-write-access", status_code=status.HTTP_200_OK)
+def request_write_access( reason: str = Form(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.is_writable:
+        raise HTTPException(status_code=400, detail="You already have write access")
 
-# # Switch roles from student to landlord
-# @user_router.patch("/me/role", response_model=UserResponse)
-# def switch_role(payload: RoleSwitch, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-#     if payload.role == UserRole.ADMIN:
-#         raise HTTPException(status_code=403, detail="Cannot switch to admin role")
+    if not current_user.email_verified:
+        raise HTTPException(status_code=403, detail="Verify your email first")
     
-#     if payload.role == UserRole.LANDLORD:
-#         current_user.role = UserRole.LANDLORD
+    if current_user.write_access_requested:
+        raise HTTPException(status_code=400, detail="You've already submitted a request")
 
-#         existing_profile = db.query(Landlord).filter(Landlord.user_id == current_user.id).first()
-#         if not existing_profile:
-#             landlord = Landlord(
-#                 user_id=current_user.id,
-#                 company_name=payload.company_name,
-#                 phone=payload.phone
-#             )
-#             db.add(landlord)
+    current_user.write_access_requested = True
+    db.commit()
 
-#     elif payload.role == UserRole.STUDENT:
-#         current_user.role = UserRole.STUDENT
-#         # landlord profile stays in db — they might switch back
-
-#     db.commit()
-#     db.refresh(current_user)
-
-#     return UserResponse.model_validate(current_user)
+    try:
+        httpx.post(
+            settings.FORMSPREE_ENDPOINT,
+            json={
+                "type": "Student Write Access Request",
+                "name": f"{current_user.first_name} {current_user.last_name}",
+                "email": current_user.email,
+                "user_id": current_user.id,
+                "reason": reason,
+            },
+        )
+    except Exception:
+        pass
+    return {"message": "Your request has been submitted. You'll be notified once reviewed."}
 
 # Delete Account
 @user_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

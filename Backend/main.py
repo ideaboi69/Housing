@@ -15,6 +15,9 @@ from Routes.saved import saved_router
 from Routes.flag import flag_router
 from Routes.messages import message_router
 from Routes.sublet import sublet_router
+from Routes.writer import writer_router
+from Routes.post import post_router
+from Routes.marketplace import marketplace_router
 from dataclasses import dataclass
 import Utils.cloudinary_config
 import asyncio
@@ -57,3 +60,6 @@ app.include_router(saved_router, prefix="/api/saved", tags=["Saved"])
 app.include_router(health_score_router, prefix="/api/health-scores", tags=["Health-Scores"])
 app.include_router(message_router, prefix="/api/messages", tags=["Messages"])
 app.include_router(sublet_router, prefix="/api/sublets", tags=["Sublets"])
+app.include_router(writer_router, prefix="/api/writers", tags=["Writers"])
+app.include_router(post_router, prefix="/api/posts", tags=["Posts"])
+app.include_router(marketplace_router, prefix="/api/marketplace", tags=["Marketplace"])

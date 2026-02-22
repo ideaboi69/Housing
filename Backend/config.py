@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     CRIBB_CLOUDINARY_API_KEY: str
     CRIBB_CLOUDINARY_API_SECRET: str
 
+    FORMSPREE_ENDPOINT: str
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

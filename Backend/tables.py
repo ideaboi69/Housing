@@ -8,6 +8,9 @@ from Schemas.propertySchema import PropertyType, PropertyRange
 from Schemas.listingSchema import LeaseType, GenderPreference, ListingStatus
 from Schemas.reviewSchema import FlagStatus
 from Schemas.convoSchema import SenderType
+from Schemas.writerSchema import WriterStatus
+from Schemas.postSchema import PostCategory, PostStatus
+from Schemas.marketplaceSchema import MarketplaceCategory, ItemCondition, PricingType, ItemStatus
 import os
 from sqlalchemy import JSON
 from config import settings
@@ -17,10 +20,10 @@ load_dotenv()
 
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,           # tests connection before using it
+    pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
-    pool_recycle=300,              # recycle connections every 5 minutes
+    pool_recycle=300
 )
 Local_Session = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -35,6 +38,8 @@ class User(Base):
     last_name = Column(String(100), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.STUDENT)
     email_verified = Column(Boolean, default=False, nullable=False)
+    is_writable = Column(Boolean, default=False, nullable=False)
+    write_access_requested = Column(Boolean, default=False, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -43,6 +48,8 @@ class User(Base):
     flags = relationship("Flag", back_populates="reporter")
     conversations = relationship("Conversation", back_populates="user")
     sublets = relationship("Sublet", back_populates="user")
+    posts = relationship("Post", back_populates="user", foreign_keys="[Post.user_id]")
+    marketplace_items = relationship("MarketplaceItem", back_populates="seller")
 
     __table_args__ = (
         CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
@@ -355,6 +362,161 @@ class SubletImage(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     sublet = relationship("Sublet", back_populates="images")
+
+class Writer(Base):
+    __tablename__ = "writers"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    business_name = Column(String(255), nullable=False)
+    business_type = Column(String(100), nullable=True)
+    website = Column(String(500), nullable=True)
+    phone = Column(String(20), nullable=True)
+    reason = Column(Text, nullable=False)
+    status = Column(Enum(WriterStatus), default=WriterStatus.PENDING, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    posts = relationship("Post", back_populates="writer", foreign_keys="[Post.writer_id]")
+
+class Post(Base):
+    __tablename__ = "posts"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(255), nullable=False)
+    slug = Column(String(255), unique=True, nullable=False)
+    content = Column(Text, nullable=False)
+    preview = Column(String(500), nullable=True)
+    cover_image_url = Column(String(500), nullable=True)
+    category = Column(Enum(PostCategory), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    writer_id = Column(Integer, ForeignKey("writers.id", ondelete="SET NULL"), nullable=True)
+    status = Column(Enum(PostStatus), default=PostStatus.DRAFT, nullable=False)
+    view_count = Column(Integer, default=0, nullable=False)
+    event_date = Column(Date, nullable=True)
+    event_location = Column(String(500), nullable=True)
+    event_link = Column(String(500), nullable=True)
+    deal_expires = Column(Date, nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="posts", foreign_keys=[user_id])
+    writer = relationship("Writer", back_populates="posts", foreign_keys=[writer_id])
+
+    __table_args__ = (
+        CheckConstraint(
+            "(user_id IS NOT NULL AND writer_id IS NULL) OR (user_id IS NULL AND writer_id IS NOT NULL)",
+            name="ck_post_single_author",
+        ),
+        Index("ix_posts_status", "status"),
+        Index("ix_posts_category", "category"),
+        Index("ix_posts_slug", "slug"),
+    )
+
+    @property
+    def author_name(self):
+        if self.user:
+            return f"{self.user.first_name} {self.user.last_name}"
+        if self.writer:
+            return self.writer.business_name
+        return "Unknown"
+
+    @property
+    def author_type(self):
+        if self.user_id:
+            return "student"
+        return "writer"
+    
+class MarketplaceItem(Base):
+    __tablename__ = "marketplace_items"
+
+    id = Column(Integer, primary_key=True)
+    seller_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(Enum(MarketplaceCategory), nullable=False)
+    condition = Column(Enum(ItemCondition), nullable=False)
+    pricing_type = Column(Enum(PricingType), nullable=False)
+    price = Column(Numeric(8, 2), nullable=True)  # null if free
+    pickup_location = Column(String(500), nullable=False)
+    pickup_notes = Column(Text, nullable=True)
+    status = Column(Enum(ItemStatus), default=ItemStatus.AVAILABLE, nullable=False)
+    view_count = Column(Integer, default=0, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    seller = relationship("User", back_populates="marketplace_items")
+    images = relationship("MarketplaceImage", back_populates="item", cascade="all, delete-orphan")
+    conversations = relationship("MarketplaceConversation", back_populates="item", cascade="all, delete-orphan")
+
+    @property
+    def seller_name(self):
+        if self.seller:
+            return f"{self.seller.first_name} {self.seller.last_name}"
+        return "Unknown"
+
+    @property
+    def primary_image(self):
+        primary = next((img.image_url for img in self.images if img.is_primary), None)
+        if not primary and self.images:
+            return self.images[0].image_url
+        return primary
+
+    __table_args__ = (
+        Index("ix_marketplace_seller", "seller_id"),
+        Index("ix_marketplace_status", "status"),
+        Index("ix_marketplace_category", "category"),
+        Index("ix_marketplace_price", "price"),
+    )
+
+
+class MarketplaceImage(Base):
+    __tablename__ = "marketplace_images"
+
+    id = Column(Integer, primary_key=True)
+    item_id = Column(Integer, ForeignKey("marketplace_items.id", ondelete="CASCADE"), nullable=False)
+    image_url = Column(String(500), nullable=False)
+    is_primary = Column(Boolean, default=False, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    item = relationship("MarketplaceItem", back_populates="images")
+
+
+class MarketplaceConversation(Base):
+    __tablename__ = "marketplace_conversations"
+
+    id = Column(Integer, primary_key=True)
+    item_id = Column(Integer, ForeignKey("marketplace_items.id", ondelete="CASCADE"), nullable=False)
+    buyer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    seller_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    item = relationship("MarketplaceItem", back_populates="conversations")
+    buyer = relationship("User", foreign_keys=[buyer_id])
+    seller = relationship("User", foreign_keys=[seller_id])
+    messages = relationship("MarketplaceMessage", back_populates="conversation", order_by="MarketplaceMessage.created_at")
+
+    __table_args__ = (
+        UniqueConstraint("item_id", "buyer_id", name="uq_marketplace_conversation"),
+    )
+
+
+class MarketplaceMessage(Base):
+    __tablename__ = "marketplace_messages"
+
+    id = Column(Integer, primary_key=True)
+    conversation_id = Column(Integer, ForeignKey("marketplace_conversations.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    content = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    conversation = relationship("MarketplaceConversation", back_populates="messages")
+    sender = relationship("User")
 
 Base.metadata.create_all(engine)
 

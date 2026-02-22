@@ -184,3 +184,264 @@ def send_message_notification(
         "subject": f"New message from {sender_name} — {property_title}",
         "html": html_content,
     })
+
+# Approval email
+def send_approval_email(to_email: str, name: str, account_type: str):
+    """Send approval notification to user or writer."""
+
+    if account_type == "writer":
+        message = "Your writer application has been approved! You can now log in and start creating posts."
+        cta_text = "Start Writing"
+        cta_url = f"{settings.FRONTEND_URL}/writers/login"
+    else:
+        message = "Your request for write access has been approved! You can now create posts on FindYourCribb."
+        cta_text = "Create a Post"
+        cta_url = f"{settings.FRONTEND_URL}/posts/new"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #dcfce7; color: #166534; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Approved
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    You're in, {name}!
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    {message}
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td align="center" style="padding: 4px 0 24px;">
+                                            <a href="{cta_url}"
+                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                                {cta_text}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    If you have any questions, reply to this email or reach out at support@findyourcribb.com
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"You've been approved — FindYourCribb",
+        "html": html_content,
+    })
+
+# Rejection email
+def send_rejection_email(to_email: str, name: str, account_type: str):
+    """Send rejection notification to user or writer."""
+
+    if account_type == "writer":
+        message = "Unfortunately, your writer application was not approved at this time. This could be due to incomplete information or a mismatch with our content guidelines."
+    else:
+        message = "Unfortunately, your request for write access was not approved at this time."
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #fee2e2; color: #991b1b; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Not Approved
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Hi {name},
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    {message}
+                                </p>
+
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    You're welcome to reapply in the future. If you think this was a mistake, feel free to reach out to us.
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td align="center" style="padding: 4px 0 24px;">
+                                            <a href="mailto:support@findyourcribb.com"
+                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                                Contact Support
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    This is an automated message. Please do not reply directly to this email.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": "Update on your application — FindYourCribb",
+        "html": html_content,
+    })
+
+# Revoked email
+def send_revoked_email(to_email: str, name: str, account_type: str):
+    """Send revocation notification to user or writer."""
+
+    if account_type == "writer":
+        message = "Your writer access on FindYourCribb has been revoked. You will no longer be able to create or publish posts."
+    else:
+        message = "Your write access on FindYourCribb has been revoked. You will no longer be able to create or publish posts."
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #fef3c7; color: #92400e; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Access Revoked
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Hi {name},
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    {message}
+                                </p>
+
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    If you believe this was a mistake, please contact our support team.
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td align="center" style="padding: 4px 0 24px;">
+                                            <a href="mailto:support@findyourcribb.com"
+                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                                Contact Support
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    This is an automated message. Please do not reply directly to this email.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": "Your write access has been revoked — FindYourCribb",
+        "html": html_content,
+    })

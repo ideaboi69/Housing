@@ -10,6 +10,7 @@ from typing import Annotated, Optional, Literal
 class UserRole(str, enum.Enum):
     STUDENT = "student"
     LANDLORD = "landlord"
+    WRITER = "writer"
     ADMIN = "admin"
 
 class UserCreate(BaseModel):

@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Admin
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Admin, Writer, Post
 from Schemas.adminSchema import AdminCreate, AdminLogin, AdminResponse, AdminTokenResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordUpdate, LandlordResponse
 from Schemas.flagSchema import FlagStatus
+from Schemas.writerSchema import WriterStatus, WriterResponse
+from Schemas.postSchema import PostResponse, PostListResponse
 from helpers import require_admin, cascade_delete_landlord
 from Utils.security import get_current_user, hash_password, create_access_token, verify_password
 from Utils.cloudinary import delete_image_from_cloudinary
+from Utils.email import send_approval_email, send_rejection_email, send_revoked_email
 from config import settings
 
 admin_router = APIRouter()
@@ -93,6 +96,20 @@ def get_website_stats(db: Session = Depends(get_db), admin: User = Depends(requi
     )
 
 # USER ENDPOINTS
+@admin_router.patch("/users/{user_id}/verify", status_code=status.HTTP_200_OK)
+def verify_user_account(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.email_verified:
+        raise HTTPException(status_code=400, detail="User is already verified")
+
+    user.email_verified = True
+    db.commit()
+
+    return {"message": f"User {user.first_name} {user.last_name} has been manually verified"}
+
 @admin_router.get("/users", response_model=list[AdminUserResponse])
 def list_all_users(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     users = db.query(User).all()
@@ -274,3 +291,178 @@ def dismiss_flag(flag_id: int, db: Session = Depends(get_db), admin: User = Depe
     db.commit()
 
     return {"message": f"Flag {flag_id} dismissed"}
+
+# WRITER ENDPOINTS
+@admin_router.get("/writers", response_model=list[WriterResponse])
+def list_all_writers(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    writers = db.query(Writer).order_by(Writer.created_at.desc()).all()
+    return [WriterResponse.model_validate(w) for w in writers]
+
+@admin_router.get("/writers/pending", response_model=list[WriterResponse])
+def list_pending_writers(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    writers = db.query(Writer).filter(Writer.status == WriterStatus.PENDING).all()
+    return [WriterResponse.model_validate(w) for w in writers]
+
+@admin_router.patch("/writers/{writer_id}/approve", status_code=status.HTTP_200_OK)
+def approve_writer(writer_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    writer = db.query(Writer).filter(Writer.id == writer_id).first()
+    if not writer:
+        raise HTTPException(status_code=404, detail="Writer not found")
+
+    if writer.status == WriterStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="Writer already approved")
+
+    writer.status = WriterStatus.APPROVED
+    db.commit()
+    
+    background_tasks.add_task(
+        send_approval_email,
+        to_email=writer.email,
+        name=writer.first_name,
+        account_type="writer",
+    )
+
+    return {"message": f"Writer '{writer.business_name}' approved"}
+
+@admin_router.patch("/writers/{writer_id}/reject", status_code=status.HTTP_200_OK)
+def reject_writer(writer_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    writer = db.query(Writer).filter(Writer.id == writer_id).first()
+    if not writer:
+        raise HTTPException(status_code=404, detail="Writer not found")
+
+    writer.status = WriterStatus.REJECTED
+    db.commit()
+
+    background_tasks.add_task(
+        send_rejection_email,
+        to_email=writer.email,
+        name=writer.first_name,
+        account_type="writer",
+    )
+
+    return {"message": f"Writer '{writer.business_name}' rejected"}
+
+@admin_router.patch("/writers/{writer_id}/revoke", status_code=status.HTTP_200_OK)
+def revoke_writer(writer_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    writer = db.query(Writer).filter(Writer.id == writer_id).first()
+    if not writer:
+        raise HTTPException(status_code=404, detail="Writer not found")
+
+    if writer.status != WriterStatus.APPROVED:
+        raise HTTPException(status_code=400, detail="Writer is not currently approved")
+
+    writer.status = WriterStatus.REVOKED
+    db.commit()
+
+    background_tasks.add_task(
+        send_revoked_email,
+        to_email=writer.email,
+        name=writer.first_name,
+        account_type="writer",
+    )
+
+    return {"message": f"Writer '{writer.business_name}' access revoked"}
+
+@admin_router.delete("/writers/{writer_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_writer(writer_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    writer = db.query(Writer).filter(Writer.id == writer_id).first()
+    if not writer:
+        raise HTTPException(status_code=404, detail="Writer not found")
+
+    posts = db.query(Post).filter(Post.writer_id == writer.id).all()
+    for post in posts:
+        if post.cover_image_url:
+            delete_image_from_cloudinary(post.cover_image_url)
+    db.query(Post).filter(Post.writer_id == writer.id).delete()
+
+    db.delete(writer)
+    db.commit()
+
+# STUDENT WRITE ENDPOINTS
+@admin_router.patch("/users/{user_id}/grant-write", status_code=status.HTTP_200_OK)
+def grant_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.is_writable:
+        raise HTTPException(status_code=400, detail="User already has write access")
+
+    user.is_writable = True
+    user.write_access_requested = False 
+    db.commit()
+
+    background_tasks.add_task(
+        send_approval_email,
+        to_email=user.email,
+        name=user.first_name,
+        account_type="student",
+    )
+
+    return {"message": f"Write access granted to {user.first_name} {user.last_name}"}
+
+@admin_router.patch("/users/{user_id}/reject-write", status_code=status.HTTP_200_OK)
+def reject_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.write_access_requested:
+        raise HTTPException(status_code=400, detail="No pending request from this user")
+
+    user.write_access_requested = False
+    db.commit()
+
+    background_tasks.add_task(
+        send_rejection_email,
+        to_email=user.email,
+        name=user.first_name,
+        account_type="student",
+    )
+
+    return {"message": f"Write request rejected for {user.first_name} {user.last_name}"}
+
+@admin_router.patch("/users/{user_id}/revoke-write", status_code=status.HTTP_200_OK)
+def revoke_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.is_writable:
+        raise HTTPException(status_code=400, detail="User doesn't have write access")
+
+    user.is_writable = False
+    user.write_access_requested = False
+    db.commit()
+
+    background_tasks.add_task(
+        send_revoked_email,
+        to_email=user.email,
+        name=user.first_name,
+        account_type="student",
+    )
+
+    return {"message": f"Write access revoked for {user.first_name} {user.last_name}"}
+
+@admin_router.get("/users/pending-writers", response_model=list[AdminUserResponse])
+def list_pending_write_requests(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    users = db.query(User).filter(User.write_access_requested == True,User.is_writable == False).all()
+    return [AdminUserResponse.model_validate(u) for u in users]
+
+# POST ENDPOINTS
+@admin_router.get("/posts", response_model=list[PostListResponse])
+def list_all_posts(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    posts = db.query(Post).order_by(Post.created_at.desc()).all()
+    return [PostListResponse.model_validate(p) for p in posts]
+
+@admin_router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_post(post_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if post.cover_image_url:
+        delete_image_from_cloudinary(post.cover_image_url)
+
+    db.delete(post)
+    db.commit()
