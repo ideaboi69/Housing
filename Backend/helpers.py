@@ -4,38 +4,32 @@ from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
 from dotenv import load_dotenv
 from sqlalchemy import text, func as sql_func
-from tables import get_db, User, Landlord, Property, Review, LandlordDocuments
+from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordVerification
 from Utils.security import get_current_user, decode_access_token
 from fastapi import APIRouter, Depends, HTTPException, status
-from Schemas.listingSchema import ListingDetailResponse
+from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import uuid 
 import boto3
 import os
 import resend
-import cloudinary
-import cloudinary.uploader
 
 load_dotenv()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-cloudinary.config(
-    cloud_name="cribb",
-    api_key=os.getenv("CRIBB_CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CRIBB_CLOUDINARY_API_SECRET"),
-)
+landlord_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/landlords/login", scheme_name="LandlordAuth")
+admin_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/admin/login", scheme_name="AdminAuth")
 
 # UofG Email checker helper
 def check_uoguelph_email(email: str) -> bool:
     return email.lower().endswith("@uoguelph.ca")
 
 # Landlord Helpers
-def require_landlord(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def require_landlord(token: str = Depends(landlord_oauth2), db: Session = Depends(get_db)):
     payload = decode_access_token(token)
 
-    if payload.get("role") != UserRole.LANDLORD:
+    if payload.get("role") != UserRole.LANDLORD.value:
         raise HTTPException(status_code=403, detail="Landlord access required")
 
     landlord = db.query(Landlord).get(payload["user_id"])
@@ -92,11 +86,21 @@ def compute_landlord_stats(landlord_id: int, db: Session) -> dict:
     }
 
 # Admin Helpers
-def require_admin(current_user: User = Depends(get_current_user)):
+def require_admin(token: str = Depends(admin_oauth2), db: Session = Depends(get_db)):
     """Dependency that ensures the current user is an admin."""
-    if current_user.role != UserRole.ADMIN:
+    payload = decode_access_token(token)
+
+    if payload.get("role") != UserRole.ADMIN.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    return current_user
+
+    admin = db.query(Admin).get(payload["user_id"])
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
+
+    if not admin.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin account is deactivated")
+
+    return admin
 
 def cascade_delete_landlord(landlord: Landlord, db: Session):
     """Delete a landlord and everything they own: properties → listings → images, health scores, saved, flags."""
@@ -136,7 +140,7 @@ def get_property_owned_by(property_id: int, landlord_id: int, db: Session) -> Pr
 
 # Listing Helpers
 def get_landlord_for_user(user: User, db: Session) -> Landlord:
-    landlord = db.query(Landlord).filter(Landlord.user_id == user.id).first()
+    landlord = db.query(Landlord).filter(Landlord.id == user.id).first()
     if not landlord:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Landlord profile not found")
     return landlord
@@ -167,6 +171,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         gender_preference=listing.gender_preference if isinstance(listing.gender_preference, str) else (listing.gender_preference.value if listing.gender_preference else None),
         status=listing.status if isinstance(listing.status, str) else listing.status.value,
         view_count=listing.view_count,
+        images=[ListingImageResponse.model_validate(img) for img in listing.images],
         created_at=listing.created_at,
         property_id=prop.id,
         title=prop.title,
@@ -181,7 +186,9 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         estimated_utility_cost=prop.estimated_utility_cost,
         distance_to_campus_km=prop.distance_to_campus_km,
         walk_time_minutes=prop.walk_time_minutes,
+        drive_time_minutes=prop.drive_time_minutes,
         bus_time_minutes=prop.bus_time_minutes,
+        nearest_bus_route=prop.nearest_bus_route,
         landlord_id=landlord.id,
         landlord_name=f"{landlord.first_name} {landlord.last_name}",
         landlord_verified=landlord.identity_verified,

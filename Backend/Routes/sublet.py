@@ -8,6 +8,7 @@ from Schemas.subletSchema import SubletCreate, SubletUpdate, SubletResponse, Sub
 from Schemas.listingSchema import GenderPreference
 from Utils.security import get_current_user
 from helpers import upload_to_s3
+from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from decimal import Decimal
 
 sublet_router = APIRouter()
@@ -51,8 +52,45 @@ def create_sublet(payload: SubletCreate, db: Session = Depends(get_db), current_
     db.refresh(sublet)
 
     response = SubletResponse.model_validate(sublet)
-    response.posted_by = f"{current_user.first_name} {current_user.last_name}"
     return response
+
+# upload sublet images
+@sublet_router.post("/{sublet_id}/images", status_code=status.HTTP_201_CREATED)
+async def upload_sublet_images(sublet_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    
+    sublet = db.query(Sublet).filter(Sublet.id == sublet_id,Sublet.user_id == current_user.id).first()
+
+    if not sublet:
+        raise HTTPException(status_code=404, detail="Sublet not found")
+
+    existing_count = len(sublet.images)
+
+    if existing_count + len(files) > 10:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum 10 images allowed. You have {existing_count}, trying to add {len(files)}.",
+        )
+
+    images = []
+    for i, file in enumerate(files):
+        image_url = upload_image_to_cloudinary(
+            file,
+            folder=f"sublets/{sublet_id}",
+        )
+
+        image = SubletImage(
+            sublet_id=sublet.id,
+            image_url=image_url,
+            is_primary=(existing_count == 0 and i == 0),
+        )
+        db.add(image)
+        images.append(image)
+
+    db.commit()
+    for img in images:
+        db.refresh(img)
+
+    return [SubletImageResponse.model_validate(img) for img in images]
 
 # Get all active sublets (public, with filters)
 @sublet_router.get("/", response_model=list[SubletListResponse])
@@ -90,38 +128,9 @@ def get_all_sublets(
         query = query.filter(Sublet.sublet_end_date >= available_until)
 
     sublets = query.order_by(Sublet.created_at.desc()).all()
+    
+    return [SubletListResponse.model_validate(sublet) for sublet in sublets]
 
-    result = []
-    for sublet in sublets:
-        user = db.query(User).filter(User.id == sublet.user_id).first()
-        primary_image = next((img.image_url for img in sublet.images if img.is_primary), None)
-        if not primary_image and sublet.images:
-            primary_image = sublet.images[0].image_url
-
-        result.append(
-            SubletListResponse(
-                id=sublet.id,
-                title=sublet.title,
-                address=sublet.address,
-                rent_per_month=sublet.rent_per_month,
-                sublet_start_date=sublet.sublet_start_date,
-                sublet_end_date=sublet.sublet_end_date,
-                room_type=sublet.room_type,
-                total_rooms=sublet.total_rooms,
-                is_furnished=sublet.is_furnished,
-                distance_to_campus_km=sublet.distance_to_campus_km,
-                walk_time_minutes=sublet.walk_time_minutes,
-                drive_time_minutes=sublet.drive_time_minutes,
-                bus_time_minutes=sublet.bus_time_minutes,
-                nearest_bus_route=sublet.nearest_bus_route,
-                status=sublet.status,
-                primary_image=primary_image,
-                posted_by=f"{user.first_name} {user.last_name}",
-                created_at=sublet.created_at,
-            )
-        )
-
-    return result
 
 # Get a single sublet by ID
 @sublet_router.get("/{sublet_id}", response_model=SubletResponse)
@@ -136,45 +145,14 @@ def get_sublet(sublet_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == sublet.user_id).first()
 
     response = SubletResponse.model_validate(sublet)
-    response.posted_by = f"{user.first_name} {user.last_name}"
     return response
 
 # Get current user's sublets
 @sublet_router.get("/my/listings", response_model=list[SubletListResponse])
 def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    
     sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
 
-    result = []
-    for sublet in sublets:
-        primary_image = next((img.image_url for img in sublet.images if img.is_primary), None)
-        if not primary_image and sublet.images:
-            primary_image = sublet.images[0].image_url
-
-        result.append(
-            SubletListResponse(
-                id=sublet.id,
-                title=sublet.title,
-                address=sublet.address,
-                rent_per_month=sublet.rent_per_month,
-                sublet_start_date=sublet.sublet_start_date,
-                sublet_end_date=sublet.sublet_end_date,
-                room_type=sublet.room_type,
-                total_rooms=sublet.total_rooms,
-                is_furnished=sublet.is_furnished,
-                distance_to_campus_km=sublet.distance_to_campus_km,
-                walk_time_minutes=sublet.walk_time_minutes,
-                drive_time_minutes=sublet.drive_time_minutes,
-                bus_time_minutes=sublet.bus_time_minutes,
-                nearest_bus_route=sublet.nearest_bus_route,
-                status=sublet.status,
-                primary_image=primary_image,
-                posted_by=f"{current_user.first_name} {current_user.last_name}",
-                created_at=sublet.created_at,
-            )
-        )
-
-    return result
+    return [SubletListResponse.model_validate(sublet) for sublet in sublets]
 
 # Update a sublet
 @sublet_router.patch("/{sublet_id}", response_model=SubletResponse)
@@ -201,7 +179,6 @@ def update_sublet(sublet_id: int, payload: SubletUpdate, db: Session = Depends(g
 
     user = db.query(User).filter(User.id == sublet.user_id).first()
     response = SubletResponse.model_validate(sublet)
-    response.posted_by = f"{user.first_name} {user.last_name}"
     return response
 
 # Delete a sublet
@@ -212,42 +189,12 @@ def delete_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: U
 
     if not sublet:
         raise HTTPException(status_code=404, detail="Sublet not found")
+    
+    for image in sublet.images:
+        delete_image_from_cloudinary(image.image_url)
 
     db.delete(sublet)
     db.commit()
-
-# Upload images to a sublet
-@sublet_router.post("/{sublet_id}/images", response_model=list[SubletImageResponse], status_code=status.HTTP_201_CREATED)
-async def upload_sublet_images(sublet_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    
-    sublet = db.query(Sublet).filter(and_(Sublet.id == sublet_id, Sublet.user_id == current_user.id)).first()
-
-    if not sublet:
-        raise HTTPException(status_code=404, detail="Sublet not found")
-
-    if len(files) > 10:
-        raise HTTPException(status_code=400, detail="Maximum 10 images allowed")
-
-    existing_count = len(sublet.images)
-    images = []
-
-    # Adjust this to use cloudinary
-    for i, file in enumerate(files):
-        _, image_url = upload_to_s3(file, current_user.id, f"sublets/{sublet_id}")
-
-        image = SubletImage(
-            sublet_id=sublet.id,
-            image_url=image_url,
-            is_primary=(existing_count == 0 and i == 0),  # first image is primary
-        )
-        db.add(image)
-        images.append(image)
-
-    db.commit()
-    for img in images:
-        db.refresh(img)
-
-    return [SubletImageResponse.model_validate(img) for img in images]
 
 # Delete an image from a sublet
 @sublet_router.delete("/{sublet_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -263,5 +210,7 @@ def delete_sublet_image(sublet_id: int, image_id: int, db: Session = Depends(get
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
 
+    delete_image_from_cloudinary(image.image_url)
     db.delete(image)
     db.commit()
+

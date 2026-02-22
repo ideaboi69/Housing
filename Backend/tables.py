@@ -15,7 +15,13 @@ from dotenv import load_dotenv
 from Schemas.subletSchema import RoomType, SubletStatus
 load_dotenv()
 
-engine = create_engine(settings.DATABASE_URL)
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True,           # tests connection before using it
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=300,              # recycle connections every 5 minutes
+)
 Local_Session = sessionmaker(bind=engine)
 Base = declarative_base()
 
@@ -79,6 +85,19 @@ class LandlordDocuments(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     landlord = relationship("Landlord", back_populates="documents")
+
+class Admin(Base):
+    __tablename__ = "admins"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    first_name = Column(String(100), nullable=False)
+    last_name = Column(String(100), nullable=False)
+    role = Column(String(50), default="admin", nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
 class Property(Base):
     __tablename__ = "properties"
@@ -306,6 +325,19 @@ class Sublet(Base):
     user = relationship("User", back_populates="sublets")
     images = relationship("SubletImage", back_populates="sublet", cascade="all, delete-orphan")
 
+    @property
+    def posted_by(self):
+        if self.user:
+            return f"{self.user.first_name} {self.user.last_name}"
+        return "Unknown"
+    
+    @property
+    def primary_image(self):
+        primary = next((img.image_url for img in self.images if img.is_primary), None)
+        if not primary and self.images:
+            return self.images[0].image_url
+        return primary
+    
     __table_args__ = (
         Index("ix_sublets_user", "user_id"),
         Index("ix_sublets_status", "status"),

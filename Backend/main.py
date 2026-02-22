@@ -15,8 +15,9 @@ from Routes.saved import saved_router
 from Routes.flag import flag_router
 from Routes.messages import message_router
 from Routes.sublet import sublet_router
-import asyncio
 from dataclasses import dataclass
+import Utils.cloudinary_config
+import asyncio
 
 app = FastAPI(title="Housing API")
 

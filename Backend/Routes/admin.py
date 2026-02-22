@@ -1,14 +1,84 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
-from Schemas.adminSchema import (AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse)
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Admin
+from Schemas.adminSchema import AdminCreate, AdminLogin, AdminResponse, AdminTokenResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordUpdate, LandlordResponse
 from Schemas.flagSchema import FlagStatus
 from helpers import require_admin, cascade_delete_landlord
-from Utils.security import get_current_user
+from Utils.security import get_current_user, hash_password, create_access_token, verify_password
+from Utils.cloudinary import delete_image_from_cloudinary
+from config import settings
 
 admin_router = APIRouter()
+
+# CREATE AN ADMIN ACCOUNT
+@admin_router.post("/register", response_model=AdminResponse, status_code=status.HTTP_201_CREATED)
+def create_admin(payload: AdminCreate, db: Session = Depends(get_db), current_admin: Admin = Depends(require_admin)):
+    existing = db.query(Admin).filter(Admin.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Admin already exists")
+
+    admin = Admin(
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+
+    return AdminResponse.model_validate(admin)
+
+# ADMIN LOGIN
+@admin_router.post("/login", response_model=AdminTokenResponse)
+def admin_login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
+    admin = db.query(Admin).filter(Admin.email == form_data.username).first()
+
+    if not admin or not verify_password(form_data.password, admin.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not admin.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin account is deactivated")
+
+    token = create_access_token({"user_id": admin.id, "role": "admin"})
+
+    return AdminTokenResponse(
+        access_token=token,
+        admin=AdminResponse.model_validate(admin),
+    )
+
+# SEED FIRST ADMIN (protected with secret key)
+@admin_router.post("/seed", response_model=AdminResponse, status_code=status.HTTP_201_CREATED)
+def seed_admin(payload: AdminCreate, secret: str, db: Session = Depends(get_db)):
+    """One-time endpoint to create the first admin. Requires ADMIN_SECRET."""
+    if secret != settings.ADMIN_SECRET:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid secret")
+
+    existing = db.query(Admin).filter(Admin.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Admin already exists")
+
+    admin = Admin(
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+    )
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+
+    return AdminResponse.model_validate(admin)
 
 # ADMIN DASHBOARD
 @admin_router.get("/stats", response_model=AdminStatsResponse)
@@ -28,7 +98,6 @@ def list_all_users(db: Session = Depends(get_db), admin: User = Depends(require_
     users = db.query(User).all()
     return [AdminUserResponse.model_validate(u) for u in users]
 
-
 @admin_router.get("/users/{user_id}", response_model=AdminUserResponse)
 def get_user_by_id(user_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -38,20 +107,11 @@ def get_user_by_id(user_id: int, db: Session = Depends(get_db), admin: User = De
     return AdminUserResponse.model_validate(user)
 
 @admin_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def delete_user(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if user.role == UserRole.ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot delete another admin")
-
-    # if user is a landlord, cascade delete their landlord stuff
-    landlord = db.query(Landlord).filter(Landlord.user_id == user.id).first()
-    if landlord:
-        cascade_delete_landlord(landlord, db)
-
-    # clean up user's reviews, saved listings, flags
     db.query(Review).filter(Review.student_id == user.id).delete()
     db.query(SavedListing).filter(SavedListing.student_id == user.id).delete()
     db.query(Flag).filter(Flag.reporter_id == user.id).delete()
@@ -63,15 +123,14 @@ def delete_user(user_id: int, db: Session = Depends(get_db), admin: User = Depen
 
 # LANDLORD ENDPOINTS
 @admin_router.get("/landlords", response_model=list[AdminLandlordResponse])
-def list_all_landlords(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+def list_all_landlords(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     landlords = db.query(Landlord).all()
     return [
         AdminLandlordResponse(
             id=l.id,
-            user_id=l.user_id,
-            first_name=l.user.first_name,
-            last_name=l.user.last_name,
-            email=l.user.email,
+            first_name=l.first_name,
+            last_name=l.last_name,
+            email=l.email,
             company_name=l.company_name,
             phone=l.phone,
             identity_verified=l.identity_verified,
@@ -87,39 +146,19 @@ def get_landlord_by_id(landlord_id: int, db: Session = Depends(get_db), admin: U
 
     return AdminLandlordResponse(
             id=landlord.id,
-            user_id=landlord.user_id,
-            first_name=landlord.user.first_name,
-            last_name=landlord.user.last_name,
-            email=landlord.user.email,
+            first_name=landlord.first_name,
+            last_name=landlord.last_name,
+            email=landlord.email,
             company_name=landlord.company_name,
             phone=landlord.phone,
             identity_verified=landlord.identity_verified)
 
-@admin_router.patch("/landlords/{landlord_id}", response_model=LandlordResponse)
-def update_landlord_profile(landlord_id: int, payload: LandlordUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
-    landlord = db.query(Landlord).filter(Landlord.id == landlord_id).first()
-
-    if payload.company_name is not None:
-        landlord.company_name = payload.company_name
-    if payload.phone is not None:
-        landlord.phone = payload.phone
-
-    db.commit()
-    db.refresh(landlord)
-
-    return AdminLandlordResponse.model_validate(landlord)
-
 @admin_router.delete("/landlords/{landlord_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_landlord(landlord_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    """Delete a landlord profile and cascade delete all their properties, listings, etc. User account reverts to student."""
+    """Delete a landlord profile and cascade delete all their properties, listings, etc"""
     landlord = db.query(Landlord).filter(Landlord.id == landlord_id).first()
     if not landlord:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Landlord not found")
-
-    # revert user back to student
-    user = db.query(User).filter(User.id == landlord.user_id).first()
-    if user:
-        user.role = UserRole.STUDENT
 
     cascade_delete_landlord(landlord, db)
     db.commit()
@@ -168,7 +207,10 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db), admin: User =
     if not listing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found")
 
-    # clean up everything tied to this listing
+    images = db.query(ListingImage).filter(ListingImage.listing_id == listing.id).all()
+    for image in images:
+        delete_image_from_cloudinary(image.image_url)
+
     db.query(ListingImage).filter(ListingImage.listing_id == listing.id).delete()
     db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete()
     db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete()

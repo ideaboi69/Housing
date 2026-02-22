@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import get_db
 from tables import User, Landlord
@@ -10,7 +11,7 @@ from Utils.email import send_verification_email
 
 user_router = APIRouter()
 
-# Register and Login
+# Create User Account
 @user_router.post("/register", status_code=status.HTTP_201_CREATED)
 def register_users(payload: UserCreate, db: Session = Depends(get_db)):
 
@@ -43,6 +44,19 @@ def register_users(payload: UserCreate, db: Session = Depends(get_db)):
         "message": "Account created. Please check your email to verify your account.",
         "user_id": user.id,
     }
+
+# User Login
+@user_router.post("/login")
+def user_login(payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.username).first()
+
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
+
+    token = create_access_token({"user_id": user.id, "role": user.role.value})
+
+    return {"access_token": token, "token_type": "bearer"}
+
 # Verify email
 @user_router.get("/verify-email", status_code=status.HTTP_200_OK)
 def verify_email(token: str, db: Session = Depends(get_db)):
@@ -80,17 +94,6 @@ def resend_verification(email: str = Form(...), db: Session = Depends(get_db)):
     send_verification_email(user.email, user.first_name, email_token)
 
     return {"message": "A verification link has been sent."}
-
-@user_router.post("/login", response_model=TokenResponse)
-def user_login(payload: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email).first()
-
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
-
-    token = create_access_token({"user_id": user.id, "role": user.role.value})
-
-    return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
 
 # Viewing and updating user profiles
 @user_router.get("/me", response_model=UserResponse)

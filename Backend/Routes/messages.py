@@ -126,6 +126,41 @@ def send_message( conversation_id: int, payload: MessageCreate, background_tasks
 
     return message
 
+# Landlord replies to a conversation
+@message_router.post("/landlord/conversations/{conversation_id}", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
+def landlord_reply(conversation_id: int, payload: MessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.landlord_id == landlord.id).first()
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    message = Message(
+        conversation_id=conversation.id,
+        sender_type=SenderType.LANDLORD,
+        sender_id=landlord.id,
+        content=payload.content,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+
+    # Email the user
+    user = db.query(User).filter(User.id == conversation.user_id).first()
+    listing = db.query(Listing).filter(Listing.id == conversation.listing_id).first()
+    property = db.query(Property).filter(Property.id == listing.property_id).first()
+
+    background_tasks.add_task(
+        send_message_notification,
+        to_email=user.email,
+        recipient_name=user.first_name,
+        sender_name=f"{landlord.first_name} {landlord.last_name}",
+        message_preview=payload.content,
+        conversation_id=conversation.id,
+        listing_title=property.title,
+    )
+
+    return message
+
 # Get all conversations for a user
 @message_router.get("/conversations", response_model=list[ConversationResponse])
 def get_conversations( db: Session = Depends(get_db), current_user=Depends(get_current_user)):
@@ -205,7 +240,7 @@ def get_landlord_conversations( db: Session = Depends(get_db), landlord: Landlor
 
 # Get a single conversation with all messages
 @message_router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
-def get_conversation( conversation_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def get_specific_conversation( conversation_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
 
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conversation:
@@ -255,7 +290,7 @@ def get_user_unread_count(db: Session = Depends(get_db),current_user: User = Dep
     total_unread = db.query(func.count(Message.id)).filter(
         and_(
             Message.conversation_id.in_(conversation_ids),
-            Message.sender_type == "landlord",
+            Message.sender_type == SenderType.LANDLORD.value,
             Message.is_read == False,
         )).scalar()
 
@@ -274,8 +309,57 @@ def get_landlord_unread_count(db: Session = Depends(get_db), landlord: Landlord 
     total_unread = db.query(func.count(Message.id)).filter(
         and_(
             Message.conversation_id.in_(conversation_ids),
-            Message.sender_type == "user",
+            Message.sender_type == SenderType.STUDENT.value,
             Message.is_read == False,
         )).scalar()
 
     return {"unread_count": total_unread}
+
+# Delete a single message (sender only)
+@message_router.delete("/conversations/{conversation_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_message(conversation_id: int, message_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Verify access
+    is_user = conversation.user_id == current_user.id
+    is_landlord = hasattr(current_user, "identity_verified") and conversation.landlord_id == current_user.id
+    if not is_user and not is_landlord:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    message = db.query(Message).filter(
+        Message.id == message_id,
+        Message.conversation_id == conversation_id,
+        Message.sender_id == current_user.id,
+    ).first()
+
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found or you are not the sender")
+
+    db.delete(message)
+    db.commit()
+
+# User deletes a conversation
+@message_router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.user_id == current_user.id).first()
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    db.query(Message).filter(Message.conversation_id == conversation.id).delete()
+    db.delete(conversation)
+    db.commit()
+
+# Landlord deletes a conversation
+@message_router.delete("/landlord/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def landlord_delete_conversation(conversation_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.landlord_id == landlord.id).first()
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    db.query(Message).filter(Message.conversation_id == conversation.id).delete()
+    db.delete(conversation)
+    db.commit()

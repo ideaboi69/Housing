@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     FRONTEND_URL: str
     EMAIL_VERIFY_EXPIRE_MINUTES: int = 60
 
+    ADMIN_SECRET: str
+
+    CRIBB_CLOUDINARY_CLOUD_NAME: str
+    CRIBB_CLOUDINARY_API_KEY: str
+    CRIBB_CLOUDINARY_API_SECRET: str
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

@@ -1,12 +1,13 @@
 from datetime import date
 from decimal import Decimal
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
 from sqlalchemy.orm import Session
-from tables import (get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore)
-from Schemas.listingSchema import (ListingCreate, ListingUpdate, ListingResponse, ListingDetailResponse, SubletConvert, ListingStatus)
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
+from Schemas.listingSchema import ListingCreate, ListingUpdate, ListingResponse, ListingDetailResponse, SubletConvert, ListingStatus, ListingImageResponse
 from Schemas.userSchema import UserRole
 from Utils.security import get_current_user
+from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from helpers import get_landlord_for_user, require_landlord, build_listing_detail, get_listing_owned_by
 
 listing_router = APIRouter()
@@ -40,6 +41,41 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
     db.refresh(listing)
 
     return ListingResponse.model_validate(listing)
+
+@listing_router.post("/{listing_id}/images", status_code=status.HTTP_201_CREATED)
+async def upload_listing_images(listing_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    
+    landlord = get_landlord_for_user(current_user, db)
+    listing = get_listing_owned_by(listing_id, landlord.id, db)
+
+    existing_count = db.query(ListingImage).filter(ListingImage.listing_id == listing.id).count()
+
+    if existing_count + len(files) > 10:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum 10 images allowed. You have {existing_count}, trying to add {len(files)}.",
+        )
+
+    images = []
+    for i, file in enumerate(files):
+        image_url = upload_image_to_cloudinary(
+            file,
+            folder=f"listings/{listing_id}",
+        )
+
+        image = ListingImage(
+            listing_id=listing.id,
+            image_url=image_url,
+            display_order=existing_count + i,
+        )
+        db.add(image)
+        images.append(image)
+
+    db.commit()
+    for img in images:
+        db.refresh(img)
+
+    return [ListingImageResponse.model_validate(img) for img in images]
 
 # Browse Listings (public, with filters)
 @listing_router.get("/", response_model=list[ListingDetailResponse])
@@ -204,6 +240,10 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db), current_user:
     landlord = get_landlord_for_user(current_user, db)
     listing = get_listing_owned_by(listing_id, landlord.id, db)
 
+    images = db.query(ListingImage).filter(ListingImage.listing_id == listing.id).all()
+    for image in images:
+        delete_image_from_cloudinary(image.image_url)
+
     db.query(ListingImage).filter(ListingImage.listing_id == listing.id).delete()
     db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete()
     db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete()
@@ -213,3 +253,19 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db), current_user:
     db.commit()
 
     return None
+
+# delete a specific image in a listing
+@listing_router.delete("/{listing_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_a_listing_image(listing_id: int, image_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    
+    landlord = get_landlord_for_user(current_user, db)
+    listing = get_listing_owned_by(listing_id, landlord.id, db)
+
+    image = db.query(ListingImage).filter(ListingImage.id == image_id, ListingImage.listing_id == listing.id).first()
+
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    delete_image_from_cloudinary(image.image_url)
+    db.delete(image)
+    db.commit()

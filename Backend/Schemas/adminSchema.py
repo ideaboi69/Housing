@@ -2,6 +2,33 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 
+# Request
+class AdminCreate(BaseModel):
+    email: str
+    password: str
+    first_name: str
+    last_name: str
+
+class AdminLogin(BaseModel):
+    email: str
+    password: str
+
+# Response
+class AdminResponse(BaseModel):
+    id: int
+    email: str
+    first_name: str
+    last_name: str
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AdminTokenResponse(BaseModel):
+    access_token: str
+    admin: AdminResponse
+
 class AdminUserResponse(BaseModel):
     id: int
     email: str
@@ -17,7 +44,6 @@ class AdminUserResponse(BaseModel):
 
 class AdminLandlordResponse(BaseModel):
     id: int
-    user_id: int
     first_name: str
     last_name: str
     email: str

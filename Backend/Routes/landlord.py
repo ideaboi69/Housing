@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, File, Form, UploadFile
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, LandlordDocuments
@@ -16,7 +17,7 @@ import json
 landlord_router = APIRouter()
 
 # Register a Landlord Profile
-@landlord_router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@landlord_router.post("/register", response_model=LandlordTokenResponse, status_code=status.HTTP_201_CREATED)
 def register_landlord(email: EmailStr = Form(...), password: str = Form(...), first_name: str = Form(...), last_name: str = Form(...), phone: str = Form(...), no_of_property: PropertyRange = Form(...), 
                     id_type: IDType = Form(...), document_type: DocumentType = Form(...), company_name: Optional[str] = Form(None), id_file: UploadFile = File(...), document_file: UploadFile = File(...), db: Session = Depends(get_db)):
     
@@ -89,27 +90,16 @@ def register_landlord(email: EmailStr = Form(...), password: str = Form(...), fi
     )
 
 # Landlord Login
-@landlord_router.post("/login", response_model=LandlordTokenResponse)
-def login_landlord(payload: LandlordLogin, db: Session = Depends(get_db)):
-    landlord = db.query(Landlord).filter(Landlord.email == payload.email).first()
+@landlord_router.post("/login")
+def login_landlord(payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    landlord = db.query(Landlord).filter(Landlord.email == payload.username).first()
 
     if not landlord or not verify_password(payload.password, landlord.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
 
-    token = create_access_token({
-        "user_id": landlord.id,
-        "role": "landlord",
-        "verified": landlord.identity_verified,
-    })
+    token = create_access_token({"user_id": landlord.id, "role": landlord.role.value, "verified": landlord.identity_verified})
 
-    return LandlordTokenResponse(
-        access_token=token,
-        landlord=LandlordResponse.model_validate(landlord),
-    )
+    return {"access_token": token, "token_type": "bearer"}
 
 # Private Landlord Profile
 @landlord_router.get("/me", response_model=LandlordResponse)

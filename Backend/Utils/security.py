@@ -5,10 +5,12 @@ from jose import JWTError, jwt, ExpiredSignatureError
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 from config import settings
-from tables import get_db, User, Landlord
+from tables import get_db, User, Landlord, Admin
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+user_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/users/login",scheme_name="UserAuth")
+landlord_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/landlords/login",scheme_name="LandlordAuth")
+admin_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/admin/login", scheme_name="AdminAuth")
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -44,7 +46,7 @@ def decode_access_token(token: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         ) 
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def get_current_user(token: str = Depends(user_oauth2), db: Session = Depends(get_db)):
     payload = decode_access_token(token)
 
     user_id = payload.get("user_id")
@@ -66,7 +68,44 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found",
         )
+
     return user
+
+def get_current_landlord(token: str = Depends(landlord_oauth2), db: Session = Depends(get_db)):
+    payload = decode_access_token(token)
+
+    if payload.get("role") != "landlord":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Landlord access required",
+        )
+
+    landlord = db.query(Landlord).get(payload["user_id"])
+    if not landlord:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Landlord not found",
+        )
+
+    return landlord
+
+def get_current_admin(token: str = Depends(admin_oauth2), db: Session = Depends(get_db)):
+    payload = decode_access_token(token)
+
+    if payload.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    admin = db.query(Admin).get(payload["user_id"])
+    if not admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin not found")
+
+    if not admin.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin account is deactivated")
+
+    return admin
 
 def require_role(required_role: str):
     """Dependency that checks if the current user has a specific role."""

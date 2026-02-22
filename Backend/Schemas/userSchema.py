@@ -25,12 +25,12 @@ class UserCreate(BaseModel):
             raise ValueError("Password must be at least 8 characters")
         return v
 
-    # @field_validator("email")
-    # @classmethod
-    # def email_must_be_uoguelph(cls, v):
-    #     if not v.endswith("@uoguelph.ca"):
-    #         raise ValueError("Must use a @uoguelph.ca email")
-    #     return v
+    @field_validator("email")
+    @classmethod
+    def email_must_be_uoguelph(cls, v):
+        if not v.endswith("@uoguelph.ca"):
+            raise ValueError("Must use a @uoguelph.ca email")
+        return v
 
 
 class UserUpdate(BaseModel):
@@ -38,12 +38,12 @@ class UserUpdate(BaseModel):
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
 
-    # @field_validator("email")
-    # @classmethod
-    # def email_must_be_uoguelph(cls, v):
-    #     if v and not v.endswith("@uoguelph.ca"):
-    #         raise ValueError("Must use a @uoguelph.ca email")
-    #     return v
+    @field_validator("email")
+    @classmethod
+    def email_must_be_uoguelph(cls, v):
+        if v and not v.endswith("@uoguelph.ca"):
+            raise ValueError("Must use a @uoguelph.ca email")
+        return v
 
 
 class UserLogin(BaseModel):
@@ -61,11 +61,6 @@ class PasswordChange(BaseModel):
             raise ValueError("Password must be at least 8 characters")
         return v
 
-# class RoleSwitch(BaseModel):
-#     role: UserRole
-#     company_name: Optional[str] = None
-#     phone: Optional[str] = None
- 
 #Request & Response    
 class UserResponse(BaseModel):
     id: int

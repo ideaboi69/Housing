@@ -90,7 +90,7 @@ class SubletResponse(BaseModel):
     walk_time_minutes: int
     drive_time_minutes: int
     bus_time_minutes: int 
-    nearest_bus_route: int
+    nearest_bus_route: str
     room_type: RoomType
     total_rooms: int
     bathrooms: int
@@ -130,9 +130,10 @@ class SubletListResponse(BaseModel):
     walk_time_minutes: int
     drive_time_minutes: int
     bus_time_minutes: int
-    nearest_bus_route: int
+    nearest_bus_route: str
     status: SubletStatus
     primary_image: Optional[str] = None
+    images: list[SubletImageResponse] = []
     posted_by: str
     created_at: datetime
 

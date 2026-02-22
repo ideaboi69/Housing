@@ -51,6 +51,14 @@ class SubletConvert(BaseModel):
     gender_preference: Optional[str] = None
 
 # Response
+class ListingImageResponse(BaseModel):
+    id: int
+    image_url: str
+    display_order: int
+
+    class Config:
+        from_attributes = True
+
 class ListingResponse(BaseModel):
     id: int
     property_id: int
@@ -64,6 +72,7 @@ class ListingResponse(BaseModel):
     gender_preference: Optional[str] = None
     status: str
     view_count: int
+    images: list[ListingImageResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -83,6 +92,7 @@ class ListingDetailResponse(BaseModel):
     gender_preference: Optional[str] = None
     status: str
     view_count: int
+    images: list[ListingImageResponse] = []
     created_at: datetime
     # property info
     property_id: int
@@ -103,3 +113,4 @@ class ListingDetailResponse(BaseModel):
     landlord_id: int
     landlord_name: str
     landlord_verified: bool
+
