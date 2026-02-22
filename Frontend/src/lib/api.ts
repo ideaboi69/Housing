@@ -19,6 +19,19 @@ import type {
   FlagCreate,
   FlagResponse,
   LandlordPublicResponse,
+  WriterRegister,
+  WriterResponse,
+  WriterTokenResponse,
+  PostCreate,
+  PostUpdate,
+  PostResponse,
+  PostListResponse,
+  PostCategory,
+  StartConversation,
+  MessageCreate,
+  MessageResponse,
+  ConversationResponse,
+  ConversationDetailResponse,
 } from "@/types";
 
 // ── Base ────────────────────────────────────────────────
@@ -38,7 +51,8 @@ class ApiError extends Error {
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("cribb_token");
+  // Check user token first, then writer token
+  return localStorage.getItem("cribb_token") || localStorage.getItem("cribb_writer_token");
 }
 
 async function request<T>(
@@ -279,6 +293,135 @@ export const landlords = {
     }),
 };
 
+// ── Writers ─────────────────────────────────────────────
+
+export const writers = {
+  register: (data: WriterRegister) =>
+    request<WriterResponse>("/api/writers/register", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  login: (data: { username: string; password: string }) => {
+    const formData = new URLSearchParams();
+    formData.append("username", data.username);
+    formData.append("password", data.password);
+    return request<WriterTokenResponse>("/api/writers/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData.toString(),
+    });
+  },
+};
+
+// ── Posts (The Bubble) ──────────────────────────────────
+
+export const posts = {
+  getAll: (category?: PostCategory) =>
+    request<PostListResponse[]>(
+      `/api/posts${category ? `?category=${category}` : ""}`
+    ),
+
+  getBySlug: (slug: string) =>
+    request<PostResponse>(`/api/posts/${slug}`),
+
+  getMyPosts: () =>
+    request<PostListResponse[]>("/api/posts/my/posts"),
+
+  create: (data: PostCreate) =>
+    request<PostResponse>("/api/posts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: number, data: PostUpdate) =>
+    request<PostResponse>(`/api/posts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) =>
+    request<null>(`/api/posts/${id}`, { method: "DELETE" }),
+
+  uploadCoverImage: async (postId: number, file: File) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/posts/${postId}/cover-image`,
+      {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new ApiError(res.status, body.detail || "Upload failed");
+    }
+    return res.json() as Promise<PostResponse>;
+  },
+};
+
+// ── Messages / Conversations ────────────────────────────
+
+export const messages = {
+  // Student starts a conversation
+  startConversation: (data: StartConversation) =>
+    request<ConversationDetailResponse>("/api/messages/conversations", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Send message in existing conversation (student)
+  sendMessage: (conversationId: number, data: MessageCreate) =>
+    request<MessageResponse>(`/api/messages/conversations/${conversationId}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Landlord replies
+  landlordReply: (conversationId: number, data: MessageCreate) =>
+    request<MessageResponse>(`/api/messages/landlord/conversations/${conversationId}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Get all conversations (student)
+  getConversations: () =>
+    request<ConversationResponse[]>("/api/messages/conversations"),
+
+  // Get all conversations (landlord)
+  getLandlordConversations: () =>
+    request<ConversationResponse[]>("/api/messages/landlord/conversations"),
+
+  // Get single conversation with messages
+  getConversation: (id: number) =>
+    request<ConversationDetailResponse>(`/api/messages/conversations/${id}`),
+
+  // Unread count (student)
+  getUnreadCount: () =>
+    request<{ unread_count: number }>("/api/messages/unread-count"),
+
+  // Unread count (landlord)
+  getLandlordUnreadCount: () =>
+    request<{ unread_count: number }>("/api/messages/landlord/unread-count"),
+
+  // Delete message
+  deleteMessage: (conversationId: number, messageId: number) =>
+    request<null>(`/api/messages/conversations/${conversationId}/messages/${messageId}`, {
+      method: "DELETE",
+    }),
+
+  // Delete conversation (student)
+  deleteConversation: (id: number) =>
+    request<null>(`/api/messages/conversations/${id}`, { method: "DELETE" }),
+
+  // Delete conversation (landlord)
+  landlordDeleteConversation: (id: number) =>
+    request<null>(`/api/messages/landlord/conversations/${id}`, { method: "DELETE" }),
+};
+
 // ── Export all as a single API object ───────────────────
 
 export const api = {
@@ -290,6 +433,9 @@ export const api = {
   saved,
   flags,
   landlords,
+  writers,
+  posts,
+  messages,
 };
 
 export { ApiError };

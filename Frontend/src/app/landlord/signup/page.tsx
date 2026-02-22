@@ -3,9 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuthStore } from "@/lib/auth-store";
-import { api } from "@/lib/api";
-import { UserRole } from "@/types";
 import {
   Building2,
   Phone,
@@ -109,7 +106,6 @@ function FileUploadBox({
 
 export default function LandlordSignupPage() {
   const router = useRouter();
-  const { register } = useAuthStore();
   const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -131,6 +127,8 @@ export default function LandlordSignupPage() {
   });
 
   // Step 3: Verification docs
+  const [idType, setIdType] = useState<string>("drivers_license");
+  const [documentType, setDocumentType] = useState<string>("property_tax_bill");
   const [govId, setGovId] = useState<File | null>(null);
   const [proofOfOwnership, setProofOfOwnership] = useState<File | null>(null);
 
@@ -173,35 +171,60 @@ export default function LandlordSignupPage() {
       setError("Government ID is required for verification");
       return;
     }
+    if (!proofOfOwnership) {
+      setError("Proof of property ownership is required");
+      return;
+    }
 
     setIsLoading(true);
     setError("");
 
     try {
-      // 1. Register the account
-      await register({
-        first_name: account.first_name,
-        last_name: account.last_name,
-        email: account.email,
-        password: account.password,
+      // Map num_properties to backend PropertyRange enum
+      const propertyRangeMap: Record<string, string> = {
+        "1": "1",
+        "2-5": "2-5",
+        "6-10": "6-10",
+        "10+": "10+",
+      };
+
+      const formData = new FormData();
+      formData.append("email", account.email);
+      formData.append("password", account.password);
+      formData.append("first_name", account.first_name);
+      formData.append("last_name", account.last_name);
+      formData.append("phone", business.phone);
+      formData.append("no_of_property", propertyRangeMap[business.num_properties] || "1");
+      formData.append("id_type", idType);
+      formData.append("document_type", documentType);
+      formData.append("id_file", govId);
+      formData.append("document_file", proofOfOwnership);
+      if (business.company_name) {
+        formData.append("company_name", business.company_name);
+      }
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${API_URL}/api/landlords/register`, {
+        method: "POST",
+        body: formData,
       });
 
-      // 2. Switch role to landlord
-      await api.auth.switchRole({
-        role: UserRole.LANDLORD,
-        company_name: business.company_name || undefined,
-        phone: business.phone || undefined,
-      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: "Registration failed" }));
+        throw new Error(body.detail || "Registration failed");
+      }
 
-      // 3. TODO: Upload documents when backend supports file upload
-      // For now, documents are selected but not uploaded — verification stays pending
-      // OJ will add: POST /api/landlords/me/documents with multipart form data
+      const data = await res.json();
 
-      // 4. Reload user and redirect
-      await useAuthStore.getState().loadUser();
-      router.push("/landlord");
+      // Store the token
+      if (data.access_token) {
+        localStorage.setItem("cribb_token", data.access_token);
+      }
+
+      router.push("/landlord/onboarding");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
       setIsLoading(false);
     }
   }
@@ -396,14 +419,59 @@ export default function LandlordSignupPage() {
                 onRemove={() => setGovId(null)}
               />
 
+              {/* ID Type selector */}
+              <div>
+                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>ID Type *</label>
+                <div className="flex gap-2 mt-2">
+                  {[
+                    { key: "drivers_license", label: "Driver's License" },
+                    { key: "passport", label: "Passport" },
+                    { key: "provincial_id", label: "Provincial ID" },
+                  ].map((opt) => (
+                    <button key={opt.key} type="button" onClick={() => setIdType(opt.key)}
+                      className={`flex-1 py-2.5 rounded-lg border transition-all ${
+                        idType === opt.key
+                          ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]"
+                          : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/15"
+                      }`}
+                      style={{ fontSize: "12px", fontWeight: idType === opt.key ? 600 : 500 }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <FileUploadBox
-                label="Proof of property ownership"
+                label="Proof of property ownership *"
                 description="Property tax bill, utility bill in your name at the property address, mortgage statement, or property management license."
                 accepted=".pdf,.jpg,.jpeg,.png"
                 file={proofOfOwnership}
                 onSelect={setProofOfOwnership}
                 onRemove={() => setProofOfOwnership(null)}
               />
+
+              {/* Document Type selector */}
+              <div>
+                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Document Type *</label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {[
+                    { key: "property_tax_bill", label: "Property Tax Bill" },
+                    { key: "utility_bill", label: "Utility Bill" },
+                    { key: "mortgage_statement", label: "Mortgage Statement" },
+                    { key: "property_management_license", label: "Mgmt License" },
+                  ].map((opt) => (
+                    <button key={opt.key} type="button" onClick={() => setDocumentType(opt.key)}
+                      className={`px-3 py-2 rounded-lg border transition-all ${
+                        documentType === opt.key
+                          ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]"
+                          : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/15"
+                      }`}
+                      style={{ fontSize: "12px", fontWeight: documentType === opt.key ? 600 : 500 }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* What happens next */}

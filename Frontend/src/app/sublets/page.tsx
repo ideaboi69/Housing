@@ -7,6 +7,7 @@ import { useIsMobile } from "@/hooks";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
 import { getScoreColor } from "@/lib/utils";
+import Link from "next/link";
 
 /* ════════════════════════════════════════════════════════
    Types & Data
@@ -607,7 +608,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
       <TapeStrip side="left" rotation={-8} />
       <TapeStrip side="right" rotation={6} />
 
-      <div className="bg-white rounded-sm overflow-hidden cursor-pointer hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-shadow" style={{ padding: "8px 8px 14px 8px", boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)" }}>
+      <Link href={`/sublets/${listing.id}`} className="bg-white rounded-sm overflow-hidden cursor-pointer hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-shadow block" style={{ padding: "8px 8px 14px 8px", boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)" }}>
         {/* Image area */}
         <div className="relative rounded-sm overflow-hidden" style={{ height: isMobile ? "130px" : "150px" }}>
           <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.15) 0%, rgba(46,196,182,0.15) 100%)" }}>
@@ -625,7 +626,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
 
           {/* Save */}
           <div className="absolute top-2 right-2">
-            <motion.button onClick={(e) => { e.stopPropagation(); setSaved(!saved); }} className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm" whileTap={{ scale: 0.85 }}>
+            <motion.button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSaved(!saved); }} className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm" whileTap={{ scale: 0.85 }}>
               <Heart className={`w-3.5 h-3.5 ${saved ? "fill-[#E71D36] text-[#E71D36]" : "text-[#1B2D45]/40"}`} />
             </motion.button>
           </div>
@@ -697,7 +698,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
           {/* Pin to board */}
           {onTogglePin && (
             <button
-              onClick={() => onTogglePin(listing.id)}
+              onClick={(e) => { e.preventDefault(); onTogglePin(listing.id); }}
               className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-all active:scale-[0.97] ${
                 isPinned
                   ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
@@ -715,7 +716,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
             <span style={{ fontSize: "10px", fontWeight: 700, color: scoreColor }}>{scoreLabel}</span>
           </div>
         </div>
-      </div>
+      </Link>
     </motion.div>
   );
 }
@@ -837,7 +838,7 @@ function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { lis
   const scoreColor = getScoreColor(listing.healthScore);
 
   return (
-    <div className="bg-white rounded-xl border border-black/[0.04] overflow-hidden hover:shadow-md hover:border-[#FF6B35]/15 transition-all group">
+    <Link href={`/sublets/${listing.id}`} className="bg-white rounded-xl border border-black/[0.04] overflow-hidden hover:shadow-md hover:border-[#FF6B35]/15 transition-all group block">
       {/* Image placeholder */}
       <div className="h-[130px] bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center relative">
         <span style={{ fontSize: "28px" }}>🏠</span>
@@ -870,12 +871,12 @@ function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { lis
           ))}
         </div>
         {onTogglePin && (
-          <button onClick={() => onTogglePin(listing.id)} className={`mt-2 w-full py-1.5 rounded-lg border text-center transition-all active:scale-[0.97] ${isPinned ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/30 hover:border-[#FF6B35]/20"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
+          <button onClick={(e) => { e.preventDefault(); onTogglePin(listing.id); }} className={`mt-2 w-full py-1.5 rounded-lg border text-center transition-all active:scale-[0.97] ${isPinned ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/30 hover:border-[#FF6B35]/20"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
             📌 {isPinned ? "Pinned" : "Pin"}
           </button>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 

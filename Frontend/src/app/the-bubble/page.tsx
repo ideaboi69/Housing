@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   ChevronUp, Bookmark, Share2, MoreHorizontal, X, ImagePlus,
   Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
+import { api, ApiError } from "@/lib/api";
+import type { PostListResponse, PostCategory as PostCategoryType } from "@/types";
 
 /* ═══════════════════════════════════════════════════════
    TYPES
    ═══════════════════════════════════════════════════════ */
 
-type Category = "events" | "new-in-guelph" | "seasonal" | "campus" | "tips";
+type Category = "event" | "deal" | "news" | "lifestyle" | "food" | "other";
 type SortMode = "trending" | "new" | "top";
 
 interface Post {
@@ -31,19 +33,22 @@ interface Post {
   isHappeningToday?: boolean;
   upvotes: number;
   postedAt: number; // unix ms for sorting
+  slug?: string;
+  viewCount?: number;
 }
 
 /* ═══════════════════════════════════════════════════════
-   CATEGORY DEFINITIONS
+   CATEGORY DEFINITIONS — matches backend PostCategory
    ═══════════════════════════════════════════════════════ */
 
 const CATEGORIES: { key: Category | "all"; label: string; emoji: string; color: string }[] = [
   { key: "all", label: "All Posts", emoji: "🔥", color: "#FF6B35" },
-  { key: "events", label: "Events", emoji: "🎉", color: "#6C5CE7" },
-  { key: "new-in-guelph", label: "New in Guelph", emoji: "🏪", color: "#2EC4B6" },
-  { key: "seasonal", label: "Seasonal", emoji: "☀️", color: "#FFB627" },
-  { key: "campus", label: "Campus", emoji: "🎓", color: "#1B2D45" },
-  { key: "tips", label: "Tips & PSAs", emoji: "💡", color: "#2EC4B6" },
+  { key: "event", label: "Events", emoji: "🎉", color: "#6C5CE7" },
+  { key: "deal", label: "Deals", emoji: "🏪", color: "#2EC4B6" },
+  { key: "news", label: "News", emoji: "📰", color: "#1B2D45" },
+  { key: "lifestyle", label: "Lifestyle", emoji: "☀️", color: "#FFB627" },
+  { key: "food", label: "Food", emoji: "🍕", color: "#E84393" },
+  { key: "other", label: "Other", emoji: "💡", color: "#98A3B0" },
 ];
 
 function getCategoryMeta(cat: Category) {
@@ -62,7 +67,7 @@ const POSTS: Post[] = [
   {
     id: "p1", author: "Jordan", initial: "J",
     avatarGradient: "linear-gradient(135deg, #FF6B35, #FFB627)",
-    verified: true, timestamp: "2h ago", category: "events",
+    verified: true, timestamp: "2h ago", category: "event",
     title: "Homecoming 2026 lineup just dropped!",
     body: "They got Tory Lanez and bbno$ headlining at Alumni Stadium. Tickets go live March 1st for students. Last year sold out in 20 minutes so set your alarms. Also there's a free BBQ at Johnston Green beforehand.",
     image: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&h=450&fit=crop",
@@ -72,7 +77,7 @@ const POSTS: Post[] = [
   {
     id: "p2", author: "Ava", initial: "A",
     avatarGradient: "linear-gradient(135deg, #6C5CE7, #a29bfe)",
-    verified: true, timestamp: "3h ago", category: "new-in-guelph",
+    verified: true, timestamp: "3h ago", category: "food",
     title: "New ramen spot on Gordon St is actually amazing",
     body: "Yuki Ramen just opened where the old Subway used to be. Tried the tonkotsu — absolutely insane for the price ($14). They also do a student discount with your OneCard. Highly recommend going before it gets too busy.",
     image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&h=450&fit=crop",
@@ -81,7 +86,7 @@ const POSTS: Post[] = [
   {
     id: "p3", author: "Marcus", initial: "M",
     avatarGradient: "linear-gradient(135deg, #2EC4B6, #0984e3)",
-    verified: true, timestamp: "5h ago", category: "tips",
+    verified: true, timestamp: "5h ago", category: "other",
     title: "PSA: You can get free printing at the library",
     body: "Most people don't know this but McLaughlin Library gives every student $20 of free printing credits per semester. Just go to the help desk with your student card and they'll load it. Saved me so much money during exam season.",
     upvotes: 156, postedAt: now - 5 * HOUR,
@@ -89,7 +94,7 @@ const POSTS: Post[] = [
   {
     id: "p4", author: "Fatima", initial: "F",
     avatarGradient: "linear-gradient(135deg, #FFB627, #FF6B35)",
-    verified: true, timestamp: "8h ago", category: "events",
+    verified: true, timestamp: "8h ago", category: "event",
     title: "Farmers Market is back starting this Saturday!",
     body: "The Guelph Farmers Market downtown is back for the season. Every Saturday 7am-12pm. They have the best apple cider donuts and local honey. It gets packed by 9am so go early if you want the good stuff.",
     eventDate: "Today", eventLocation: "Downtown Guelph", isHappeningToday: true,
@@ -98,7 +103,7 @@ const POSTS: Post[] = [
   {
     id: "p5", author: "Lena", initial: "L",
     avatarGradient: "linear-gradient(135deg, #1B2D45, #5C6B7A)",
-    verified: true, timestamp: "1d ago", category: "campus",
+    verified: true, timestamp: "1d ago", category: "news",
     title: "UC renovations will close the south entrance all March",
     body: "Just got an email from UofG facilities. The University Centre south entrance is closed for renovations starting March 3rd through April. Use the north entrance near the courtyard. The Bullring cafe will still be open thankfully.",
     upvotes: 72, postedAt: now - DAY,
@@ -106,7 +111,7 @@ const POSTS: Post[] = [
   {
     id: "p6", author: "Sam", initial: "S",
     avatarGradient: "linear-gradient(135deg, #FFB627, #e17055)",
-    verified: true, timestamp: "1d ago", category: "seasonal",
+    verified: true, timestamp: "1d ago", category: "lifestyle",
     title: "Best patios to hit up this spring in Guelph",
     body: "Now that it's warming up here's my ranked list: 1) Baker St. Station (huge patio, great vibes) 2) The Wooly (rooftop!!) 3) Royal City Brewing (dogs allowed) 4) Miijidaa (fancy but worth it). You're welcome.",
     upvotes: 201, postedAt: now - DAY - 2 * HOUR,
@@ -357,17 +362,27 @@ function BecomeWriterCard({ onApply, compact }: { onApply: () => void; compact?:
    ═══════════════════════════════════════════════════════ */
 
 function WriterModal({ onClose, onApproved }: { onClose: () => void; onApproved: () => void }) {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [affiliation, setAffiliation] = useState("");
-  const [affiliationType, setAffiliationType] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [businessName, setBusinessName] = useState("");
+  const [businessType, setBusinessType] = useState("");
+  const [website, setWebsite] = useState("");
+  const [phone, setPhone] = useState("");
   const [reason, setReason] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const isMobile = useIsMobile();
 
-  const canSubmit = name.trim() && email.trim() && affiliation.trim() && affiliationType && reason.trim().length > 10;
+  const canSubmit = firstName.trim() && lastName.trim() && email.trim() && password.length >= 6 && businessType && reason.trim().length > 10;
 
   const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
+  const labelEl = (text: string, required = true) => (
+    <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{text}{required && " *"}</label>
+  );
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -376,7 +391,7 @@ function WriterModal({ onClose, onApproved }: { onClose: () => void; onApproved:
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="bg-white rounded-2xl w-full overflow-hidden" style={{ maxWidth: isMobile ? "100%" : "480px", maxHeight: "90vh", boxShadow: "0 24px 80px rgba(0,0,0,0.15)" }}>
+        className="bg-white rounded-2xl w-full overflow-hidden" style={{ maxWidth: isMobile ? "100%" : "520px", maxHeight: "90vh", boxShadow: "0 24px 80px rgba(0,0,0,0.15)" }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
@@ -398,51 +413,86 @@ function WriterModal({ onClose, onApproved }: { onClose: () => void; onApproved:
           {!submitted ? (
             <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -20 }}>
               <div className="px-5 py-4 space-y-3.5 overflow-y-auto" style={{ maxHeight: "calc(90vh - 180px)" }}>
-                {/* Name */}
-                <div>
-                  <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Full Name *</label>
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+
+                {/* Name row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    {labelEl("First Name")}
+                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+                  </div>
+                  <div>
+                    {labelEl("Last Name")}
+                    <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+                  </div>
                 </div>
 
                 {/* Email */}
                 <div>
-                  <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email *</label>
+                  {labelEl("Email")}
                   <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@uoguelph.ca or business email" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
                   <p className="text-[#98A3B0] mt-1" style={{ fontSize: "10px" }}>UofG students use your @uoguelph.ca email. Businesses use your business email.</p>
                 </div>
 
-                {/* Affiliation type + name */}
+                {/* Password */}
                 <div>
-                  <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>I&apos;m writing as a... *</label>
-                  <div className="flex flex-wrap gap-1.5 mb-2.5">
+                  {labelEl("Password")}
+                  <div className="relative">
+                    <input type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min. 6 characters" className={`${inputClass} pr-10`} style={{ fontSize: "13px", fontWeight: 500 }} />
+                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#98A3B0] hover:text-[#5C6B7A] transition-colors">
+                      {showPw ? <span style={{ fontSize: "11px" }}>Hide</span> : <span style={{ fontSize: "11px" }}>Show</span>}
+                    </button>
+                  </div>
+                  <p className="text-[#98A3B0] mt-1" style={{ fontSize: "10px" }}>You&apos;ll use this to log in and manage your posts.</p>
+                </div>
+
+                {/* Business type */}
+                <div>
+                  {labelEl("I'm writing as a...")}
+                  <div className="flex flex-wrap gap-1.5">
                     {[
                       { key: "student", label: "🎓 Student", color: "#1B2D45" },
                       { key: "club", label: "🏛️ Club / Org", color: "#6C5CE7" },
                       { key: "business", label: "🏪 Local Business", color: "#2EC4B6" },
                       { key: "other", label: "✨ Other", color: "#FFB627" },
                     ].map((opt) => (
-                      <button key={opt.key} onClick={() => setAffiliationType(opt.key)}
-                        className={`px-3 py-1.5 rounded-full border transition-all ${affiliationType === opt.key ? "border-transparent text-white" : "border-black/[0.06] text-[#5C6B7A] hover:border-black/15 bg-white"}`}
-                        style={{ fontSize: "11px", fontWeight: 600, backgroundColor: affiliationType === opt.key ? opt.color : undefined }}>
+                      <button key={opt.key} onClick={() => setBusinessType(opt.key)}
+                        className={`px-3 py-1.5 rounded-full border transition-all ${businessType === opt.key ? "border-transparent text-white" : "border-black/[0.06] text-[#5C6B7A] hover:border-black/15 bg-white"}`}
+                        style={{ fontSize: "11px", fontWeight: 600, backgroundColor: businessType === opt.key ? opt.color : undefined }}>
                         {opt.label}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Organization / club name */}
+                {/* Business name — always shown, label adapts */}
                 <div>
-                  <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {affiliationType === "business" ? "Business Name *" : affiliationType === "club" ? "Club / Organization *" : "Program or Affiliation *"}
-                  </label>
-                  <input type="text" value={affiliation} onChange={(e) => setAffiliation(e.target.value)}
-                    placeholder={affiliationType === "business" ? "e.g. Yuki Ramen" : affiliationType === "club" ? "e.g. UofG Dance Club" : "e.g. Computer Science, 3rd year"}
+                  {labelEl(businessType === "business" ? "Business Name" : businessType === "club" ? "Club / Organization Name" : "Organization / Program")}
+                  <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)}
+                    placeholder={businessType === "business" ? "e.g. Yuki Ramen" : businessType === "club" ? "e.g. UofG Dance Club" : "e.g. Computer Science, 3rd Year"}
                     className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
                 </div>
 
-                {/* What will you post about */}
+                {/* Conditional: website + phone for businesses */}
+                <AnimatePresence>
+                  {(businessType === "business" || businessType === "club") && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          {labelEl("Website", false)}
+                          <input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className={inputClass} style={{ fontSize: "12px", fontWeight: 500 }} />
+                        </div>
+                        <div>
+                          {labelEl("Phone", false)}
+                          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(519) 555-0123" className={inputClass} style={{ fontSize: "12px", fontWeight: 500 }} />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Reason */}
                 <div>
-                  <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>What will you post about? *</label>
+                  {labelEl("What will you post about?")}
                   <textarea value={reason} onChange={(e) => setReason(e.target.value)}
                     placeholder="Events, campus news, local deals, tips for students..." rows={3}
                     className={`${inputClass} resize-none`} style={{ fontSize: "13px", lineHeight: 1.6 }} />
@@ -460,12 +510,39 @@ function WriterModal({ onClose, onApproved }: { onClose: () => void; onApproved:
               {/* Footer */}
               <div className="px-5 py-4 border-t border-black/5 flex items-center justify-between gap-3">
                 <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-[#E8E4DC] text-[#5C6B7A] hover:bg-[#1B2D45]/[0.03] transition-all" style={{ fontSize: "13px", fontWeight: 600 }}>Cancel</button>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={() => { if (canSubmit) setSubmitted(true); }}
+                <motion.button whileTap={{ scale: 0.97 }} onClick={async () => {
+                  if (!canSubmit || submitting) return;
+                  setSubmitting(true);
+                  setError("");
+                  try {
+                    await api.writers.register({
+                      email,
+                      password,
+                      first_name: firstName,
+                      last_name: lastName,
+                      business_name: businessName,
+                      business_type: businessType || undefined,
+                      website: website || undefined,
+                      phone: phone || undefined,
+                      reason,
+                    });
+                    setSubmitted(true);
+                  } catch (err) {
+                    setError(err instanceof ApiError ? err.detail : "Something went wrong. Please try again.");
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
                   className="px-5 py-2.5 rounded-xl text-white transition-all"
                   style={{ fontSize: "13px", fontWeight: 700, backgroundColor: canSubmit ? "#FF6B35" : "#98A3B0", boxShadow: canSubmit ? "0 2px 12px rgba(255,107,53,0.35)" : "none", cursor: canSubmit ? "pointer" : "not-allowed" }}>
-                  Submit Application
+                  {submitting ? "Submitting..." : "Submit Application"}
                 </motion.button>
               </div>
+              {error && (
+                <div className="px-5 pb-3">
+                  <p className="text-[#E71D36] bg-[#E71D36]/5 rounded-xl px-3 py-2" style={{ fontSize: "12px", fontWeight: 500 }}>{error}</p>
+                </div>
+              )}
             </motion.div>
           ) : (
             <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="px-5 py-10 text-center">
@@ -497,7 +574,32 @@ function PostModal({ onClose }: { onClose: () => void }) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const isMobile = useIsMobile();
+
+  const handleSubmit = async () => {
+    if (!title || !selectedCategory || submitting) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await api.posts.create({
+        title,
+        content: body,
+        preview: body.slice(0, 160),
+        category: selectedCategory as PostCategoryType,
+        event_date: eventDate || undefined,
+        event_location: eventLocation || undefined,
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to create post.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
 
@@ -544,16 +646,16 @@ function PostModal({ onClose }: { onClose: () => void }) {
 
           {/* Conditional event fields */}
           <AnimatePresence>
-            {selectedCategory === "events" && (
+            {selectedCategory === "event" && (
               <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Event Date</label>
-                    <input type="date" className={inputClass} style={{ fontSize: "12px" }} />
+                    <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className={inputClass} style={{ fontSize: "12px" }} />
                   </div>
                   <div>
                     <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Location</label>
-                    <input type="text" placeholder="Where?" className={inputClass} style={{ fontSize: "12px" }} />
+                    <input type="text" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} placeholder="Where?" className={inputClass} style={{ fontSize: "12px" }} />
                   </div>
                 </div>
               </motion.div>
@@ -567,13 +669,16 @@ function PostModal({ onClose }: { onClose: () => void }) {
           </motion.div>
         </div>
 
-        <div className="px-5 py-4 border-t border-black/5 flex items-center justify-between gap-3">
-          <p className="text-[#98A3B0]" style={{ fontSize: "10px", lineHeight: 1.5 }}>Posts are public and auto-expire in 30 days.</p>
-          <motion.button whileTap={{ scale: 0.97 }}
-            className="shrink-0 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors"
-            style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)", opacity: title && selectedCategory ? 1 : 0.5 }}>
-            Post to The Bubble
-          </motion.button>
+        <div className="px-5 py-4 border-t border-black/5 flex flex-col gap-2">
+          {error && <p className="text-[#E71D36] bg-[#E71D36]/5 rounded-xl px-3 py-2" style={{ fontSize: "12px", fontWeight: 500 }}>{error}</p>}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[#98A3B0]" style={{ fontSize: "10px", lineHeight: 1.5 }}>Posts are public and auto-expire in 30 days.</p>
+            <motion.button whileTap={{ scale: 0.97 }} onClick={handleSubmit} disabled={submitting || !title || !selectedCategory}
+              className="shrink-0 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors disabled:opacity-50"
+              style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}>
+              {submitting ? "Posting..." : "Post to The Bubble"}
+            </motion.button>
+          </div>
         </div>
       </motion.div>
     </motion.div>

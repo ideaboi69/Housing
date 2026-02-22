@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Menu, X, Settings, Bookmark, Heart, LogOut, ChevronDown,
-  User, Shield, LayoutDashboard,
+  User, Shield, LayoutDashboard, MessageCircle,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 
 const navItems = [
   { label: "Browse", path: "/browse" },
@@ -42,12 +43,30 @@ export function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const isLandlord = user?.role === "landlord";
 
   const allNavItems = isLandlord
     ? [{ label: "Dashboard", path: "/landlord" }, ...navItems]
     : navItems;
+
+  // Poll unread message count
+  const fetchUnread = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await api.messages.getUnreadCount();
+      setUnreadCount(data.unread_count);
+    } catch {
+      // silently fail
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+    return () => clearInterval(interval);
+  }, [fetchUnread]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -67,6 +86,7 @@ export function Navbar() {
   }, [pathname]);
 
   const dropdownLinks = [
+    { label: "Messages", href: "/messages", icon: MessageCircle },
     { label: "Saved Listings", href: "/saved", icon: Bookmark },
     { label: "My Matches", href: "/roommates/matches", icon: Heart },
     { label: "Settings", href: "/settings", icon: Settings },
@@ -110,8 +130,29 @@ export function Navbar() {
         </div>
 
         {/* Right side – desktop */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-2">
           {user ? (
+            <>
+              {/* Message icon */}
+              <Link
+                href="/messages"
+                className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                  pathname === "/messages"
+                    ? "bg-[#FF6B35]/10 text-[#FF6B35]"
+                    : "text-[#1B2D45]/40 hover:bg-[#1B2D45]/5 hover:text-[#1B2D45]/60"
+                }`}
+              >
+                <MessageCircle className="w-[18px] h-[18px]" />
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#FF6B35] text-white flex items-center justify-center"
+                    style={{ fontSize: "9px", fontWeight: 800 }}
+                  >
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Link>
+
             <div className="relative" ref={dropdownRef}>
               {/* Avatar trigger */}
               <button
@@ -203,6 +244,7 @@ export function Navbar() {
                 </div>
               )}
             </div>
+            </>
           ) : (
             <>
               <Link

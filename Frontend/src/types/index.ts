@@ -341,3 +341,169 @@ export interface ListingImage {
   image_url: string;
   display_order: number;
 }
+
+// ── Writer ─────────────────────────────────────────────
+
+export enum WriterStatus {
+  PENDING = "pending",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+  REVOKED = "revoked",
+}
+
+export interface WriterRegister {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  business_name: string;
+  business_type?: string;
+  website?: string;
+  phone?: string;
+  reason: string;
+}
+
+export interface WriterResponse {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  business_name: string;
+  business_type?: string;
+  website?: string;
+  phone?: string;
+  status: WriterStatus;
+  created_at: string;
+}
+
+export interface WriterTokenResponse {
+  access_token: string;
+  writer: WriterResponse;
+}
+
+// ── Post (The Bubble) ──────────────────────────────────
+
+export enum PostStatus {
+  DRAFT = "draft",
+  PUBLISHED = "published",
+  ARCHIVED = "archived",
+}
+
+export enum PostCategory {
+  EVENT = "event",
+  DEAL = "deal",
+  NEWS = "news",
+  LIFESTYLE = "lifestyle",
+  FOOD = "food",
+  OTHER = "other",
+}
+
+export interface PostCreate {
+  title: string;
+  content: string;
+  preview?: string;
+  category: PostCategory;
+  event_date?: string;
+  event_location?: string;
+  event_link?: string;
+  deal_expires?: string;
+}
+
+export interface PostUpdate {
+  title?: string;
+  content?: string;
+  preview?: string;
+  category?: PostCategory;
+  status?: PostStatus;
+  event_date?: string;
+  event_location?: string;
+  event_link?: string;
+  deal_expires?: string;
+}
+
+export interface PostResponse {
+  id: number;
+  title: string;
+  slug: string;
+  content: string;
+  preview?: string;
+  cover_image_url?: string;
+  category: PostCategory;
+  author_name: string;
+  author_type: string;
+  status: PostStatus;
+  view_count: number;
+  event_date?: string;
+  event_location?: string;
+  event_link?: string;
+  deal_expires?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PostListResponse {
+  id: number;
+  title: string;
+  slug: string;
+  preview?: string;
+  cover_image_url?: string;
+  category: PostCategory;
+  author_name: string;
+  author_type: string;
+  status: PostStatus;
+  view_count: number;
+  event_date?: string;
+  deal_expires?: string;
+  created_at: string;
+}
+
+// ── Messages / Conversations ───────────────────────────
+
+export enum SenderType {
+  STUDENT = "student",
+  LANDLORD = "landlord",
+}
+
+export interface StartConversation {
+  listing_id: number;
+  content: string;
+}
+
+export interface MessageCreate {
+  content: string;
+}
+
+export interface MessageResponse {
+  id: number;
+  conversation_id: number;
+  sender_type: SenderType;
+  sender_id: number;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface ConversationResponse {
+  id: number;
+  listing_id: number;
+  listing_title: string;
+  user_id: number;
+  user_name?: string;
+  landlord_id: number;
+  landlord_name: string;
+  created_at: string;
+  updated_at: string;
+  last_message?: MessageResponse;
+  unread_count: number;
+}
+
+export interface ConversationDetailResponse {
+  id: number;
+  listing_id: number;
+  listing_title: string;
+  user_id: number;
+  user_name: string;
+  landlord_id: number;
+  landlord_name: string;
+  messages: MessageResponse[];
+}
