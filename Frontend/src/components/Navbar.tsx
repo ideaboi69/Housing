@@ -1,29 +1,77 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import {
+  Menu, X, Settings, Bookmark, Heart, LogOut, ChevronDown,
+  User, Shield, LayoutDashboard,
+} from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 
 const navItems = [
   { label: "Browse", path: "/browse" },
   { label: "Sublets", path: "/sublets" },
   { label: "Roommates", path: "/roommates" },
-  { label: "Demand Board", path: "/demand-board" },
+  { label: "The Bubble", path: "/the-bubble" },
 ];
+
+/* ── Avatar helper ── */
+function UserAvatar({ firstName, lastName, size = 34 }: { firstName: string; lastName: string; size?: number }) {
+  const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+  return (
+    <div
+      className="rounded-full flex items-center justify-center text-white shrink-0"
+      style={{
+        width: size,
+        height: size,
+        background: "linear-gradient(135deg, #FF6B35, #FFB627)",
+        fontSize: `${size * 0.38}px`,
+        fontWeight: 700,
+        letterSpacing: "-0.02em",
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
 
 export function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
 
   const isLandlord = user?.role === "landlord";
 
-  // Add Dashboard link for landlords
   const allNavItems = isLandlord
     ? [{ label: "Dashboard", path: "/landlord" }, ...navItems]
     : navItems;
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [dropdownOpen]);
+
+  // Close dropdown on route change
+  useEffect(() => {
+    setDropdownOpen(false);
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  const dropdownLinks = [
+    { label: "Saved Listings", href: "/saved", icon: Bookmark },
+    { label: "My Matches", href: "/roommates/matches", icon: Heart },
+    { label: "Settings", href: "/settings", icon: Settings },
+    ...(isLandlord ? [{ label: "Landlord Dashboard", href: "/landlord", icon: LayoutDashboard }] : []),
+  ];
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
@@ -64,30 +112,97 @@ export function Navbar() {
         {/* Right side – desktop */}
         <div className="hidden md:flex items-center gap-3">
           {user ? (
-            <>
-              {!isLandlord && (
-                <Link
-                  href="/landlord/signup"
-                  className="text-[#1B2D45]/40 hover:text-[#FF6B35] transition-colors px-2"
-                  style={{ fontSize: "12px", fontWeight: 500 }}
-                >
-                  Are you a landlord?
-                </Link>
-              )}
-              <span
-                className="text-[#1B2D45]/60 px-3"
-                style={{ fontSize: "14px", fontWeight: 500 }}
-              >
-                {user.first_name}
-              </span>
+            <div className="relative" ref={dropdownRef}>
+              {/* Avatar trigger */}
               <button
-                onClick={logout}
-                className="px-5 py-2 rounded-xl border border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all"
-                style={{ fontSize: "14px", fontWeight: 500 }}
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-[#1B2D45]/[0.04] transition-all"
               >
-                Log out
+                <UserAvatar firstName={user.first_name} lastName={user.last_name} />
+                <span
+                  className="text-[#1B2D45]/80 max-w-[120px] truncate"
+                  style={{ fontSize: "13px", fontWeight: 600 }}
+                >
+                  {user.first_name}
+                </span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-[#1B2D45]/40 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
+                />
               </button>
-            </>
+
+              {/* Dropdown menu */}
+              {dropdownOpen && (
+                <div
+                  className="absolute right-0 top-[calc(100%+6px)] w-[260px] bg-white rounded-2xl border border-black/[0.06] overflow-hidden"
+                  style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.04)" }}
+                >
+                  {/* User info header */}
+                  <div className="px-4 pt-4 pb-3 border-b border-black/[0.04]">
+                    <div className="flex items-center gap-3">
+                      <UserAvatar firstName={user.first_name} lastName={user.last_name} size={40} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
+                          {user.first_name} {user.last_name}
+                        </p>
+                        <p className="text-[#98A3B0] truncate" style={{ fontSize: "11px" }}>
+                          {user.email}
+                        </p>
+                      </div>
+                      {user.email_verified && (
+                        <div className="w-5 h-5 rounded-full bg-[#2EC4B6]/10 flex items-center justify-center shrink-0" title="Email verified">
+                          <Shield className="w-3 h-3 text-[#2EC4B6]" />
+                        </div>
+                      )}
+                    </div>
+                    {!isLandlord && (
+                      <Link
+                        href="/landlord/signup"
+                        className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[#FAF8F4] border border-[#E8E4DC] text-[#1B2D45]/60 hover:border-[#FF6B35]/30 hover:text-[#FF6B35] transition-all"
+                        style={{ fontSize: "11px", fontWeight: 600 }}
+                      >
+                        <User className="w-3 h-3" />
+                        Are you a landlord?
+                      </Link>
+                    )}
+                  </div>
+
+                  {/* Links */}
+                  <div className="py-1.5">
+                    {dropdownLinks.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = pathname === item.href;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${
+                            isActive
+                              ? "bg-[#FF6B35]/5 text-[#FF6B35]"
+                              : "text-[#1B2D45]/70 hover:bg-[#1B2D45]/[0.03] hover:text-[#1B2D45]"
+                          }`}
+                          style={{ fontSize: "13px", fontWeight: isActive ? 600 : 500 }}
+                        >
+                          <Icon className="w-4 h-4" />
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+
+                  {/* Logout */}
+                  <div className="border-t border-black/[0.04] py-1.5">
+                    <button
+                      onClick={() => { logout(); setDropdownOpen(false); }}
+                      className="flex items-center gap-3 px-4 py-2.5 w-full text-left text-[#E71D36]/80 hover:bg-[#E71D36]/5 transition-colors"
+                      style={{ fontSize: "13px", fontWeight: 500 }}
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Log out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <Link
@@ -125,6 +240,22 @@ export function Navbar() {
       {mobileMenuOpen && (
         <div className="md:hidden absolute top-[56px] left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-black/[0.08] shadow-lg z-40">
           <div className="px-4 py-3 space-y-1">
+            {/* User info on mobile */}
+            {user && (
+              <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-[#FAF8F4] rounded-xl">
+                <UserAvatar firstName={user.first_name} lastName={user.last_name} size={36} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
+                    {user.first_name} {user.last_name}
+                  </p>
+                  <p className="text-[#98A3B0] truncate" style={{ fontSize: "11px" }}>
+                    {user.email}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Nav links */}
             {allNavItems.map((item) => {
               const isActive = pathname === item.path;
               return (
@@ -143,13 +274,37 @@ export function Navbar() {
                 </Link>
               );
             })}
+
+            {/* User-specific links on mobile */}
+            {user && (
+              <div className="border-t border-black/5 mt-2 pt-2 space-y-1">
+                {dropdownLinks.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-[#1B2D45]/60 hover:bg-[#1B2D45]/5 rounded-xl transition-colors"
+                      style={{ fontSize: "14px", fontWeight: 500 }}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Auth actions */}
             <div className="flex items-center gap-2 pt-3 pb-1 px-2 border-t border-black/5 mt-2">
               {user ? (
                 <button
                   onClick={() => { logout(); setMobileMenuOpen(false); }}
-                  className="flex-1 py-2.5 rounded-xl border border-[#1B2D45]/15 text-[#1B2D45] text-center"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#E71D36]/20 text-[#E71D36]/70"
                   style={{ fontSize: "14px", fontWeight: 500 }}
                 >
+                  <LogOut className="w-4 h-4" />
                   Log out
                 </button>
               ) : (

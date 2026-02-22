@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
-import { Check, Shield, Flag, X } from "lucide-react";
+import { Check, Shield, Flag, X, Target, Lock, MessageCircle, Footprints, Bookmark, MessageCircleMore } from "lucide-react";
 import { useIsMobile } from "@/hooks";
 
 /* ════════════════════════════════════════════════════════
@@ -13,12 +13,72 @@ interface LifestyleProfile {
   id: string;
   firstName: string;
   initial: string; // last name initial only
+  year: string; // e.g. "3rd year"
   program: string;
   budget: [number, number]; // min, max
   moveIn: string;
+  leaseLength: string; // e.g. "8-month", "12-month"
+  bio: string;
   tags: Record<string, string>; // category → value
   compatibility?: number;
+  saved?: boolean;
 }
+
+// Short subtitles for each tag value (shown under the pill label like Figma)
+const TAG_SUBTITLES: Record<string, string> = {
+  "Early Bird (before 10pm)": "Up by 7–8am",
+  "Night Owl (after midnight)": "Up past midnight",
+  "Flexible": "Goes with the flow",
+  "Very Tidy": "Tidies daily",
+  "Reasonably Clean": "Weekly tidying",
+  "Relaxed": "Easygoing about mess",
+  "Quiet — I need silence": "Prefers calm space",
+  "Moderate — music at a normal volume": "Casual background noise",
+  "Loud — I play music / have people over": "Loves energy",
+  "Rarely / Never": "Values quiet space",
+  "Sometimes (weekends)": "Social on weekends",
+  "Often — I'm social": "Loves having guests",
+  "Study at home": "Studies at home",
+  "Library / campus mostly": "Studies on campus",
+  "Mix of both": "Flexible study spots",
+  "No smoking at all": "Smoke-free",
+  "Outside only": "Outdoors only",
+  "I smoke / vape": "Smokes / vapes",
+  "No pets please": "No pets",
+  "I'm fine with pets": "Open to pets",
+  "I have a pet": "Has a pet",
+  "I cook daily": "Shares kitchen a lot",
+  "A few times a week": "Occasional cook",
+  "Mostly takeout / meal plan": "Rarely cooks",
+};
+
+// Short display labels for tags (cleaner than full option text)
+const TAG_SHORT_LABELS: Record<string, string> = {
+  "Early Bird (before 10pm)": "Early Bird",
+  "Night Owl (after midnight)": "Night Owl",
+  "Flexible": "Flexible",
+  "Very Tidy": "Very Clean",
+  "Reasonably Clean": "Relaxed Clean",
+  "Relaxed": "Easy Going",
+  "Quiet — I need silence": "Quiet",
+  "Moderate — music at a normal volume": "Moderate Noise",
+  "Loud — I play music / have people over": "Social",
+  "Rarely / Never": "Quiet Space",
+  "Sometimes (weekends)": "Social",
+  "Often — I'm social": "Very Social",
+  "Study at home": "Studious",
+  "Library / campus mostly": "Campus Studier",
+  "Mix of both": "Flexible",
+  "No smoking at all": "Non-Smoker",
+  "Outside only": "Outside Smoker",
+  "I smoke / vape": "Smoker",
+  "No pets please": "No Pets",
+  "I'm fine with pets": "Pet Friendly",
+  "I have a pet": "Has Pet",
+  "I cook daily": "Cooks Often",
+  "A few times a week": "Cooks Sometimes",
+  "Mostly takeout / meal plan": "Takeout",
+};
 
 const LIFESTYLE_CATEGORIES = [
   {
@@ -88,38 +148,45 @@ const GENDER_HOUSING_OPTIONS = ["Mixed gender fine", "Same gender preferred", "N
 
 const mockProfiles: LifestyleProfile[] = [
   {
-    id: "r1", firstName: "Alex", initial: "T.", program: "Computer Science",
-    budget: [500, 650], moveIn: "Fall 2026",
+    id: "r1", firstName: "Alex", initial: "T.", year: "3rd year", program: "Computer Science",
+    budget: [500, 650], moveIn: "Fall 2026", leaseLength: "8-month",
+    bio: "Looking for a chill roommate for a 2BR near campus. I'm pretty quiet during the week but love going out on weekends.",
     tags: { sleep: "Night Owl (after midnight)", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Mix of both", smoking: "No smoking at all", pets: "I'm fine with pets", cooking: "I cook daily" },
   },
   {
-    id: "r2", firstName: "Jordan", initial: "K.", program: "Business Administration",
-    budget: [650, 800], moveIn: "Fall 2026",
+    id: "r2", firstName: "Jordan", initial: "K.", year: "2nd year", program: "Business Administration",
+    budget: [650, 800], moveIn: "Fall 2026", leaseLength: "12-month",
+    bio: "Transfer student looking for a clean, organized living situation. I keep to myself mostly but enjoy the occasional movie night.",
     tags: { sleep: "Early Bird (before 10pm)", cleanliness: "Very Tidy", noise: "Quiet — I need silence", guests: "Rarely / Never", study: "Library / campus mostly", smoking: "No smoking at all", pets: "No pets please", cooking: "A few times a week" },
   },
   {
-    id: "r3", firstName: "Sam", initial: "W.", program: "Engineering",
-    budget: [500, 650], moveIn: "Fall 2026",
+    id: "r3", firstName: "Sam", initial: "W.", year: "4th year", program: "Engineering",
+    budget: [500, 650], moveIn: "Fall 2026", leaseLength: "8-month",
+    bio: "Social butterfly who loves hosting. Looking for roommates who are cool with people coming over. I'll cook for the house!",
     tags: { sleep: "Night Owl (after midnight)", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Often — I'm social", study: "Study at home", smoking: "Outside only", pets: "I'm fine with pets", cooking: "Mostly takeout / meal plan" },
   },
   {
-    id: "r4", firstName: "Riley", initial: "M.", program: "Kinesiology",
-    budget: [650, 800], moveIn: "Winter 2027",
+    id: "r4", firstName: "Riley", initial: "M.", year: "2nd year", program: "Kinesiology",
+    budget: [650, 800], moveIn: "Winter 2027", leaseLength: "8-month",
+    bio: "Early riser, gym every morning. I have a small cat named Mochi. Looking for someone who's tidy and respectful of shared spaces.",
     tags: { sleep: "Early Bird (before 10pm)", cleanliness: "Very Tidy", noise: "Quiet — I need silence", guests: "Sometimes (weekends)", study: "Library / campus mostly", smoking: "No smoking at all", pets: "I have a pet", cooking: "I cook daily" },
   },
   {
-    id: "r5", firstName: "Taylor", initial: "R.", program: "Environmental Science",
-    budget: [500, 650], moveIn: "Fall 2026",
+    id: "r5", firstName: "Taylor", initial: "R.", year: "3rd year", program: "Environmental Science",
+    budget: [500, 650], moveIn: "Fall 2026", leaseLength: "12-month",
+    bio: "Plant parent looking for a relaxed living situation. I'm flexible on most things and easy to get along with.",
     tags: { sleep: "Flexible", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Mix of both", smoking: "No smoking at all", pets: "I'm fine with pets", cooking: "A few times a week" },
   },
   {
-    id: "r6", firstName: "Morgan", initial: "L.", program: "Psychology",
-    budget: [800, 2000], moveIn: "Fall 2026",
+    id: "r6", firstName: "Morgan", initial: "L.", year: "1st year", program: "Psychology",
+    budget: [800, 2000], moveIn: "Fall 2026", leaseLength: "12-month",
+    bio: "First time living off campus! I'm quiet, love journaling and late-night walks. Looking for a calm, safe space.",
     tags: { sleep: "Night Owl (after midnight)", cleanliness: "Relaxed", noise: "Loud — I play music / have people over", guests: "Often — I'm social", study: "Mix of both", smoking: "Outside only", pets: "I'm fine with pets", cooking: "Mostly takeout / meal plan" },
   },
   {
-    id: "r7", firstName: "Quinn", initial: "B.", program: "Arts",
-    budget: [500, 650], moveIn: "Summer 2026",
+    id: "r7", firstName: "Quinn", initial: "B.", year: "4th year", program: "Arts",
+    budget: [500, 650], moveIn: "Summer 2026", leaseLength: "4-month",
+    bio: "Looking for a summer sublet roommate. I'm in the studio most days so I'm barely home. Clean and quiet.",
     tags: { sleep: "Flexible", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Study at home", smoking: "No smoking at all", pets: "No pets please", cooking: "I cook daily" },
   },
 ];
@@ -359,10 +426,11 @@ function CompatBadge({ score }: { score: number }) {
    ════════════════════════════════════════════════════════ */
 
 function ProfileCard({
-  profile, onInterested, onPass, onReport, isTop,
+  profile, onInterested, onPass, onReport, onSave, isTop,
 }: {
-  profile: LifestyleProfile; onInterested: () => void; onPass: () => void; onReport: () => void; isTop: boolean;
+  profile: LifestyleProfile; onInterested: () => void; onPass: () => void; onReport: () => void; onSave: () => void; isTop: boolean;
 }) {
+  const [bioExpanded, setBioExpanded] = useState(false);
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-12, 12]);
   const passOpacity = useTransform(x, [-100, -30], [1, 0]);
@@ -373,9 +441,8 @@ function ProfileCard({
     else if (info.offset.x < -100) onPass();
   }
 
-  // Group tags for display
+  const budgetLabel = profile.budget[1] >= 2000 ? `$${profile.budget[0]}+/mo` : `$${profile.budget[0]}–$${profile.budget[1]}/mo`;
   const tagEntries = Object.entries(profile.tags);
-  const budgetLabel = profile.budget[1] >= 2000 ? `$${profile.budget[0]}+` : `$${profile.budget[0]}–$${profile.budget[1]}`;
 
   return (
     <motion.div
@@ -388,69 +455,89 @@ function ProfileCard({
       animate={{ scale: isTop ? 1 : 0.95, opacity: isTop ? 1 : 0.6 }}
       exit={{ x: 300, opacity: 0, transition: { duration: 0.3 } }}
     >
-      {/* Swipe indicators */}
       {isTop && (
         <>
-          <motion.div className="absolute top-6 left-6 z-20 px-3 py-1.5 rounded-lg bg-[#E71D36] text-white" style={{ opacity: passOpacity, fontSize: "14px", fontWeight: 800 }}>
-            PASS
-          </motion.div>
-          <motion.div className="absolute top-6 right-6 z-20 px-3 py-1.5 rounded-lg bg-[#4ADE80] text-white" style={{ opacity: likeOpacity, fontSize: "14px", fontWeight: 800 }}>
-            INTERESTED
-          </motion.div>
+          <motion.div className="absolute top-6 left-6 z-20 px-3 py-1.5 rounded-lg bg-[#E71D36] text-white" style={{ opacity: passOpacity, fontSize: "14px", fontWeight: 800 }}>PASS</motion.div>
+          <motion.div className="absolute top-6 right-6 z-20 px-3 py-1.5 rounded-lg bg-[#4ADE80] text-white" style={{ opacity: likeOpacity, fontSize: "14px", fontWeight: 800 }}>INTERESTED</motion.div>
         </>
       )}
 
       <div className="h-full bg-white rounded-2xl border border-black/[0.06] overflow-hidden flex flex-col" style={{ boxShadow: isTop ? "0 8px 40px rgba(0,0,0,0.08)" : "0 2px 12px rgba(0,0,0,0.04)" }}>
-        {/* Header */}
-        <div className="p-5 pb-3 border-b border-black/[0.04]">
+        {/* Header: Avatar + Name + Year/Program */}
+        <div className="p-5 pb-3">
           <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center">
-                  <span style={{ fontSize: "16px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
-                </div>
-                <div>
-                  <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>{profile.firstName} {profile.initial}</h3>
-                  <p className="text-[#1B2D45]/40" style={{ fontSize: "12px", fontWeight: 500 }}>{profile.program}</p>
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0">
+                <span style={{ fontSize: "18px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
+              </div>
+              <div>
+                <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>{profile.firstName} {profile.initial}</h3>
+                <p className="text-[#1B2D45]/40" style={{ fontSize: "12px", fontWeight: 500 }}>{profile.year} · {profile.program}</p>
               </div>
             </div>
-            <CompatBadge score={profile.compatibility ?? 0} />
+            <div className="flex items-center gap-1.5">
+              <CompatBadge score={profile.compatibility ?? 0} />
+              <button onClick={onReport} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#1B2D45]/15 hover:text-[#E71D36] transition-all" title="Report"><Flag className="w-3 h-3" /></button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 mt-3">
-            <span className="px-2.5 py-1 rounded-lg bg-[#FF6B35]/[0.06] text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 600 }}>{budgetLabel}/mo</span>
-            <span className="px-2.5 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>{profile.moveIn}</span>
+
+          {/* Status badge */}
+          <div className="mt-3">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FF6B35] text-white" style={{ fontSize: "10px", fontWeight: 700 }}>
+              🔍 Looking for a room
+            </span>
+          </div>
+
+          {/* Budget / Move-in / Lease row */}
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#FF6B35]/[0.06] text-[#FF6B35]" style={{ fontSize: "10px", fontWeight: 600 }}>💰 {budgetLabel}</span>
+            <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>📅 {profile.moveIn}</span>
+            <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>{profile.leaseLength}</span>
           </div>
         </div>
 
-        {/* Lifestyle tags */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-2">
-          {tagEntries.map(([key, value]) => {
-            const cat = LIFESTYLE_CATEGORIES.find((c) => c.key === key);
-            if (!cat) return null;
-            return (
-              <div key={key} className="flex items-start gap-2.5">
-                <span className="shrink-0 mt-0.5" style={{ fontSize: "14px" }}>{cat.emoji}</span>
-                <div>
-                  <span className="text-[#1B2D45]/30 block" style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{cat.label}</span>
-                  <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{value}</span>
+        {/* Bio */}
+        <div className="px-5 pb-3">
+          <p className="text-[#1B2D45]/60" style={{ fontSize: "12px", lineHeight: 1.6 }}>
+            {bioExpanded ? profile.bio : profile.bio.length > 100 ? profile.bio.slice(0, 100) + "..." : profile.bio}
+          </p>
+          {profile.bio.length > 100 && (
+            <button onClick={() => setBioExpanded(!bioExpanded)} className="text-[#FF6B35] mt-0.5" style={{ fontSize: "11px", fontWeight: 600 }}>
+              {bioExpanded ? "Show less" : "Read more"}
+            </button>
+          )}
+        </div>
+
+        {/* Lifestyle pill chips */}
+        <div className="flex-1 overflow-y-auto px-5 pb-4">
+          <span className="text-[#1B2D45]/30 block mb-2" style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>LIFESTYLE</span>
+          <div className="flex flex-wrap gap-2">
+            {tagEntries.map(([key, value]) => {
+              const cat = LIFESTYLE_CATEGORIES.find((c) => c.key === key);
+              if (!cat) return null;
+              const shortLabel = TAG_SHORT_LABELS[value] || value;
+              const subtitle = TAG_SUBTITLES[value] || "";
+              return (
+                <div key={key} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4] border border-black/[0.02]">
+                  <span style={{ fontSize: "14px" }}>{cat.emoji}</span>
+                  <div>
+                    <div className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>{shortLabel}</div>
+                    {subtitle && <div className="text-[#1B2D45]/30" style={{ fontSize: "9px", fontWeight: 500 }}>{subtitle}</div>}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons: Message (locked) + Save */}
         {isTop && (
           <div className="p-4 border-t border-black/[0.04] flex items-center gap-3">
-            <button onClick={onPass} className="flex-1 py-3 rounded-xl border-2 border-black/[0.06] text-[#1B2D45]/40 hover:border-[#E71D36]/20 hover:text-[#E71D36] transition-all active:scale-[0.97]" style={{ fontSize: "13px", fontWeight: 700 }}>
-              Pass
+            <button onClick={onInterested} className="flex-[2] py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all active:scale-[0.97] flex items-center justify-center gap-2" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
+              <MessageCircleMore className="w-4 h-4" /> Message
             </button>
-            <button onClick={onInterested} className="flex-[2] py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all active:scale-[0.97]" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
-              I&apos;m Interested 👋
-            </button>
-            <button onClick={onReport} className="w-10 h-10 rounded-xl border border-black/[0.04] flex items-center justify-center text-[#1B2D45]/20 hover:text-[#E71D36] hover:border-[#E71D36]/20 transition-all" title="Report profile">
-              <Flag className="w-3.5 h-3.5" />
+            <button onClick={onSave} className="flex-1 py-3 rounded-xl border-2 border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35] transition-all active:scale-[0.97] flex items-center justify-center gap-2" style={{ fontSize: "13px", fontWeight: 700 }}>
+              <Bookmark className="w-4 h-4" /> Save
             </button>
           </div>
         )}
@@ -460,12 +547,14 @@ function ProfileCard({
 }
 
 /* ════════════════════════════════════════════════════════
-   Grid Card (desktop view)
+   Grid Card (desktop — Figma style)
    ════════════════════════════════════════════════════════ */
 
-function GridProfileCard({ profile, onInterested, onReport }: { profile: LifestyleProfile; onInterested: () => void; onReport: () => void }) {
-  const budgetLabel = profile.budget[1] >= 2000 ? `$${profile.budget[0]}+` : `$${profile.budget[0]}–$${profile.budget[1]}`;
-  const topTags = Object.entries(profile.tags).slice(0, 4);
+function GridProfileCard({ profile, onInterested, onSave, onReport }: { profile: LifestyleProfile; onInterested: () => void; onSave: () => void; onReport: () => void }) {
+  const [bioExpanded, setBioExpanded] = useState(false);
+  const budgetLabel = profile.budget[1] >= 2000 ? `$${profile.budget[0]}+/mo` : `$${profile.budget[0]}–$${profile.budget[1]}/mo`;
+  // Show top 5 tags
+  const topTags = Object.entries(profile.tags).slice(0, 5);
 
   return (
     <motion.div
@@ -478,48 +567,79 @@ function GridProfileCard({ profile, onInterested, onReport }: { profile: Lifesty
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center">
-              <span style={{ fontSize: "14px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0">
+              <span style={{ fontSize: "15px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
             </div>
             <div>
               <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>{profile.firstName} {profile.initial}</h3>
-              <p className="text-[#1B2D45]/35" style={{ fontSize: "11px" }}>{profile.program}</p>
+              <p className="text-[#1B2D45]/35" style={{ fontSize: "11px" }}>{profile.year} · {profile.program}</p>
             </div>
           </div>
           <button onClick={onReport} className="w-7 h-7 rounded-lg flex items-center justify-center text-[#1B2D45]/10 hover:text-[#E71D36] hover:bg-[#E71D36]/5 opacity-0 group-hover:opacity-100 transition-all" title="Report">
             <Flag className="w-3 h-3" />
           </button>
         </div>
+
+        {/* Status badge */}
+        <div className="mt-2">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FF6B35] text-white" style={{ fontSize: "9px", fontWeight: 700 }}>
+            🔍 Looking for a room
+          </span>
+        </div>
       </div>
 
-      {/* Compat + Budget row */}
-      <div className="px-4 pb-3 flex items-center gap-2">
+      {/* Compat + Budget + Move-in + Lease row */}
+      <div className="px-4 pb-2 flex items-center gap-1.5 flex-wrap">
         <CompatBadge score={profile.compatibility ?? 0} />
-        <span className="ml-auto px-2 py-0.5 rounded-md bg-[#FF6B35]/[0.06] text-[#FF6B35]" style={{ fontSize: "10px", fontWeight: 600 }}>{budgetLabel}</span>
-        <span className="px-2 py-0.5 rounded-md bg-[#1B2D45]/[0.04] text-[#1B2D45]/40" style={{ fontSize: "10px", fontWeight: 600 }}>{profile.moveIn}</span>
+        <span className="ml-auto px-2 py-0.5 rounded-md bg-[#FF6B35]/[0.06] text-[#FF6B35]" style={{ fontSize: "9px", fontWeight: 600 }}>💰 {budgetLabel}</span>
+        <span className="px-2 py-0.5 rounded-md bg-[#1B2D45]/[0.04] text-[#1B2D45]/40" style={{ fontSize: "9px", fontWeight: 600 }}>📅 {profile.moveIn}</span>
+        <span className="px-2 py-0.5 rounded-md bg-[#1B2D45]/[0.04] text-[#1B2D45]/40" style={{ fontSize: "9px", fontWeight: 600 }}>{profile.leaseLength}</span>
       </div>
 
-      {/* Tags */}
-      <div className="px-4 pb-3 space-y-1.5">
-        {topTags.map(([key, value]) => {
-          const cat = LIFESTYLE_CATEGORIES.find((c) => c.key === key);
-          if (!cat) return null;
-          return (
-            <div key={key} className="flex items-center gap-2">
-              <span style={{ fontSize: "12px" }}>{cat.emoji}</span>
-              <span className="text-[#1B2D45]/60 truncate" style={{ fontSize: "11px", fontWeight: 500 }}>{value}</span>
-            </div>
-          );
-        })}
-        {Object.keys(profile.tags).length > 4 && (
-          <span className="text-[#1B2D45]/20" style={{ fontSize: "10px", fontWeight: 500 }}>+{Object.keys(profile.tags).length - 4} more</span>
+      {/* Bio */}
+      <div className="px-4 pb-2">
+        <p className="text-[#1B2D45]/50" style={{ fontSize: "11px", lineHeight: 1.6 }}>
+          {bioExpanded ? profile.bio : profile.bio.length > 80 ? profile.bio.slice(0, 80) + "..." : profile.bio}
+        </p>
+        {profile.bio.length > 80 && (
+          <button onClick={() => setBioExpanded(!bioExpanded)} className="text-[#FF6B35]" style={{ fontSize: "10px", fontWeight: 600 }}>
+            {bioExpanded ? "Show less" : "Read more"}
+          </button>
         )}
       </div>
 
-      {/* Action */}
-      <div className="p-3 pt-0">
-        <button onClick={onInterested} className="w-full py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all active:scale-[0.97]" style={{ fontSize: "12px", fontWeight: 700 }}>
-          I&apos;m Interested 👋
+      {/* Lifestyle pill chips */}
+      <div className="px-4 pb-3">
+        <span className="text-[#1B2D45]/25 block mb-1.5" style={{ fontSize: "9px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>LIFESTYLE</span>
+        <div className="flex flex-wrap gap-1.5">
+          {topTags.map(([key, value]) => {
+            const cat = LIFESTYLE_CATEGORIES.find((c) => c.key === key);
+            if (!cat) return null;
+            const shortLabel = TAG_SHORT_LABELS[value] || value;
+            const subtitle = TAG_SUBTITLES[value] || "";
+            return (
+              <div key={key} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#FAF8F4] border border-black/[0.02]">
+                <span style={{ fontSize: "12px" }}>{cat.emoji}</span>
+                <div>
+                  <div className="text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>{shortLabel}</div>
+                  {subtitle && <div className="text-[#1B2D45]/25" style={{ fontSize: "8px", fontWeight: 500 }}>{subtitle}</div>}
+                </div>
+              </div>
+            );
+          })}
+          {Object.keys(profile.tags).length > 5 && (
+            <span className="text-[#1B2D45]/20 self-center" style={{ fontSize: "9px", fontWeight: 500 }}>+{Object.keys(profile.tags).length - 5} more</span>
+          )}
+        </div>
+      </div>
+
+      {/* Message + Save */}
+      <div className="p-3 pt-0 flex items-center gap-2">
+        <button onClick={onInterested} className="flex-[2] py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all active:scale-[0.97] flex items-center justify-center gap-1.5" style={{ fontSize: "12px", fontWeight: 700 }}>
+          <MessageCircleMore className="w-3.5 h-3.5" /> Message
+        </button>
+        <button onClick={onSave} className="flex-1 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35] transition-all active:scale-[0.97] flex items-center justify-center gap-1.5" style={{ fontSize: "12px", fontWeight: 700 }}>
+          <Bookmark className="w-3.5 h-3.5" /> Save
         </button>
       </div>
     </motion.div>
@@ -618,6 +738,7 @@ export default function RoommatesPage() {
   const [viewMode, setViewMode] = useState<RoommateView>("cards");
   const [interestedIds, setInterestedIds] = useState<string[]>([]);
   const [passedIds, setPassedIds] = useState<string[]>([]);
+  const [savedIds, setSavedIds] = useState<string[]>([]);
   const [showMatchesSheet, setShowMatchesSheet] = useState(false);
 
   const profiles = useMemo(() => {
@@ -646,6 +767,10 @@ export default function RoommatesPage() {
 
   const handlePass = useCallback((id: string) => {
     setPassedIds((prev) => [...prev, id]);
+  }, []);
+
+  const handleSave = useCallback((id: string) => {
+    setSavedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   }, []);
 
   function handleProfileComplete(tags: Record<string, string>, budget: [number, number]) {
@@ -705,44 +830,131 @@ export default function RoommatesPage() {
       {!hasProfile && !showForm ? (
         /* ─── Welcome Screen ─── */
         <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6">
-          <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden" style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.03)" }}>
+          <div className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden relative" style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.03)" }}>
+
+            {/* SVG Grain Overlay */}
+            <div className="absolute inset-0 pointer-events-none z-[1] opacity-[0.025]" style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "repeat",
+              backgroundSize: "128px 128px",
+            }} />
+
             {/* Hero */}
-            <div className="relative px-6 md:px-10 pt-10 md:pt-14 pb-8 text-center overflow-hidden">
-              {/* Background decoration */}
-              <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(255,107,53,0.04) 0%, transparent 70%)" }} />
-              <div className="absolute top-4 left-[15%] text-[#1B2D45]/[0.03] select-none" style={{ fontSize: "80px" }}>🌙</div>
-              <div className="absolute top-8 right-[12%] text-[#1B2D45]/[0.03] select-none" style={{ fontSize: "60px" }}>✨</div>
-              <div className="absolute bottom-2 left-[25%] text-[#1B2D45]/[0.03] select-none" style={{ fontSize: "50px" }}>🍳</div>
-              <div className="absolute bottom-6 right-[20%] text-[#1B2D45]/[0.03] select-none" style={{ fontSize: "65px" }}>🎵</div>
+            <div className="relative px-6 md:px-10 pt-12 md:pt-16 pb-10 text-center overflow-hidden">
+              {/* Background radial gradient */}
+              <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(255,107,53,0.05) 0%, transparent 65%)" }} />
+
+              {/* ─── Vibe Tag Stickers ─── */}
+              {!isMobile && (
+                <>
+                  {[
+                    { label: "☕️ 8AM Classes", top: "14%", left: "8%", rotate: -6, delay: 0 },
+                    { label: "🎧 Quiet Study", top: "28%", right: "6%", rotate: 4, delay: 0.3 },
+                    { label: "🧹 Clean Kitchen", bottom: "22%", left: "10%", rotate: 3, delay: 0.6 },
+                    { label: "🌙 Night Owl", top: "10%", right: "14%", rotate: -3, delay: 0.15 },
+                    { label: "🍳 Home Cook", bottom: "16%", right: "10%", rotate: 5, delay: 0.45 },
+                  ].map((tag) => (
+                    <motion.div
+                      key={tag.label}
+                      className="absolute z-[2] select-none cursor-default"
+                      style={{
+                        top: tag.top, left: tag.left, right: (tag as any).right, bottom: (tag as any).bottom,
+                      }}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: [0, -6, 0], rotate: tag.rotate }}
+                      transition={{ y: { repeat: Infinity, duration: 3 + tag.delay * 2, ease: "easeInOut", delay: tag.delay }, opacity: { duration: 0.5, delay: tag.delay + 0.2 } }}
+                      whileHover={{ rotate: 0, scale: 1.08, transition: { duration: 0.2, type: "spring", stiffness: 400 } }}
+                    >
+                      <div className="bg-white px-3 py-1.5 rounded-full border border-black/[0.06]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)", fontSize: "12px", fontWeight: 600, color: "#1B2D45", whiteSpace: "nowrap" }}>
+                        {tag.label}
+                      </div>
+                    </motion.div>
+                  ))}
+                </>
+              )}
 
               <div className="relative z-10">
-                <span style={{ fontSize: "48px" }}>🤝</span>
-                <h2 className="text-[#1B2D45] mt-4" style={{ fontSize: isMobile ? "26px" : "34px", fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                {/* ─── Floating Micro-UI: Match Preview ─── */}
+                <motion.div
+                  className="inline-block mb-5"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.1 }}
+                >
+                  <div className="px-4 py-2 rounded-2xl border border-white/40" style={{
+                    background: "rgba(255,255,255,0.6)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.02)",
+                  }}>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#4ADE80" }}>✨ 94% Match</span>
+                  </div>
+                </motion.div>
+
+                <h2 className="text-[#1B2D45]" style={{ fontSize: isMobile ? "26px" : "34px", fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
                   Stop rolling the dice<br />on roommates.
                 </h2>
                 <p className="text-[#1B2D45]/50 mt-3 max-w-[460px] mx-auto" style={{ fontSize: "14px", lineHeight: 1.7 }}>
                   Answer 10 quick lifestyle questions and we&apos;ll match you with UofG students who actually live like you. No awkward surprises in September.
                 </p>
               </div>
+
+              {/* Mobile vibe tags — horizontal scroll */}
+              {isMobile && (
+                <div className="flex gap-2 justify-center flex-wrap mt-5 relative z-10">
+                  {["☕️ 8AM Classes", "🎧 Quiet Study", "🧹 Clean Kitchen", "🌙 Night Owl"].map((label, i) => (
+                    <motion.div
+                      key={label}
+                      className="bg-white px-3 py-1.5 rounded-full border border-black/[0.06]"
+                      style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.06)", fontSize: "11px", fontWeight: 600, color: "#1B2D45" }}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 + i * 0.1 }}
+                    >
+                      {label}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Feature cards */}
-            <div className={`px-6 md:px-10 pb-8 grid gap-3 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+            {/* ─── Bento Feature Cards ─── */}
+            <div className={`px-6 md:px-10 pb-8 grid gap-3 relative z-10 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
               {[
-                { emoji: "🎯", title: "Compatibility Matching", desc: "We compare 8 lifestyle habits — sleep, cleanliness, noise, guests, and more — to find people you'll actually get along with." },
-                { emoji: "🔒", title: "Anonymous Until Match", desc: "Only your first name and lifestyle tags are visible. No photos, no last name, no contact info shared until you both say yes." },
-                { emoji: "💬", title: "Chat After Match", desc: "When both students express interest, messaging unlocks. All conversations stay on cribb — your contact info stays private." },
+                {
+                  icon: <Target className="w-5 h-5" />,
+                  iconColor: "#FF6B35",
+                  iconBg: "rgba(255,107,53,0.1)",
+                  title: "Compatibility Matching",
+                  desc: "We compare 8 lifestyle habits — sleep, cleanliness, noise, guests, and more — to find people you'll actually get along with.",
+                },
+                {
+                  icon: <Lock className="w-5 h-5" />,
+                  iconColor: "#2EC4B6",
+                  iconBg: "rgba(46,196,182,0.1)",
+                  title: "Anonymous Until Match",
+                  desc: "Only your first name and lifestyle tags are visible. No photos, no last name, no contact info shared until you both say yes.",
+                },
+                {
+                  icon: <MessageCircle className="w-5 h-5" />,
+                  iconColor: "#FFB627",
+                  iconBg: "rgba(255,182,39,0.1)",
+                  title: "Chat After Match",
+                  desc: "When both students express interest, messaging unlocks. All conversations stay on cribb — your contact info stays private.",
+                },
               ].map((f) => (
-                <div key={f.title} className="bg-[#FAF8F4] rounded-xl p-4 border border-black/[0.02]">
-                  <span style={{ fontSize: "24px" }}>{f.emoji}</span>
-                  <h3 className="text-[#1B2D45] mt-2" style={{ fontSize: "14px", fontWeight: 700 }}>{f.title}</h3>
-                  <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px", lineHeight: 1.6 }}>{f.desc}</p>
+                <div key={f.title} className="bg-[#FAF8F4] rounded-xl p-5 border border-black/[0.02]">
+                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ backgroundColor: f.iconBg, color: f.iconColor }}>
+                    {f.icon}
+                  </div>
+                  <h3 className="text-[#1B2D45] mt-3" style={{ fontSize: "14px", fontWeight: 700 }}>{f.title}</h3>
+                  <p className="text-[#1B2D45]/40 mt-1.5" style={{ fontSize: "12px", lineHeight: 1.6 }}>{f.desc}</p>
                 </div>
               ))}
             </div>
 
-            {/* How it works */}
-            <div className="px-6 md:px-10 pb-8">
+            {/* ─── How It Works ─── */}
+            <div className="px-6 md:px-10 pb-8 relative z-10">
               <div className="flex items-center gap-2 mb-4">
                 <div className="h-px flex-1 bg-black/[0.04]" />
                 <span className="text-[#1B2D45]/30 shrink-0" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>HOW IT WORKS</span>
@@ -750,14 +962,14 @@ export default function RoommatesPage() {
               </div>
               <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-4"}`}>
                 {[
-                  { step: "1", label: "Take the quiz", sub: "2 min, 10 questions" },
-                  { step: "2", label: "Browse matches", sub: "Sorted by compatibility" },
-                  { step: "3", label: "Express interest", sub: "Swipe or tap" },
-                  { step: "4", label: "Match & chat", sub: "When it's mutual" },
-                ].map((s) => (
-                  <div key={s.step} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#FF6B35]/[0.08] flex items-center justify-center shrink-0">
-                      <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{s.step}</span>
+                  { icon: <Check className="w-4 h-4" />, color: "#FF6B35", bg: "rgba(255,107,53,0.08)", label: "Take the quiz", sub: "2 min, 10 questions" },
+                  { icon: <Target className="w-4 h-4" />, color: "#2EC4B6", bg: "rgba(46,196,182,0.08)", label: "Browse matches", sub: "Sorted by compatibility" },
+                  { icon: <Footprints className="w-4 h-4" />, color: "#FFB627", bg: "rgba(255,182,39,0.08)", label: "Express interest", sub: "Swipe or tap" },
+                  { icon: <MessageCircle className="w-4 h-4" />, color: "#4ADE80", bg: "rgba(74,222,128,0.08)", label: "Match & chat", sub: "When it's mutual" },
+                ].map((s, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: s.bg, color: s.color }}>
+                      {s.icon}
                     </div>
                     <div>
                       <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{s.label}</div>
@@ -768,8 +980,8 @@ export default function RoommatesPage() {
               </div>
             </div>
 
-            {/* CTA */}
-            <div className="px-6 md:px-10 pb-10 text-center">
+            {/* ─── CTA ─── */}
+            <div className="px-6 md:px-10 pb-10 text-center relative z-10">
               <motion.button
                 onClick={() => setShowForm(true)}
                 className="px-8 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors active:scale-[0.98]"
@@ -817,7 +1029,7 @@ export default function RoommatesPage() {
         </div>
       ) : viewMode === "cards" || isMobile ? (
         <div className={`max-w-[420px] mx-auto px-4 md:px-6 py-4 ${interestedIds.length > 0 && !isMobile ? "mr-[280px] ml-auto" : ""}`}>
-          <div className="relative" style={{ height: "520px" }}>
+          <div className="relative" style={{ height: "620px" }}>
             <AnimatePresence>
               {remainingProfiles.slice(0, 2).map((profile, i) => (
                 <ProfileCard
@@ -826,6 +1038,7 @@ export default function RoommatesPage() {
                   isTop={i === 0}
                   onInterested={() => handleInterested(profile.id)}
                   onPass={() => handlePass(profile.id)}
+                  onSave={() => handleSave(profile.id)}
                   onReport={() => {/* TODO: report modal */}}
                 />
               ))}
@@ -843,6 +1056,7 @@ export default function RoommatesPage() {
                 key={profile.id}
                 profile={profile}
                 onInterested={() => handleInterested(profile.id)}
+                onSave={() => handleSave(profile.id)}
                 onReport={() => {/* TODO */}}
               />
             ))}
