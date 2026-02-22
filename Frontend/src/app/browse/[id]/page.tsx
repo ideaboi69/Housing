@@ -14,10 +14,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, MapPin, Clock, Bus, Heart, Check, X, ChevronLeft, ChevronRight,
-  Bed, Bath, Calendar, MessageCircle, Share2, Flag, Zap, Car, Shirt, Droplets,
-  Ruler, AlertCircle,
+  Bed, Bath, Calendar, MessageCircle, Share2, Flag, Zap, Ruler, AlertCircle,
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
+import { getAmenityChecklist } from "@/lib/amenities";
 import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
 
 /* ── Animation helpers ─────────────────────────── */
@@ -97,29 +97,21 @@ function ImageGallery({ images }: { images: string[] }) {
 /* ── Review Card ───────────────────────────────── */
 
 function ReviewCard({ review, index }: { review: ReviewResponse; index: number }) {
-  const avg = (review.responsiveness + review.maintenance_speed + review.respect_privacy + review.fairness_of_charges) / 4;
   return (
     <motion.div className="bg-[#FAF8F4] rounded-xl p-4"
       initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }} transition={{ delay: index * 0.08 }}>
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#1B2D45]/10 flex items-center justify-center text-[#1B2D45]/40"
-            style={{ fontSize: "11px", fontWeight: 700 }}>S{review.student_id}</div>
-          <div>
-            <p className="text-[#1B2D45]/40" style={{ fontSize: "10px" }}>
-              {new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}
-            </p>
-          </div>
-        </div>
+        <p className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>
+          {new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}
+        </p>
         <div className={`px-2 py-0.5 rounded-full ${review.would_rent_again ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#E71D36]/10 text-[#E71D36]"}`}
           style={{ fontSize: "10px", fontWeight: 600 }}>
           {review.would_rent_again ? "Would rent again ✓" : "Would not rent again"}
         </div>
       </div>
-
-      {/* Rating bars */}
-      <div className="grid grid-cols-4 gap-2 mb-3">
+      {/* Star ratings only — no comments for legal reasons */}
+      <div className="grid grid-cols-4 gap-3">
         {[
           { label: "Response", val: review.responsiveness },
           { label: "Maintenance", val: review.maintenance_speed },
@@ -127,15 +119,16 @@ function ReviewCard({ review, index }: { review: ReviewResponse; index: number }
           { label: "Fairness", val: review.fairness_of_charges },
         ].map((r) => (
           <div key={r.label} className="text-center">
-            <div className="text-[#1B2D45]/30" style={{ fontSize: "8px", fontWeight: 600 }}>{r.label}</div>
-            <div className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>{r.val}<span className="text-[#1B2D45]/20">/5</span></div>
+            <div className="text-[#1B2D45]/30" style={{ fontSize: "9px", fontWeight: 600 }}>{r.label}</div>
+            <div className="flex items-center justify-center gap-0.5 mt-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <span key={star} style={{ fontSize: "12px", color: star <= r.val ? "#FFB627" : "#1B2D45" + "15" }}>★</span>
+              ))}
+            </div>
+            <div className="text-[#1B2D45]/50 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{r.val}/5</div>
           </div>
         ))}
       </div>
-
-      {review.comment && (
-        <p className="text-[#1B2D45]/60" style={{ fontSize: "12px", lineHeight: 1.5 }}>"{review.comment}"</p>
-      )}
     </motion.div>
   );
 }
@@ -165,27 +158,32 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   useEffect(() => {
     async function load() {
       setIsLoading(true);
+      let usedMock = false;
       try {
         const data = await api.listings.getById(listingId);
-        setListing(data);
-        // Try real health score
-        try {
-          const hs = await api.healthScores.get(listingId);
-          setHealthScore(hs);
-        } catch {
-          setHealthScore(getMockHealthScore(listingId) || null);
+        if (data && data.id) {
+          setListing(data);
+          // Try real health score
+          try {
+            const hs = await api.healthScores.get(listingId);
+            setHealthScore(hs);
+          } catch {
+            setHealthScore(getMockHealthScore(listingId) || null);
+          }
+          // Try real reviews
+          try {
+            const rv = await api.reviews.browse({ property_id: data.property_id });
+            setReviews(rv);
+          } catch {
+            setReviews(getMockReviews(data.property_id));
+          }
+          setImages(getListingImages(listingId));
+        } else {
+          throw new Error("Empty response");
         }
-        // Try real reviews
-        try {
-          const rv = await api.reviews.browse({ property_id: data.property_id });
-          setReviews(rv);
-        } catch {
-          setReviews(getMockReviews(data.property_id));
-        }
-        // TODO: fetch real images from listing images endpoint
-        setImages(getListingImages(listingId));
       } catch {
-        // Backend unavailable — use mock
+        // Backend unavailable or empty — use mock
+        usedMock = true;
         const mock = getMockListing(listingId);
         if (mock) {
           setListing(mock);
@@ -245,12 +243,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
 
   const overallScore = healthScore?.overall_score ?? 0;
 
-  const amenities = [
-    { label: "Furnished", has: listing.is_furnished, icon: Shirt },
-    { label: "Parking", has: listing.has_parking, icon: Car },
-    { label: "Laundry", has: listing.has_laundry, icon: Droplets },
-    { label: "Utilities Included", has: listing.utilities_included, icon: Zap },
-  ];
+  const amenities = getAmenityChecklist(listing as unknown as Record<string, unknown>);
+  const hasAmenities = amenities.filter((a) => a.has);
+  const noAmenities = amenities.filter((a) => !a.has);
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
@@ -263,7 +258,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           </Link>
         </motion.div>
 
-        <div className="grid lg:grid-cols-[1fr_360px] gap-6">
+        <motion.div variants={fadeUp} className="grid lg:grid-cols-[1fr_360px] gap-6">
           {/* ─── Main Content ─── */}
           <div>
             {/* Image gallery */}
@@ -318,18 +313,28 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               {/* Amenities */}
               <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Amenities</h3>
               <div className="grid grid-cols-2 gap-2.5 mt-3">
-                {amenities.map((a) => {
+                {hasAmenities.map((a) => {
                   const Icon = a.icon;
                   return (
-                    <motion.div key={a.label} className="flex items-center gap-2.5 py-2"
+                    <motion.div key={a.key} className="flex items-center gap-2.5 py-2"
                       initial={{ opacity: 0, x: -8 }} whileInView={{ opacity: 1, x: 0 }}
                       viewport={{ once: true }} transition={{ type: "spring", stiffness: 200 }}>
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${a.has ? "bg-[#4ADE80]/10" : "bg-[#1B2D45]/[0.03]"}`}>
-                        <Icon className={`w-3.5 h-3.5 ${a.has ? "text-[#4ADE80]" : "text-[#1B2D45]/15"}`} />
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#4ADE80]/10">
+                        <Icon className="w-3.5 h-3.5 text-[#4ADE80]" />
                       </div>
-                      <span className={a.has ? "text-[#1B2D45]" : "text-[#1B2D45]/25 line-through"}
-                        style={{ fontSize: "13px", fontWeight: 500 }}>{a.label}</span>
+                      <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{a.label}</span>
                     </motion.div>
+                  );
+                })}
+                {noAmenities.map((a) => {
+                  const Icon = a.icon;
+                  return (
+                    <div key={a.key} className="flex items-center gap-2.5 py-2">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#1B2D45]/[0.03]">
+                        <Icon className="w-3.5 h-3.5 text-[#1B2D45]/15" />
+                      </div>
+                      <span className="text-[#1B2D45]/25 line-through" style={{ fontSize: "13px", fontWeight: 500 }}>{a.label}</span>
+                    </div>
                   );
                 })}
               </div>
@@ -505,9 +510,22 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               <div className="text-[#1B2D45]/25 text-center mt-4" style={{ fontSize: "11px" }}>
                 {listing.view_count} views · Listed {formatDate(listing.created_at)}
               </div>
+
+              {/* Map */}
+              <div className="mt-4 rounded-xl border border-black/[0.04] overflow-hidden">
+                <div className="h-[160px] bg-[#f0ece6] flex items-center justify-center">
+                  <div className="text-center">
+                    <span style={{ fontSize: "28px" }}>📍</span>
+                    <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px", fontWeight: 500 }}>Guelph, ON</p>
+                  </div>
+                </div>
+                <div className="p-2.5">
+                  <p className="text-[#1B2D45]/40" style={{ fontSize: "10px" }}>{listing.address}</p>
+                </div>
+              </div>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       </motion.div>
 
       {/* Book Showing Modal — placeholder until backend is ready */}

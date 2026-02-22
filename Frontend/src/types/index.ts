@@ -178,10 +178,22 @@ export interface ListingDetailResponse {
   property_type: string;
   total_rooms: number;
   bathrooms: number;
+  // ── Standard Amenities (consistent across listings & sublets) ──
   is_furnished: boolean;
   has_parking: boolean;
   has_laundry: boolean;
   utilities_included: boolean;
+  pet_friendly?: boolean;
+  has_air_conditioning?: boolean;
+  has_wifi?: boolean;
+  has_dishwasher?: boolean;
+  has_gym?: boolean;
+  has_elevator?: boolean;
+  has_backyard?: boolean;
+  has_balcony?: boolean;
+  smoking_allowed?: boolean;
+  wheelchair_accessible?: boolean;
+  // ──────────────────────────────────────────────────────────────
   estimated_utility_cost: number | null;
   distance_to_campus_km: number | null;
   walk_time_minutes: number | null;
@@ -506,4 +518,58 @@ export interface ConversationDetailResponse {
   landlord_id: number;
   landlord_name: string;
   messages: MessageResponse[];
+}
+
+// ── Showings / Calendar Booking ────────────────────────
+
+export enum ShowingStatus {
+  PENDING = "pending",
+  CONFIRMED = "confirmed",
+  DECLINED = "declined",
+  CANCELLED = "cancelled",
+  COMPLETED = "completed",
+}
+
+export interface ShowingSlot {
+  id: number;
+  listing_id: number;
+  date: string; // "2026-03-15"
+  start_time: string; // "14:00"
+  end_time: string; // "14:30"
+  is_booked: boolean;
+}
+
+export interface ShowingRequest {
+  listing_id: number;
+  slot_id: number;
+  message?: string;
+}
+
+export interface ShowingResponse {
+  id: number;
+  listing_id: number;
+  listing_title: string;
+  student_id: number;
+  student_name: string;
+  landlord_id: number;
+  landlord_name: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  status: ShowingStatus;
+  message?: string;
+  created_at: string;
+}
+
+export interface ShowingSlotCreate {
+  listing_id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+}
+
+export interface ShowingSlotBulkCreate {
+  listing_id: number;
+  dates: string[];
+  time_slots: { start_time: string; end_time: string }[];
 }
