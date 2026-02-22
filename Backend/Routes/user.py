@@ -48,12 +48,32 @@ def register_users(payload: UserCreate, db: Session = Depends(get_db)):
     }
 
 # User Login
+# JSON login for frontend
 @user_router.post("/login")
-def user_login(payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@user_router.post("/login")
+def user_login(payload: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email).first()
+
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    token = create_access_token({"user_id": user.id, "role": user.role.value})
+
+    return {"access_token": token, "token_type": "bearer"}
+
+# Login for swagger 
+@user_router.post("/login/swagger")
+def user_login_swagger(payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.username).first()
 
     if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
 
     token = create_access_token({"user_id": user.id, "role": user.role.value})
 

@@ -14,7 +14,7 @@ post_bearer = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Declaring various authentication methods for each user type
-user_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/users/login",scheme_name="UserAuth")
+user_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/users/login/swagger",scheme_name="UserAuth")
 landlord_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/landlords/login",scheme_name="LandlordAuth")
 admin_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/admin/login", scheme_name="AdminAuth")
 writer_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/writers/login", scheme_name="WriterAuth")
