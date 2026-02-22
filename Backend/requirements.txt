@@ -14,5 +14,4 @@ boto3
 resend
 httpx
 email_validator
-python-multipart
-watchfiles==0.21.0
+cloudinary
