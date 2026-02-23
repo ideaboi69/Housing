@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   motion,
   AnimatePresence,
@@ -8,16 +8,16 @@ import {
   useSpring,
   useInView,
 } from "framer-motion";
-import { useRef } from "react";
 import { useIsMobile } from "@/hooks";
 import { PolaroidCard } from "@/components/browse/PolaroidCard";
 import { MapView } from "@/components/browse/MapView";
 import { SearchAndFilters } from "@/components/browse/SearchAndFilters";
+import { FilterModal } from "@/components/browse/FilterModal";
 import { MyPicksTray } from "@/components/browse/MyPicksTray";
 import { MobileBottomTabs } from "@/components/browse/MobileBottomTabs";
 import { api } from "@/lib/api";
 import { mockListings, mockHealthScores } from "@/lib/mock-data";
-import type { ListingDetailResponse } from "@/types";
+import type { ListingDetailResponse, ListingFilters } from "@/types";
 
 type ViewMode = "board" | "grid" | "map";
 
@@ -88,43 +88,83 @@ export default function BrowsePage() {
   const [healthScores, setHealthScores] = useState<Record<number, number>>(mockHealthScores);
   const [isLoading, setIsLoading] = useState(true);
   const [useMock, setUseMock] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<ListingFilters>({ status: "active", limit: 20 });
+  const [searchQuery, setSearchQuery] = useState("");
   const isMobile = useIsMobile();
 
-  useEffect(() => {
-    async function fetchListings() {
-      try {
-        const data = await api.listings.browse({ status: "active", limit: 20 });
-        if (data && data.length > 0) {
-          setListings(data);
-          // Fetch health scores for real listings
-          const scores: Record<number, number> = {};
-          await Promise.allSettled(
-            data.map(async (l) => {
-              try {
-                const hs = await api.healthScores.get(l.id);
-                if (hs?.overall_score) scores[l.id] = hs.overall_score;
-              } catch {
-                // Score not computed yet — skip
-              }
-            })
-          );
-          setHealthScores(scores);
-        } else {
-          setListings(mockListings);
-          setHealthScores(mockHealthScores);
-          setUseMock(true);
-        }
-      } catch (err) {
-        console.error("[cribb] Browse fetch failed, using demo data:", err);
+  const fetchListings = useCallback(async (filterParams: ListingFilters) => {
+    setIsLoading(true);
+    try {
+      const data = await api.listings.browse(filterParams);
+      if (data && data.length > 0) {
+        setListings(data);
+        setUseMock(false);
+        // Fetch health scores
+        const scores: Record<number, number> = {};
+        await Promise.allSettled(
+          data.map(async (l) => {
+            try {
+              const hs = await api.healthScores.get(l.id);
+              if (hs?.overall_score) scores[l.id] = hs.overall_score;
+            } catch { /* not computed */ }
+          })
+        );
+        setHealthScores(scores);
+      } else {
         setListings(mockListings);
         setHealthScores(mockHealthScores);
         setUseMock(true);
-      } finally {
-        setIsLoading(false);
       }
+    } catch (err) {
+      console.error("[cribb] Browse fetch failed, using demo data:", err);
+      setListings(mockListings);
+      setHealthScores(mockHealthScores);
+      setUseMock(true);
+    } finally {
+      setIsLoading(false);
     }
-    fetchListings();
   }, []);
+
+  useEffect(() => {
+    fetchListings(filters);
+  }, [filters, fetchListings]);
+
+  // Count active filters (non-default)
+  const activeFilterCount = useMemo(() => {
+    return [
+      filters.price_min !== undefined,
+      filters.price_max !== undefined,
+      !!filters.property_type,
+      !!filters.lease_type,
+      filters.is_furnished === true,
+      filters.has_parking === true,
+      filters.has_laundry === true,
+      filters.utilities_included === true,
+      filters.distance_max !== undefined,
+      filters.sort_by && filters.sort_by !== "created_at",
+    ].filter(Boolean).length;
+  }, [filters]);
+
+  const handleApplyFilters = useCallback((newFilters: ListingFilters) => {
+    setFilters(newFilters);
+  }, []);
+
+  const handleQuickFilter = useCallback((quickFilters: Partial<ListingFilters>) => {
+    // Quick filters reset to base + the quick filter
+    setFilters({ status: "active", limit: 20, ...quickFilters });
+  }, []);
+
+  // Client-side search filtering (address/title)
+  const filteredListings = useMemo(() => {
+    if (!searchQuery.trim()) return listings;
+    const q = searchQuery.toLowerCase();
+    return listings.filter(
+      (l) =>
+        l.title?.toLowerCase().includes(q) ||
+        l.address?.toLowerCase().includes(q)
+    );
+  }, [listings, searchQuery]);
 
   const togglePin = useCallback((id: number) => {
     setPinnedIds((prev) =>
@@ -143,22 +183,22 @@ export default function BrowsePage() {
   );
 
   const sections = useMemo(() => {
-    const nearCampus = listings.filter((l) => (l.walk_time_minutes ?? 99) <= 10);
-    const midDistance = listings.filter((l) => {
+    const nearCampus = filteredListings.filter((l) => (l.walk_time_minutes ?? 99) <= 10);
+    const midDistance = filteredListings.filter((l) => {
       const wt = l.walk_time_minutes ?? 99;
       return wt > 10 && wt <= 20;
     });
-    const farther = listings.filter((l) => (l.walk_time_minutes ?? 0) > 20);
+    const farther = filteredListings.filter((l) => (l.walk_time_minutes ?? 0) > 20);
 
     return [
       { key: "near", title: "Near Campus", emoji: "🎓", subtitle: "Walking distance to classes", items: nearCampus },
       { key: "mid", title: "Stone Road Area", emoji: "🛍️", subtitle: "Close to shopping and transit", items: midDistance },
       { key: "far", title: "South End & Beyond", emoji: "🏘️", subtitle: "More space, great value", items: farther },
     ].filter((s) => s.items.length > 0);
-  }, [listings]);
+  }, [filteredListings]);
 
-  const avgRent = listings.length > 0
-    ? Math.round(listings.reduce((acc, l) => acc + Number(l.rent_per_room), 0) / listings.length)
+  const avgRent = filteredListings.length > 0
+    ? Math.round(filteredListings.reduce((acc, l) => acc + Number(l.rent_per_room), 0) / filteredListings.length)
     : 0;
 
   return (
@@ -179,7 +219,7 @@ export default function BrowsePage() {
               Find your Guelph cribb 🏠
             </h1>
             <p className="mt-1 md:mt-1.5 text-[#1B2D45]/45" style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 400 }}>
-              <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{listings.length} listings</span>{" "}
+              <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{filteredListings.length} listings</span>{" "}
               available near University of Guelph
               {useMock && <span className="ml-2 text-[#FF6B35]/60" style={{ fontSize: "11px" }}>(demo data)</span>}
             </p>
@@ -210,7 +250,7 @@ export default function BrowsePage() {
           {[
             { icon: "📈", label: "Avg rent", ticker: <Ticker value={avgRent} prefix="$" suffix="/rm" />, bg: "rgba(46,196,182,0.08)" },
             { icon: "✨", label: "New this week", ticker: <Ticker value={12} />, bg: "rgba(255,107,53,0.08)" },
-            { icon: "📅", label: "8-mo leases", ticker: <Ticker value={listings.filter(l => l.lease_type === "8_month").length} />, bg: "rgba(255,182,39,0.08)" },
+            { icon: "📅", label: "8-mo leases", ticker: <Ticker value={filteredListings.filter(l => l.lease_type === "8_month").length} />, bg: "rgba(255,182,39,0.08)" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-2 md:gap-2.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl border border-black/5 shrink-0" style={{ backgroundColor: s.bg }}>
               <span style={{ fontSize: isMobile ? "14px" : "16px" }}>{s.icon}</span>
@@ -224,7 +264,21 @@ export default function BrowsePage() {
       </div>
 
       {/* Search & Filters (now sticky/glass in component) */}
-      <SearchAndFilters />
+      <SearchAndFilters
+        onSearchChange={setSearchQuery}
+        onQuickFilter={handleQuickFilter}
+        onOpenFilters={() => setFilterOpen(true)}
+        activeFilterCount={activeFilterCount}
+      />
+
+      {/* Filter Modal */}
+      <FilterModal
+        isOpen={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        onApply={handleApplyFilters}
+        currentFilters={filters}
+        resultCount={filteredListings.length}
+      />
 
       {/* My Picks Tray */}
       <MyPicksTray
@@ -330,7 +384,7 @@ export default function BrowsePage() {
             className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
-              {listings.map((listing) => (
+              {filteredListings.map((listing) => (
                 <PolaroidCard
                   key={listing.id}
                   listing={listing}
@@ -352,7 +406,7 @@ export default function BrowsePage() {
             exit="exit"
             transition={{ duration: 0.15 }}
           >
-            <MapView listings={listings} pinnedIds={pinnedIds} onTogglePin={togglePin} />
+            <MapView listings={filteredListings} pinnedIds={pinnedIds} onTogglePin={togglePin} />
           </motion.div>
         )}
       </AnimatePresence>

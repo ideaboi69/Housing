@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { UserResponse, UserCreate, UserLogin } from "@/types";
 import { api, ApiError } from "@/lib/api";
+import { useSavedStore } from "@/lib/saved-store";
 
 interface AuthState {
   user: UserResponse | null;
@@ -28,6 +29,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       const res = await api.auth.login(data);
       localStorage.setItem("cribb_token", res.access_token);
       set({ user: res.user, token: res.access_token, isLoading: false });
+      // Load saved listings for the newly logged-in user
+      useSavedStore.getState().loadSaved();
     } catch (err) {
       const message = err instanceof ApiError ? err.detail : "Login failed";
       set({ error: message, isLoading: false });
@@ -58,6 +61,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     localStorage.removeItem("cribb_token");
+    useSavedStore.getState().clear();
     set({ user: null, token: null });
   },
 

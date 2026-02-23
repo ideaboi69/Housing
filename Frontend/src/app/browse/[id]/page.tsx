@@ -1,8 +1,12 @@
 "use client";
 
-import { use, useState, useRef, useEffect } from "react";
-import { useSaveToggle } from "@/hooks";
+import { use, useState, useRef, useEffect, useCallback } from "react";
+import { useSavedStore } from "@/lib/saved-store";
+import { useAuthStore } from "@/lib/auth-store";
 import { ScoreRing } from "@/components/ui/ScoreRing";
+import { ReportModal } from "@/components/ui/ReportModal";
+import { ReviewModal } from "@/components/ui/ReviewModal";
+import { ShareButton } from "@/components/ui/ShareButton";
 import {
   formatPrice, formatLeaseType, formatPropertyType, formatDate, getScoreColor, getScoreLabel,
 } from "@/lib/utils";
@@ -14,7 +18,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, MapPin, Clock, Bus, Heart, Check, X, ChevronLeft, ChevronRight,
-  Bed, Bath, Calendar, MessageCircle, Share2, Flag, Zap, Ruler, AlertCircle,
+  Bed, Bath, Calendar, MessageCircle, Share2, Flag, Zap, Ruler, AlertCircle, Star,
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { getAmenityChecklist } from "@/lib/amenities";
@@ -151,8 +155,25 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [contactSending, setContactSending] = useState(false);
   const [contactSent, setContactSent] = useState(false);
   const [showingOpen, setShowingOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
-  const { isSaved, toggle: toggleSave, isLoading: saveBusy } = useSaveToggle(listingId);
+  const user = useAuthStore((s) => s.user);
+
+  // Saved store — syncs with PolaroidCard hearts
+  const isSaved = useSavedStore((s) => s.savedIds.has(listingId));
+  const saveBusy = useSavedStore((s) => s.togglingIds.has(listingId));
+  const toggleSave = useSavedStore((s) => s.toggleSave);
+
+  const handleToggleSave = useCallback(async () => {
+    try {
+      await toggleSave(listingId);
+    } catch (err) {
+      if (err instanceof Error && err.message === "auth_required") {
+        router.push("/login");
+      }
+    }
+  }, [listingId, toggleSave, router]);
 
   // Fetch listing — backend first, mock fallback
   useEffect(() => {
@@ -258,7 +279,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           </Link>
         </motion.div>
 
-        <motion.div variants={fadeUp} className="grid lg:grid-cols-[1fr_360px] gap-6">
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          className="grid lg:grid-cols-[1fr_360px] gap-6"
+        >
           {/* ─── Main Content ─── */}
           <div>
             {/* Image gallery */}
@@ -415,21 +441,53 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               )}
 
               {/* Reviews */}
-              {reviews.length > 0 && (
-                <div className="mt-8">
+              <div className="mt-8">
+                <div className="flex items-center justify-between">
                   <h3 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
                     Student Reviews
-                    <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/5 text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 700 }}>
-                      {reviews.length}
-                    </span>
+                    {reviews.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/5 text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 700 }}>
+                        {reviews.length}
+                      </span>
+                    )}
                   </h3>
+                  {user ? (
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setReviewOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FFB627]/10 text-[#FFB627] hover:bg-[#FFB627]/15 transition-colors"
+                      style={{ fontSize: "12px", fontWeight: 600 }}
+                    >
+                      <Star className="w-3.5 h-3.5" /> Leave a Review
+                    </motion.button>
+                  ) : (
+                    <Link
+                      href="/login"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/40 hover:text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.06] transition-colors"
+                      style={{ fontSize: "12px", fontWeight: 500 }}
+                    >
+                      Sign in to review
+                    </Link>
+                  )}
+                </div>
+                {reviews.length > 0 ? (
                   <div className="space-y-3 mt-3">
                     {reviews.map((review, i) => (
                       <ReviewCard key={review.id} review={review} index={i} />
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="mt-4 py-8 text-center rounded-xl border border-dashed border-[#1B2D45]/10 bg-[#FAF8F4]/50">
+                    <span style={{ fontSize: "28px" }}>⭐</span>
+                    <p className="text-[#1B2D45]/40 mt-2" style={{ fontSize: "13px", fontWeight: 500 }}>
+                      No reviews yet
+                    </p>
+                    <p className="text-[#1B2D45]/25 mt-1" style={{ fontSize: "12px" }}>
+                      Lived here? Be the first to rate this property.
+                    </p>
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
 
@@ -484,7 +542,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               </motion.button>
 
               {/* Save */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={toggleSave} disabled={saveBusy}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave} disabled={saveBusy}
                 className={`w-full mt-2 py-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${
                   isSaved
                     ? "border-[#E71D36]/20 bg-[#E71D36]/[0.04] text-[#E71D36]"
@@ -497,12 +555,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
 
               {/* Share + Report */}
               <div className="flex items-center gap-2 mt-3">
-                <button className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#1B2D45]/50 hover:bg-[#1B2D45]/[0.03] transition-all"
-                  style={{ fontSize: "11px", fontWeight: 500 }}>
-                  <Share2 className="w-3 h-3" /> Share
-                </button>
-                <button className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
-                  style={{ fontSize: "11px", fontWeight: 500 }}>
+                <ShareButton path={`/browse/${listingId}`} title={listing.title} variant="inline" />
+                <button
+                  onClick={() => setReportOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
+                  style={{ fontSize: "11px", fontWeight: 500 }}
+                >
                   <Flag className="w-3 h-3" /> Report
                 </button>
               </div>
@@ -558,6 +616,25 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        listingId={listingId}
+        listingTitle={listing.title}
+      />
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        propertyId={listing.property_id}
+        propertyTitle={listing.title}
+        onReviewSubmitted={(newReview) => {
+          setReviews((prev) => [newReview, ...prev]);
+        }}
+      />
     </div>
   );
 }

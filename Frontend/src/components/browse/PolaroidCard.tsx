@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Heart, Pin } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
 import { formatPrice, formatPropertyType } from "@/lib/utils";
+import { useSavedStore } from "@/lib/saved-store";
 import type { ListingDetailResponse } from "@/types";
 
 interface PolaroidCardProps {
@@ -26,8 +28,23 @@ export function PolaroidCard({
   onTogglePin,
   isMobile = false,
 }: PolaroidCardProps) {
-  const [saved, setSaved] = useState(false);
+  const router = useRouter();
+  const saved = useSavedStore((s) => s.savedIds.has(listing.id));
+  const toggling = useSavedStore((s) => s.togglingIds.has(listing.id));
+  const toggleSave = useSavedStore((s) => s.toggleSave);
   const [isHovered, setIsHovered] = useState(false);
+
+  const handleSaveClick = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await toggleSave(listing.id);
+    } catch (err) {
+      if (err instanceof Error && err.message === "auth_required") {
+        router.push("/login");
+      }
+    }
+  }, [listing.id, toggleSave, router]);
   const score = healthScore ?? 0;
 
   /* ── Spring-driven hover state ────────────────── */
@@ -138,12 +155,9 @@ export function PolaroidCard({
                 </motion.div>
               )}
               <motion.button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setSaved(!saved);
-                }}
-                className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm"
+                onClick={handleSaveClick}
+                disabled={toggling}
+                className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm disabled:opacity-50"
                 whileTap={{ scale: 0.85 }}
               >
                 <motion.div

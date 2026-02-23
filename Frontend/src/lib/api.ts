@@ -85,7 +85,7 @@ async function request<T>(
   return res.json();
 }
 
-function toQueryString(params: Record<string, unknown>): string {
+function toQueryString(params: object): string {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {

@@ -24,6 +24,7 @@ export default function NewPropertyPage() {
   const [form, setForm] = useState({
     title: "",
     address: "",
+    postal_code: "",
     property_type: PropertyType.HOUSE,
     total_rooms: 1,
     bathrooms: 1,
@@ -34,6 +35,7 @@ export default function NewPropertyPage() {
     estimated_utility_cost: "",
     distance_to_campus_km: "",
     walk_time_minutes: "",
+    drive_time_minutes: "",
     bus_time_minutes: "",
     nearest_bus_route: "",
   });
@@ -44,8 +46,8 @@ export default function NewPropertyPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.title || !form.address) {
-      setError("Title and address are required");
+    if (!form.title || !form.address || !form.postal_code || !form.drive_time_minutes) {
+      setError("Title, address, postal code, and drive time are required");
       return;
     }
 
@@ -56,6 +58,7 @@ export default function NewPropertyPage() {
       const payload = {
         title: form.title,
         address: form.address,
+        postal_code: form.postal_code,
         property_type: form.property_type,
         total_rooms: form.total_rooms,
         bathrooms: form.bathrooms,
@@ -63,11 +66,12 @@ export default function NewPropertyPage() {
         has_parking: form.has_parking,
         has_laundry: form.has_laundry,
         utilities_included: form.utilities_included,
-        estimated_utility_cost: form.estimated_utility_cost ? Number(form.estimated_utility_cost) : undefined,
-        distance_to_campus_km: form.distance_to_campus_km ? Number(form.distance_to_campus_km) : undefined,
-        walk_time_minutes: form.walk_time_minutes ? Number(form.walk_time_minutes) : undefined,
-        bus_time_minutes: form.bus_time_minutes ? Number(form.bus_time_minutes) : undefined,
-        nearest_bus_route: form.nearest_bus_route || undefined,
+        estimated_utility_cost: form.estimated_utility_cost ? Number(form.estimated_utility_cost) : 0,
+        distance_to_campus_km: form.distance_to_campus_km ? Number(form.distance_to_campus_km) : 0,
+        walk_time_minutes: form.walk_time_minutes ? Number(form.walk_time_minutes) : 0,
+        drive_time_minutes: Number(form.drive_time_minutes),
+        bus_time_minutes: form.bus_time_minutes ? Number(form.bus_time_minutes) : 0,
+        nearest_bus_route: form.nearest_bus_route || "",
       };
 
       const property = await api.properties.create(payload);
@@ -128,6 +132,19 @@ export default function NewPropertyPage() {
                 value={form.address}
                 onChange={(e) => update("address", e.target.value)}
                 placeholder="e.g. 78 College Ave W, Guelph, ON"
+                required
+                className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                style={{ fontSize: "14px" }}
+              />
+            </div>
+
+            <div>
+              <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Postal code</label>
+              <input
+                type="text"
+                value={form.postal_code}
+                onChange={(e) => update("postal_code", e.target.value)}
+                placeholder="e.g. N1G 2W1"
                 required
                 className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
                 style={{ fontSize: "14px" }}
@@ -249,7 +266,9 @@ export default function NewPropertyPage() {
           {/* Location & Transit */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <h2 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Getting to Campus</h2>
-            <p className="text-[#1B2D45]/30" style={{ fontSize: "12px" }}>Helps students compare commute times. Leave blank if unknown.</p>
+            <p className="text-[#1B2D45]/30" style={{ fontSize: "12px" }}>
+              Helps students compare commute times. Drive time is required by the current backend; others can be left blank.
+            </p>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -282,6 +301,18 @@ export default function NewPropertyPage() {
                   value={form.bus_time_minutes}
                   onChange={(e) => update("bus_time_minutes", e.target.value)}
                   placeholder="8"
+                  className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                  style={{ fontSize: "14px" }}
+                />
+              </div>
+              <div>
+                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Drive time (minutes)</label>
+                <input
+                  type="number"
+                  value={form.drive_time_minutes}
+                  onChange={(e) => update("drive_time_minutes", e.target.value)}
+                  placeholder="5"
+                  required
                   className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
                   style={{ fontSize: "14px" }}
                 />

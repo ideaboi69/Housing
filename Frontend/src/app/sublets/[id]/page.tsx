@@ -1,17 +1,22 @@
 "use client";
 
-import { use, useState, useRef } from "react";
+import { use, useState, useRef, useCallback } from "react";
 import { ScoreRing } from "@/components/ui/ScoreRing";
+import { ReportModal } from "@/components/ui/ReportModal";
+import { ReviewModal } from "@/components/ui/ReviewModal";
+import { ShareButton } from "@/components/ui/ShareButton";
 import { getScoreColor } from "@/lib/utils";
 import { getAmenityChecklist } from "@/lib/amenities";
 import { getMockSublet } from "@/lib/mock-sublets";
 import { getMockReviews } from "@/lib/mock-data";
+import { useSavedStore } from "@/lib/saved-store";
+import { useAuthStore } from "@/lib/auth-store";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, MapPin, Heart, Check, ChevronLeft, ChevronRight,
   Bed, Bath, Calendar, MessageCircle, Share2, Flag, Tag, Users,
-  GraduationCap, Zap,
+  GraduationCap, Zap, Star,
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import type { ReviewResponse } from "@/types";
@@ -99,12 +104,38 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   const router = useRouter();
   const sublet = getMockSublet(id);
 
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(false);  // fallback for sublets without listing_id
   const [messageSending, setMessageSending] = useState(false);
   const [messageSent, setMessageSent] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  const user = useAuthStore((s) => s.user);
+
+  // Use saved store if sublet has a listing_id, otherwise local toggle
+  const hasListingId = sublet && typeof sublet.listing_id === "number";
+  const storeSaved = useSavedStore((s) => hasListingId ? s.savedIds.has(sublet.listing_id!) : false);
+  const storeToggling = useSavedStore((s) => hasListingId ? s.togglingIds.has(sublet.listing_id!) : false);
+  const storeToggle = useSavedStore((s) => s.toggleSave);
+
+  const isSaved = hasListingId ? storeSaved : saved;
+
+  const handleToggleSave = useCallback(async () => {
+    if (hasListingId) {
+      try {
+        await storeToggle(sublet!.listing_id!);
+      } catch (err) {
+        if (err instanceof Error && err.message === "auth_required") {
+          router.push("/login");
+        }
+      }
+    } else {
+      setSaved(!saved);
+    }
+  }, [hasListingId, sublet, storeToggle, saved, router]);
 
   // TODO: fetch real reviews for the property once backend links sublets to properties
-  const reviews: ReviewResponse[] = sublet ? getMockReviews(1) : []; // Use property 1 reviews as placeholder
+  const [reviews, setReviews] = useState<ReviewResponse[]>(sublet ? getMockReviews(1) : []);
 
   const handleMessage = async () => {
     if (messageSending || messageSent) return;
@@ -268,14 +299,43 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               </motion.div>
 
               {/* Reviews — stars only, no comments */}
-              {reviews.length > 0 && (
-                <div className="mt-8">
+              <div className="mt-8">
+                <div className="flex items-center justify-between">
                   <h3 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-                    Property Reviews <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/5 text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 700 }}>{reviews.length}</span>
+                    Property Reviews
+                    {reviews.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/5 text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 700 }}>{reviews.length}</span>
+                    )}
                   </h3>
-                  <div className="space-y-3 mt-3">{reviews.map((r, i) => <ReviewCard key={r.id} review={r} index={i} />)}</div>
+                  {user ? (
+                    <motion.button
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => setReviewOpen(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FFB627]/10 text-[#FFB627] hover:bg-[#FFB627]/15 transition-colors"
+                      style={{ fontSize: "12px", fontWeight: 600 }}
+                    >
+                      <Star className="w-3.5 h-3.5" /> Leave a Review
+                    </motion.button>
+                  ) : (
+                    <Link
+                      href="/login"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/40 hover:text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.06] transition-colors"
+                      style={{ fontSize: "12px", fontWeight: 500 }}
+                    >
+                      Sign in to review
+                    </Link>
+                  )}
                 </div>
-              )}
+                {reviews.length > 0 ? (
+                  <div className="space-y-3 mt-3">{reviews.map((r, i) => <ReviewCard key={r.id} review={r} index={i} />)}</div>
+                ) : (
+                  <div className="mt-4 py-8 text-center rounded-xl border border-dashed border-[#1B2D45]/10 bg-[#FAF8F4]/50">
+                    <span style={{ fontSize: "28px" }}>⭐</span>
+                    <p className="text-[#1B2D45]/40 mt-2" style={{ fontSize: "13px", fontWeight: 500 }}>No reviews yet</p>
+                    <p className="text-[#1B2D45]/25 mt-1" style={{ fontSize: "12px" }}>Lived here? Be the first to rate this property.</p>
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
 
@@ -313,16 +373,23 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               </motion.button>
 
               {/* Save */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => setSaved(!saved)}
-                className={`w-full mt-2 py-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${saved ? "border-[#E71D36]/20 bg-[#E71D36]/[0.04] text-[#E71D36]" : "border-black/[0.06] text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.03]"}`}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave}
+                disabled={storeToggling}
+                className={`w-full mt-2 py-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${isSaved ? "border-[#E71D36]/20 bg-[#E71D36]/[0.04] text-[#E71D36]" : "border-black/[0.06] text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.03]"}`}
                 style={{ fontSize: "14px", fontWeight: 500 }}>
-                <Heart className={`w-4 h-4 ${saved ? "fill-[#E71D36]" : ""}`} /> {saved ? "Saved" : "Save Sublet"}
+                <Heart className={`w-4 h-4 ${isSaved ? "fill-[#E71D36]" : ""}`} /> {isSaved ? "Saved" : "Save Sublet"}
               </motion.button>
 
               {/* Share + Report */}
               <div className="flex items-center gap-2 mt-3">
-                <button className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#1B2D45]/50 hover:bg-[#1B2D45]/[0.03] transition-all" style={{ fontSize: "11px", fontWeight: 500 }}><Share2 className="w-3 h-3" /> Share</button>
-                <button className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all" style={{ fontSize: "11px", fontWeight: 500 }}><Flag className="w-3 h-3" /> Report</button>
+                <ShareButton path={`/sublets/${id}`} title={sublet.title} variant="inline" />
+                <button
+                  onClick={() => setReportOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
+                  style={{ fontSize: "11px", fontWeight: 500 }}
+                >
+                  <Flag className="w-3 h-3" /> Report
+                </button>
               </div>
 
               <div className="text-[#1B2D45]/25 text-center mt-4" style={{ fontSize: "11px" }}>{sublet.views} views · {sublet.saves} saves</div>
@@ -343,6 +410,25 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
           </motion.div>
         </div>
       </motion.div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        listingId={hasListingId ? sublet.listing_id! : parseInt(id, 10)}
+        listingTitle={sublet.title}
+      />
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        propertyId={1}
+        propertyTitle={sublet.title}
+        onReviewSubmitted={(newReview) => {
+          setReviews((prev) => [newReview, ...prev]);
+        }}
+      />
     </div>
   );
 }

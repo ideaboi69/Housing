@@ -7,7 +7,7 @@ import {
   Send, Shield, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useWriterStore } from "@/lib/writer-store";
+import { useWriterStore } from "@/lib/store";
 import { api, ApiError } from "@/lib/api";
 import type { PostListResponse, PostResponse, PostCategory } from "@/types";
 
