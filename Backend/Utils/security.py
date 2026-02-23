@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status, Security
 from fastapi.security import OAuth2PasswordBearer, HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt, ExpiredSignatureError
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.orm import Session
 from config import settings
 from tables import get_db, User, Landlord, Admin, Writer
@@ -11,8 +11,6 @@ from Schemas.userSchema import UserRole
 
 post_bearer = HTTPBearer(auto_error=False)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # Declaring various authentication methods for each user type
 user_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/users/login/swagger",scheme_name="UserAuth")
 landlord_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/landlords/login",scheme_name="LandlordAuth")
@@ -20,10 +18,10 @@ admin_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/admin/login", scheme_name="Ad
 writer_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/writers/login", scheme_name="WriterAuth")
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password, hashed_password)
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
