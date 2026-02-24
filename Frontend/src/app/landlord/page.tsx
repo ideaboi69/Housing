@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
@@ -17,6 +17,11 @@ import {
   ChevronRight,
   Home,
   AlertCircle,
+  Phone,
+  Mail,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import { getScoreColor } from "@/lib/utils";
 
@@ -30,6 +35,7 @@ interface LandlordProfile {
   identity_verified: boolean;
   company_name: string | null;
   phone: string | null;
+  email?: string | null;
 }
 
 interface PropertyWithListings extends PropertyResponse {
@@ -157,6 +163,166 @@ function EmptyProperties() {
         <Plus className="w-4 h-4" />
         Add Property
       </Link>
+    </div>
+  );
+}
+
+/* ── Contact Info Editor ───────────────────── */
+
+function ContactInfoCard({
+  profile,
+  userEmail,
+  onUpdate,
+}: {
+  profile: LandlordProfile | null;
+  userEmail?: string;
+  onUpdate: (data: { company_name?: string; phone?: string }) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [companyName, setCompanyName] = useState(profile?.company_name ?? "");
+  const [phone, setPhone] = useState(profile?.phone ?? "");
+  const [saved, setSaved] = useState(false);
+
+  // Sync fields when profile updates
+  useEffect(() => {
+    setCompanyName(profile?.company_name ?? "");
+    setPhone(profile?.phone ?? "");
+  }, [profile]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onUpdate({
+        company_name: companyName.trim() || undefined,
+        phone: phone.trim() || undefined,
+      });
+      setSaved(true);
+      setEditing(false);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // Error handled by parent
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setCompanyName(profile?.company_name ?? "");
+    setPhone(profile?.phone ?? "");
+    setEditing(false);
+  };
+
+  const displayEmail = profile?.email ?? userEmail ?? null;
+
+  return (
+    <div className="bg-white rounded-xl border border-black/[0.04] p-5">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>Contact Information</h3>
+        {!editing ? (
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[#FF6B35] hover:bg-[#FF6B35]/[0.04] transition-colors"
+            style={{ fontSize: "12px", fontWeight: 600 }}
+          >
+            <Pencil className="w-3 h-3" /> Edit
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[#1B2D45]/40 hover:bg-[#1B2D45]/[0.04] transition-colors"
+              style={{ fontSize: "12px", fontWeight: 600 }}
+            >
+              <X className="w-3 h-3" /> Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-50 transition-colors"
+              style={{ fontSize: "12px", fontWeight: 600 }}
+            >
+              {saving ? "Saving..." : <><Check className="w-3 h-3" /> Save</>}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p className="text-[#1B2D45]/35 mb-4" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+        This is shown publicly on your listings so students can reach you directly.
+      </p>
+
+      <div className="space-y-3">
+        {/* Company Name */}
+        <div>
+          <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>
+            Company / Realtor Name
+          </label>
+          {editing ? (
+            <input
+              type="text"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="e.g. Mitchell Property Management"
+              className="w-full px-3 py-2 rounded-lg border border-[#1B2D45]/10 text-[#1B2D45] placeholder:text-[#1B2D45]/20 focus:border-[#FF6B35]/30 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/10 transition-all"
+              style={{ fontSize: "13px" }}
+            />
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FAF8F4]">
+              <Building2 className="w-3.5 h-3.5 text-[#1B2D45]/30" />
+              <span className={profile?.company_name ? "text-[#1B2D45]" : "text-[#1B2D45]/25 italic"} style={{ fontSize: "13px" }}>
+                {profile?.company_name ?? "Not set"}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>
+            Phone Number
+          </label>
+          {editing ? (
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="e.g. (519) 555-0147"
+              className="w-full px-3 py-2 rounded-lg border border-[#1B2D45]/10 text-[#1B2D45] placeholder:text-[#1B2D45]/20 focus:border-[#FF6B35]/30 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/10 transition-all"
+              style={{ fontSize: "13px" }}
+            />
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FAF8F4]">
+              <Phone className="w-3.5 h-3.5 text-[#1B2D45]/30" />
+              <span className={profile?.phone ? "text-[#1B2D45]" : "text-[#1B2D45]/25 italic"} style={{ fontSize: "13px" }}>
+                {profile?.phone ?? "Not set"}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Email (read-only — comes from account) */}
+        <div>
+          <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>
+            Email
+          </label>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FAF8F4]">
+            <Mail className="w-3.5 h-3.5 text-[#1B2D45]/30" />
+            <span className={displayEmail ? "text-[#1B2D45]" : "text-[#1B2D45]/25 italic"} style={{ fontSize: "13px" }}>
+              {displayEmail ?? "Not available"}
+            </span>
+            {displayEmail && (
+              <span className="text-[#1B2D45]/20 ml-auto" style={{ fontSize: "10px" }}>from account</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {saved && (
+        <div className="flex items-center gap-1.5 mt-3 text-[#4ADE80]" style={{ fontSize: "12px", fontWeight: 600 }}>
+          <Check className="w-3.5 h-3.5" /> Contact info updated
+        </div>
+      )}
     </div>
   );
 }
@@ -343,6 +509,18 @@ export default function LandlordDashboard() {
             ))}
           </div>
         )}
+
+        {/* Contact Info */}
+        <div className="mt-8">
+          <ContactInfoCard
+            profile={profile}
+            userEmail={user.email}
+            onUpdate={async (data) => {
+              const updated = await api.landlords.updateProfile(data);
+              setProfile((prev) => prev ? { ...prev, ...updated } : prev);
+            }}
+          />
+        </div>
 
         {/* Quick actions */}
         {properties.length > 0 && (

@@ -7,6 +7,7 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
+import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
 import {
   formatPrice, formatLeaseType, formatPropertyType, formatDate, getScoreColor, getScoreLabel,
 } from "@/lib/utils";
@@ -492,9 +493,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* ─── Sidebar ─── */}
-          <motion.div className="space-y-4" variants={fadeUp}>
+          <motion.div className="space-y-4 sticky top-[80px] self-start" variants={fadeUp}>
             {/* Price card */}
-            <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5 sticky top-[80px]"
+            <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5"
               style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>
               <div className="flex items-baseline gap-1">
                 <span className="text-[#FF6B35]" style={{ fontSize: "32px", fontWeight: 800 }}>
@@ -516,10 +517,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   <span className="relative z-[1]">Verified Landlord</span>
                 </motion.div>
               )}
-
-              <div className="text-[#1B2D45]/50 mt-3" style={{ fontSize: "12px" }}>
-                Listed by <span className="text-[#1B2D45] font-semibold">{listing.landlord_name}</span>
-              </div>
 
               {/* Contact Landlord */}
               <motion.button whileTap={{ scale: 0.97 }} onClick={handleContact} disabled={contactSending || contactSent}
@@ -568,18 +565,26 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               <div className="text-[#1B2D45]/25 text-center mt-4" style={{ fontSize: "11px" }}>
                 {listing.view_count} views · Listed {formatDate(listing.created_at)}
               </div>
+            </div>
 
-              {/* Map */}
-              <div className="mt-4 rounded-xl border border-black/[0.04] overflow-hidden">
-                <div className="h-[160px] bg-[#f0ece6] flex items-center justify-center">
-                  <div className="text-center">
-                    <span style={{ fontSize: "28px" }}>📍</span>
-                    <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px", fontWeight: 500 }}>Guelph, ON</p>
-                  </div>
+            {/* Landlord Contact Card */}
+            <LandlordContactCard
+              landlordId={listing.landlord_id}
+              landlordName={listing.landlord_name}
+              landlordVerified={listing.landlord_verified}
+            />
+
+            {/* Map */}
+            <div className="rounded-xl border border-black/[0.04] overflow-hidden bg-white/90 backdrop-blur-xl"
+              style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
+              <div className="h-[160px] bg-[#f0ece6] flex items-center justify-center">
+                <div className="text-center">
+                  <span style={{ fontSize: "28px" }}>📍</span>
+                  <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px", fontWeight: 500 }}>Guelph, ON</p>
                 </div>
-                <div className="p-2.5">
-                  <p className="text-[#1B2D45]/40" style={{ fontSize: "10px" }}>{listing.address}</p>
-                </div>
+              </div>
+              <div className="p-2.5">
+                <p className="text-[#1B2D45]/40" style={{ fontSize: "10px" }}>{listing.address}</p>
               </div>
             </div>
           </motion.div>

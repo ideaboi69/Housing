@@ -5,6 +5,7 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
+import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
 import { getScoreColor } from "@/lib/utils";
 import { getAmenityChecklist } from "@/lib/amenities";
 import { getMockSublet } from "@/lib/mock-sublets";
@@ -340,9 +341,9 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* ─── Sidebar ─── */}
-          <motion.div className="space-y-4" variants={fadeUp}>
+          <motion.div className="space-y-4 sticky top-[80px] self-start" variants={fadeUp}>
             {/* Price card */}
-            <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5 sticky top-[80px]" style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>
+            <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5" style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>
               <div className="flex items-baseline gap-2">
                 <span className="text-[#FF6B35]" style={{ fontSize: "32px", fontWeight: 800 }}>${sublet.subletPrice}</span>
                 <span className="text-[#1B2D45]/30" style={{ fontSize: "14px" }}>/mo</span>
@@ -406,6 +407,35 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                   <p className="text-[#1B2D45]/40" style={{ fontSize: "10px" }}>{sublet.address}</p>
                 </div>
               </div>
+
+              {/* Contact Card */}
+              {hasListingId ? (
+                <LandlordContactCard
+                  landlordId={sublet.listing_id!}
+                  landlordName={sublet.posterName}
+                  landlordVerified={false}
+                />
+              ) : (
+                <div className="mt-4 bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-4"
+                  style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2EC4B6]/20 to-[#4ADE80]/20 flex items-center justify-center">
+                      <span className="text-[#2EC4B6]" style={{ fontSize: "16px", fontWeight: 800 }}>
+                        {sublet.posterName.charAt(0)}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.posterName}</p>
+                      <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{sublet.posterType}</p>
+                    </div>
+                  </div>
+                  {sublet.posterIsStudent && sublet.posterYear && sublet.posterProgram && (
+                    <p className="text-[#1B2D45]/30 mt-3 pt-3 border-t border-[#1B2D45]/[0.04]" style={{ fontSize: "11px" }}>
+                      🎓 {sublet.posterYear} year · {sublet.posterProgram}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         </div>

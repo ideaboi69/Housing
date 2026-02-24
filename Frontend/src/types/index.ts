@@ -336,6 +336,8 @@ export interface LandlordPublicResponse {
   last_name: string;
   company_name: string | null;
   identity_verified: boolean;
+  email?: string | null;
+  phone?: string | null;
   avg_responsiveness: number | null;
   avg_maintenance_speed: number | null;
   avg_respect_privacy: number | null;
