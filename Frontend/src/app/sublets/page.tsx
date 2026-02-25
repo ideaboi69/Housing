@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Heart, Check, ChevronRight, SlidersHorizontal, X, ArrowRight, ChevronDown } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import {
+  Heart, Check, ChevronRight, SlidersHorizontal, X, ArrowRight, ChevronDown,
+  Sparkles, ExternalLink, Minus, MapPin, DollarSign, Clock, ShieldCheck,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
-import { getScoreColor } from "@/lib/utils";
+import { getScoreColor, formatPrice } from "@/lib/utils";
 import Link from "next/link";
 
 /* ════════════════════════════════════════════════════════
@@ -902,6 +905,311 @@ function BottomCTA() {
 const desktopStaggers = [0, 18, 8, 14, 4, 20];
 
 /* ════════════════════════════════════════════════════════
+   Sublet Compare Modal (matches browse flow + AI summary)
+   ════════════════════════════════════════════════════════ */
+
+type SubletCellValue = string | number | boolean | null | undefined;
+
+interface SubletCompareRow {
+  label: string;
+  icon?: React.ReactNode;
+  values: SubletCellValue[];
+  type: "text" | "price" | "boolean" | "score" | "distance" | "time";
+  bestFn?: "lowest" | "highest";
+}
+
+function getSubletBestIndex(values: SubletCellValue[], fn: "lowest" | "highest"): number[] {
+  const nums = values.map((v) => (typeof v === "number" ? v : null));
+  const validNums = nums.filter((n): n is number => n !== null);
+  if (validNums.length === 0) return [];
+  const target = fn === "lowest" ? Math.min(...validNums) : Math.max(...validNums);
+  return nums.reduce<number[]>((acc, n, i) => (n === target ? [...acc, i] : acc), []);
+}
+
+function SubletCompareCell({
+  value,
+  type,
+  isBest,
+}: {
+  value: SubletCellValue;
+  type: SubletCompareRow["type"];
+  isBest: boolean;
+}) {
+  const bestClass = isBest ? "text-[#4ADE80] font-bold" : "text-[#1B2D45]";
+
+  if (value === null || value === undefined) {
+    return <span className="text-[#1B2D45]/20" style={{ fontSize: "13px" }}>—</span>;
+  }
+
+  if (type === "boolean") {
+    return value ? (
+      <Check className={`w-4 h-4 ${isBest ? "text-[#4ADE80]" : "text-[#2EC4B6]"}`} />
+    ) : (
+      <Minus className="w-4 h-4 text-[#1B2D45]/15" />
+    );
+  }
+
+  if (type === "price") {
+    return <span className={bestClass} style={{ fontSize: "14px", fontWeight: 700 }}>{formatPrice(value as number)}</span>;
+  }
+
+  if (type === "score") {
+    const score = value as number;
+    return <span style={{ fontSize: "14px", fontWeight: 700, color: getScoreColor(score) }}>{score}</span>;
+  }
+
+  if (type === "distance") {
+    return <span className={bestClass} style={{ fontSize: "13px", fontWeight: 600 }}>{value} km</span>;
+  }
+
+  if (type === "time") {
+    return <span className={bestClass} style={{ fontSize: "13px", fontWeight: 600 }}>{value} min</span>;
+  }
+
+  return <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{String(value)}</span>;
+}
+
+function parseSubletDistance(distance: string): number | null {
+  const n = Number.parseFloat(distance);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseSubletWalkTime(walkTime: string): number | null {
+  const n = Number.parseInt(walkTime, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+function generateSubletCompareSummary(listings: SubletListing[]): string {
+  if (listings.length < 2) return "";
+
+  const enriched = listings.map((l) => ({
+    ...l,
+    dist: parseSubletDistance(l.distance) ?? 99,
+    walk: parseSubletWalkTime(l.walkTime) ?? 999,
+    savingsPct: Math.round(((l.originalPrice - l.subletPrice) / l.originalPrice) * 100),
+  }));
+
+  const cheapest = [...enriched].sort((a, b) => a.subletPrice - b.subletPrice)[0];
+  const bestScore = [...enriched].sort((a, b) => b.healthScore - a.healthScore)[0];
+  const closest = [...enriched].sort((a, b) => a.dist - b.dist)[0];
+
+  const parts: string[] = [];
+
+  if (bestScore.healthScore > 0) {
+    parts.push(`${bestScore.title} has the strongest health score (${bestScore.healthScore}), which makes it the safest all-around pick on paper.`);
+  }
+  parts.push(`${cheapest.title} is the cheapest option at ${formatPrice(cheapest.subletPrice)}/month.`);
+  if (closest.id !== cheapest.id) {
+    parts.push(`${closest.title} is the closest to campus at ${closest.distance}.`);
+  }
+
+  const verified = enriched.filter((l) => l.verified);
+  if (verified.length > 0 && verified.length < enriched.length) {
+    parts.push(`Verified listings in this set: ${verified.map((l) => l.title).join(" and ")}.`);
+  }
+
+  const negotiable = enriched.filter((l) => l.negotiablePrice);
+  if (negotiable.length > 0) {
+    parts.push(`${negotiable.map((l) => l.title).join(" and ")} ${negotiable.length === 1 ? "is" : "are"} marked negotiable, so you may be able to lower the price.`);
+  }
+
+  return parts.join(" ");
+}
+
+function SubletCompareModal({
+  isOpen,
+  onClose,
+  listings,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  listings: SubletListing[];
+}) {
+  const [showAI, setShowAI] = useState(false);
+  const [aiText, setAiText] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && listings.length >= 2) {
+      setAiLoading(true);
+      setShowAI(true);
+      const timer = setTimeout(() => {
+        setAiText(generateSubletCompareSummary(listings));
+        setAiLoading(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+    setShowAI(false);
+    setAiText("");
+  }, [isOpen, listings]);
+
+  const rows: SubletCompareRow[] = useMemo(() => {
+    const vals = (fn: (l: SubletListing) => SubletCellValue) => listings.map(fn);
+    return [
+      { label: "Sublet Price", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => l.subletPrice), type: "price", bestFn: "lowest" },
+      { label: "Original Rent", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => l.originalPrice), type: "price", bestFn: "lowest" },
+      { label: "Health Score", icon: <ShieldCheck className="w-3.5 h-3.5" />, values: vals((l) => l.healthScore), type: "score", bestFn: "highest" },
+      { label: "Distance", icon: <MapPin className="w-3.5 h-3.5" />, values: vals((l) => parseSubletDistance(l.distance)), type: "distance", bestFn: "lowest" },
+      { label: "Walk Time", icon: <Clock className="w-3.5 h-3.5" />, values: vals((l) => parseSubletWalkTime(l.walkTime)), type: "time", bestFn: "lowest" },
+      { label: "Neighborhood", values: vals((l) => l.neighborhood), type: "text" },
+      { label: "Type", values: vals((l) => (l.roommatesStaying === null ? "Entire place" : "Private room")), type: "text" },
+      { label: "Beds", values: vals((l) => `${l.bedsAvailable} of ${l.bedsTotal}`), type: "text" },
+      { label: "Furnished", values: vals((l) => l.furnished), type: "boolean" },
+      { label: "Negotiable", values: vals((l) => l.negotiablePrice), type: "boolean" },
+      { label: "Verified", values: vals((l) => l.verified), type: "boolean" },
+      { label: "Parking", values: vals((l) => l.amenities.includes("Parking")), type: "boolean" },
+      { label: "Utilities Incl.", values: vals((l) => l.amenities.includes("Utilities Incl.")), type: "boolean" },
+      { label: "Poster", values: vals((l) => l.posterType), type: "text" },
+    ];
+  }, [listings]);
+
+  if (!isOpen || listings.length === 0) return null;
+
+  const colWidth = listings.length <= 2 ? "min-w-[220px]" : listings.length === 3 ? "min-w-[180px]" : "min-w-[160px]";
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[120] flex flex-col"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }}
+        >
+          <motion.div
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-white border-b border-black/[0.06] px-5 py-4 flex items-center justify-between shrink-0"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#FF6B35]/10 flex items-center justify-center">
+                <span style={{ fontSize: "16px" }}>📊</span>
+              </div>
+              <div>
+                <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>
+                  Compare Sublets
+                </h2>
+                <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>
+                  {listings.length} picks · Best values highlighted in green
+                </p>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-9 h-9 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors">
+              <X className="w-4 h-4 text-[#1B2D45]/50" />
+            </button>
+          </motion.div>
+
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.05 }}
+            className="flex-1 overflow-auto bg-[#FAF8F4]"
+          >
+            <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-5">
+              <AnimatePresence>
+                {showAI && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="mb-5 bg-gradient-to-br from-[#FF6B35]/[0.04] to-[#FFB627]/[0.04] rounded-xl border border-[#FF6B35]/10 p-5"
+                  >
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <Sparkles className="w-4 h-4 text-[#FF6B35]" />
+                      <span className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 700 }}>AI Analysis</span>
+                    </div>
+                    {aiLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map((i) => (
+                            <motion.div
+                              key={i}
+                              className="w-1.5 h-1.5 rounded-full bg-[#FF6B35]/40"
+                              animate={{ opacity: [0.3, 1, 0.3] }}
+                              transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>Analyzing your picks...</span>
+                      </div>
+                    ) : (
+                      <p className="text-[#1B2D45]/70" style={{ fontSize: "13px", lineHeight: 1.7 }}>{aiText}</p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="bg-white rounded-xl border border-black/[0.04] overflow-hidden" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
+                <div className="overflow-x-auto">
+                  <table className="w-full" style={{ minWidth: `${140 + listings.length * 180}px` }}>
+                    <thead>
+                      <tr className="border-b border-black/[0.04]">
+                        <th className="w-[140px] min-w-[140px] p-4 text-left sticky left-0 bg-white z-10" />
+                        {listings.map((l) => (
+                          <th key={l.id} className={`${colWidth} p-4 text-center`}>
+                            <Link href={`/sublets/${l.id}`} className="group block">
+                              <div className="w-full h-[100px] rounded-lg bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] mb-2.5 overflow-hidden relative">
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span style={{ fontSize: "24px" }}>☀️</span>
+                                </div>
+                                <div
+                                  className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center text-white"
+                                  style={{ fontSize: "10px", fontWeight: 800, backgroundColor: getScoreColor(l.healthScore) }}
+                                >
+                                  {l.healthScore}
+                                </div>
+                              </div>
+                              <p className="text-[#1B2D45] truncate group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "13px", fontWeight: 700 }}>
+                                {l.title}
+                              </p>
+                              <p className="text-[#1B2D45]/30 truncate mt-0.5" style={{ fontSize: "10px" }}>
+                                {l.street}
+                              </p>
+                              <div className="flex items-center justify-center gap-1 mt-1.5 text-[#FF6B35] opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: "10px", fontWeight: 600 }}>
+                                View sublet <ExternalLink className="w-2.5 h-2.5" />
+                              </div>
+                            </Link>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, ri) => {
+                        const bestIndices = row.bestFn ? getSubletBestIndex(row.values, row.bestFn) : [];
+                        return (
+                          <tr key={row.label} className={`border-b border-black/[0.02] ${ri % 2 === 0 ? "bg-white" : "bg-[#FAF8F4]/50"}`}>
+                            <td className="px-4 py-3 sticky left-0 z-10" style={{ backgroundColor: ri % 2 === 0 ? "white" : "#FDFCFA" }}>
+                              <div className="flex items-center gap-2">
+                                {row.icon && <span className="text-[#1B2D45]/25">{row.icon}</span>}
+                                <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 600 }}>{row.label}</span>
+                              </div>
+                            </td>
+                            {row.values.map((val, ci) => (
+                              <td key={ci} className="px-4 py-3 text-center">
+                                <SubletCompareCell value={val} type={row.type} isBest={bestIndices.includes(ci)} />
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <p className="text-center text-[#1B2D45]/25 mt-4" style={{ fontSize: "11px" }}>
+                Tap any sublet header to view full details · Green highlights indicate best value in each row
+              </p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
    Sublet Picks Tray
    ════════════════════════════════════════════════════════ */
 
@@ -946,7 +1254,7 @@ function SubletPickCard({ listing, onRemove }: { listing: SubletListing; onRemov
   );
 }
 
-function SubletPicksTray({ picks, onRemove, showSheet, onCloseSheet }: { picks: SubletListing[]; onRemove: (id: string) => void; showSheet: boolean; onCloseSheet: () => void }) {
+function SubletPicksTray({ picks, onRemove, onCompare, showSheet, onCloseSheet }: { picks: SubletListing[]; onRemove: (id: string) => void; onCompare: () => void; showSheet: boolean; onCloseSheet: () => void }) {
   const isMobile = useIsMobile();
 
   if (picks.length === 0) return null;
@@ -981,7 +1289,7 @@ function SubletPicksTray({ picks, onRemove, showSheet, onCloseSheet }: { picks: 
                     {picks.length}
                   </motion.span>
                 </div>
-                <button className="flex items-center gap-1.5 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 600 }}>
+                <button onClick={onCompare} className="flex items-center gap-1.5 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 600 }}>
                   Compare all
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
@@ -1025,7 +1333,7 @@ function SubletPicksTray({ picks, onRemove, showSheet, onCloseSheet }: { picks: 
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <button className="flex items-center gap-1.5 text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 600 }}>
+                <button onClick={onCompare} className="flex items-center gap-1.5 text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 600 }}>
                   Compare
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
@@ -1152,6 +1460,7 @@ export default function SubletsPage() {
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<SubletViewMode>("board");
   const [showPicksSheet, setShowPicksSheet] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   const toggleFilter = (key: string) => {
     setActiveFilters((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
@@ -1257,7 +1566,13 @@ export default function SubletsPage() {
         onClose={() => setShowFiltersModal(false)}
       />
 
-      <SubletPicksTray picks={pinnedListings} onRemove={togglePin} showSheet={showPicksSheet} onCloseSheet={() => setShowPicksSheet(false)} />
+      <SubletPicksTray
+        picks={pinnedListings}
+        onRemove={togglePin}
+        onCompare={() => setCompareOpen(true)}
+        showSheet={showPicksSheet}
+        onCloseSheet={() => setShowPicksSheet(false)}
+      />
 
       {/* Content */}
       {filteredListings.length === 0 ? (
@@ -1314,6 +1629,12 @@ export default function SubletsPage() {
       </AnimatePresence>
 
       <BottomCTA />
+
+      <SubletCompareModal
+        isOpen={compareOpen}
+        onClose={() => setCompareOpen(false)}
+        listings={pinnedListings}
+      />
     </div>
   );
 }
