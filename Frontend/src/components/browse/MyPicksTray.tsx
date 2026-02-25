@@ -11,6 +11,7 @@ import Link from "next/link";
 interface MyPicksTrayProps {
   picks: ListingDetailResponse[];
   onRemove: (id: number) => void;
+  onCompare: () => void;
   showBottomSheet?: boolean;
   onCloseBottomSheet?: () => void;
 }
@@ -80,6 +81,7 @@ function PickCard({
 export function MyPicksTray({
   picks,
   onRemove,
+  onCompare,
   showBottomSheet = false,
   onCloseBottomSheet,
 }: MyPicksTrayProps) {
@@ -136,6 +138,7 @@ export function MyPicksTray({
                 <div className="flex items-center gap-2">
                   {picks.length > 0 && (
                     <button
+                      onClick={onCompare}
                       className="flex items-center gap-1.5 text-[#FF6B35]"
                       style={{ fontSize: "12px", fontWeight: 600 }}
                     >
@@ -224,6 +227,7 @@ export function MyPicksTray({
                 </motion.span>
               </div>
               <button
+                onClick={onCompare}
                 className="flex items-center gap-1.5 text-[#FF6B35] hover:underline"
                 style={{ fontSize: "12px", fontWeight: 600 }}
               >

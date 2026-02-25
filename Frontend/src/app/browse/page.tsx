@@ -14,6 +14,7 @@ import { MapView } from "@/components/browse/MapView";
 import { SearchAndFilters } from "@/components/browse/SearchAndFilters";
 import { FilterModal } from "@/components/browse/FilterModal";
 import { MyPicksTray } from "@/components/browse/MyPicksTray";
+import { CompareModal } from "@/components/browse/CompareModal";
 import { MobileBottomTabs } from "@/components/browse/MobileBottomTabs";
 import { api } from "@/lib/api";
 import { mockListings, mockHealthScores } from "@/lib/mock-data";
@@ -91,6 +92,7 @@ export default function BrowsePage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<ListingFilters>({ status: "active", limit: 20 });
   const [searchQuery, setSearchQuery] = useState("");
+  const [compareOpen, setCompareOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const fetchListings = useCallback(async (filterParams: ListingFilters) => {
@@ -284,6 +286,7 @@ export default function BrowsePage() {
       <MyPicksTray
         picks={pinnedListings}
         onRemove={removePin}
+        onCompare={() => setCompareOpen(true)}
         showBottomSheet={showPicksSheet}
         onCloseBottomSheet={() => setShowPicksSheet(false)}
       />
@@ -443,6 +446,14 @@ export default function BrowsePage() {
 
       {/* Bottom padding on mobile for the fixed tab bar */}
       {isMobile && <div className="h-[56px]" />}
+
+      {/* Compare Modal */}
+      <CompareModal
+        isOpen={compareOpen}
+        onClose={() => setCompareOpen(false)}
+        listings={pinnedListings}
+        healthScores={healthScores}
+      />
     </div>
   );
 }
