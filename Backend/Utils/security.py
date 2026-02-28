@@ -18,10 +18,10 @@ admin_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/admin/login", scheme_name="Ad
 writer_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/writers/login", scheme_name="WriterAuth")
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()

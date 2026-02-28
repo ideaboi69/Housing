@@ -50,7 +50,6 @@ def register_users(payload: UserCreate, db: Session = Depends(get_db)):
 # User Login
 # JSON login for frontend
 @user_router.post("/login")
-@user_router.post("/login")
 def user_login(payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
 
@@ -62,7 +61,18 @@ def user_login(payload: UserLogin, db: Session = Depends(get_db)):
 
     token = create_access_token({"user_id": user.id, "role": user.role.value})
 
-    return {"access_token": token, "token_type": "bearer"}
+    return {"access_token": token, 
+            "token_type": "bearer", 
+            "user": {
+            "id": user.id,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": user.role.value,
+            "email_verified": user.email_verified,
+            "is_writable": user.is_writable,
+        },
+    }
 
 # Login for swagger 
 @user_router.post("/login/swagger")
