@@ -123,7 +123,7 @@ function PropertyCard({ property }: { property: PropertyWithListings }) {
         </span>
         {property.healthScore && (
           <span className="px-2.5 py-1 rounded-lg" style={{ fontSize: "11px", fontWeight: 700, color: scoreColor, background: `${scoreColor}15` }}>
-            HS {property.healthScore}
+            CS {property.healthScore}
           </span>
         )}
         <span className="text-[#1B2D45]/30 flex items-center gap-1 ml-auto" style={{ fontSize: "11px" }}>
@@ -392,7 +392,7 @@ export default function LandlordDashboard() {
               }));
               totalViews = listings.reduce((sum, l) => sum + l.view_count, 0);
 
-              // Get health score for first active listing
+              // Get Cribb Score for first active listing
               const activeListing = listings.find(l => l.status === "active");
               if (activeListing) {
                 try {
@@ -486,7 +486,7 @@ export default function LandlordDashboard() {
           />
           <StatCard
             icon={<TrendingUp className="w-4 h-4 text-[#4ADE80]" />}
-            label="Avg Health Score"
+            label="Avg Cribb Score"
             value={avgScore ?? "—"}
             sub={avgScore ? (avgScore >= 85 ? "Great" : avgScore >= 65 ? "Good" : "Needs work") : "No scores yet"}
           />

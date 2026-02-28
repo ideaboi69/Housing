@@ -36,13 +36,13 @@ Frontend/
 │   │   │   ├── MyPicksTray.tsx     # Desktop tray + mobile bottom sheet
 │   │   │   └── MobileBottomTabs.tsx # Fixed bottom nav for mobile
 │   │   └── ui/
-│   │       ├── ScoreRing.tsx       # Animated SVG health score ring
+│   │       ├── ScoreRing.tsx       # Animated SVG Cribb Score ring
 │   │       └── BoardDecorations.tsx # Pushpin & tape strip SVGs
 │   ├── hooks/index.ts              # useListing, useHealthScore, useReviews, useIsMobile
 │   ├── lib/
 │   │   ├── api.ts                  # Full API client (auth, listings, reviews, etc.)
 │   │   ├── auth-store.ts           # Zustand auth store with JWT management
-│   │   ├── mock-data.ts            # 6 mock listings + health scores for demo
+│   │   ├── mock-data.ts            # 6 mock listings + Cribb Scores for demo
 │   │   └── utils.ts                # formatPrice, getScoreColor, date helpers
 │   └── types/index.ts              # All TypeScript interfaces matching backend schemas
 ├── next.config.ts                   # Image domains for Unsplash
@@ -105,7 +105,7 @@ Ported complete Figma mockup to `page.tsx`:
 - Column 1 scrolls up (25s), Column 2 down (28s), Column 3 up (32s)
 - 6 real apartment photos per column from Unsplash
 - Fade edges (top/bottom/left gradients)
-- Two honest badge pills: "Built by UofG students" + "Health Score on every listing"
+- Two honest badge pills: "Built by UofG students" + "Cribb Score on every listing"
 - No fake social proof metrics
 
 **Section 2 — Neighborhood Map**
@@ -114,7 +114,7 @@ Ported complete Figma mockup to `page.tsx`:
 - Pulsing University of Guelph marker
 - Zone labels with listing counts and avg rents
 
-**Section 3 — Health Score Explainer**
+**Section 3 — Cribb Score Explainer**
 - Side-by-side layout: left explanation, right live demo card
 - Animated score ring at 87 with 4 sub-score progress bars
 - Score legend with color-coded meanings
@@ -131,10 +131,10 @@ Ported complete Figma mockup to `page.tsx`:
 - 3 student request cards with budgets, tags, and urgency
 
 **Section 7 — Popular Listings**
-- 4 listing preview cards with images, health score mini-rings, save hearts
+- 4 listing preview cards with images, Cribb Score mini-rings, save hearts
 
 **Section 8 — Footer**
-- 4-column link layout with health score legend
+- 4-column link layout with Cribb Score legend
 
 ---
 
@@ -170,7 +170,7 @@ Ported complete Figma mockup to `page.tsx`:
 
 **My Picks Tray**
 - Desktop: horizontal orange-bordered strip showing pinned listings
-- Shows thumbnail placeholder, title, price, health score dot, remove button
+- Shows thumbnail placeholder, title, price, Cribb Score dot, remove button
 - "Compare all" action button
 - Count badge bounces on update via spring animation
 - Mobile: bottom sheet drawer that slides up over blurred backdrop
@@ -199,7 +199,7 @@ Ported complete Figma mockup to `page.tsx`:
 - Quick facts grid: Type, Rooms, Lease, Move-in (staggered fade-up)
 - Amenities checklist with Check/X icons
 - Getting to Campus: walk time, bus time, distance
-- Health Score Breakdown: 4 horizontal bars with staggered fill animations + emoji labels
+- Cribb Score Breakdown: 4 horizontal bars with staggered fill animations + emoji labels
 - Student Reviews section with rating breakdowns and would-rent-again badges
 
 **Sidebar (Glassmorphism)**

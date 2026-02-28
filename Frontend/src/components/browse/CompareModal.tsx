@@ -101,11 +101,11 @@ function generateMockSummary(listings: ListingDetailResponse[], scores: Record<n
   const parts: string[] = [];
 
   if (cheapest.id === closest.id && cheapest.id === bestScore.id) {
-    parts.push(`${cheapest.title} stands out across the board — it's the most affordable at ${formatPrice(cheapest.rent)}/room, closest to campus at ${cheapest.dist} km, and has the highest health score of ${cheapest.score}.`);
+    parts.push(`${cheapest.title} stands out across the board — it's the most affordable at ${formatPrice(cheapest.rent)}/room, closest to campus at ${cheapest.dist} km, and has the highest Cribb Score of ${cheapest.score}.`);
     parts.push(`It's the clear winner in this comparison.`);
   } else {
     if (bestScore.score > 0) {
-      parts.push(`${bestScore.title} has the strongest health score (${bestScore.score}), suggesting better overall quality and landlord reputation.`);
+      parts.push(`${bestScore.title} has the strongest Cribb Score (${bestScore.score}), suggesting better overall quality and landlord reputation.`);
     }
     parts.push(`${cheapest.title} is the most budget-friendly at ${formatPrice(cheapest.rent)}/room.`);
     if (closest.id !== cheapest.id) {
@@ -158,7 +158,7 @@ export function CompareModal({ isOpen, onClose, listings, healthScores }: Compar
     return [
       { label: "Price / Room", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => Number(l.rent_per_room)), type: "price", bestFn: "lowest" },
       { label: "Total Rent", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => Number(l.rent_total)), type: "price", bestFn: "lowest" },
-      { label: "Health Score", icon: <TrendingUp className="w-3.5 h-3.5" />, values: vals((l) => healthScores[l.id] ?? null), type: "score", bestFn: "highest" },
+      { label: "Cribb Score", icon: <TrendingUp className="w-3.5 h-3.5" />, values: vals((l) => healthScores[l.id] ?? null), type: "score", bestFn: "highest" },
       { label: "Distance", icon: <MapPin className="w-3.5 h-3.5" />, values: vals((l) => l.distance_to_campus_km), type: "distance", bestFn: "lowest" },
       { label: "Walk Time", icon: <Clock className="w-3.5 h-3.5" />, values: vals((l) => l.walk_time_minutes), type: "time", bestFn: "lowest" },
       { label: "Type", values: vals((l) => l.property_type), type: "text" },

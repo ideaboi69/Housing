@@ -276,10 +276,10 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>📍</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.distanceKm} km</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to UofG</p></div></div>
               </div>
 
-              {/* Health Score Breakdown */}
+              {/* Cribb Score Breakdown */}
               <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.4 }}>
                 <h3 className="mt-8 text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-                  Health Score Breakdown
+                  Cribb Score Breakdown
                   <span className="px-2 py-0.5 rounded-full text-white" style={{ fontSize: "10px", fontWeight: 700, backgroundColor: scoreColor }}>{score}/100</span>
                 </h3>
                 <div className="space-y-3 mt-3">

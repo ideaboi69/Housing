@@ -22,7 +22,7 @@ interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   {
     selector: "[data-tour='health-score']",
-    title: "Health Score",
+    title: "Cribb Score",
     description: "Every listing is rated 0–100 based on maintenance, landlord responsiveness, and real tenant reviews. Green = great, red = be careful.",
     icon: <ShieldCheck className="w-5 h-5" />,
     color: "#4ADE80",
@@ -30,7 +30,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     selector: "[data-tour='pin-to-board']",
     title: "Pin to Board",
-    description: "Pin your favourite listings and compare them side-by-side — rent, amenities, health scores, and more. No more spreadsheets.",
+    description: "Pin your favourite listings and compare them side-by-side — rent, amenities, Cribb Scores, and more. No more spreadsheets.",
     icon: <Pin className="w-5 h-5" />,
     color: "#FF6B35",
   },

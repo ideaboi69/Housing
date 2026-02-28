@@ -153,7 +153,7 @@ function SubletHero({ onListClick }: { onListClick: () => void }) {
             Summer Sublets in Guelph
           </h1>
           <p className="text-[#1B2D45]/50 mt-2" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.6 }}>
-            Find short-term housing from students leaving for co-op, or list your place while you&apos;re away. Better than Facebook groups.
+            Find short-term housing from students leaving for co-op, or list your place while you&apos;re away.
           </p>
         </div>
         <motion.button
@@ -996,7 +996,7 @@ function generateSubletCompareSummary(listings: SubletListing[]): string {
   const parts: string[] = [];
 
   if (bestScore.healthScore > 0) {
-    parts.push(`${bestScore.title} has the strongest health score (${bestScore.healthScore}), which makes it the safest all-around pick on paper.`);
+    parts.push(`${bestScore.title} has the strongest Cribb Score (${bestScore.healthScore}), which makes it the safest all-around pick on paper.`);
   }
   parts.push(`${cheapest.title} is the cheapest option at ${formatPrice(cheapest.subletPrice)}/month.`);
   if (closest.id !== cheapest.id) {
@@ -1048,7 +1048,7 @@ function SubletCompareModal({
     return [
       { label: "Sublet Price", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => l.subletPrice), type: "price", bestFn: "lowest" },
       { label: "Original Rent", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => l.originalPrice), type: "price", bestFn: "lowest" },
-      { label: "Health Score", icon: <ShieldCheck className="w-3.5 h-3.5" />, values: vals((l) => l.healthScore), type: "score", bestFn: "highest" },
+      { label: "Cribb Score", icon: <ShieldCheck className="w-3.5 h-3.5" />, values: vals((l) => l.healthScore), type: "score", bestFn: "highest" },
       { label: "Distance", icon: <MapPin className="w-3.5 h-3.5" />, values: vals((l) => parseSubletDistance(l.distance)), type: "distance", bestFn: "lowest" },
       { label: "Walk Time", icon: <Clock className="w-3.5 h-3.5" />, values: vals((l) => parseSubletWalkTime(l.walkTime)), type: "time", bestFn: "lowest" },
       { label: "Neighborhood", values: vals((l) => l.neighborhood), type: "text" },

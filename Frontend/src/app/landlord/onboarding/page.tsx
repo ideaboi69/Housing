@@ -93,7 +93,7 @@ export default function LandlordOnboardingPage() {
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[
             { icon: "📋", label: "Easy listing management" },
-            { icon: "📊", label: "Health Score visibility" },
+            { icon: "📊", label: "Cribb Score visibility" },
             { icon: "🎓", label: "Verified student tenants" },
           ].map((b) => (
             <div key={b.label} className="text-center bg-white rounded-xl border border-black/[0.04] p-3">

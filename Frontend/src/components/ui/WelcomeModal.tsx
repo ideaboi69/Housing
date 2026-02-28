@@ -13,7 +13,7 @@ const slides = [
     icon: <ShieldCheck className="w-7 h-7" />,
     iconBg: "from-[#4ADE80]/15 to-[#2EC4B6]/15",
     iconColor: "#4ADE80",
-    title: "Every listing has a Health Score",
+    title: "Every listing has a Cribb Score",
     description:
       "We rate every listing on maintenance, responsiveness, and tenant satisfaction so you know exactly what you're getting — before you sign.",
     visual: (
@@ -43,7 +43,7 @@ const slides = [
     iconColor: "#FF6B35",
     title: "Pin, compare, decide",
     description:
-      "Pin your favourite listings to the board and compare them side-by-side — rent, amenities, health scores, everything. No more spreadsheets.",
+      "Pin your favourite listings to the board and compare them side-by-side — rent, amenities, Cribb Scores, everything. No more spreadsheets.",
     visual: (
       <div className="mt-5 bg-white rounded-xl border border-black/[0.04] p-3 max-w-[260px] mx-auto" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
         <div className="flex items-center gap-2 mb-2">

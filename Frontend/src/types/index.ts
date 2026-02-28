@@ -262,7 +262,7 @@ export interface ReviewCreate {
   would_rent_again: boolean;
 }
 
-// ── Health Score ────────────────────────────────────────
+// ── Cribb Score ────────────────────────────────────────
 
 export interface HealthScoreResponse {
   id: number;

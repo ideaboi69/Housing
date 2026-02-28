@@ -106,7 +106,7 @@ export default function BrowsePage() {
       if (data && data.length > 0) {
         setListings(data);
         setUseMock(false);
-        // Fetch health scores
+        // Fetch Cribb Scores
         const scores: Record<number, number> = {};
         await Promise.allSettled(
           data.map(async (l) => {

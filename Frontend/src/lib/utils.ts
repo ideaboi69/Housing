@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// ── Health Score Helpers ────────────────────────────────
+// ── Cribb Score Helpers ────────────────────────────────
 
 export function getScoreColor(score: number): string {
   if (score >= 85) return "#4ADE80";

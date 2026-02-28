@@ -12,7 +12,7 @@ health_score_router = APIRouter()
 # Calculate score for listing
 @health_score_router.post("/{listing_id}/compute", response_model=HealthScoreResponse, status_code=status.HTTP_200_OK)
 def compute_health_score(listing_id: int, db: Session = Depends(get_db)):
-    """Compute (or recompute) the housing health score for a listing."""
+    """Compute (or recompute) the housing cribb score for a listing."""
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found")

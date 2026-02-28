@@ -35,7 +35,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         const propListings = allListings.filter(l => l.property_id === propertyId);
         setListings(propListings);
 
-        // Fetch health scores
+        // Fetch Cribb Scores
         const scoreMap: Record<number, HealthScoreResponse> = {};
         await Promise.allSettled(
           propListings.map(async (l) => {
@@ -196,7 +196,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                         )}
                         {score?.overall_score && (
                           <span className="px-2 py-0.5 rounded-full" style={{ fontSize: "10px", fontWeight: 700, color: scoreColor, background: `${scoreColor}15` }}>
-                            HS {score.overall_score}
+                            CS {score.overall_score}
                           </span>
                         )}
                       </div>

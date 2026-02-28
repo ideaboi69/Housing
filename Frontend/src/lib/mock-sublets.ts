@@ -5,6 +5,7 @@
 
 export interface SubletDetail {
   id: string;
+  listing_id?: number;
   title: string;
   street: string;
   address: string;

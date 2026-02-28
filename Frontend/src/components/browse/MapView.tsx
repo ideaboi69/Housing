@@ -160,7 +160,7 @@ export function MapView({ listings, pinnedIds, onTogglePin }: MapViewProps) {
 
         {/* Legend */}
         <div className="absolute top-4 left-4 z-[1000] bg-white/90 backdrop-blur-sm rounded-xl px-4 py-3 shadow-md">
-          <div className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>Health Score</div>
+          <div className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>Cribb Score</div>
           <div className="flex items-center gap-3 mt-1.5">
             {[
               { color: "#4ADE80", label: "85+" },

@@ -89,7 +89,7 @@ export default function NewListingPage({ params }: { params: Promise<{ id: strin
 
       await api.listings.create(payload);
 
-      // Compute health score
+      // Compute Cribb Score
       try {
         const allListings = await api.listings.browse({ skip: 0, limit: 100 });
         const newListing = allListings.find(l => l.property_id === propertyId);

@@ -52,7 +52,7 @@ Backend/
 
 ## February 17, 2025
 
-### Session 3: Property, Listing, Review, Saved, Flag & Health Score Systems
+### Session 3: Property, Listing, Review, Saved, Flag & Cribb Score Systems
 
 ---
 
@@ -63,7 +63,7 @@ Backend/
 ├── main.py
 ├── config.py
 ├── tables.py
-├── helpers.py           # Shared scoring logic for health scores
+├── helpers.py           # Shared scoring logic for Cribb Scores
 ├── .env
 ├── Utils/
 │   └── security.py
@@ -222,16 +222,16 @@ Key design decisions:
 - Users can only view their own flags; admin endpoints handle flag management
 - Flag status uses `FlagStatus.PENDING` enum on creation
 
-**12. Health Score Schemas**
+**12. Cribb Score Schemas**
 
 - `HealthScoreResponse` — all sub-scores + overall score + timestamp
 
-**13. Health Score Endpoints — Complete**
+**13. Cribb Score Endpoints — Complete**
 
 | Method | Endpoint | Who | What It Does |
 |--------|----------|-----|-------------|
-| POST | `/api/health-scores/{listing_id}/compute` | Anyone | Compute or recompute health score |
-| GET | `/api/health-scores/{listing_id}` | Anyone | Get cached health score |
+| POST | `/api/health-scores/{listing_id}/compute` | Anyone | Compute or recompute Cribb Score |
+| GET | `/api/health-scores/{listing_id}` | Anyone | Get cached Cribb Score |
 
 Scoring logic (in `helpers.py`):
 - **Price vs Market (30%)** — compares listing's rent_per_room to market average for same property type. Cheaper = higher score.
@@ -283,7 +283,7 @@ Key design decisions:
 **Reviews:** Verified-only creation, one per property, auto-linked landlord, owner editing
 **Saved Listings:** Bookmark/unbookmark, saved page with full details, check status
 **Flags:** Report listings or reviews, duplicate prevention, admin resolution flow
-**Health Scores:** 4-component scoring system, cached computation, public access
+**Cribb Scores:** 4-component scoring system, cached computation, public access
 
 ### Up Next
 

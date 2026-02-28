@@ -185,7 +185,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
         const data = await api.listings.getById(listingId);
         if (data && data.id) {
           setListing(data);
-          // Try real health score
+          // Try real Cribb Score
           try {
             const hs = await api.healthScores.get(listingId);
             setHealthScore(hs);
@@ -408,11 +408,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
 
-              {/* Health Score Breakdown */}
+              {/* Cribb Score Breakdown */}
               {healthScore && (
                 <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.4 }}>
                   <h3 className="mt-8 text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-                    Health Score Breakdown
+                    Cribb Score Breakdown
                     {overallScore > 0 && (
                       <span className="px-2 py-0.5 rounded-full text-white" style={{ fontSize: "10px", fontWeight: 700, backgroundColor: getScoreColor(overallScore) }}>
                         {overallScore}/100

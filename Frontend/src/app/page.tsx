@@ -33,7 +33,7 @@ const healthBreakdowns = [
 
 const howItWorksSteps = [
   { icon: <Search className="w-6 h-6 text-white" />, bg: "#FF6B35", title: "Browse & Filter", desc: "Search by price, distance, lease type, furnishing, and more. Every listing shows walk time and bus time to campus." },
-  { icon: <Pin className="w-6 h-6 text-white" />, bg: "#2EC4B6", title: "Save & Compare", desc: "Pin listings to your board. Compare health scores, prices, and reviews side by side." },
+  { icon: <Pin className="w-6 h-6 text-white" />, bg: "#2EC4B6", title: "Save & Compare", desc: "Pin listings to your board. Compare Cribb Scores, prices, and reviews side by side." },
   { icon: <MessageCircle className="w-6 h-6 text-white" />, bg: "#1B2D45", title: "Contact with Confidence", desc: "Reach out to verified landlords. You'll know their ratings, response time, and what other students say." },
 ];
 
@@ -147,7 +147,7 @@ export default function HomePage() {
                 Student housing,<br />finally done right.
               </h1>
               <p className="mt-5 text-[#1B2D45]/55 max-w-[480px]" style={{ fontSize: "16px", fontWeight: 400, lineHeight: 1.7 }}>
-                Find trusted, verified listings near University of Guelph. Real reviews, transparent pricing, and a Health Score on every listing so you never rent blind.
+                Find trusted, verified listings near University of Guelph. Real reviews, transparent pricing, and a Cribb Score on every listing so you never rent blind.
               </p>
               <div className="flex items-center gap-3 mt-8">
                 <Link href="/browse" className="px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.35)" }}>
@@ -165,7 +165,7 @@ export default function HomePage() {
                 </div>
                 <div className="inline-flex items-center gap-2 bg-[#FAF8F4] border border-black/5 rounded-full px-4 py-1.5">
                   <span style={{ fontSize: "13px" }}>💚</span>
-                  <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Health Score on every listing</span>
+                  <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Cribb Score on every listing</span>
                 </div>
                 <div className="inline-flex items-center gap-2 bg-[#FAF8F4] border border-black/5 rounded-full px-4 py-1.5">
                   <span style={{ fontSize: "13px" }}>🔒</span>
@@ -297,7 +297,7 @@ export default function HomePage() {
         <div className="max-w-[1200px] mx-auto px-6 py-20">
           <div className="bg-white rounded-3xl border border-black/5 p-10 flex flex-col md:flex-row gap-10 md:gap-16 items-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <div className="flex-1 min-w-0">
-              <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.2 }}>Every listing gets<br />a Health Score</h2>
+              <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.2 }}>Every listing gets<br />a Cribb Score</h2>
               <p className="mt-4 text-[#1B2D45]/50 max-w-[440px]" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.7 }}>No more guessing. Every score is computed from real data and student reviews — so you can compare listings with confidence.</p>
               <div className="flex items-center gap-5 mt-7 flex-wrap">
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#4ADE80]" /><span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>85+ Great Match</span></div>

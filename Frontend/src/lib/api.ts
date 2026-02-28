@@ -231,7 +231,7 @@ export const reviews = {
     request<ReviewResponse[]>("/api/reviews/me/all"),
 };
 
-// ── Health Scores ───────────────────────────────────────
+// ── Cribb Scores ───────────────────────────────────────
 
 export const healthScores = {
   get: (listingId: number) =>

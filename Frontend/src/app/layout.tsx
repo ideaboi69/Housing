@@ -8,10 +8,10 @@ import { Toaster } from "sonner";
 export const metadata: Metadata = {
   title: "cribb — Student Housing, Finally Done Right",
   description:
-    "Find trusted, verified student housing near University of Guelph. Real reviews, transparent pricing, and a Health Score on every listing.",
+    "Find trusted, verified student housing near University of Guelph. Real reviews, transparent pricing, and a Cribb Score on every listing.",
   openGraph: {
     title: "cribb — Student Housing for UofG",
-    description: "Trusted listings, real reviews, Health Scores. Find your Guelph cribb.",
+    description: "Trusted listings, real reviews, Cribb Scores. Find your Guelph cribb.",
     type: "website",
   },
 };
