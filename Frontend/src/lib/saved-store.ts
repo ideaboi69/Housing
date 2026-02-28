@@ -66,20 +66,19 @@ export const useSavedStore = create<SavedState>((set, get) => ({
         await api.saved.save(listingId);
       }
     } catch (err) {
-      // Revert on failure
-      const revertSaved = new Set(get().savedIds);
-      if (wasSaved) {
-        revertSaved.add(listingId);
-      } else {
-        revertSaved.delete(listingId);
-      }
-      set({ savedIds: revertSaved });
-
-      // If 401/403, user isn't logged in
+      // Only revert on auth errors — keep optimistic state for network/backend failures
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        const revertSaved = new Set(get().savedIds);
+        if (wasSaved) {
+          revertSaved.add(listingId);
+        } else {
+          revertSaved.delete(listingId);
+        }
+        set({ savedIds: revertSaved });
         throw new Error("auth_required");
       }
-      throw err;
+      // For other errors (network, backend down), keep the optimistic state
+      // so the UI still works in dev/mock mode
     } finally {
       const doneToggling = new Set(get().togglingIds);
       doneToggling.delete(listingId);

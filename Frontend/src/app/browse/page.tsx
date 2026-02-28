@@ -9,6 +9,7 @@ import {
   useInView,
 } from "framer-motion";
 import { useIsMobile } from "@/hooks";
+import { useRouter } from "next/navigation";
 import { PolaroidCard } from "@/components/browse/PolaroidCard";
 import { MapView } from "@/components/browse/MapView";
 import { SearchAndFilters } from "@/components/browse/SearchAndFilters";
@@ -17,6 +18,7 @@ import { MyPicksTray } from "@/components/browse/MyPicksTray";
 import { CompareModal } from "@/components/browse/CompareModal";
 import { MobileBottomTabs } from "@/components/browse/MobileBottomTabs";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
 import { mockListings, mockHealthScores } from "@/lib/mock-data";
 import type { ListingDetailResponse, ListingFilters } from "@/types";
 
@@ -83,6 +85,8 @@ const sectionHeaderVariants = {
 };
 
 export default function BrowsePage() {
+  const router = useRouter();
+  const { user } = useAuthStore();
   const [viewMode, setViewMode] = useState<ViewMode>("board");
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
   const [listings, setListings] = useState<ListingDetailResponse[]>(mockListings);
@@ -169,10 +173,14 @@ export default function BrowsePage() {
   }, [listings, searchQuery]);
 
   const togglePin = useCallback((id: number) => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
     setPinnedIds((prev) =>
       prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
     );
-  }, []);
+  }, [user, router]);
 
   const removePin = useCallback((id: number) => {
     setPinnedIds((prev) => prev.filter((pid) => pid !== id));
@@ -228,7 +236,7 @@ export default function BrowsePage() {
           </div>
 
           {/* View toggle with indicator */}
-          <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0">
+          <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0" data-tour="view-switcher">
             {(["board", "grid", "map"] as const).map((mode) => (
               <button
                 key={mode}

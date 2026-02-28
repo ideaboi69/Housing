@@ -113,6 +113,7 @@ export function Navbar() {
               <Link
                 key={item.label}
                 href={item.path}
+                data-tour={item.label === "The Bubble" ? "the-bubble" : undefined}
                 className={`px-4 py-2 rounded-lg transition-all ${
                   isActive
                     ? "bg-[#FF6B35]/10 text-[#FF6B35]"
@@ -197,7 +198,7 @@ export function Navbar() {
                     </div>
                     {!isLandlord && (
                       <Link
-                        href="/landlord/signup"
+                        href="/landlord/login"
                         className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[#FAF8F4] border border-[#E8E4DC] text-[#1B2D45]/60 hover:border-[#FF6B35]/30 hover:text-[#FF6B35] transition-all"
                         style={{ fontSize: "11px", fontWeight: 600 }}
                       >

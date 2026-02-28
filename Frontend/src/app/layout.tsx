@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { AuthHydrator } from "@/components/AuthHydrator";
+import { OnboardingProvider } from "@/components/OnboardingProvider";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-white text-[#1B2D45] antialiased">
         <AuthHydrator />
+        <OnboardingProvider />
         <Navbar />
         <main>{children}</main>
         <Toaster position="bottom-right" richColors />

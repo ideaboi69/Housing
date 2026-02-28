@@ -101,7 +101,7 @@ export function PolaroidCard({
       {/* Card body */}
       <Link
         href={`/browse/${listing.id}`}
-        className="bg-white rounded-sm overflow-hidden cursor-pointer block"
+        className="bg-white rounded-sm cursor-pointer block"
         style={{ padding: "8px 8px 14px 8px" }}
       >
         <motion.div style={{ boxShadow: shadow }} className="rounded-sm">
@@ -136,7 +136,7 @@ export function PolaroidCard({
 
             {/* Health score */}
             {score > 0 && (
-              <div className="absolute top-2 left-2">
+              <div className="absolute top-2 left-2" data-tour="health-score">
                 <ScoreRing score={score} size={isMobile ? 34 : 38} />
               </div>
             )}
@@ -244,6 +244,7 @@ export function PolaroidCard({
           {/* Pin button */}
           {onTogglePin && (
             <motion.button
+              data-tour="pin-to-board"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
