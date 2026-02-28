@@ -61,16 +61,17 @@ def user_login(payload: UserLogin, db: Session = Depends(get_db)):
 
     token = create_access_token({"user_id": user.id, "role": user.role.value})
 
-    return {"access_token": token, 
-            "token_type": "bearer", 
-            "user": {
-            "id": user.id,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "role": user.role.value,
-            "email_verified": user.email_verified,
-            "is_writable": user.is_writable,
+    return {
+        "access_token": token, 
+        "token_type": "bearer", 
+        "user": {
+        "id": user.id,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "role": user.role.value,
+        "email_verified": user.email_verified,
+        "is_writable": user.is_writable,
         },
     }
 

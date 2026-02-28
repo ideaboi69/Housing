@@ -99,7 +99,19 @@ def login_landlord(payload: OAuth2PasswordRequestForm = Depends(), db: Session =
 
     token = create_access_token({"user_id": landlord.id, "role": landlord.role.value, "verified": landlord.identity_verified})
 
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": 
+            token, "token_type": "bearer",
+            "landlord": {
+            "id": landlord.id,
+            "email": landlord.email,
+            "first_name": landlord.first_name,
+            "last_name": landlord.last_name,
+            "identity_verified": landlord.identity_verified,
+            "company_name": landlord.company_name,
+            "phone": landlord.phone,
+        },
+    }
 
 # Private Landlord Profile
 @landlord_router.get("/me", response_model=LandlordResponse)

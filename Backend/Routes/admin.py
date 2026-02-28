@@ -36,11 +36,8 @@ def create_admin(payload: AdminCreate, db: Session = Depends(get_db), current_ad
     return AdminResponse.model_validate(admin)
 
 # ADMIN LOGIN
-@admin_router.post("/login", response_model=AdminTokenResponse)
-def admin_login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db),
-):
+@admin_router.post("/login")
+def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     admin = db.query(Admin).filter(Admin.email == form_data.username).first()
 
     if not admin or not verify_password(form_data.password, admin.password_hash):
@@ -55,10 +52,17 @@ def admin_login(
 
     token = create_access_token({"user_id": admin.id, "role": "admin"})
 
-    return AdminTokenResponse(
-        access_token=token,
-        admin=AdminResponse.model_validate(admin),
-    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "admin": {
+            "id": admin.id,
+            "email": admin.email,
+            "first_name": admin.first_name,
+            "last_name": admin.last_name,
+            "is_active": admin.is_active,
+        },
+    }
 
 # SEED FIRST ADMIN (protected with secret key)
 @admin_router.post("/seed", response_model=AdminResponse, status_code=status.HTTP_201_CREATED)
