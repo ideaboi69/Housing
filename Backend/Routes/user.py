@@ -6,7 +6,7 @@ from tables import get_db
 from tables import User, Landlord
 from Schemas.userSchema import UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange
 from helpers import check_uoguelph_email
-from Utils.security import hash_password, verify_password, create_access_token, get_current_user
+from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password
 from Utils.email_token import create_email_verification_token, decode_email_verification_token
 from Utils.email import send_verification_email
 from config import settings
@@ -26,6 +26,8 @@ def register_users(payload: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists",
         )
+    
+    validate_password(payload.password)
 
     user = User(
         email=payload.email,

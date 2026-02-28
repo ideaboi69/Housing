@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import get_db, Writer
 from Schemas.writerSchema import WriterRegister, WriterResponse, WriterTokenResponse, WriterStatus
-from Utils.security import hash_password, verify_password, create_access_token, decode_access_token
+from Utils.security import hash_password, verify_password, create_access_token, decode_access_token, validate_password
 from config import settings
 
 writer_router = APIRouter()
@@ -15,6 +15,8 @@ def register_writer(payload: WriterRegister, db: Session = Depends(get_db)):
     existing = db.query(Writer).filter(Writer.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
+    
+    validate_password(payload.password)
 
     writer = Writer(
         email=payload.email,

@@ -8,6 +8,7 @@ from config import settings
 from tables import get_db, User, Landlord, Admin, Writer
 from Schemas.writerSchema import WriterStatus
 from Schemas.userSchema import UserRole
+import re
 
 post_bearer = HTTPBearer(auto_error=False)
 
@@ -22,6 +23,15 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+
+def validate_password(password: str) -> str:
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least 1 uppercase letter")
+    if not re.search(r"[0-9]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least 1 number")
+    return password
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()

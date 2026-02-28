@@ -9,7 +9,7 @@ from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse
 from helpers import require_admin, cascade_delete_landlord
-from Utils.security import get_current_user, hash_password, create_access_token, verify_password
+from Utils.security import get_current_user, hash_password, create_access_token, verify_password, validate_password
 from Utils.cloudinary import delete_image_from_cloudinary
 from Utils.email import send_approval_email, send_rejection_email, send_revoked_email
 from config import settings
@@ -22,6 +22,8 @@ def create_admin(payload: AdminCreate, db: Session = Depends(get_db), current_ad
     existing = db.query(Admin).filter(Admin.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Admin already exists")
+
+    validate_password(payload.password)
 
     admin = Admin(
         email=payload.email,
