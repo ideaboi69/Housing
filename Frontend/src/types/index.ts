@@ -54,6 +54,10 @@ export interface UserResponse {
   email_verified: boolean;
   created_at: string;
   updated_at: string;
+  // Landlord-specific (populated when role === "landlord")
+  identity_verified?: boolean;
+  company_name?: string | null;
+  phone?: string | null;
 }
 
 export interface UserCreate {
@@ -202,6 +206,8 @@ export interface ListingDetailResponse {
   landlord_id: number;
   landlord_name: string;
   landlord_verified: boolean;
+  // engagement
+  save_count?: number;
 }
 
 export interface ListingCreate {
@@ -264,7 +270,7 @@ export interface ReviewCreate {
 
 // ── Cribb Score ────────────────────────────────────────
 
-export interface HealthScoreResponse {
+export interface CribbScoreResponse {
   id: number;
   listing_id: number;
   price_vs_market_score: number | null;

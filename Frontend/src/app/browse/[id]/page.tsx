@@ -8,6 +8,7 @@ import { ReportModal } from "@/components/ui/ReportModal";
 import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
+import { BookShowingModal } from "@/components/landlord/BookShowingModal";
 import {
   formatPrice, formatLeaseType, formatPropertyType, formatDate, getScoreColor, getScoreLabel,
 } from "@/lib/utils";
@@ -591,34 +592,15 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
         </motion.div>
       </motion.div>
 
-      {/* Book Showing Modal — placeholder until backend is ready */}
+      {/* Book Showing Modal */}
       <AnimatePresence>
         {showingOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-            style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
-            onClick={(e) => { if (e.target === e.currentTarget) setShowingOpen(false); }}>
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl w-full p-6 text-center" style={{ maxWidth: "400px", boxShadow: "0 24px 80px rgba(0,0,0,0.15)" }}>
-              <div className="w-14 h-14 rounded-2xl bg-[#FF6B35]/10 flex items-center justify-center mx-auto mb-4">
-                <Calendar className="w-6 h-6 text-[#FF6B35]" />
-              </div>
-              <h3 className="text-[#1B2D45] mb-2" style={{ fontSize: "18px", fontWeight: 800 }}>Book a Showing</h3>
-              <p className="text-[#98A3B0] mb-4 max-w-[280px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.5 }}>
-                Showing times will be available once the landlord sets up their calendar. For now, contact them directly.
-              </p>
-              <div className="flex gap-2">
-                <button onClick={() => setShowingOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-[#E8E4DC] text-[#5C6B7A]" style={{ fontSize: "13px", fontWeight: 600 }}>
-                  Close
-                </button>
-                <button onClick={() => { setShowingOpen(false); handleContact(); }}
-                  className="flex-1 py-2.5 rounded-xl bg-[#FF6B35] text-white" style={{ fontSize: "13px", fontWeight: 700 }}>
-                  Message Instead
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+          <BookShowingModal
+            listingId={listing.id}
+            listingTitle={listing.title}
+            landlordName={listing.landlord_name}
+            onClose={() => setShowingOpen(false)}
+          />
         )}
       </AnimatePresence>
 

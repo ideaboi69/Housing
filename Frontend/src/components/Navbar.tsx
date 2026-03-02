@@ -85,13 +85,18 @@ export function Navbar() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  const dropdownLinks = [
-    { label: "Messages", href: "/messages", icon: MessageCircle },
-    { label: "Saved Listings", href: "/saved", icon: Bookmark },
-    { label: "My Matches", href: "/roommates/matches", icon: Heart },
-    { label: "Settings", href: "/settings", icon: Settings },
-    ...(isLandlord ? [{ label: "Landlord Dashboard", href: "/landlord", icon: LayoutDashboard }] : []),
-  ];
+  const dropdownLinks = isLandlord
+    ? [
+        { label: "Dashboard", href: "/landlord", icon: LayoutDashboard },
+        { label: "Messages", href: "/messages", icon: MessageCircle },
+        { label: "Settings", href: "/settings", icon: Settings },
+      ]
+    : [
+        { label: "Messages", href: "/messages", icon: MessageCircle },
+        { label: "Saved Listings", href: "/saved", icon: Bookmark },
+        { label: "My Group", href: "/roommates", icon: Heart },
+        { label: "Settings", href: "/settings", icon: Settings },
+      ];
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">

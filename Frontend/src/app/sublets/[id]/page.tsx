@@ -393,7 +393,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 </button>
               </div>
 
-              <div className="text-[#1B2D45]/25 text-center mt-4" style={{ fontSize: "11px" }}>{sublet.views} views · {sublet.saves} saves</div>
+              <div className="text-[#1B2D45]/25 text-center mt-4" style={{ fontSize: "11px" }}>{sublet.views} viewed · {sublet.saves} saved</div>
 
               {/* Map */}
               <div className="mt-4 rounded-xl border border-black/[0.04] overflow-hidden">

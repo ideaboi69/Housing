@@ -3,11 +3,11 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Heart, Pin } from "lucide-react";
+import { Heart, Pin, Eye } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
-import { formatPrice, formatPropertyType } from "@/lib/utils";
+import { formatPrice, formatPropertyType, formatLeaseType } from "@/lib/utils";
 import { useSavedStore } from "@/lib/saved-store";
 import type { ListingDetailResponse } from "@/types";
 
@@ -69,6 +69,18 @@ export function PolaroidCard({
   if (listing.has_laundry) tags.push("Laundry");
   if (listing.utilities_included) tags.push("Utilities Incl.");
 
+  /* ── Format move-in date for display ────────────── */
+  const moveInLabel = listing.move_in_date
+    ? new Date(listing.move_in_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : null;
+
+  /* ── Lease type short label ─────────────────────── */
+  const leaseLabel = listing.lease_type ? formatLeaseType(listing.lease_type) : null;
+
+  /* ── Social proof counts ────────────────────────── */
+  const viewCount = listing.view_count ?? 0;
+  const saveCount = listing.save_count ?? 0;
+
   return (
     <motion.div
       className="relative group"
@@ -81,7 +93,6 @@ export function PolaroidCard({
         hoverProgress.set(0);
         setIsHovered(false);
       }}
-      /* entrance stagger — parent can orchestrate via staggerChildren */
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 260, damping: 22 }}
@@ -217,6 +228,7 @@ export function PolaroidCard({
             </span>
           </div>
 
+          {/* Tags row 1 — property info + lease + move-in */}
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
             <span
               className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded"
@@ -230,18 +242,56 @@ export function PolaroidCard({
             >
               {listing.total_rooms} bed
             </span>
-            {tags.slice(0, 2).map((tag) => (
+            {leaseLabel && (
               <span
-                key={tag}
-                className="bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 px-2 py-0.5 rounded border border-[#FF6B35]/10"
+                className="bg-[#2EC4B6]/[0.08] text-[#2EC4B6] px-2 py-0.5 rounded"
+                style={{ fontSize: "9px", fontWeight: 600 }}
+              >
+                {leaseLabel}
+              </span>
+            )}
+            {moveInLabel && (
+              <span
+                className="bg-[#1B2D45]/[0.04] text-[#1B2D45]/40 px-2 py-0.5 rounded"
                 style={{ fontSize: "9px", fontWeight: 500 }}
               >
-                {tag}
+                📅 {moveInLabel}
               </span>
-            ))}
+            )}
           </div>
 
-          {/* Pin button */}
+          {/* Tags row 2 — amenities */}
+          {tags.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+              {tags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag}
+                  className="bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 px-2 py-0.5 rounded border border-[#FF6B35]/10"
+                  style={{ fontSize: "9px", fontWeight: 500 }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Social proof — viewed / saved */}
+          {(viewCount > 0 || saveCount > 0) && (
+            <div className="flex items-center gap-2.5 mt-2 text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 500 }}>
+              {viewCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <Eye className="w-3 h-3" /> {viewCount} viewed
+                </span>
+              )}
+              {saveCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <Heart className="w-3 h-3" /> {saveCount} saved
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Pin to compare board */}
           {onTogglePin && (
             <motion.button
               data-tour="pin-to-board"
@@ -250,7 +300,7 @@ export function PolaroidCard({
                 e.stopPropagation();
                 onTogglePin(listing.id);
               }}
-              className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-colors ${
+              className={`mt-2.5 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-colors ${
                 isPinned
                   ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
                   : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]/60"

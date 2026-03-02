@@ -860,7 +860,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
 
           {/* Bottom bar */}
           <div className="mt-3 pt-2.5 border-t border-black/[0.04] flex items-center justify-between">
-            <span className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 500 }}>👁 {listing.views} · 📌 {listing.saves}</span>
+            <span className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 500 }}>👁 {listing.views} viewed · ❤️ {listing.saves} saved</span>
             <span style={{ fontSize: "10px", fontWeight: 700, color: scoreColor }}>{scoreLabel}</span>
           </div>
         </div>
@@ -869,7 +869,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
   );
 }
 
-function BottomCTA() {
+function BottomCTA({ onListClick }: { onListClick: () => void }) {
   const isMobile = useIsMobile();
   return (
     <motion.div
@@ -887,6 +887,7 @@ function BottomCTA() {
           </p>
         </div>
         <motion.button
+          onClick={onListClick}
           className="px-6 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors shrink-0"
           style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
           whileTap={{ scale: 0.97 }}
@@ -1462,6 +1463,8 @@ export default function SubletsPage() {
   const [showPicksSheet, setShowPicksSheet] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
 
+  const handleListClick = () => setShowListForm((prev) => !prev);
+
   const toggleFilter = (key: string) => {
     setActiveFilters((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
   };
@@ -1492,9 +1495,9 @@ export default function SubletsPage() {
   }, [selectedRange, activeFilters]);
 
   return (
-    <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
+      <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
       <SummerBanner />
-      <SubletHero onListClick={() => setShowListForm(!showListForm)} />
+      <SubletHero onListClick={handleListClick} />
       <InsightStats />
       <ListSubletForm visible={showListForm} />
       <DateRangeSelector selectedRange={selectedRange} onChange={setSelectedRange} />
@@ -1628,7 +1631,7 @@ export default function SubletsPage() {
         )}
       </AnimatePresence>
 
-      <BottomCTA />
+      <BottomCTA onListClick={handleListClick} />
 
       <SubletCompareModal
         isOpen={compareOpen}

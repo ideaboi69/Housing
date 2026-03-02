@@ -279,7 +279,16 @@ export const landlords = {
     request<LandlordPublicResponse>(`/api/landlords/${id}`),
 
   getMyProfile: () =>
-    request<{ id: number; user_id: number; identity_verified: boolean; company_name: string | null; phone: string | null }>("/api/landlords/me"),
+    request<{
+      id: number;
+      email: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      no_of_property: string;
+      company_name: string | null;
+      identity_verified: boolean;
+    }>("/api/landlords/me"),
 
   updateProfile: (data: { company_name?: string; phone?: string }) =>
     request<{ id: number; user_id: number; identity_verified: boolean; company_name: string | null; phone: string | null }>("/api/landlords/me", {
