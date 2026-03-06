@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Users, Shield, ChevronRight, Calendar, DollarSign, MapPin, Home, Send, Check, Link2 } from "lucide-react";
+import { Users, Shield, ChevronRight, MapPin, Home, Send, Check, Link2 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { type LifestyleProfile, TAG_SHORT_LABELS, MOCK_GROUPS } from "@/components/roommates/roommate-data";
+import { type LifestyleProfile, type RoommateGroup, TAG_SHORT_LABELS, getRoommateGroupByInviteCode } from "@/components/roommates/roommate-data";
 
 /* ── Member Preview ── */
 
@@ -38,12 +38,23 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
   const router = useRouter();
   const { user } = useAuthStore();
 
+  const [group, setGroup] = useState<RoommateGroup | null | undefined>(undefined);
   const [requestMessage, setRequestMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [sent, setSent] = useState(false);
 
-  // TODO: GET /api/groups/join/{code}
-  const group = MOCK_GROUPS.find((g) => g.inviteCode === code);
+  useEffect(() => {
+    // TODO: GET /api/groups/join/{code}
+    setGroup(getRoommateGroupByInviteCode(code) ?? null);
+  }, [code]);
+
+  if (group === undefined) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
+        <div className="w-8 h-8 border-3 border-[#FF6B35]/20 border-t-[#FF6B35] rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!group) {
     return (
@@ -65,6 +76,16 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
   }
 
   const filled = group.groupSize - group.spotsNeeded;
+  const displayRent = group.housing?.status === "linked"
+    ? group.housing.linkedListingPrice
+    : group.housing?.status === "pending"
+      ? group.housing.selfReportedRent
+      : null;
+  const utilitiesIncluded = group.housing?.status === "linked"
+    ? group.housing.linkedListingUtilitiesIncluded
+    : group.housing?.status === "pending"
+      ? group.housing.selfReportedUtilitiesIncluded
+      : undefined;
 
   const handleRequest = () => {
     if (!user) {
@@ -107,35 +128,83 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
           <div className="px-5 py-5">
             <p className="text-[#1B2D45]/60" style={{ fontSize: "13px", lineHeight: 1.6 }}>{group.description}</p>
 
-            {/* Tags */}
-            <div className="flex items-center gap-2 mt-4 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>
-                <DollarSign className="w-3 h-3" /> ${group.budgetMin}–${group.budgetMax}/mo
-              </span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>
-                <Calendar className="w-3 h-3" /> {group.moveIn}
-              </span>
-              {group.preferredArea && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2EC4B6]/[0.06] text-[#2EC4B6]" style={{ fontSize: "11px", fontWeight: 600 }}>
-                  <MapPin className="w-3 h-3" /> {group.preferredArea}
-                </span>
-              )}
-              {group.genderPreference && group.genderPreference !== "No preference" && (
-                <span className="px-2.5 py-1 rounded-lg bg-[#FFB627]/[0.06] text-[#FFB627]" style={{ fontSize: "11px", fontWeight: 600 }}>{group.genderPreference}</span>
-              )}
+            {/* Snapshot */}
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
+                <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Rent</div>
+                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>
+                  {displayRent ? `$${displayRent}/mo` : `$${group.budgetMin}–$${group.budgetMax}/mo`}
+                </div>
+              </div>
+              <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
+                <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Utilities</div>
+                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>
+                  {utilitiesIncluded == null ? "Not listed" : utilitiesIncluded ? "Included" : "Extra"}
+                </div>
+              </div>
+              <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
+                <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Move-in</div>
+                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>{group.moveIn}</div>
+              </div>
+              <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
+                <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Availability</div>
+                <div
+                  className="mt-0.5"
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: group.housing?.status === "linked" ? "#4ADE80" : "#FFB627",
+                  }}
+                >
+                  {group.housing?.status === "linked" ? "Verified place" : "Awaiting verification"}
+                </div>
+              </div>
             </div>
 
-            {/* Target listing */}
-            {group.targetListingTitle && (
+            {group.genderPreference && group.genderPreference !== "No preference" && (
+              <div className="mt-3">
+                <span className="px-2.5 py-1 rounded-lg bg-[#FFB627]/[0.06] text-[#FFB627]" style={{ fontSize: "11px", fontWeight: 600 }}>
+                  {group.genderPreference}
+                </span>
+              </div>
+            )}
+
+            {/* Current home / listing */}
+            {group.housing?.status === "linked" && group.housing.linkedListingId ? (
+              <Link href={`/browse/${group.housing.linkedListingId}`} className="flex items-center gap-3 mt-4 px-4 py-3 rounded-xl bg-[#4ADE80]/[0.04] border border-[#4ADE80]/10 hover:border-[#4ADE80]/20 transition-all">
+                <Home className="w-5 h-5 text-[#4ADE80] shrink-0" />
+                  <div className="flex-1">
+                    <div className="text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>Verified current home</div>
+                  <div className="text-[#4ADE80]" style={{ fontSize: "12px", fontWeight: 700 }}>{group.housing.linkedListingAddress || group.housing.linkedListingTitle}</div>
+                  <div className="text-[#1B2D45]/35 mt-0.5" style={{ fontSize: "10px", fontWeight: 600 }}>
+                    {group.housing.linkedListingPrice ? `$${group.housing.linkedListingPrice}/mo` : "Rent not listed"}
+                    {group.housing.linkedListingUtilitiesIncluded != null ? ` · ${group.housing.linkedListingUtilitiesIncluded ? "Utilities included" : "Utilities extra"}` : ""}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-[#4ADE80]/40" />
+              </Link>
+            ) : group.housing?.status === "pending" && group.housing.selfReportedAddress ? (
+              <div className="flex items-center gap-3 mt-4 px-4 py-3 rounded-xl bg-[#FFB627]/[0.04] border border-[#FFB627]/10">
+                <MapPin className="w-5 h-5 text-[#FFB627] shrink-0" />
+                <div className="flex-1">
+                  <div className="text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>Current availability awaiting verification</div>
+                  <div className="text-[#FFB627]" style={{ fontSize: "12px", fontWeight: 700 }}>{group.housing.selfReportedAddress}</div>
+                  <div className="text-[#1B2D45]/35 mt-0.5" style={{ fontSize: "10px", fontWeight: 600 }}>
+                    {group.housing.selfReportedRent ? `~$${group.housing.selfReportedRent}/person` : "Rent not listed"}
+                    {group.housing.selfReportedUtilitiesIncluded != null ? ` · ${group.housing.selfReportedUtilitiesIncluded ? "Utilities included" : "Utilities extra"}` : ""}
+                  </div>
+                </div>
+              </div>
+            ) : group.targetListingTitle ? (
               <Link href={`/browse/${group.targetListingId}`} className="flex items-center gap-3 mt-4 px-4 py-3 rounded-xl bg-[#FF6B35]/[0.04] border border-[#FF6B35]/10 hover:border-[#FF6B35]/20 transition-all">
                 <Home className="w-5 h-5 text-[#FF6B35] shrink-0" />
                 <div className="flex-1">
-                  <div className="text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>Eyeing a listing</div>
+                  <div className="text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>Current home</div>
                   <div className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 600 }}>{group.targetListingTitle}</div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-[#FF6B35]/40" />
               </Link>
-            )}
+            ) : null}
           </div>
 
           {/* Members */}
@@ -167,7 +236,7 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
                 <textarea
                   value={requestMessage}
                   onChange={(e) => setRequestMessage(e.target.value)}
-                  placeholder="Hey! I saw this on your story — I'm a 2nd year student looking for roommates..."
+                  placeholder="Hey! I saw this on your story — I’m interested in the available room and think I’d be a good fit..."
                   className="w-full px-4 py-3 rounded-xl bg-[#FAF8F4] border border-black/[0.04] focus:border-[#FF6B35]/20 focus:outline-none resize-none transition-all"
                   style={{ fontSize: "13px", lineHeight: 1.5, minHeight: 90 }}
                   autoFocus
@@ -183,7 +252,7 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
             ) : (
               <div className="text-center">
                 <button onClick={() => user ? setShowForm(true) : router.push(`/login?redirect=/roommates/groups/join/${code}`)} className="w-full py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.25)" }}>
-                  {user ? "Request to Join" : "Sign Up to Join"}
+                  {user ? "Request This Availability" : "Sign Up to Join"}
                 </button>
                 {!user && (
                   <p className="text-[#1B2D45]/20 mt-2" style={{ fontSize: "10px" }}>

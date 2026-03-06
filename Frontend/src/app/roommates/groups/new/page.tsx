@@ -1,59 +1,128 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronLeft, Users, Copy, Check, Link2, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { BUDGET_OPTIONS, MOVE_IN_OPTIONS, GENDER_HOUSING_OPTIONS } from "@/components/roommates/roommate-data";
+import {
+  type LifestyleProfile,
+  type RoommateGroup,
+  MOVE_IN_OPTIONS,
+  GENDER_HOUSING_OPTIONS,
+  getStoredRoommateGroupByOwner,
+  upsertStoredRoommateGroup,
+} from "@/components/roommates/roommate-data";
 
 export default function CreateGroupPage() {
-  const router = useRouter();
   const { user } = useAuthStore();
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [groupSize, setGroupSize] = useState(4);
   const [haveCount, setHaveCount] = useState(2);
-  const [budgetMin, setBudgetMin] = useState(500);
-  const [budgetMax, setBudgetMax] = useState(700);
+  const [rentPerPerson, setRentPerPerson] = useState(650);
+  const [utilitiesIncluded, setUtilitiesIncluded] = useState(false);
   const [moveIn, setMoveIn] = useState("Fall 2026");
-  const [area, setArea] = useState("");
+  const [address, setAddress] = useState("");
   const [gender, setGender] = useState("No preference");
   const [description, setDescription] = useState("");
   const [isVisible, setIsVisible] = useState(true);
 
   // Result
   const [created, setCreated] = useState(false);
+  const [createdGroupId, setCreatedGroupId] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [landlordInviteUrl, setLandlordInviteUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const [landlordCopied, setLandlordCopied] = useState(false);
+  const [existingGroup, setExistingGroup] = useState<RoommateGroup | null | undefined>(undefined);
 
   const spotsNeeded = groupSize - haveCount;
-  const areas = ["Near Campus", "South End", "Downtown", "West End", "East Side", "No preference"];
+  const ownerKey = user ? `user:${user.id}` : "";
 
   const canContinue = () => {
     if (step === 0) return name.trim().length >= 2;
     if (step === 1) return haveCount > 0 && groupSize > haveCount;
-    if (step === 2) return !!moveIn && !!area;
+    if (step === 2) return !!moveIn && address.trim().length >= 8 && rentPerPerson > 0;
     if (step === 3) return description.trim().length >= 10;
     return true;
   };
 
+  useEffect(() => {
+    if (!user) {
+      setExistingGroup(null);
+      return;
+    }
+
+    setExistingGroup(
+      getStoredRoommateGroupByOwner(`user:${user.id}`) ??
+      getStoredRoommateGroupByOwner(`${user.id}-member-1`) ??
+      null
+    );
+  }, [user]);
+
+  const buildLandlordSignupUrl = (code: string) => {
+    const base = typeof window !== "undefined" ? window.location.origin : "https://cribb.ca";
+    return `${base}/landlord/signup?claim=${encodeURIComponent(code)}`;
+  };
+
+  const copyText = (value: string, setter: (state: boolean) => void) => {
+    navigator.clipboard.writeText(value);
+    setter(true);
+    setTimeout(() => setter(false), 2000);
+  };
+
   const handleCreate = () => {
-    // TODO: POST /api/groups { name, group_size, spots_needed, budget_min, budget_max, preferred_area, move_in, gender_preference, description, is_visible }
+    // TODO: POST /api/groups { name, group_size, rent_per_person, move_in, address, gender_preference, description, is_visible }
+    if (!user) return;
+    if (existingGroup) return;
+
     const code = name.replace(/[^a-zA-Z]/g, "").slice(0, 4).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const groupId = `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const members = Array.from({ length: haveCount }, (_, index) => buildMember(index));
+    const landlordUrl = buildLandlordSignupUrl(code);
+
+    const group: RoommateGroup = {
+      id: groupId,
+      name: name.trim(),
+      createdBy: ownerKey || `${user.id}-member-1`,
+      members,
+      groupSize,
+      spotsNeeded,
+      budgetMin: rentPerPerson,
+      budgetMax: rentPerPerson,
+      preferredArea: null,
+      targetListingId: null,
+      targetListingTitle: null,
+      description: description.trim(),
+      inviteCode: code,
+      isVisible,
+      genderPreference: gender,
+      moveIn,
+      createdAt: new Date().toISOString(),
+      housing: {
+        status: "pending",
+        selfReportedAddress: address.trim(),
+        selfReportedRent: rentPerPerson,
+        selfReportedUtilitiesIncluded: utilitiesIncluded,
+        landlordInviteUrl: landlordUrl,
+      },
+      bannerGradient: "linear-gradient(135deg, #FF6B35 0%, #FFB627 100%)",
+    };
+
+    upsertStoredRoommateGroup(group);
+    setCreatedGroupId(groupId);
     setInviteCode(code);
+    setLandlordInviteUrl(landlordUrl);
     setCreated(true);
+    setExistingGroup(group);
   };
 
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/roommates/groups/join/${inviteCode}` : `cribb.ca/join/${inviteCode}`;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const handleCopy = () => copyText(shareUrl, setCopied);
+  const handleLandlordCopy = () => copyText(landlordInviteUrl, setLandlordCopied);
 
   if (!user) {
     return (
@@ -63,6 +132,82 @@ export default function CreateGroupPage() {
           <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 700 }}>Log in to create a group</h2>
           <p className="text-[#1B2D45]/35 mt-1 mb-4" style={{ fontSize: "13px" }}>You need a cribb account first.</p>
           <Link href="/login" className="inline-block px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white" style={{ fontSize: "13px", fontWeight: 700 }}>Log In</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const buildMember = (index: number): LifestyleProfile => {
+    const firstName = index === 0
+      ? user.first_name || "You"
+      : `Roommate ${index + 1}`;
+    const lastInitial = index === 0
+      ? (user.last_name ? `${user.last_name.charAt(0)}.` : "")
+      : `${index + 1}.`;
+
+    return {
+      id: `${user.id}-member-${index + 1}`,
+      firstName,
+      initial: lastInitial,
+      year: "UofG student",
+      program: index === 0 ? "Group organizer" : "Current housemate",
+      budget: [rentPerPerson, rentPerPerson],
+      moveIn,
+      leaseLength: "Flexible",
+      bio: index === 0
+        ? "Created this group on Cribb to fill an available room."
+        : "Current housemate in the group.",
+      tags: {
+        sleep: "Flexible",
+        cleanliness: "Reasonably Clean",
+        noise: "Moderate — music at a normal volume",
+        guests: "Sometimes (weekends)",
+        study: "Mix of both",
+        smoking: "No smoking at all",
+        pets: "I'm fine with pets",
+        cooking: "A few times a week",
+      },
+    };
+  };
+
+  if (!created && existingGroup === undefined) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-[#FF6B35]/20 border-t-[#FF6B35] rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!created && existingGroup) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4]">
+        <div className="max-w-[520px] mx-auto px-4 py-10">
+          <Link href="/roommates" className="inline-flex items-center gap-1 text-[#1B2D45]/35 hover:text-[#1B2D45] transition-colors mb-6" style={{ fontSize: "12px", fontWeight: 600 }}>
+            <ChevronLeft className="w-4 h-4" /> Back
+          </Link>
+          <div className="bg-white rounded-2xl border border-black/[0.04] p-6" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
+            <div className="w-14 h-14 rounded-2xl bg-[#FFB627]/10 flex items-center justify-center mb-4">
+              <Users className="w-7 h-7 text-[#FFB627]" />
+            </div>
+            <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>You already have a live group</h1>
+            <p className="text-[#1B2D45]/40 mt-2" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+              You can only keep one active roommate group at a time. Update or delete your current group before creating another one.
+            </p>
+            <div className="mt-4 px-4 py-3 rounded-xl bg-[#FAF8F4] border border-black/[0.04]">
+              <div className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{existingGroup.name}</div>
+              <div className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px" }}>
+                {existingGroup.housing?.selfReportedAddress || existingGroup.housing?.linkedListingAddress || "Current availability post"}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mt-6">
+              <Link href={`/roommates/groups/${existingGroup.id}`} className="flex-1 py-3 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>
+                View Group
+              </Link>
+              <Link href={`/roommates/groups/${existingGroup.id}/manage`} className="flex-1 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all text-center" style={{ fontSize: "13px", fontWeight: 700 }}>
+                Manage Group
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -78,12 +223,12 @@ export default function CreateGroupPage() {
             </div>
             <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>{name}</h1>
             <p className="text-[#1B2D45]/40 mt-1 mb-6" style={{ fontSize: "13px" }}>
-              Your group is live! Share the link with your friends to join.
+              Your availability post is live. Share the student link with potential roommates and the landlord link so your place can be verified on Cribb.
             </p>
 
             {/* Invite link */}
             <div className="bg-white rounded-xl border border-black/[0.04] p-4 mb-4" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-              <label className="text-[#1B2D45]/40 block mb-2 text-left" style={{ fontSize: "11px", fontWeight: 600 }}>Share this link</label>
+              <label className="text-[#1B2D45]/40 block mb-2 text-left" style={{ fontSize: "11px", fontWeight: 600 }}>Student invite link</label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#FAF8F4] border border-black/[0.04]">
                   <Link2 className="w-3.5 h-3.5 text-[#1B2D45]/25 shrink-0" />
@@ -94,7 +239,24 @@ export default function CreateGroupPage() {
                 </button>
               </div>
               <p className="text-[#1B2D45]/20 mt-2 text-left" style={{ fontSize: "10px" }}>
-                Anyone with this link can view your group and request to join.
+                Anyone with this link can view your post and request the available room.
+              </p>
+            </div>
+
+            {/* Landlord invite link */}
+            <div className="bg-white rounded-xl border border-[#2EC4B6]/10 p-4 mb-4" style={{ boxShadow: "0 2px 12px rgba(46,196,182,0.05)" }}>
+              <label className="text-[#2EC4B6] block mb-2 text-left" style={{ fontSize: "11px", fontWeight: 700 }}>Landlord verification link</label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#FAF8F4] border border-[#2EC4B6]/10">
+                  <Link2 className="w-3.5 h-3.5 text-[#2EC4B6]/40 shrink-0" />
+                  <span className="text-[#2EC4B6]/60 truncate" style={{ fontSize: "12px", fontWeight: 500 }}>{landlordInviteUrl}</span>
+                </div>
+                <button onClick={handleLandlordCopy} className="px-4 py-2.5 rounded-lg bg-[#2EC4B6] text-white hover:bg-[#28b0a3] transition-all flex items-center gap-1.5 shrink-0" style={{ fontSize: "12px", fontWeight: 600 }}>
+                  {landlordCopied ? <><Check className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                </button>
+              </div>
+              <p className="text-[#1B2D45]/25 mt-2 text-left" style={{ fontSize: "10px" }}>
+                Send this to your landlord so they can sign up and attach the home to Cribb.
               </p>
             </div>
 
@@ -103,8 +265,11 @@ export default function CreateGroupPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="px-2.5 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>{haveCount} of {groupSize} filled</span>
                 <span className="px-2.5 py-1 rounded-lg bg-[#FF6B35]/[0.06] text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 600 }}>Need {spotsNeeded} more</span>
-                <span className="px-2.5 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>${budgetMin}–${budgetMax}/mo</span>
-                <span className="px-2.5 py-1 rounded-lg bg-[#2EC4B6]/[0.06] text-[#2EC4B6]" style={{ fontSize: "11px", fontWeight: 600 }}>{area}</span>
+                <span className="px-2.5 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>${rentPerPerson}/mo</span>
+                <span className={`px-2.5 py-1 rounded-lg ${utilitiesIncluded ? "bg-[#4ADE80]/[0.08] text-[#4ADE80]" : "bg-[#1B2D45]/[0.04] text-[#1B2D45]/50"}`} style={{ fontSize: "11px", fontWeight: 600 }}>
+                  {utilitiesIncluded ? "Utilities included" : "Utilities extra"}
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-[#2EC4B6]/[0.06] text-[#2EC4B6]" style={{ fontSize: "11px", fontWeight: 600 }}>{address}</span>
               </div>
             </div>
 
@@ -112,7 +277,7 @@ export default function CreateGroupPage() {
               <Link href="/roommates" className="flex-1 py-3 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all" style={{ fontSize: "13px", fontWeight: 600 }}>
                 Browse Roommates
               </Link>
-              <Link href={`/roommates/groups/${inviteCode}`} className="flex-1 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>
+              <Link href={`/roommates/groups/${createdGroupId}`} className="flex-1 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>
                 View Group Page
               </Link>
             </div>
@@ -191,20 +356,40 @@ export default function CreateGroupPage() {
             </div>
           )}
 
-          {/* Step 3: Preferences */}
+          {/* Step 3: Availability details */}
           {step === 2 && (
             <div>
-              <h2 className="text-[#1B2D45] mb-5" style={{ fontSize: "22px", fontWeight: 800 }}>Group preferences</h2>
+              <h2 className="text-[#1B2D45] mb-5" style={{ fontSize: "22px", fontWeight: 800 }}>Availability details</h2>
 
-              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Budget range (per person/month)</label>
-              <div className="flex items-center gap-2 mb-5">
-                <div className="flex-1">
-                  <input type="number" value={budgetMin} onChange={(e) => setBudgetMin(Number(e.target.value))} className="w-full px-3 py-2.5 rounded-xl bg-white border-2 border-black/[0.04] focus:border-[#FF6B35]/30 focus:outline-none" style={{ fontSize: "14px" }} placeholder="Min" />
-                </div>
-                <span className="text-[#1B2D45]/20" style={{ fontSize: "12px" }}>to</span>
-                <div className="flex-1">
-                  <input type="number" value={budgetMax} onChange={(e) => setBudgetMax(Number(e.target.value))} className="w-full px-3 py-2.5 rounded-xl bg-white border-2 border-black/[0.04] focus:border-[#FF6B35]/30 focus:outline-none" style={{ fontSize: "14px" }} placeholder="Max" />
-                </div>
+              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Rent (per person/month)</label>
+              <input
+                type="number"
+                min={0}
+                value={rentPerPerson}
+                onChange={(e) => setRentPerPerson(Number(e.target.value))}
+                className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black/[0.04] focus:border-[#FF6B35]/30 focus:outline-none mb-5"
+                style={{ fontSize: "14px" }}
+                placeholder="e.g. 725"
+              />
+
+              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Utilities</label>
+              <div className="grid grid-cols-2 gap-2 mb-5">
+                <button
+                  type="button"
+                  onClick={() => setUtilitiesIncluded(true)}
+                  className={`px-3 py-2.5 rounded-xl border-2 transition-all ${utilitiesIncluded ? "border-[#FF6B35] bg-[#FF6B35]/[0.04] text-[#FF6B35]" : "border-black/[0.04] text-[#1B2D45]/50 hover:border-[#FF6B35]/20"}`}
+                  style={{ fontSize: "13px", fontWeight: utilitiesIncluded ? 600 : 400 }}
+                >
+                  Included
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUtilitiesIncluded(false)}
+                  className={`px-3 py-2.5 rounded-xl border-2 transition-all ${!utilitiesIncluded ? "border-[#FF6B35] bg-[#FF6B35]/[0.04] text-[#FF6B35]" : "border-black/[0.04] text-[#1B2D45]/50 hover:border-[#FF6B35]/20"}`}
+                  style={{ fontSize: "13px", fontWeight: !utilitiesIncluded ? 600 : 400 }}
+                >
+                  Extra
+                </button>
               </div>
 
               <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Move-in timing</label>
@@ -215,13 +400,15 @@ export default function CreateGroupPage() {
                 })}
               </div>
 
-              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Preferred area</label>
-              <div className="grid grid-cols-3 gap-2 mb-5">
-                {areas.map((a) => {
-                  const sel = area === a;
-                  return <button key={a} onClick={() => setArea(a)} className={`px-3 py-2.5 rounded-xl border-2 transition-all ${sel ? "border-[#FF6B35] bg-[#FF6B35]/[0.04] text-[#FF6B35]" : "border-black/[0.04] text-[#1B2D45]/50 hover:border-[#FF6B35]/20"}`} style={{ fontSize: "12px", fontWeight: sel ? 600 : 400 }}>{a}</button>;
-                })}
-              </div>
+              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Home address</label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g. 12 Wilson St, Guelph, ON"
+                className="w-full px-4 py-3 rounded-xl bg-white border-2 border-black/[0.04] focus:border-[#FF6B35]/30 focus:outline-none mb-5"
+                style={{ fontSize: "14px" }}
+              />
 
               <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Gender preference</label>
               <div className="space-y-2">
@@ -229,6 +416,13 @@ export default function CreateGroupPage() {
                   const sel = gender === opt;
                   return <button key={opt} onClick={() => setGender(opt)} className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all ${sel ? "border-[#FF6B35] bg-[#FF6B35]/[0.04]" : "border-black/[0.04] hover:border-[#FF6B35]/20 bg-white"}`} style={{ fontSize: "13px", fontWeight: sel ? 600 : 400, color: sel ? "#FF6B35" : "#1B2D45" }}>{opt}</button>;
                 })}
+              </div>
+
+              <div className="mt-5 rounded-xl px-4 py-3 bg-[#2EC4B6]/[0.04] border border-[#2EC4B6]/10">
+                <div className="text-[#2EC4B6]" style={{ fontSize: "12px", fontWeight: 700 }}>Landlord verification link is generated automatically</div>
+                <div className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                  After you post, you&apos;ll get a second link to send your landlord so they can attach the home to Cribb.
+                </div>
               </div>
             </div>
           )}

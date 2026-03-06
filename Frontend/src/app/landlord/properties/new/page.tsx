@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { getLandlordClaimCode, setLandlordClaimCode, setLandlordClaimState } from "@/lib/landlord-claim";
 import { PropertyType } from "@/types";
 import { ArrowLeft, MapPin, Home, Check } from "lucide-react";
 
@@ -17,9 +18,11 @@ const propertyTypes = [
 
 export default function NewPropertyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [claimCode, setClaimCode] = useState("");
 
   const [form, setForm] = useState({
     title: "",
@@ -39,6 +42,17 @@ export default function NewPropertyPage() {
     bus_time_minutes: "",
     nearest_bus_route: "",
   });
+
+  useEffect(() => {
+    const queryClaim = searchParams.get("claim")?.trim() ?? "";
+    if (queryClaim) {
+      setClaimCode(queryClaim);
+      setLandlordClaimCode(queryClaim);
+      return;
+    }
+
+    setClaimCode(getLandlordClaimCode());
+  }, [searchParams]);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -75,7 +89,21 @@ export default function NewPropertyPage() {
       };
 
       const property = await api.properties.create(payload);
-      router.push(`/landlord/properties/${property.id}/listings/new`);
+      if (claimCode) {
+        setLandlordClaimCode(claimCode);
+        setLandlordClaimState({
+          claim_code: claimCode,
+          status: "property_created",
+          updated_at: new Date().toISOString(),
+          property_id: property.id,
+          property_title: property.title,
+          property_address: property.address,
+        });
+      }
+      const nextUrl = claimCode
+        ? `/landlord/properties/${property.id}/listings/new?claim=${encodeURIComponent(claimCode)}`
+        : `/landlord/properties/${property.id}/listings/new`;
+      router.push(nextUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create property");
       setIsSubmitting(false);
@@ -100,8 +128,31 @@ export default function NewPropertyPage() {
 
         <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 800 }}>Add a Property</h1>
         <p className="text-[#1B2D45]/40 mt-1 mb-6" style={{ fontSize: "14px" }}>
-          Enter your property details. You&apos;ll create a listing for it in the next step.
+          {claimCode
+            ? "Add the property tied to the roommate-group verification request. You’ll create the matching listing in the next step."
+            : "Enter your property details. You&apos;ll create a listing for it in the next step."}
         </p>
+
+        {claimCode && (
+          <div className="mb-6 rounded-xl border border-[#2EC4B6]/15 bg-[#2EC4B6]/[0.04] px-4 py-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#2EC4B6]/10 flex items-center justify-center shrink-0">
+                <Home className="w-5 h-5 text-[#2EC4B6]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Claimed home setup</span>
+                  <span className="px-2 py-0.5 rounded-md bg-white border border-[#2EC4B6]/10 text-[#2EC4B6]" style={{ fontSize: "9px", fontWeight: 700 }}>
+                    Claim {claimCode}
+                  </span>
+                </div>
+                <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                  This property is being added as part of a roommate-group verification request. Use the exact home details that match the lease or ownership documents you submitted.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
@@ -109,6 +160,14 @@ export default function NewPropertyPage() {
             <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
               <Home className="w-4 h-4 text-[#FF6B35]" /> Basic Info
             </h2>
+
+            {claimCode && (
+              <div className="rounded-xl bg-[#1B2D45]/[0.04] px-4 py-3">
+                <p className="text-[#1B2D45]/55" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                  After this, you&apos;ll create the listing that will eventually be connected to claim code <strong>{claimCode}</strong>.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Property title</label>
@@ -351,7 +410,7 @@ export default function NewPropertyPage() {
               className="flex-1 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-60 transition-all"
               style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
             >
-              {isSubmitting ? "Creating..." : "Create Property & Add Listing →"}
+              {isSubmitting ? "Creating..." : claimCode ? "Create Claimed Property →" : "Create Property & Add Listing →"}
             </button>
           </div>
         </form>

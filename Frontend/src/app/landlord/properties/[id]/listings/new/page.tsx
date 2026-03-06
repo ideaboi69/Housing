@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { getLandlordClaimCode, setLandlordClaimCode, setLandlordClaimState } from "@/lib/landlord-claim";
 import { LeaseType, GenderPreference } from "@/types";
 import type { PropertyResponse } from "@/types";
 import { ArrowLeft, DollarSign, Calendar, Users, Check, Home, Loader2 } from "lucide-react";
@@ -20,11 +21,13 @@ export default function NewListingPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const propertyId = Number(id);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const [property, setProperty] = useState<PropertyResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [loadingProperty, setLoadingProperty] = useState(true);
+  const [claimCode, setClaimCode] = useState("");
 
   const [form, setForm] = useState({
     rent_per_room: "",
@@ -36,6 +39,17 @@ export default function NewListingPage({ params }: { params: Promise<{ id: strin
     sublet_end_date: "",
     gender_preference: GenderPreference.ANY,
   });
+
+  useEffect(() => {
+    const queryClaim = searchParams.get("claim")?.trim() ?? "";
+    if (queryClaim) {
+      setClaimCode(queryClaim);
+      setLandlordClaimCode(queryClaim);
+      return;
+    }
+
+    setClaimCode(getLandlordClaimCode());
+  }, [searchParams]);
 
   useEffect(() => {
     async function loadProperty() {
@@ -87,7 +101,20 @@ export default function NewListingPage({ params }: { params: Promise<{ id: strin
         gender_preference: form.gender_preference !== GenderPreference.ANY ? form.gender_preference : undefined,
       };
 
-      await api.listings.create(payload);
+      const createdListing = await api.listings.create(payload);
+      if (claimCode) {
+        setLandlordClaimCode(claimCode);
+        setLandlordClaimState({
+          claim_code: claimCode,
+          status: "listing_created",
+          updated_at: new Date().toISOString(),
+          property_id: propertyId,
+          property_title: property?.title,
+          property_address: property?.address,
+          listing_id: createdListing.id,
+          listing_rent_per_room: createdListing.rent_per_room,
+        });
+      }
 
       // Compute Cribb Score
       try {
@@ -136,12 +163,41 @@ export default function NewListingPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
+        {claimCode && (
+          <div className="mb-6 rounded-xl border border-[#2EC4B6]/15 bg-[#2EC4B6]/[0.04] px-4 py-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#2EC4B6]/10 flex items-center justify-center shrink-0">
+                <Home className="w-5 h-5 text-[#2EC4B6]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Claimed home listing setup</span>
+                  <span className="px-2 py-0.5 rounded-md bg-white border border-[#2EC4B6]/10 text-[#2EC4B6]" style={{ fontSize: "9px", fontWeight: 700 }}>
+                    Claim {claimCode}
+                  </span>
+                </div>
+                <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                  This listing is being created as part of a roommate-group property verification flow. Use the real rent, lease, and availability details for the claimed home.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Pricing */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
               <DollarSign className="w-4 h-4 text-[#FF6B35]" /> Pricing
             </h2>
+
+            {claimCode && (
+              <div className="rounded-xl bg-[#1B2D45]/[0.04] px-4 py-3">
+                <p className="text-[#1B2D45]/55" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                  Once this listing is published, the dashboard can continue the claimed-home verification flow tied to <strong>{claimCode}</strong>.
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -322,7 +378,7 @@ export default function NewListingPage({ params }: { params: Promise<{ id: strin
                   Publishing...
                 </>
               ) : (
-                "Publish Listing →"
+                claimCode ? "Publish Claimed Listing →" : "Publish Listing →"
               )}
             </button>
           </div>

@@ -9,10 +9,45 @@ import { useAuthStore } from "@/lib/auth-store";
 import { useSavedStore } from "@/lib/saved-store";
 import { api } from "@/lib/api";
 import { mockListings } from "@/lib/mock-data";
+import { mockSubletDetails } from "@/lib/mock-sublets";
 import type { SavedListingDetailResponse } from "@/types";
 
-/** Convert a mock listing into the SavedListingDetailResponse shape */
-function mockToSaved(listingId: number): SavedListingDetailResponse | null {
+type SavedPageItem = SavedListingDetailResponse & {
+  href: string;
+};
+
+function toSavedPageItem(item: SavedListingDetailResponse): SavedPageItem {
+  const matchedSublet = mockSubletDetails.find((sublet) => sublet.listing_id === item.listing_id);
+  return {
+    ...item,
+    href: item.is_sublet && matchedSublet ? `/sublets/${matchedSublet.id}` : `/browse/${item.listing_id}`,
+  };
+}
+
+/** Convert mock data into the SavedListingDetailResponse shape */
+function mockToSaved(listingId: number): SavedPageItem | null {
+  const sublet = mockSubletDetails.find((item) => item.listing_id === listingId);
+  if (sublet) {
+    return {
+      id: listingId,
+      listing_id: listingId,
+      saved_at: new Date().toISOString(),
+      rent_per_room: sublet.subletPrice,
+      rent_total: sublet.subletPrice * Math.max(sublet.bedsAvailable, 1),
+      lease_type: "sublet",
+      move_in_date: sublet.subletStart ?? null,
+      is_sublet: true,
+      status: "active",
+      title: sublet.title,
+      address: sublet.address,
+      property_type: sublet.propertyType,
+      is_furnished: sublet.is_furnished,
+      has_parking: sublet.has_parking,
+      distance_to_campus_km: sublet.distanceKm ?? null,
+      href: `/sublets/${sublet.id}`,
+    };
+  }
+
   const l = mockListings.find((m) => m.id === listingId);
   if (!l) return null;
   return {
@@ -31,6 +66,7 @@ function mockToSaved(listingId: number): SavedListingDetailResponse | null {
     is_furnished: l.is_furnished,
     has_parking: l.has_parking,
     distance_to_campus_km: l.distance_to_campus_km ?? null,
+    href: `/browse/${listingId}`,
   };
 }
 
@@ -38,7 +74,7 @@ export default function SavedListingsPage() {
   const router = useRouter();
   const { user, token } = useAuthStore();
   const { savedIds, toggleSave } = useSavedStore();
-  const [listings, setListings] = useState<SavedListingDetailResponse[]>([]);
+  const [listings, setListings] = useState<SavedPageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [removingId, setRemovingId] = useState<number | null>(null);
 
@@ -56,7 +92,7 @@ export default function SavedListingsPage() {
       // Try backend first
       const data = await api.saved.getAll();
       if (data && data.length > 0) {
-        setListings(data);
+        setListings(data.map(toSavedPageItem));
         setLoading(false);
         return;
       }
@@ -65,7 +101,7 @@ export default function SavedListingsPage() {
     }
 
     // Fallback: use Zustand savedIds + mock data
-    const fallbackListings: SavedListingDetailResponse[] = [];
+    const fallbackListings: SavedPageItem[] = [];
     savedIds.forEach((id) => {
       const item = mockToSaved(id);
       if (item) fallbackListings.push(item);
@@ -77,7 +113,7 @@ export default function SavedListingsPage() {
   // Re-sync when savedIds change (e.g. user saves from browse and comes back)
   useEffect(() => {
     if (!loading && listings.length === 0 && savedIds.size > 0) {
-      const fallbackListings: SavedListingDetailResponse[] = [];
+      const fallbackListings: SavedPageItem[] = [];
       savedIds.forEach((id) => {
         const item = mockToSaved(id);
         if (item) fallbackListings.push(item);
@@ -137,7 +173,7 @@ export default function SavedListingsPage() {
             </div>
             <h3 className="text-[#1B2D45] mt-4" style={{ fontSize: "18px", fontWeight: 800 }}>No saved listings yet</h3>
             <p className="text-[#1B2D45]/40 mt-2 max-w-[320px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.6 }}>
-              Browse listings and tap the heart icon to save them here for easy comparison later.
+              Browse listings or sublets and tap the heart icon to save them here for easy comparison later.
             </p>
             <Link
               href="/browse"
@@ -161,7 +197,7 @@ export default function SavedListingsPage() {
                 exit={{ opacity: 0, x: -100, transition: { duration: 0.25 } }}
                 className="bg-white rounded-xl border border-black/[0.04] overflow-hidden hover:border-[#FF6B35]/15 hover:shadow-md transition-all group"
               >
-                <Link href={`/browse/${item.listing_id}`} className="flex items-stretch">
+                <Link href={item.href} className="flex items-stretch">
                   {/* Left color bar */}
                   <div className="w-1.5 shrink-0" style={{ background: item.status === "active" ? "#4ADE80" : "#FFB627" }} />
 

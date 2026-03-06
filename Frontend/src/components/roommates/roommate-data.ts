@@ -18,6 +18,22 @@ export interface LifestyleProfile {
   avatar?: string;
 }
 
+export interface GroupHousing {
+  status: "linked" | "pending";
+  linkedListingId?: number;
+  linkedListingTitle?: string;
+  linkedListingAddress?: string;
+  linkedListingPrice?: number;
+  linkedListingUtilitiesIncluded?: boolean;
+  linkedListingScore?: number;
+  linkedListingImage?: string;
+  selfReportedAddress?: string;
+  selfReportedRent?: number;
+  selfReportedUtilitiesIncluded?: boolean;
+  selfReportedPhotos?: string[];
+  landlordInviteUrl?: string;
+}
+
 export interface RoommateGroup {
   id: string;
   name: string;
@@ -36,6 +52,7 @@ export interface RoommateGroup {
   genderPreference: string | null;
   moveIn: string;
   createdAt: string;
+  housing?: GroupHousing;
   bannerGradient?: string;
 }
 
@@ -170,6 +187,16 @@ export const MOCK_GROUPS: RoommateGroup[] = [
     description: "3 girls looking for 1 more to fill our 4-bedroom on Edinburgh. We're all pretty tidy, quiet during the week but love a movie night on weekends. Cat-friendly!",
     inviteCode: "EDIN2026", isVisible: true, genderPreference: "Same gender preferred", moveIn: "Fall 2026",
     createdAt: "2026-02-15",
+    housing: {
+      status: "linked",
+      linkedListingId: 3,
+      linkedListingTitle: "4BR House on Edinburgh Rd",
+      linkedListingAddress: "87 Edinburgh Rd S, Guelph, ON",
+      linkedListingPrice: 690,
+      linkedListingUtilitiesIncluded: false,
+      linkedListingScore: 86,
+      linkedListingImage: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&h=300&fit=crop",
+    },
     bannerGradient: "linear-gradient(135deg, #FF6B35 0%, #FFB627 100%)",
   },
   {
@@ -178,9 +205,20 @@ export const MOCK_GROUPS: RoommateGroup[] = [
     groupSize: 5, spotsNeeded: 3,
     budgetMin: 500, budgetMax: 650,
     preferredArea: "Near Campus", targetListingId: null, targetListingTitle: null,
-    description: "Two CS students looking for 3 more to find a 5-bedroom near campus. Night owls welcome. We game a lot but keep the place clean.",
+    description: "Two CS students with a lease signed on Wilson St looking for 3 more to fill the open rooms. Night owls welcome. We game a lot but keep the place clean.",
     inviteCode: "CS5HOUSE", isVisible: true, genderPreference: "Mixed gender fine", moveIn: "Fall 2026",
     createdAt: "2026-02-20",
+    housing: {
+      status: "pending",
+      selfReportedAddress: "12 Wilson St, Guelph, ON",
+      selfReportedRent: 610,
+      selfReportedUtilitiesIncluded: true,
+      selfReportedPhotos: [
+        "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400&h=300&fit=crop",
+        "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=300&fit=crop",
+      ],
+      landlordInviteUrl: "https://cribb.ca/landlord/claim/CS5HOUSE",
+    },
     bannerGradient: "linear-gradient(135deg, #1B2D45 0%, #2EC4B6 100%)",
   },
   {
@@ -189,9 +227,16 @@ export const MOCK_GROUPS: RoommateGroup[] = [
     groupSize: 2, spotsNeeded: 1,
     budgetMin: 650, budgetMax: 800,
     preferredArea: "Downtown", targetListingId: null, targetListingTitle: null,
-    description: "Just me looking for 1 roommate. I'm very organized and prefer a quiet space. Ideal for someone who studies a lot.",
+    description: "I already have a quiet 2-bedroom downtown and need one replacement roommate. Ideal for someone who studies a lot and wants a calm space.",
     inviteCode: "QUIET2BR", isVisible: true, genderPreference: "No preference", moveIn: "Fall 2026",
     createdAt: "2026-02-25",
+    housing: {
+      status: "pending",
+      selfReportedAddress: "55 Macdonell St, Guelph, ON",
+      selfReportedRent: 775,
+      selfReportedUtilitiesIncluded: false,
+      landlordInviteUrl: "https://cribb.ca/landlord/claim/QUIET2BR",
+    },
     bannerGradient: "linear-gradient(135deg, #6C63FF 0%, #A78BFA 100%)",
   },
   {
@@ -200,9 +245,93 @@ export const MOCK_GROUPS: RoommateGroup[] = [
     groupSize: 5, spotsNeeded: 2,
     budgetMin: 500, budgetMax: 700,
     preferredArea: null, targetListingId: null, targetListingTitle: null,
-    description: "Social house looking for 2 more who are down for game nights, hosting, and good vibes. We cook together a lot.",
+    description: "Social house with two open rooms available now. We already have the place locked in and want two more who are down for game nights, hosting, and good vibes.",
     inviteCode: "FUNHAUS", isVisible: true, genderPreference: "Mixed gender fine", moveIn: "Fall 2026",
     createdAt: "2026-03-01",
+    housing: {
+      status: "linked",
+      linkedListingId: 1,
+      linkedListingTitle: "Cozy Townhouse on College Ave",
+      linkedListingAddress: "118 College Ave W, Guelph, ON",
+      linkedListingPrice: 725,
+      linkedListingUtilitiesIncluded: true,
+      linkedListingScore: 88,
+      linkedListingImage: "https://images.unsplash.com/photo-1579632151052-92f741fb9b79?w=400&h=300&fit=crop",
+    },
     bannerGradient: "linear-gradient(135deg, #E71D36 0%, #FF6B35 100%)",
   },
 ];
+
+const ROOMMATE_GROUPS_STORAGE_KEY = "cribb_roommate_groups";
+
+function canUseLocalStorage() {
+  return typeof window !== "undefined";
+}
+
+function isRoommateGroup(value: unknown): value is RoommateGroup {
+  if (!value || typeof value !== "object") return false;
+  const group = value as Partial<RoommateGroup>;
+  return typeof group.id === "string" && typeof group.name === "string" && typeof group.inviteCode === "string";
+}
+
+export function loadStoredRoommateGroups(): RoommateGroup[] {
+  if (!canUseLocalStorage()) return [];
+
+  try {
+    const raw = localStorage.getItem(ROOMMATE_GROUPS_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(isRoommateGroup);
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredRoommateGroups(groups: RoommateGroup[]) {
+  if (!canUseLocalStorage()) return;
+
+  try {
+    localStorage.setItem(ROOMMATE_GROUPS_STORAGE_KEY, JSON.stringify(groups));
+  } catch {
+    /* ignore quota/storage errors */
+  }
+}
+
+export function upsertStoredRoommateGroup(group: RoommateGroup) {
+  const existing = loadStoredRoommateGroups();
+  const next = [group, ...existing.filter((item) => item.id !== group.id)];
+  saveStoredRoommateGroups(next);
+}
+
+export function removeStoredRoommateGroup(id: string) {
+  const existing = loadStoredRoommateGroups();
+  const next = existing.filter((item) => item.id !== id);
+
+  if (next.length === existing.length) return false;
+
+  saveStoredRoommateGroups(next);
+  return true;
+}
+
+export function getStoredRoommateGroupByOwner(ownerId: string) {
+  return loadStoredRoommateGroups().find((group) => group.createdBy === ownerId);
+}
+
+export function getAllRoommateGroups() {
+  return [...loadStoredRoommateGroups(), ...MOCK_GROUPS];
+}
+
+export function getVisibleRoommateGroups() {
+  return getAllRoommateGroups().filter((group) => group.isVisible);
+}
+
+export function getRoommateGroupById(id: string) {
+  return getAllRoommateGroups().find((group) => group.id === id);
+}
+
+export function getRoommateGroupByInviteCode(code: string) {
+  return getAllRoommateGroups().find((group) => group.inviteCode === code);
+}

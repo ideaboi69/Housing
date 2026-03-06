@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Heart, Check, ChevronRight, SlidersHorizontal, X, ArrowRight, ChevronDown,
   Sparkles, ExternalLink, Minus, MapPin, DollarSign, Clock, ShieldCheck,
@@ -11,6 +11,8 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
 import { getScoreColor, formatPrice } from "@/lib/utils";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSavedStore } from "@/lib/saved-store";
 
 /* ════════════════════════════════════════════════════════
    Types & Data
@@ -18,6 +20,7 @@ import Link from "next/link";
 
 interface SubletListing {
   id: string;
+  listing_id?: number;
   title: string;
   street: string;
   subletPrice: number;
@@ -47,7 +50,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 const subletListings: SubletListing[] = [
   {
-    id: "s1", title: "Furnished Room in 4BR House", street: "78 College Ave W",
+    id: "s1", listing_id: 1001, title: "Furnished Room in 4BR House", street: "78 College Ave W",
     subletPrice: 550, originalPrice: 720, healthScore: 91, verified: true,
     posterType: "4th year, Engineering", posterIsStudent: true,
     availableMonths: [false, false, false, false, true, true, true, false, false, false, false, false], neighborhood: "Campus",
@@ -57,7 +60,7 @@ const subletListings: SubletListing[] = [
     amenities: ["Utilities Incl.", "Laundry", "Backyard"], views: 89, saves: 14, rotation: -2.2,
   },
   {
-    id: "s2", title: "Entire 2BR Apartment", street: "155 Gordon St",
+    id: "s2", listing_id: 1002, title: "Entire 2BR Apartment", street: "155 Gordon St",
     subletPrice: 1100, originalPrice: 1400, healthScore: 86, verified: true,
     posterType: "Property Manager", posterIsStudent: false,
     availableMonths: [false, false, false, false, true, true, true, true, false, false, false, false], neighborhood: "Stone Road",
@@ -67,7 +70,7 @@ const subletListings: SubletListing[] = [
     amenities: ["Parking", "Dishwasher", "A/C"], views: 203, saves: 31, rotation: 1.5,
   },
   {
-    id: "s3", title: "Private Room near Campus", street: "42 Suffolk St W",
+    id: "s3", listing_id: 1003, title: "Private Room near Campus", street: "42 Suffolk St W",
     subletPrice: 480, originalPrice: 680, healthScore: 68, verified: false,
     posterType: "3rd year, Arts", posterIsStudent: true,
     availableMonths: [false, false, false, false, true, true, true, false, false, false, false, false], neighborhood: "Campus",
@@ -77,7 +80,7 @@ const subletListings: SubletListing[] = [
     amenities: ["Laundry", "WiFi"], views: 47, saves: 5, rotation: -0.8,
   },
   {
-    id: "s4", title: "Studio Apartment Downtown", street: "88 Macdonell St",
+    id: "s4", listing_id: 1004, title: "Studio Apartment Downtown", street: "88 Macdonell St",
     subletPrice: 700, originalPrice: 950, healthScore: 82, verified: true,
     posterType: "Landlord", posterIsStudent: false,
     availableMonths: [false, false, false, false, false, true, true, true, false, false, false, false], neighborhood: "Downtown",
@@ -87,7 +90,7 @@ const subletListings: SubletListing[] = [
     amenities: ["A/C", "Gym", "Utilities Incl."], views: 134, saves: 22, rotation: 2.1,
   },
   {
-    id: "s5", title: "Room in Townhouse", street: "31 Grange St",
+    id: "s5", listing_id: 1005, title: "Room in Townhouse", street: "31 Grange St",
     subletPrice: 450, originalPrice: 640, healthScore: 64, verified: false,
     posterType: "2nd year, Business", posterIsStudent: true,
     availableMonths: [false, false, false, false, true, true, false, false, false, false, false, false], neighborhood: "South End",
@@ -97,7 +100,7 @@ const subletListings: SubletListing[] = [
     amenities: ["Parking", "Backyard"], views: 28, saves: 3, rotation: -1.4,
   },
   {
-    id: "s6", title: "Master Bedroom in 5BR House", street: "62 Dean Ave",
+    id: "s6", listing_id: 1006, title: "Master Bedroom in 5BR House", street: "62 Dean Ave",
     subletPrice: 500, originalPrice: 600, healthScore: 88, verified: true,
     posterType: "4th year, CompSci", posterIsStudent: true,
     availableMonths: [false, false, false, false, true, true, true, true, false, false, false, false], neighborhood: "Campus",
@@ -736,10 +739,34 @@ function AvailabilityTimeline({ months, selectedRange }: { months: boolean[]; se
    ════════════════════════════════════════════════════════ */
 
 function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }: { listing: SubletListing; selectedRange: [number, number]; isMobile: boolean; isPinned?: boolean; onTogglePin?: (id: string) => void }) {
-  const [saved, setSaved] = useState(false);
+  const router = useRouter();
+  const [savedFallback, setSavedFallback] = useState(false);
+  const hasListingId = typeof listing.listing_id === "number";
+  const saved = useSavedStore((s) => hasListingId ? s.savedIds.has(listing.listing_id!) : false);
+  const toggling = useSavedStore((s) => hasListingId ? s.togglingIds.has(listing.listing_id!) : false);
+  const toggleSave = useSavedStore((s) => s.toggleSave);
   const discount = Math.round(((listing.originalPrice - listing.subletPrice) / listing.originalPrice) * 100);
   const scoreColor = getScoreColor(listing.healthScore);
   const scoreLabel = getScoreLabel(listing.healthScore);
+  const isSaved = hasListingId ? saved : savedFallback;
+
+  const handleSaveClick = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!hasListingId) {
+      setSavedFallback((current) => !current);
+      return;
+    }
+
+    try {
+      await toggleSave(listing.listing_id!);
+    } catch (err) {
+      if (err instanceof Error && err.message === "auth_required") {
+        router.push("/login");
+      }
+    }
+  }, [hasListingId, listing.listing_id, toggleSave, router]);
 
   return (
     <motion.div
@@ -774,8 +801,8 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
 
           {/* Save */}
           <div className="absolute top-2 right-2">
-            <motion.button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSaved(!saved); }} className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm" whileTap={{ scale: 0.85 }}>
-              <Heart className={`w-3.5 h-3.5 ${saved ? "fill-[#E71D36] text-[#E71D36]" : "text-[#1B2D45]/40"}`} />
+            <motion.button onClick={handleSaveClick} disabled={toggling} className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm disabled:opacity-50" whileTap={{ scale: 0.85 }}>
+              <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-[#E71D36] text-[#E71D36]" : "text-[#1B2D45]/40"}`} />
             </motion.button>
           </div>
 

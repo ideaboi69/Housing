@@ -3,6 +3,43 @@
 import { create } from "zustand";
 import { api, ApiError } from "@/lib/api";
 
+const SAVED_IDS_STORAGE_KEY = "cribb_saved_listing_ids";
+
+function readPersistedSavedIds(): Set<number> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(SAVED_IDS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(
+      parsed
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function persistSavedIds(savedIds: Set<number>) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SAVED_IDS_STORAGE_KEY, JSON.stringify(Array.from(savedIds)));
+  } catch {
+    // Ignore storage failures
+  }
+}
+
+function clearPersistedSavedIds() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(SAVED_IDS_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures
+  }
+}
+
 interface SavedState {
   /** Set of listing IDs the current user has saved */
   savedIds: Set<number>;
@@ -29,15 +66,21 @@ export const useSavedStore = create<SavedState>((set, get) => ({
   togglingIds: new Set(),
 
   loadSaved: async () => {
+    const localSaved = readPersistedSavedIds();
     try {
       const saved = await api.saved.getAll();
+      const merged = new Set<number>([
+        ...saved.map((s) => s.listing_id),
+        ...Array.from(localSaved),
+      ]);
+      persistSavedIds(merged);
       set({
-        savedIds: new Set(saved.map((s) => s.listing_id)),
+        savedIds: merged,
         isLoaded: true,
       });
     } catch {
       // Not logged in or error — that's fine, start empty
-      set({ savedIds: new Set(), isLoaded: true });
+      set({ savedIds: localSaved, isLoaded: true });
     }
   },
 
@@ -57,6 +100,7 @@ export const useSavedStore = create<SavedState>((set, get) => ({
     } else {
       nextSaved.add(listingId);
     }
+    persistSavedIds(nextSaved);
     set({ savedIds: nextSaved, togglingIds: nextToggling });
 
     try {
@@ -74,6 +118,7 @@ export const useSavedStore = create<SavedState>((set, get) => ({
         } else {
           revertSaved.delete(listingId);
         }
+        persistSavedIds(revertSaved);
         set({ savedIds: revertSaved });
         throw new Error("auth_required");
       }
@@ -90,5 +135,8 @@ export const useSavedStore = create<SavedState>((set, get) => ({
 
   isToggling: (listingId: number) => get().togglingIds.has(listingId),
 
-  clear: () => set({ savedIds: new Set(), isLoaded: false, togglingIds: new Set() }),
+  clear: () => {
+    clearPersistedSavedIds();
+    set({ savedIds: new Set(), isLoaded: false, togglingIds: new Set() });
+  },
 }));

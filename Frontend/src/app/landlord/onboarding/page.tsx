@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { Building2, ShieldCheck, Home, MessageCircle, ArrowRight, CheckCircle2, Clock, Sparkles } from "lucide-react";
@@ -9,8 +9,31 @@ import { motion } from "framer-motion";
 
 export default function LandlordOnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuthStore();
   const [step, setStep] = useState(0);
+  const [claimCode, setClaimCode] = useState("");
+  const claimFromQuery = searchParams.get("claim")?.trim() ?? "";
+  const isClaimFlow = claimCode.length > 0;
+
+  useEffect(() => {
+    if (claimFromQuery) {
+      setClaimCode(claimFromQuery);
+      try {
+        localStorage.setItem("cribb_landlord_claim_code", claimFromQuery);
+      } catch {
+        /* ignore storage errors */
+      }
+      return;
+    }
+
+    try {
+      const cachedClaim = localStorage.getItem("cribb_landlord_claim_code")?.trim() ?? "";
+      setClaimCode(cachedClaim);
+    } catch {
+      setClaimCode("");
+    }
+  }, [claimFromQuery]);
 
   // Redirect if not a landlord
   useEffect(() => {
@@ -38,12 +61,14 @@ export default function LandlordOnboardingPage() {
       icon: <Sparkles className="w-7 h-7" />,
       iconBg: "bg-[#1B2D45]/[0.08]",
       iconColor: "text-[#1B2D45]",
-      title: `Welcome, ${user.first_name}!`,
-      description: "Your landlord account has been created. Here's what happens next and how cribb works for property owners.",
+      title: isClaimFlow ? `You're almost there, ${user.first_name}` : `Welcome, ${user.first_name}!`,
+      description: isClaimFlow
+        ? `Your landlord account has been created. Next, we'll guide you through what happens before claim code ${claimCode} can be attached to the roommate group's home on cribb.`
+        : "Your landlord account has been created. Here's what happens next and how cribb works for property owners.",
       visual: (
         <div className="grid grid-cols-3 gap-3 mt-6">
           {[
-            { emoji: "📋", label: "Easy listing management", desc: "Add properties and listings in minutes" },
+            { emoji: "📋", label: isClaimFlow ? "Claim in progress" : "Easy listing management", desc: isClaimFlow ? "This home stays pending until verification is approved" : "Add properties and listings in minutes" },
             { emoji: "🎓", label: "Verified students", desc: "UofG students only — no random inquiries" },
             { emoji: "📊", label: "Cribb Score", desc: "Build your reputation with every interaction" },
           ].map((b) => (
@@ -60,10 +85,16 @@ export default function LandlordOnboardingPage() {
       icon: <ShieldCheck className="w-7 h-7" />,
       iconBg: user.identity_verified ? "bg-[#4ADE80]/[0.1]" : "bg-[#FFB627]/[0.1]",
       iconColor: user.identity_verified ? "text-[#4ADE80]" : "text-[#FFB627]",
-      title: user.identity_verified ? "You're verified!" : "Verification in progress",
+      title: user.identity_verified
+        ? (isClaimFlow ? "You're verified. Home claim can move forward" : "You're verified!")
+        : "Verification in progress",
       description: user.identity_verified
-        ? "Your identity has been confirmed. Your listings will show the \"Verified Landlord\" badge, which students trust more."
-        : "Our team is reviewing your documents — this usually takes 1-2 business days. You can start adding properties right away. They'll go live once you're approved.",
+        ? (isClaimFlow
+          ? `Your identity has been confirmed. The home tied to claim code ${claimCode} can now be attached to the roommate group on cribb.`
+          : "Your identity has been confirmed. Your listings will show the \"Verified Landlord\" badge, which students trust more.")
+        : (isClaimFlow
+          ? "Our team is reviewing your documents — this usually takes 1-2 business days. Once approved, the claimed home can be attached to the roommate group."
+          : "Our team is reviewing your documents — this usually takes 1-2 business days. You can start adding properties right away. They'll go live once you're approved."),
       visual: (
         <div className="mt-6 space-y-3">
           {[
@@ -90,13 +121,15 @@ export default function LandlordOnboardingPage() {
       icon: <Home className="w-7 h-7" />,
       iconBg: "bg-[#1B2D45]/[0.08]",
       iconColor: "text-[#1B2D45]",
-      title: "Your dashboard",
-      description: "From your dashboard you can manage properties, create listings, respond to student inquiries, and track your Cribb Score. Ready to get started?",
+      title: isClaimFlow ? "Finish the home verification flow" : "Your dashboard",
+      description: isClaimFlow
+        ? "From your dashboard you can add the claimed property details, connect the home to the roommate group, and manage future listings once verification is approved."
+        : "From your dashboard you can manage properties, create listings, respond to student inquiries, and track your Cribb Score. Ready to get started?",
       visual: (
         <div className="mt-6 space-y-2">
           {[
-            { icon: <Building2 className="w-4 h-4" />, label: "Add your first property", desc: "Address, type, and details" },
-            { icon: <Home className="w-4 h-4" />, label: "Create a listing", desc: "Rent, amenities, photos, move-in date" },
+            { icon: <Building2 className="w-4 h-4" />, label: isClaimFlow ? "Add the claimed property" : "Add your first property", desc: isClaimFlow ? `Use claim code ${claimCode} to match the roommate group's home` : "Address, type, and details" },
+            { icon: <Home className="w-4 h-4" />, label: isClaimFlow ? "Attach it to the group" : "Create a listing", desc: isClaimFlow ? "Connect the verified home so students see trusted property details" : "Rent, amenities, photos, move-in date" },
             { icon: <MessageCircle className="w-4 h-4" />, label: "Respond to inquiries", desc: "Students will message you directly" },
           ].map((item) => (
             <div key={item.label} className="flex items-center gap-3 bg-[#FAF8F4] rounded-xl p-3">
@@ -125,6 +158,21 @@ export default function LandlordOnboardingPage() {
         <div className="text-center mb-6">
           <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.04em" }}>cribb</Link>
         </div>
+
+        {isClaimFlow && (
+          <div className="mb-6 rounded-xl border border-[#2EC4B6]/15 bg-[#2EC4B6]/[0.04] px-4 py-4">
+            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+              Home claim in progress
+            </div>
+            <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+              This onboarding flow is tied to a roommate-group property verification request.
+            </p>
+            <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5 border border-[#2EC4B6]/10">
+              <span className="text-[#2EC4B6]" style={{ fontSize: "10px", fontWeight: 700 }}>Claim code</span>
+              <span className="text-[#1B2D45]/60" style={{ fontSize: "10px", fontWeight: 600 }}>{claimCode}</span>
+            </div>
+          </div>
+        )}
 
         {/* Card */}
         <motion.div

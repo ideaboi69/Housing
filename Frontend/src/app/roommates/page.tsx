@@ -3,13 +3,14 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles } from "lucide-react";
+import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin } from "lucide-react";
 import { useIsMobile } from "@/hooks";
+import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import {
   type LifestyleProfile, type RoommateGroup,
   LIFESTYLE_CATEGORIES, TAG_SHORT_LABELS, BUDGET_OPTIONS, MOVE_IN_OPTIONS, GENDER_HOUSING_OPTIONS,
   computeCompatibility, computeGroupCompatibility,
-  MOCK_PROFILES, MOCK_GROUPS,
+  MOCK_PROFILES, getVisibleRoommateGroups,
 } from "@/components/roommates/roommate-data";
 
 /* ════════════════════════════════════════════════════════
@@ -39,9 +40,42 @@ function CompatRing({ score, size = 36 }: { score: number; size?: number }) {
 
 /* ── Dossier Group Card ── */
 
-function DossierGroupCard({ group, compatibility, index = 0 }: { group: RoommateGroup; compatibility?: number; index?: number }) {
+function DossierGroupCard({
+  group,
+  compatibility,
+  index = 0,
+  claimState,
+}: {
+  group: RoommateGroup;
+  compatibility?: number;
+  index?: number;
+  claimState?: LandlordClaimState | null;
+}) {
   const filled = group.groupSize - group.spotsNeeded;
   const defaultGradient = "linear-gradient(135deg, #1B2D45 0%, #2a4060 100%)";
+  const displayAddress = group.housing?.status === "linked"
+    ? group.housing.linkedListingAddress
+    : group.housing?.status === "pending"
+      ? group.housing.selfReportedAddress
+      : null;
+  const displayRent = group.housing?.status === "linked"
+    ? group.housing.linkedListingPrice
+    : group.housing?.status === "pending"
+      ? group.housing.selfReportedRent
+      : null;
+  const utilitiesIncluded = group.housing?.status === "linked"
+    ? group.housing.linkedListingUtilitiesIncluded
+    : group.housing?.status === "pending"
+      ? group.housing.selfReportedUtilitiesIncluded
+      : undefined;
+  const matchingClaim = claimState?.claim_code === group.inviteCode ? claimState : null;
+  const addressAccent = group.housing?.status === "linked" ? "#4ADE80" : "#FFB627";
+  const addressBg = group.housing?.status === "linked" ? "rgba(74,222,128,0.08)" : "rgba(255,182,39,0.08)";
+  const pendingBadge = matchingClaim?.status === "listing_created"
+    ? "✅ Listing ready"
+    : matchingClaim?.status === "property_created"
+      ? "🏠 Property added"
+      : "⏳ Has a place";
 
   return (
     <motion.div
@@ -106,13 +140,79 @@ function DossierGroupCard({ group, compatibility, index = 0 }: { group: Roommate
               {group.description}
             </p>
 
-            {/* Tags */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/45 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 700 }}>${group.budgetMin}–${group.budgetMax}</span>
-              <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/45 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 700 }}>{group.moveIn}</span>
-              {group.preferredArea && <span className="px-2 py-0.5 rounded-lg bg-[#2EC4B6]/[0.08] text-[#2EC4B6] border border-[#2EC4B6]/15" style={{ fontSize: "9px", fontWeight: 700 }}>📍 {group.preferredArea}</span>}
-              {group.genderPreference && group.genderPreference !== "No preference" && <span className="px-2 py-0.5 rounded-lg bg-[#FFB627]/[0.08] text-[#FFB627] border border-[#FFB627]/15" style={{ fontSize: "9px", fontWeight: 700 }}>{group.genderPreference}</span>}
+            {/* Snapshot list */}
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
+                <div className="text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 700 }}>Rent</div>
+                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>
+                  {displayRent ? `$${displayRent}/mo` : `$${group.budgetMin}–$${group.budgetMax}`}
+                </div>
+              </div>
+              <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
+                <div className="text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 700 }}>Utilities</div>
+                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>
+                  {utilitiesIncluded == null ? "Not listed" : utilitiesIncluded ? "Included" : "Extra"}
+                </div>
+              </div>
+              <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
+                <div className="text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 700 }}>Move-in</div>
+                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{group.moveIn}</div>
+              </div>
+              <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
+                <div className="text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 700 }}>Availability</div>
+                <div
+                  className="mt-0.5"
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: group.housing?.status === "linked" ? "#4ADE80" : "#FFB627",
+                  }}
+                >
+                  {group.housing?.status === "linked" ? "Verified place" : pendingBadge}
+                </div>
+              </div>
             </div>
+
+            {group.genderPreference && group.genderPreference !== "No preference" && (
+              <div className="mt-2">
+                <span className="px-2 py-0.5 rounded-lg bg-[#FFB627]/[0.08] text-[#FFB627] border border-[#FFB627]/15" style={{ fontSize: "9px", fontWeight: 700 }}>
+                  {group.genderPreference}
+                </span>
+              </div>
+            )}
+
+            {/* Address line for groups with confirmed availability */}
+            {displayAddress && (
+              <div
+                className="flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg min-w-0"
+                style={{ background: addressBg, border: `1.5px solid ${addressAccent}20` }}
+              >
+                <MapPin className="w-3 h-3 shrink-0" style={{ color: addressAccent }} />
+                <span className="truncate" style={{ fontSize: "10px", fontWeight: 700, color: addressAccent }}>
+                  Availability at {displayAddress}
+                </span>
+              </div>
+            )}
+
+            {matchingClaim && group.housing?.status === "pending" && (
+              <div
+                className="mt-2 px-2.5 py-1.5 rounded-lg"
+                style={{
+                  background: matchingClaim.status === "listing_created" ? "rgba(74,222,128,0.06)" : "rgba(46,196,182,0.06)",
+                  border: `1.5px solid ${matchingClaim.status === "listing_created" ? "rgba(74,222,128,0.18)" : "rgba(46,196,182,0.18)"}`,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    color: matchingClaim.status === "listing_created" ? "#4ADE80" : "#2EC4B6",
+                  }}
+                >
+                  {matchingClaim.status === "listing_created" ? "Frontend progress: landlord finished the listing" : "Frontend progress: landlord added the property"}
+                </span>
+              </div>
+            )}
 
             {/* CTA */}
             <div className="flex items-center justify-end mt-2.5">
@@ -249,7 +349,7 @@ function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>
 
 type LookingMode = null | "solo" | "with-friends";
 
-function GettingStarted({ onSelect }: { onSelect: (mode: LookingMode, count: number, need: number) => void }) {
+function GettingStarted({ onSelect }: { onSelect: (mode: Exclude<LookingMode, null>, count: number, need: number) => void }) {
   const [mode, setMode] = useState<LookingMode>(null);
   const [haveCount, setHaveCount] = useState(2);
   const [needCount, setNeedCount] = useState(1);
@@ -267,14 +367,14 @@ function GettingStarted({ onSelect }: { onSelect: (mode: LookingMode, count: num
           <motion.button onClick={() => setMode("solo")} className="w-full bg-white rounded-2xl p-5 text-left transition-all group" style={{ border: "2.5px solid rgba(27,45,69,0.06)", boxShadow: "4px 4px 0px rgba(27,45,69,0.06)" }} whileHover={{ y: -2, boxShadow: "6px 6px 0px rgba(27,45,69,0.1)" }} whileTap={{ y: 1, boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(255,107,53,0.08)", border: "2px solid rgba(255,107,53,0.12)" }}><User className="w-6 h-6 text-[#FF6B35]" /></div>
-              <div><h3 className="text-[#1B2D45] group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I&apos;m on my own</h3><p className="text-[#1B2D45]/35" style={{ fontSize: "12px" }}>Looking for roommates or a group to join</p></div>
+              <div><h3 className="text-[#1B2D45] group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I&apos;m on my own</h3><p className="text-[#1B2D45]/35" style={{ fontSize: "12px" }}>Looking to join a house with availability</p></div>
               <ChevronRight className="w-4 h-4 text-[#1B2D45]/15 ml-auto shrink-0" />
             </div>
           </motion.button>
           <motion.button onClick={() => setMode("with-friends")} className="w-full bg-white rounded-2xl p-5 text-left transition-all group" style={{ border: "2.5px solid rgba(27,45,69,0.06)", boxShadow: "4px 4px 0px rgba(27,45,69,0.06)" }} whileHover={{ y: -2, boxShadow: "6px 6px 0px rgba(27,45,69,0.1)" }} whileTap={{ y: 1, boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(46,196,182,0.08)", border: "2px solid rgba(46,196,182,0.12)" }}><Users className="w-6 h-6 text-[#2EC4B6]" /></div>
-              <div><h3 className="text-[#1B2D45] group-hover:text-[#2EC4B6] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I have friends already</h3><p className="text-[#1B2D45]/35" style={{ fontSize: "12px" }}>Create a group and find more people</p></div>
+              <div><h3 className="text-[#1B2D45] group-hover:text-[#2EC4B6] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I have friends already</h3><p className="text-[#1B2D45]/35" style={{ fontSize: "12px" }}>We already have a place and need to fill a room</p></div>
               <ChevronRight className="w-4 h-4 text-[#1B2D45]/15 ml-auto shrink-0" />
             </div>
           </motion.button>
@@ -386,7 +486,7 @@ function saveProfile(profile: SavedProfile) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(profile)); } catch { /* quota — ignore */ }
 }
 
-export function clearRoommateProfile() {
+function clearRoommateProfile() {
   try { localStorage.removeItem(STORAGE_KEY); } catch {}
 }
 
@@ -401,6 +501,8 @@ export default function RoommatesPage() {
   const [myBudget, setMyBudget] = useState<[number, number]>([500, 650]);
   const [tab, setTab] = useState<"groups" | "individuals">("groups");
   const [activeFilter, setActiveFilter] = useState("all");
+  const visibleGroups = useMemo(() => (hydrated ? getVisibleRoommateGroups() : []), [hydrated]);
+  const claimState = useMemo(() => (hydrated ? getLandlordClaimState() : null), [hydrated]);
 
   // Hydrate from localStorage on mount — skip straight to browse if profile exists
   useEffect(() => {
@@ -419,7 +521,7 @@ export default function RoommatesPage() {
 
   const handleQuizComplete = (tags: Record<string, string>, budget: [number, number]) => { setMyTags(tags); setMyBudget(budget); setHasProfile(true); };
 
-  const handleSetupSelect = (mode: LookingMode, have: number, need: number) => {
+  const handleSetupSelect = (mode: Exclude<LookingMode, null>, have: number, need: number) => {
     setMyMode(mode);
     setSetupDone(true);
     const defaultTab = mode === "solo" ? "groups" : "individuals";
@@ -442,8 +544,8 @@ export default function RoommatesPage() {
 
   const groupsWithCompat = useMemo(() => {
     let groups = hasProfile
-      ? MOCK_GROUPS.map((g) => ({ ...g, _compat: computeGroupCompatibility(myTags, myBudget, g.members) })).sort((a, b) => b._compat - a._compat)
-      : MOCK_GROUPS.map((g) => ({ ...g, _compat: 0 }));
+      ? visibleGroups.map((g) => ({ ...g, _compat: computeGroupCompatibility(myTags, myBudget, g.members) })).sort((a, b) => b._compat - a._compat)
+      : visibleGroups.map((g) => ({ ...g, _compat: 0 }));
 
     // Apply filters
     if (activeFilter === "1more") groups = groups.filter((g) => g.spotsNeeded === 1);
@@ -454,7 +556,7 @@ export default function RoommatesPage() {
     else if (activeFilter === "under700") groups = groups.filter((g) => g.budgetMax <= 700);
 
     return groups;
-  }, [hasProfile, myTags, myBudget, activeFilter]);
+  }, [hasProfile, myTags, myBudget, activeFilter, visibleGroups]);
 
   const individualsWithCompat = useMemo(() => {
     if (!hasProfile) return MOCK_PROFILES;
@@ -487,7 +589,7 @@ export default function RoommatesPage() {
               Find your perfect roommates
             </h1>
             <p className="text-[#1B2D45]/40 mt-4 mx-auto" style={{ fontSize: "16px", lineHeight: 1.6, maxWidth: "420px" }}>
-              Create a group, share the link on your story, and find people who match your vibe.
+              Post your availability, share the student invite link, and find someone who fits the house vibe.
             </p>
             <motion.button
               onClick={() => setStarted(true)}
@@ -505,8 +607,8 @@ export default function RoommatesPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-14">
               {[
                 { step: "1", emoji: "📝", title: "Take the quiz", desc: "2-minute lifestyle quiz so we know your vibe — sleep, cleanliness, budget, the essentials.", color: "#FF6B35" },
-                { step: "2", emoji: "👥", title: "Create or join a group", desc: "Solo? Browse groups. Have friends? Create a group and share the link on your story.", color: "#2EC4B6" },
-                { step: "3", emoji: "🤝", title: "Connect and fill your spot", desc: "Message, meet up, and find the right person to complete your house. No more DM chaos.", color: "#FFB627" },
+                { step: "2", emoji: "🏠", title: "Post the availability", desc: "Already have a lease? Create a group for your current place and share the student invite link.", color: "#2EC4B6" },
+                { step: "3", emoji: "🤝", title: "Review requests and fill it", desc: "Message, vet, and choose the right person to take the available room. No more DM chaos.", color: "#FFB627" },
               ].map((item, i) => (
                 <motion.div
                   key={item.step}
@@ -533,12 +635,12 @@ export default function RoommatesPage() {
           {/* Group preview */}
           <RevealSection delay={0.1}>
             <div className="text-center mb-5">
-              <h2 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Groups looking right now</h2>
+              <h2 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Availability right now</h2>
               <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "12px" }}>Take the quiz to see your compatibility score</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-              {MOCK_GROUPS.slice(0, 4).map((g, i) => (
-                <DossierGroupCard key={g.id} group={g} index={i} />
+              {visibleGroups.slice(0, 4).map((g, i) => (
+                <DossierGroupCard key={g.id} group={g} index={i} claimState={claimState} />
               ))}
             </div>
           </RevealSection>
@@ -578,7 +680,7 @@ export default function RoommatesPage() {
         <div className="flex items-start justify-between flex-wrap gap-4 mb-5">
           <div>
             <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>Roommates</h1>
-            <p className="text-[#1B2D45]/35 mt-0.5" style={{ fontSize: "12px" }}>{myMode === "solo" ? "Browse groups looking for members" : "Find people for your group"}</p>
+            <p className="text-[#1B2D45]/35 mt-0.5" style={{ fontSize: "12px" }}>{myMode === "solo" ? "Browse houses with availability" : "Find someone for your current place"}</p>
           </div>
           <Link href="/roommates/groups/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "12px", fontWeight: 700, border: "2px solid #e55e2e", boxShadow: "3px 3px 0px rgba(255,107,53,0.15)" }}>
             <Plus className="w-3.5 h-3.5" /> Create Group
@@ -612,7 +714,7 @@ export default function RoommatesPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {groupsWithCompat.map((g, i) => <DossierGroupCard key={g.id} group={g} compatibility={hasProfile ? g._compat : undefined} index={i} />)}
+                  {groupsWithCompat.map((g, i) => <DossierGroupCard key={g.id} group={g} compatibility={hasProfile ? g._compat : undefined} index={i} claimState={claimState} />)}
                 </div>
               )}
             </motion.div>

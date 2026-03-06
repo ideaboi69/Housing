@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { clearLandlordClaim, getLandlordClaimCode, getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse } from "@/types";
 import {
   Plus, Building2, Eye, TrendingUp, Shield, ShieldCheck,
@@ -135,12 +136,18 @@ function OverviewTab({
   properties,
   conversations,
   unreadCount,
+  claimCode,
+  claimState,
+  onClearClaim,
   onSwitchTab,
 }: {
   user: { first_name: string; identity_verified?: boolean; company_name?: string | null };
   properties: PropertyWithListings[];
   conversations: ConversationResponse[];
   unreadCount: number;
+  claimCode: string;
+  claimState: LandlordClaimState | null;
+  onClearClaim: () => void;
   onSwitchTab: (t: Tab) => void;
 }) {
   const totalListings = properties.reduce((sum, p) => sum + p.listings.length, 0);
@@ -151,9 +158,80 @@ function OverviewTab({
 
   // Recent conversations (last 3)
   const recentConvos = conversations.slice(0, 3);
+  const claimStage = claimState?.claim_code === claimCode ? claimState.status : "claim_started";
+  const primaryClaimHref =
+    claimStage === "listing_created" && claimState?.property_id
+      ? `/landlord/properties/${claimState.property_id}`
+      : claimStage === "property_created" && claimState?.property_id
+      ? `/landlord/properties/${claimState.property_id}/listings/new?claim=${encodeURIComponent(claimCode)}`
+      : "/landlord/properties/new?claim=" + encodeURIComponent(claimCode);
+  const primaryClaimLabel =
+    claimStage === "property_created"
+      ? "Create Claimed Listing"
+      : claimStage === "listing_created"
+        ? "Claimed Listing Ready"
+        : "Add Claimed Property";
+  const claimDescription =
+    claimStage === "property_created"
+      ? `The property has been added${claimState?.property_title ? ` as ${claimState.property_title}` : ""}. Create the listing next so the claimed home is ready to attach.`
+      : claimStage === "listing_created"
+        ? `The claimed listing has been published${claimState?.listing_rent_per_room ? ` at $${claimState.listing_rent_per_room}/room` : ""}. Frontend flow is complete; backend still needs to attach it to the roommate group.`
+        : "A roommate group invited you to verify their home on cribb. Add the property details next, then create the matching listing.";
 
   return (
     <div className="space-y-6">
+      {claimCode && (
+        <div className="bg-[#2EC4B6]/[0.05] border border-[#2EC4B6]/15 rounded-xl px-4 py-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#2EC4B6]/10 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 text-[#2EC4B6]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Finish verifying a claimed home</span>
+                <span className="px-2 py-0.5 rounded-md bg-white border border-[#2EC4B6]/10 text-[#2EC4B6]" style={{ fontSize: "9px", fontWeight: 700 }}>
+                  Claim {claimCode}
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-white border border-black/[0.06] text-[#1B2D45]/55" style={{ fontSize: "9px", fontWeight: 700 }}>
+                  {claimStage === "property_created" ? "Property Added" : claimStage === "listing_created" ? "Listing Published" : "Needs Property"}
+                </span>
+              </div>
+              <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                {claimDescription}
+              </p>
+              {claimState?.property_address && (
+                <div className="mt-2 text-[#1B2D45]/30" style={{ fontSize: "11px" }}>
+                  {claimState.property_address}
+                </div>
+              )}
+              <div className="flex items-center gap-2 flex-wrap mt-3">
+                <Link
+                  href={primaryClaimHref}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#1B2D45] text-white hover:bg-[#152438] transition-all"
+                  style={{ fontSize: "11px", fontWeight: 700 }}
+                >
+                  {primaryClaimLabel} <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+                <button
+                  onClick={() => onSwitchTab("properties")}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-[#1B2D45]/10 text-[#1B2D45]/55 hover:text-[#1B2D45] hover:border-[#1B2D45]/20 transition-all"
+                  style={{ fontSize: "11px", fontWeight: 600 }}
+                >
+                  View Properties
+                </button>
+                <button
+                  onClick={onClearClaim}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[#1B2D45]/25 hover:text-[#1B2D45]/45 transition-all"
+                  style={{ fontSize: "11px", fontWeight: 600 }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Verification Banner */}
       {user.identity_verified === false && (
         <div className="bg-[#FFB627]/[0.08] border border-[#FFB627]/20 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
@@ -989,6 +1067,19 @@ export default function LandlordDashboard() {
   const [conversations, setConversations] = useState<ConversationResponse[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [claimCode, setClaimCode] = useState("");
+  const [claimState, setClaimState] = useState<LandlordClaimState | null>(null);
+
+  useEffect(() => {
+    setClaimCode(getLandlordClaimCode());
+    setClaimState(getLandlordClaimState());
+  }, []);
+
+  const handleClearClaim = useCallback(() => {
+    clearLandlordClaim();
+    setClaimCode("");
+    setClaimState(null);
+  }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -1110,6 +1201,9 @@ export default function LandlordDashboard() {
                     properties={properties}
                     conversations={conversations}
                     unreadCount={unreadCount}
+                    claimCode={claimCode}
+                    claimState={claimState}
+                    onClearClaim={handleClearClaim}
                     onSwitchTab={setTab}
                   />
                 )}

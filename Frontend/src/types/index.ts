@@ -281,6 +281,9 @@ export interface CribbScoreResponse {
   created_at: string;
 }
 
+// Temporary compatibility alias while older imports are migrated.
+export type HealthScoreResponse = CribbScoreResponse;
+
 // ── Saved Listing ──────────────────────────────────────
 
 export interface SavedListingResponse {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Building2, Phone, Shield, Upload, FileText, X, Check,
@@ -80,9 +80,12 @@ function FileUploadBox({
 
 export default function LandlordSignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const claimCode = searchParams.get("claim")?.trim() ?? "";
+  const isClaimFlow = claimCode.length > 0;
 
   const [account, setAccount] = useState({ first_name: "", last_name: "", email: "", password: "", confirm_password: "" });
   const [business, setBusiness] = useState({ company_name: "", phone: "", num_properties: "1" });
@@ -90,6 +93,15 @@ export default function LandlordSignupPage() {
   const [documentType, setDocumentType] = useState<string>("property_tax_bill");
   const [govId, setGovId] = useState<File | null>(null);
   const [proofOfOwnership, setProofOfOwnership] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (!isClaimFlow) return;
+    try {
+      localStorage.setItem("cribb_landlord_claim_code", claimCode);
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [claimCode, isClaimFlow]);
 
   function validateStep0() {
     if (!account.first_name || !account.last_name || !account.email || !account.password) { setError("All fields are required"); return false; }
@@ -141,7 +153,10 @@ export default function LandlordSignupPage() {
 
       const data = await res.json();
       if (data.access_token) localStorage.setItem("cribb_token", data.access_token);
-      router.push("/landlord/onboarding");
+      const nextUrl = isClaimFlow
+        ? `/landlord/onboarding?claim=${encodeURIComponent(claimCode)}`
+        : "/landlord/onboarding";
+      router.push(nextUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -177,11 +192,37 @@ export default function LandlordSignupPage() {
               <Building2 className="w-4 h-4 text-[#1B2D45]/60" />
             </div>
             <div className="text-left">
-              <h1 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 800 }}>Landlord Registration</h1>
-              <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>List your properties to verified UofG students</p>
+              <h1 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 800 }}>
+                {isClaimFlow ? "Verify a Home on Cribb" : "Landlord Registration"}
+              </h1>
+              <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>
+                {isClaimFlow ? "Complete signup to claim a home shared by a roommate group" : "List your properties to verified UofG students"}
+              </p>
             </div>
           </div>
         </div>
+
+        {isClaimFlow && (
+          <div className="mb-6 rounded-xl border border-[#2EC4B6]/15 bg-[#2EC4B6]/[0.04] px-4 py-4">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#2EC4B6]/10 flex items-center justify-center shrink-0">
+                <Building2 className="w-4 h-4 text-[#2EC4B6]" />
+              </div>
+              <div>
+                <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                  You were invited to verify a home for a roommate group
+                </div>
+                <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                  Finish this landlord signup and document review, then you can attach the claimed property to the group on Cribb.
+                </p>
+                <div className="mt-2 inline-flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5 border border-[#2EC4B6]/10">
+                  <span className="text-[#2EC4B6]" style={{ fontSize: "10px", fontWeight: 700 }}>Claim code</span>
+                  <span className="text-[#1B2D45]/60" style={{ fontSize: "10px", fontWeight: 600 }}>{claimCode}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <StepIndicator current={step} />
 
@@ -232,6 +273,14 @@ export default function LandlordSignupPage() {
               <Building2 className="w-4 h-4 text-[#1B2D45]/50" /> Business Details
             </h2>
 
+            {isClaimFlow && (
+              <div className="rounded-xl bg-[#1B2D45]/[0.04] px-4 py-3">
+                <p className="text-[#1B2D45]/55" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                  This account will be used to verify the home tied to claim code <strong>{claimCode}</strong>. Use the landlord or management contact details that match your documents.
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Company or management name</label>
               <input type="text" value={business.company_name} onChange={(e) => setBusiness({ ...business, company_name: e.target.value })} placeholder="Optional — leave blank if individual landlord" className={inputCls} style={{ fontSize: "14px" }} />
@@ -270,7 +319,9 @@ export default function LandlordSignupPage() {
 
               <div className="bg-[#1B2D45]/[0.04] rounded-xl p-4">
                 <p className="text-[#1B2D45]/60" style={{ fontSize: "12px", lineHeight: 1.6 }}>
-                  To protect students and build trust, we verify all landlords before their listings go live. Upload the documents below — our team typically reviews within <strong>1-2 business days</strong>.
+                  {isClaimFlow
+                    ? <>To protect students and confirm this claimed home is legitimate, we verify all landlords before the home is attached to a group. Upload the documents below. Review typically takes <strong>1-2 business days</strong>.</>
+                    : <>To protect students and build trust, we verify all landlords before their listings go live. Upload the documents below — our team typically reviews within <strong>1-2 business days</strong>.</>}
                 </p>
               </div>
 

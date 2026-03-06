@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Shield, ShieldCheck, ChevronLeft, MessageCircle, Link2, Copy, Check, MapPin, Home, Calendar, DollarSign, Sparkles, Send, Settings } from "lucide-react";
+import { Users, Shield, ShieldCheck, ChevronLeft, MessageCircle, Link2, Copy, Check, MapPin, Home, Calendar, DollarSign, Sparkles, Send, Settings, Search, Share2, Camera, ExternalLink } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import {
-  type LifestyleProfile, type RoommateGroup,
+  type LifestyleProfile, type RoommateGroup, type GroupHousing,
   TAG_SHORT_LABELS, computeGroupCompatibility,
-  MOCK_GROUPS,
+  getRoommateGroupById,
 } from "@/components/roommates/roommate-data";
 
 /* ── Helpers ── */
@@ -65,6 +66,22 @@ function MemberCard({ member }: { member: LifestyleProfile }) {
   );
 }
 
+/* ── Landlord Copy Button ── */
+
+function LandlordCopyButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button onClick={handleCopy} className="px-3 py-2 rounded-lg bg-[#2EC4B6] text-white hover:bg-[#28b0a3] transition-all flex items-center gap-1.5 shrink-0" style={{ fontSize: "10px", fontWeight: 600 }}>
+      {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+    </button>
+  );
+}
+
 /* ── Main Page ── */
 
 export default function GroupDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -72,13 +89,29 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
   const router = useRouter();
   const { user } = useAuthStore();
 
+  const [group, setGroup] = useState<RoommateGroup | null | undefined>(undefined);
+  const [claimState, setClaimState] = useState<LandlordClaimState | null>(null);
   const [requestSent, setRequestSent] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // TODO: fetch from API — GET /api/groups/{id}
-  const group = MOCK_GROUPS.find((g) => g.id === id);
+  useEffect(() => {
+    // TODO: fetch from API — GET /api/groups/{id}
+    setGroup(getRoommateGroupById(id) ?? null);
+  }, [id]);
+
+  useEffect(() => {
+    setClaimState(getLandlordClaimState());
+  }, []);
+
+  if (group === undefined) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
+        <div className="w-8 h-8 border-3 border-[#FF6B35]/20 border-t-[#FF6B35] rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!group) {
     return (
@@ -94,6 +127,26 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
 
   const filled = group.groupSize - group.spotsNeeded;
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/roommates/groups/join/${group.inviteCode}` : "";
+  const isOwner = Boolean(user) && (
+    group.createdBy === `user:${user?.id}` ||
+    group.createdBy === `${user?.id}-member-1`
+  );
+  const displayRent = group.housing?.status === "linked"
+    ? group.housing.linkedListingPrice
+    : group.housing?.status === "pending"
+      ? group.housing.selfReportedRent
+      : null;
+  const utilitiesIncluded = group.housing?.status === "linked"
+    ? group.housing.linkedListingUtilitiesIncluded
+    : group.housing?.status === "pending"
+      ? group.housing.selfReportedUtilitiesIncluded
+      : undefined;
+  const matchingClaim = claimState?.claim_code === group.inviteCode ? claimState : null;
+  const pendingHeadline = matchingClaim?.status === "listing_created"
+    ? "Landlord published the listing"
+    : matchingClaim?.status === "property_created"
+      ? "Landlord added the property details"
+      : "Current availability awaiting landlord verification";
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -140,39 +193,211 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
 
           <p className="text-[#1B2D45]/60 mb-4" style={{ fontSize: "13px", lineHeight: 1.6 }}>{group.description}</p>
 
-          {/* Info tags */}
-          <div className="flex items-center gap-2 flex-wrap mb-4">
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>
-              <DollarSign className="w-3 h-3" /> ${group.budgetMin}–${group.budgetMax}/mo
-            </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>
-              <Calendar className="w-3 h-3" /> {group.moveIn}
-            </span>
-            {group.preferredArea && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#2EC4B6]/[0.06] text-[#2EC4B6]" style={{ fontSize: "11px", fontWeight: 600 }}>
-                <MapPin className="w-3 h-3" /> {group.preferredArea}
-              </span>
-            )}
-            {group.genderPreference && group.genderPreference !== "No preference" && (
+          {/* Snapshot */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
+              <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Rent</div>
+              <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>
+                {displayRent ? `$${displayRent}/mo` : `$${group.budgetMin}–$${group.budgetMax}/mo`}
+              </div>
+            </div>
+            <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
+              <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Utilities</div>
+              <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>
+                {utilitiesIncluded == null ? "Not listed" : utilitiesIncluded ? "Included" : "Extra"}
+              </div>
+            </div>
+            <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
+              <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Move-in</div>
+              <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>{group.moveIn}</div>
+            </div>
+            <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
+              <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Availability</div>
+              <div
+                className="mt-0.5"
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: group.housing?.status === "linked" ? "#4ADE80" : "#FFB627",
+                }}
+              >
+                {group.housing?.status === "linked" ? "Verified place" : "Awaiting verification"}
+              </div>
+            </div>
+          </div>
+
+          {group.genderPreference && group.genderPreference !== "No preference" && (
+            <div className="mb-4">
               <span className="px-2.5 py-1 rounded-lg bg-[#FFB627]/[0.06] text-[#FFB627]" style={{ fontSize: "11px", fontWeight: 600 }}>
                 {group.genderPreference}
               </span>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Target listing */}
-          {group.targetListingTitle && (
+          {/* Housing Status */}
+          {group.housing && (
+            <div className="mb-4">
+              {/* ── Linked: Verified listing ── */}
+              {group.housing.status === "linked" && group.housing.linkedListingId && (
+                <Link href={`/browse/${group.housing.linkedListingId}`} className="block rounded-xl overflow-hidden hover:translate-y-[-2px] transition-all" style={{ border: "2.5px solid rgba(74,222,128,0.2)", boxShadow: "0 2px 12px rgba(74,222,128,0.08)" }}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#4ADE80]/[0.06]">
+                    <ShieldCheck className="w-3 h-3 text-[#4ADE80]" />
+                    <span className="text-[#4ADE80]" style={{ fontSize: "10px", fontWeight: 700 }}>Verified current home on Cribb</span>
+                  </div>
+                  <div className="flex items-center gap-4 p-4 bg-white">
+                    {group.housing.linkedListingImage ? (
+                      <div className="w-20 h-16 rounded-lg bg-[#FAF8F4] overflow-hidden shrink-0">
+                        <img src={group.housing.linkedListingImage} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      </div>
+                    ) : (
+                      <div className="w-20 h-16 rounded-lg bg-[#FF6B35]/[0.06] flex items-center justify-center shrink-0">
+                        <Home className="w-6 h-6 text-[#FF6B35]/30" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{group.housing.linkedListingTitle}</h4>
+                      <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{group.housing.linkedListingAddress}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {group.housing.linkedListingScore && (
+                          <span className="px-2 py-0.5 rounded bg-[#4ADE80]/10 text-[#4ADE80]" style={{ fontSize: "10px", fontWeight: 700 }}>Cribb Score: {group.housing.linkedListingScore}</span>
+                        )}
+                        {group.housing.linkedListingPrice && (
+                          <span className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 600 }}>${group.housing.linkedListingPrice}/mo</span>
+                        )}
+                        {group.housing.linkedListingUtilitiesIncluded != null && (
+                          <span className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 600 }}>
+                            · {group.housing.linkedListingUtilitiesIncluded ? "Utilities included" : "Utilities extra"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-[#1B2D45]/15 shrink-0" />
+                  </div>
+                </Link>
+              )}
+
+              {/* ── Pending: Self-reported ── */}
+              {group.housing.status === "pending" && (
+                <div className="rounded-xl overflow-hidden" style={{ border: "2.5px solid rgba(255,182,39,0.2)", boxShadow: "0 2px 12px rgba(255,182,39,0.06)" }}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#FFB627]/[0.06]">
+                    <span style={{ fontSize: "10px" }}>⏳</span>
+                    <span className="text-[#FFB627]" style={{ fontSize: "10px", fontWeight: 700 }}>{pendingHeadline}</span>
+                  </div>
+                  <div className="p-4 bg-white">
+                    {/* Optional photos */}
+                    {group.housing.selfReportedPhotos && group.housing.selfReportedPhotos.length > 0 && (
+                      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+                        {group.housing.selfReportedPhotos.map((src, i) => (
+                          <div key={i} className="w-24 h-18 rounded-lg overflow-hidden shrink-0 bg-[#FAF8F4]" style={{ aspectRatio: "4/3" }}>
+                            <img src={src} alt={`Place photo ${i + 1}`} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#FFB627]/[0.06] flex items-center justify-center shrink-0" style={{ border: "2px solid rgba(255,182,39,0.1)" }}>
+                        <MapPin className="w-5 h-5 text-[#FFB627]" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{group.housing.selfReportedAddress}</h4>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {group.housing.selfReportedRent && (
+                            <span className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>~${group.housing.selfReportedRent}/person</span>
+                          )}
+                          {group.housing.selfReportedUtilitiesIncluded != null && (
+                            <span className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>
+                              · {group.housing.selfReportedUtilitiesIncluded ? "Utilities included" : "Utilities extra"}
+                            </span>
+                          )}
+                          <span className="text-[#FFB627]/60" style={{ fontSize: "10px", fontWeight: 600 }}>· Self-reported</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-[#1B2D45]/25 mt-2.5" style={{ fontSize: "10px", lineHeight: 1.4 }}>
+                      The group already has this place lined up. Amenities, Cribb Score, and full details will appear once the landlord verifies it on Cribb.
+                    </p>
+
+                    {matchingClaim && (
+                      <div
+                        className="mt-3 rounded-xl px-3 py-3"
+                        style={{
+                          background: matchingClaim.status === "listing_created" ? "rgba(74,222,128,0.06)" : "rgba(46,196,182,0.05)",
+                          border: `1.5px solid ${matchingClaim.status === "listing_created" ? "rgba(74,222,128,0.18)" : "rgba(46,196,182,0.18)"}`,
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          {matchingClaim.status === "listing_created" ? (
+                            <Check className="w-3.5 h-3.5 text-[#4ADE80]" />
+                          ) : (
+                            <Home className="w-3.5 h-3.5 text-[#2EC4B6]" />
+                          )}
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              color: matchingClaim.status === "listing_created" ? "#4ADE80" : "#2EC4B6",
+                            }}
+                          >
+                            {matchingClaim.status === "listing_created" ? "Frontend progress: listing published" : "Frontend progress: property added"}
+                          </span>
+                        </div>
+                        <p className="text-[#1B2D45]/35 mt-1.5" style={{ fontSize: "10px", lineHeight: 1.45 }}>
+                          {matchingClaim.status === "listing_created"
+                            ? "The landlord has already created the property and published the listing on Cribb. The final backend step still needs to attach it to this group."
+                            : "The landlord has started the verification flow and added the property details. The listing is the next step."}
+                        </p>
+                        {matchingClaim.property_address && (
+                          <div className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontWeight: 600 }}>
+                            Property: {matchingClaim.property_address}
+                          </div>
+                        )}
+                        {matchingClaim.status === "listing_created" && matchingClaim.listing_rent_per_room && (
+                          <div className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "10px", fontWeight: 600 }}>
+                            Listing rent: ${matchingClaim.listing_rent_per_room}/room
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Landlord invite link */}
+                    {group.housing.landlordInviteUrl && (
+                      <div className="mt-3 pt-3" style={{ borderTop: "1.5px solid rgba(27,45,69,0.04)" }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Share2 className="w-3.5 h-3.5 text-[#2EC4B6]" />
+                          <span className="text-[#2EC4B6]" style={{ fontSize: "11px", fontWeight: 700 }}>Landlord verification link</span>
+                        </div>
+                        <p className="text-[#1B2D45]/30 mb-2" style={{ fontSize: "10px", lineHeight: 1.4 }}>
+                          This is separate from the student join link below. Send this to your landlord so they can claim and verify the home on Cribb.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FAF8F4] border border-[#2EC4B6]/10 min-w-0">
+                            <Link2 className="w-3 h-3 text-[#2EC4B6]/40 shrink-0" />
+                            <span className="text-[#2EC4B6]/60 truncate" style={{ fontSize: "10px", fontWeight: 500 }}>{group.housing.landlordInviteUrl}</span>
+                          </div>
+                          <LandlordCopyButton url={group.housing.landlordInviteUrl} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* Fallback for old data format without housing object */}
+          {!group.housing && group.targetListingTitle && (
             <Link href={`/browse/${group.targetListingId}`} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#FF6B35]/[0.04] border border-[#FF6B35]/10 hover:border-[#FF6B35]/20 transition-all mb-4">
               <Home className="w-5 h-5 text-[#FF6B35] shrink-0" />
               <div>
-                <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>Eyeing a listing</div>
+                <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>Current home</div>
                 <div className="text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 600 }}>{group.targetListingTitle} →</div>
               </div>
             </Link>
           )}
 
           {/* Manage (owner only — TODO: check ownership via API) */}
-          {user && (
+          {isOwner && (
             <Link href={`/roommates/groups/${group.id}/manage`} className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl border border-[#1B2D45]/10 text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/20 transition-all mb-3" style={{ fontSize: "12px", fontWeight: 600 }}>
               <Settings className="w-3.5 h-3.5" /> Manage Group
             </Link>
@@ -182,7 +407,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
           <div className="flex items-center gap-2">
             <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FAF8F4] border border-black/[0.04]">
               <Link2 className="w-3.5 h-3.5 text-[#1B2D45]/25 shrink-0" />
-              <span className="text-[#1B2D45]/40 truncate" style={{ fontSize: "11px" }}>{shareUrl || `cribb.ca/join/${group.inviteCode}`}</span>
+              <span className="text-[#1B2D45]/40 truncate" style={{ fontSize: "11px" }}>Student invite: {shareUrl || `cribb.ca/join/${group.inviteCode}`}</span>
             </div>
             <button onClick={handleCopy} className="px-3 py-2 rounded-lg bg-[#1B2D45] text-white hover:bg-[#152438] transition-all flex items-center gap-1.5 shrink-0" style={{ fontSize: "11px", fontWeight: 600 }}>
               {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy Link</>}
@@ -240,7 +465,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                 <textarea
                   value={requestMessage}
                   onChange={(e) => setRequestMessage(e.target.value)}
-                  placeholder="Hey! I'm a 2nd year student looking for a place near campus..."
+                  placeholder="Hey! I'm a 2nd year student and I’m interested in the available room at your place..."
                   className="w-full px-4 py-3 rounded-xl bg-[#FAF8F4] border border-black/[0.04] focus:border-[#FF6B35]/20 focus:outline-none resize-none transition-all"
                   style={{ fontSize: "13px", lineHeight: 1.5, minHeight: 100 }}
                 />
