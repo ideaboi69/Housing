@@ -11,6 +11,7 @@ from Schemas.convoSchema import SenderType
 from Schemas.writerSchema import WriterStatus
 from Schemas.postSchema import PostCategory, PostStatus
 from Schemas.marketplaceSchema import MarketplaceCategory, ItemCondition, PricingType, ItemStatus
+from Schemas.UDashSchema import *
 import os
 from sqlalchemy import JSON
 from config import settings
@@ -40,6 +41,10 @@ class User(Base):
     email_verified = Column(Boolean, default=False, nullable=False)
     is_writable = Column(Boolean, default=False, nullable=False)
     write_access_requested = Column(Boolean, default=False, nullable=False)
+    profile_photo_url = Column(String(500), nullable=True)
+    program = Column(String(255), nullable=True)
+    year = Column(Enum(StudentYear), nullable=True)
+    bio = Column(String(200), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -50,6 +55,9 @@ class User(Base):
     sublets = relationship("Sublet", back_populates="user")
     posts = relationship("Post", back_populates="user", foreign_keys="[Post.user_id]")
     marketplace_items = relationship("MarketplaceItem", back_populates="seller")
+    housing_preferences = relationship("UserHousingPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    roommate_profile = relationship("RoommateProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    notification_preferences = relationship("NotificationPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
@@ -472,7 +480,6 @@ class MarketplaceItem(Base):
         Index("ix_marketplace_price", "price"),
     )
 
-
 class MarketplaceImage(Base):
     __tablename__ = "marketplace_images"
 
@@ -483,7 +490,6 @@ class MarketplaceImage(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     item = relationship("MarketplaceItem", back_populates="images")
-
 
 class MarketplaceConversation(Base):
     __tablename__ = "marketplace_conversations"
@@ -504,7 +510,6 @@ class MarketplaceConversation(Base):
         UniqueConstraint("item_id", "buyer_id", name="uq_marketplace_conversation"),
     )
 
-
 class MarketplaceMessage(Base):
     __tablename__ = "marketplace_messages"
 
@@ -517,6 +522,53 @@ class MarketplaceMessage(Base):
 
     conversation = relationship("MarketplaceConversation", back_populates="messages")
     sender = relationship("User")
+
+class UserHousingPreferences(Base):
+    __tablename__ = "user_housing_preferences"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    budget = Column(Numeric(8, 2), nullable=True)
+    move_in_date = Column(Date, nullable=True)
+    lease_term = Column(Enum(LeaseTermPreference), nullable=True)
+    preferred_areas = Column(JSON, default=[], nullable=False)    
+    property_types = Column(JSON, default=[], nullable=False)        
+    must_haves = Column(JSON, default=[], nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="housing_preferences")
+
+class RoommateProfile(Base):
+    __tablename__ = "roommate_profiles"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    is_visible = Column(Boolean, default=True, nullable=False)
+    sleep_schedule = Column(Enum(SleepSchedule), nullable=True)
+    cleanliness = Column(Enum(Cleanliness), nullable=True)
+    noise_level = Column(Enum(NoiseLevel), nullable=True)
+    guests_social = Column(Enum(GuestsSocial), nullable=True)
+    vibe_tags = Column(JSON, default=[], nullable=False)             # max 5 tags
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="roommate_profile")
+
+class NotificationPreferences(Base):
+    __tablename__ = "notification_preferences"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    new_listings_matching = Column(Boolean, default=True, nullable=False)
+    price_drops_saved = Column(Boolean, default=True, nullable=False)
+    new_roommate_matches = Column(Boolean, default=True, nullable=False)
+    weekly_bubble_digest = Column(Boolean, default=False, nullable=False)
+    cribb_news_updates = Column(Boolean, default=False, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="notification_preferences")
 
 Base.metadata.create_all(engine)
 
