@@ -131,7 +131,6 @@ def get_all_sublets(
     
     return [SubletListResponse.model_validate(sublet) for sublet in sublets]
 
-
 # Get a single sublet by ID
 @sublet_router.get("/{sublet_id}", response_model=SubletResponse)
 def get_sublet(sublet_id: int, db: Session = Depends(get_db)):
@@ -153,6 +152,50 @@ def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(g
     sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
 
     return [SubletListResponse.model_validate(sublet) for sublet in sublets]
+@sublet_router.get("/drafts/my", response_model=list[SubletListResponse])
+def get_my_draft_sublets(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    sublets = db.query(Sublet).filter(
+        Sublet.user_id == current_user.id,
+        Sublet.status == SubletStatus.DRAFT,
+    ).order_by(Sublet.created_at.desc()).all()
+
+    return [SubletListResponse.model_validate(s) for s in sublets]
+
+
+@sublet_router.patch("/{sublet_id}/publish", response_model=SubletResponse)
+def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
+    sublet = db.query(Sublet).filter(Sublet.id == sublet_id, Sublet.user_id == current_user.id).first()
+
+    if not sublet:
+        raise HTTPException(status_code=404, detail="Sublet not found")
+
+    if sublet.status != SubletStatus.DRAFT:
+        raise HTTPException(status_code=400, detail="Only drafts can be published")
+
+    sublet.status = SubletStatus.ACTIVE
+    db.commit()
+    db.refresh(sublet)
+
+    return SubletResponse.model_validate(sublet)
+
+@sublet_router.patch("/{sublet_id}/unpublish", response_model=SubletResponse)
+def unpublish_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    sublet = db.query(Sublet).filter(Sublet.id == sublet_id, Sublet.user_id == current_user.id).first()
+
+    if not sublet:
+        raise HTTPException(status_code=404, detail="Sublet not found")
+
+    if sublet.status != SubletStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Only active sublets can be unpublished")
+
+    sublet.status = SubletStatus.DRAFT
+    db.commit()
+    db.refresh(sublet)
+
+    return SubletResponse.model_validate(sublet)
 
 # Update a sublet
 @sublet_router.patch("/{sublet_id}", response_model=SubletResponse)

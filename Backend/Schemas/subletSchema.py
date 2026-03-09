@@ -11,6 +11,7 @@ class RoomType(str, enum.Enum):
     PRIVATE = "private"
 
 class SubletStatus(str, enum.Enum):
+    DRAFT = "draft"
     ACTIVE = "active"
     RENTED = "rented"
     EXPIRED = "expired"

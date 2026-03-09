@@ -202,7 +202,6 @@ def delete_item(item_id: int, db: Session = Depends(get_db), current_user: User 
 # ──────────────────────────────────────────────
 # MESSAGES
 # ──────────────────────────────────────────────
-    
 # Start conversation
 @marketplace_router.post("/conversations", response_model=MarketplaceMessageResponse, status_code=status.HTTP_201_CREATED)
 def start_marketplace_conversation(payload: StartMarketplaceConversation, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
@@ -389,3 +388,45 @@ def get_marketplace_unread_count(db: Session = Depends(get_db), current_user: Us
     ).scalar()
 
     return {"unread_count": total}
+
+# Drafts
+@marketplace_router.get("/drafts/my", response_model=list[MarketplaceItemListResponse])
+def get_my_draft_items(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    items = db.query(MarketplaceItem).filter(
+        MarketplaceItem.seller_id == current_user.id,
+        MarketplaceItem.status == ItemStatus.DRAFT,
+    ).order_by(MarketplaceItem.created_at.desc()).all()
+
+    return [MarketplaceItemListResponse.model_validate(i) for i in items]
+
+@marketplace_router.patch("/items/{item_id}/publish", response_model=MarketplaceItemResponse)
+def publish_item(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    item = db.query(MarketplaceItem).filter(MarketplaceItem.id == item_id, MarketplaceItem.seller_id == current_user.id,).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    if item.status != ItemStatus.DRAFT:
+        raise HTTPException(status_code=400, detail="Only drafts can be published")
+
+    item.status = ItemStatus.AVAILABLE
+    db.commit()
+    db.refresh(item)
+
+    return MarketplaceItemResponse.model_validate(item)
+
+@marketplace_router.patch("/items/{item_id}/unpublish", response_model=MarketplaceItemResponse)
+def unpublish_item(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    item = db.query(MarketplaceItem).filter(MarketplaceItem.id == item_id, MarketplaceItem.seller_id == current_user.id).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    if item.status != ItemStatus.AVAILABLE:
+        raise HTTPException(status_code=400, detail="Only available items can be unpublished")
+
+    item.status = ItemStatus.DRAFT
+    db.commit()
+    db.refresh(item)
+
+    return MarketplaceItemResponse.model_validate(item)

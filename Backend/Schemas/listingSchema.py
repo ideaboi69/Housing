@@ -18,6 +18,7 @@ class GenderPreference(str, enum.Enum):
     OTHER = "other"
 
 class ListingStatus(str, enum.Enum):
+    DRAFT = "draft"
     ACTIVE = "active"
     RENTED = "rented"
     EXPIRED = "expired"

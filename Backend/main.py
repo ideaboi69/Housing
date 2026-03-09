@@ -18,7 +18,11 @@ from Routes.sublet import sublet_router
 from Routes.writer import writer_router
 from Routes.post import post_router
 from Routes.marketplace import marketplace_router
+from Routes.roommates import roommate_router
+from Routes.viewing import viewing_router
 from dataclasses import dataclass
+from apscheduler.schedulers.background import BackgroundScheduler
+from Utils.scheduler import send_viewing_reminders
 import Utils.cloudinary_config
 import asyncio
 
@@ -63,3 +67,14 @@ app.include_router(sublet_router, prefix="/api/sublets", tags=["Sublets"])
 app.include_router(writer_router, prefix="/api/writers", tags=["Writers"])
 app.include_router(post_router, prefix="/api/posts", tags=["Posts"])
 app.include_router(marketplace_router, prefix="/api/marketplace", tags=["Marketplace"])
+app.include_router(roommate_router, prefix="/api/roommates", tags=["Roommates"])
+app.include_router(viewing_router, prefix="/api/viewings", tags=["Viewings"])
+
+# Email scheduler
+scheduler = BackgroundScheduler()
+scheduler.add_job(send_viewing_reminders, "cron", hour=9, minute=0)
+scheduler.start()
+
+@app.on_event("shutdown")
+def shutdown_scheduler():
+    scheduler.shutdown()

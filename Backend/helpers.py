@@ -1,18 +1,21 @@
 from fastapi import HTTPException, Depends, status, APIRouter, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, ViewingAvailability, ViewingBooking
 from dotenv import load_dotenv
 from sqlalchemy import text, func as sql_func
-from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin, Writer, Conversation, Message
+from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin, Writer, Conversation, Message, RoommateProfile, RoommateGroup, Post
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordVerification
 from Utils.security import get_current_user, decode_access_token
 from fastapi import APIRouter, Depends, HTTPException, status
 from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse
 from Utils.cloudinary import delete_image_from_cloudinary
+from Schemas.roommateSchema import *
+from Schemas.viewingSchema import BookingResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from datetime import timedelta
 import uuid 
 import boto3
 import os
@@ -343,3 +346,117 @@ def generate_slug(title: str) -> str:
     slug = re.sub(r"[^\w\s-]", "", title.lower())
     slug = re.sub(r"[\s_]+", "-", slug).strip("-")
     return f"{slug}-{uuid.uuid4().hex[:8]}"
+
+# Helpers calculating compatibility 
+def calculate_compatibility(profile_a: RoommateProfile, profile_b: RoommateProfile) -> int:
+    if not profile_a or not profile_b:
+        return 0
+
+    score = 0
+    total_weight = 0
+
+    comparisons = [
+        ("sleep_schedule", 15),
+        ("cleanliness", 20),
+        ("noise_level", 15),
+        ("guests", 10),
+        ("study_habits", 5),
+        ("smoking", 15),
+        ("pets", 5),
+        ("kitchen_use", 5),
+        ("budget_range", 5),
+        ("roommate_timing", 5),
+    ]
+
+    for field, weight in comparisons:
+        val_a = getattr(profile_a, field)
+        val_b = getattr(profile_b, field)
+
+        if val_a is None or val_b is None:
+            continue
+
+        total_weight += weight
+
+        if val_a == val_b:
+            score += weight
+        else:
+            options = [e.value for e in type(val_a)]
+            try:
+                idx_a = options.index(val_a.value)
+                idx_b = options.index(val_b.value)
+                distance = abs(idx_a - idx_b)
+                max_distance = len(options) - 1
+                if max_distance > 0:
+                    score += weight * (1 - distance / max_distance) * 0.5
+            except (ValueError, ZeroDivisionError):
+                pass
+
+    if total_weight == 0:
+        return 0
+
+    return round((score / total_weight) * 100)
+
+def calculate_group_compatibility(user_profile: RoommateProfile, group: RoommateGroup, db: Session) -> int:
+    active_members = [m for m in group.members if m.is_active]
+    if not active_members:
+        return 0
+
+    total = 0
+    count = 0
+    for member in active_members:
+        member_profile = db.query(RoommateProfile).filter(
+            RoommateProfile.user_id == member.user_id
+        ).first()
+        if member_profile and member_profile.quiz_completed:
+            total += calculate_compatibility(user_profile, member_profile)
+            count += 1
+
+    return round(total / count) if count > 0 else 0
+
+# Writers Helper
+def get_owned_post(current_author, db: Session):
+    if isinstance(current_author, User):
+        return db.query(Post).filter(Post.user_id == current_author.id)
+    else:
+        return db.query(Post).filter(Post.writer_id == current_author.id)
+    
+# Vewing helpers
+def generate_hourly_slots(availability: ViewingAvailability) -> list[dict]:
+    slots = []
+    current = datetime.combine(availability.date, availability.start_time)
+    end = datetime.combine(availability.date, availability.end_time)
+
+    while current + timedelta(hours=1) <= end:
+        slot_end = current + timedelta(hours=1)
+        slots.append({
+            "start_time": current.time(),
+            "end_time": slot_end.time(),
+        })
+        current = slot_end
+
+    return slots
+
+def build_booking_response(booking: ViewingBooking, db: Session) -> BookingResponse:
+    slot = booking.slot
+    student = db.query(User).filter(User.id == booking.student_id).first()
+    landlord = db.query(Landlord).filter(Landlord.id == booking.landlord_id).first()
+    listing = db.query(Listing).filter(Listing.id == booking.listing_id).first()
+    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+
+    return BookingResponse(
+        id=booking.id,
+        slot_id=booking.slot_id,
+        listing_id=booking.listing_id,
+        student_id=booking.student_id,
+        student_name=f"{student.first_name} {student.last_name}",
+        landlord_id=booking.landlord_id,
+        landlord_name=f"{landlord.first_name} {landlord.last_name}",
+        date=slot.date,
+        start_time=slot.start_time,
+        end_time=slot.end_time,
+        status=booking.status,
+        notes=booking.notes,
+        listing_title=prop.title,
+        listing_address=prop.address,
+        created_at=booking.created_at,
+    )

@@ -14,3 +14,4 @@ resend
 httpx
 email_validator
 cloudinary
+apscheduler

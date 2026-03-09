@@ -171,6 +171,51 @@ def list_my_listings(db: Session = Depends(get_db), current_user: User = Depends
     listings = db.query(Listing).join(Property).filter(Property.landlord_id == landlord.id).all()
     return [ListingResponse.model_validate(l) for l in listings]
 
+@listing_router.get("/drafts/my", response_model=list[ListingResponse])
+def get_my_draft_listings(db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+    listings = db.query(Listing).join(Property).filter(Property.landlord_id == landlord.id, Listing.status == ListingStatus.DRAFT).order_by(Listing.created_at.desc()).all()
+
+    return [ListingResponse.model_validate(l) for l in listings]
+
+
+@listing_router.patch("/{listing_id}/publish", response_model=ListingResponse)
+def publish_listing(listing_id: int, db: Session = Depends(get_db),landlord: Landlord = Depends(require_landlord)):
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+    if prop.landlord_id != landlord.id:
+        raise HTTPException(status_code=403, detail="Not your listing")
+
+    if listing.status != ListingStatus.DRAFT:
+        raise HTTPException(status_code=400, detail="Only drafts can be published")
+
+    listing.status = ListingStatus.ACTIVE
+    db.commit()
+    db.refresh(listing)
+
+    return ListingResponse.model_validate(listing)
+
+@listing_router.patch("/{listing_id}/unpublish", response_model=ListingResponse)
+def unpublish_listing(listing_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+
+    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+    if prop.landlord_id != landlord.id:
+        raise HTTPException(status_code=403, detail="Not your listing")
+
+    if listing.status != ListingStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Only active listings can be unpublished")
+
+    listing.status = ListingStatus.DRAFT
+    db.commit()
+    db.refresh(listing)
+
+    return ListingResponse.model_validate(listing)
+
 # Get Single Listings (public, increments view count)
 @listing_router.get("/{listing_id}", response_model=ListingDetailResponse)
 def get_listing(listing_id: int, db: Session = Depends(get_db)):

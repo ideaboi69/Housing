@@ -1,7 +1,7 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, Boolean, Numeric, Date, TIMESTAMP, func, DECIMAL, Enum, text, CheckConstraint, UniqueConstraint, Index
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, Boolean, Numeric, Date, TIMESTAMP, func, DECIMAL, Enum, text, CheckConstraint, UniqueConstraint, Index, Time
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
-from datetime import datetime
+from datetime import datetime, time 
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import DocumentType, IDType, LandlordVerification
 from Schemas.propertySchema import PropertyType, PropertyRange 
@@ -11,7 +11,9 @@ from Schemas.convoSchema import SenderType
 from Schemas.writerSchema import WriterStatus
 from Schemas.postSchema import PostCategory, PostStatus
 from Schemas.marketplaceSchema import MarketplaceCategory, ItemCondition, PricingType, ItemStatus
+from Schemas.roommateSchema import *
 from Schemas.UDashSchema import *
+from Schemas.viewingSchema import *
 import os
 from sqlalchemy import JSON
 from config import settings
@@ -56,8 +58,13 @@ class User(Base):
     posts = relationship("Post", back_populates="user", foreign_keys="[Post.user_id]")
     marketplace_items = relationship("MarketplaceItem", back_populates="seller")
     housing_preferences = relationship("UserHousingPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    roommate_profile = relationship("RoommateProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     notification_preferences = relationship("NotificationPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    roommate_profile = relationship("RoommateProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    owned_roommate_groups = relationship("RoommateGroup", back_populates="owner")
+    roommate_memberships = relationship("RoommateGroupMember", back_populates="user")
+    roommate_invites_received = relationship("RoommateInvite", foreign_keys="[RoommateInvite.invited_user_id]", back_populates="invited_user")
+    roommate_requests_sent = relationship("RoommateRequest", back_populates="user")
+    viewing_bookings = relationship("ViewingBooking", back_populates="student")
 
     __table_args__ = (
         CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
@@ -83,6 +90,8 @@ class Landlord(Base):
     reviews = relationship("Review", back_populates="landlord")
     documents = relationship("LandlordDocuments", back_populates="landlord")
     conversations = relationship("Conversation", back_populates="landlord")
+    viewing_availabilities = relationship("ViewingAvailability", back_populates="landlord")
+    viewing_bookings = relationship("ViewingBooking", back_populates="landlord")
 
 class LandlordDocuments(Base):
     __tablename__ = "landlord_documents"
@@ -162,7 +171,7 @@ class Listing(Base):
     sublet_start_date = Column(Date, nullable=True)
     sublet_end_date = Column(Date, nullable=True)
     gender_preference = Column(Enum(GenderPreference), nullable=True)
-    status = Column(Enum(ListingStatus), default=ListingStatus.ACTIVE, nullable=False)
+    status = Column(Enum(ListingStatus), default=ListingStatus.DRAFT, nullable=False)
     view_count = Column(Integer, default=0, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -173,6 +182,10 @@ class Listing(Base):
     saved_by = relationship("SavedListing", back_populates="listing")
     flags = relationship("Flag", back_populates="listing")
     conversations = relationship("Conversation", back_populates="listing")
+    roommate_group = relationship("RoommateGroup", back_populates="listing", uselist=False)
+    viewing_availabilities = relationship("ViewingAvailability", back_populates="listing", cascade="all, delete-orphan")
+    viewing_slots = relationship("ViewingSlot", back_populates="listing", cascade="all, delete-orphan")
+    viewing_bookings = relationship("ViewingBooking", back_populates="listing", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_listings_status", "status"),
@@ -331,7 +344,7 @@ class Sublet(Base):
     sublet_end_date = Column(Date, nullable=False)
     move_in_date = Column(Date, nullable=False)
     gender_preference = Column(Enum(GenderPreference), nullable=True)
-    status = Column(Enum(SubletStatus), default=SubletStatus.ACTIVE, nullable=False)
+    status = Column(Enum(SubletStatus), default=SubletStatus.DRAFT, nullable=False)
     view_count = Column(Integer, default=0, nullable=False)
     description = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
@@ -451,7 +464,7 @@ class MarketplaceItem(Base):
     price = Column(Numeric(8, 2), nullable=True)  # null if free
     pickup_location = Column(String(500), nullable=False)
     pickup_notes = Column(Text, nullable=True)
-    status = Column(Enum(ItemStatus), default=ItemStatus.AVAILABLE, nullable=False)
+    status = Column(Enum(ItemStatus), default=ItemStatus.DRAFT, nullable=False)
     view_count = Column(Integer, default=0, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -539,22 +552,6 @@ class UserHousingPreferences(Base):
 
     user = relationship("User", back_populates="housing_preferences")
 
-class RoommateProfile(Base):
-    __tablename__ = "roommate_profiles"
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
-    is_visible = Column(Boolean, default=True, nullable=False)
-    sleep_schedule = Column(Enum(SleepSchedule), nullable=True)
-    cleanliness = Column(Enum(Cleanliness), nullable=True)
-    noise_level = Column(Enum(NoiseLevel), nullable=True)
-    guests_social = Column(Enum(GuestsSocial), nullable=True)
-    vibe_tags = Column(JSON, default=[], nullable=False)             # max 5 tags
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
-    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    user = relationship("User", back_populates="roommate_profile")
-
 class NotificationPreferences(Base):
     __tablename__ = "notification_preferences"
 
@@ -569,6 +566,226 @@ class NotificationPreferences(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="notification_preferences")
+
+class RoommateProfile(Base):
+    __tablename__ = "roommate_profiles"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    is_visible = Column(Boolean, default=True, nullable=False)
+    # Quiz answers (10 steps)
+    sleep_schedule = Column(Enum(SleepSchedule), nullable=True)
+    cleanliness = Column(Enum(Cleanliness), nullable=True)
+    noise_level = Column(Enum(NoiseLevel), nullable=True)
+    guests = Column(Enum(GuestFrequency), nullable=True)
+    study_habits = Column(Enum(StudyHabits), nullable=True)
+    smoking = Column(Enum(SmokingVaping), nullable=True)
+    pets = Column(Enum(PetPreference), nullable=True)
+    kitchen_use = Column(Enum(KitchenUse), nullable=True)
+    budget_range = Column(Enum(BudgetRange), nullable=True)
+    roommate_timing = Column(Enum(RoommateTiming), nullable=True)
+    gender_housing_pref = Column(Enum(GenderHousingPref), nullable=True)
+    # Post-quiz choices
+    search_type = Column(Enum(RoommateSearchType), nullable=True)
+    roommates_needed = Column(Integer, nullable=True)  # for "on my own" path
+
+    quiz_completed = Column(Boolean, default=False, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="roommate_profile")
+
+    @property
+    def lifestyle_tags(self):
+        """Generate display tags from quiz answers."""
+        tags = []
+        tag_map = {
+            "sleep_schedule": {"early_bird": "Early Bird", "night_owl": "Night Owl", "flexible": "Flexible"},
+            "cleanliness": {"very_tidy": "Very Clean", "reasonably_clean": "Relaxed Clean", "relaxed": "Relaxed"},
+            "noise_level": {"quiet": "Quiet", "moderate": "Moderate Noise", "loud": "Lively"},
+            "guests": {"rarely": "Quiet Space", "sometimes": "Social", "often": "Very Social"},
+            "smoking": {"no_smoking": "No Smoking", "outside_only": "Outside Only", "i_smoke": "Smoker"},
+        }
+        for field, mapping in tag_map.items():
+            val = getattr(self, field)
+            if val and val.value in mapping:
+                tags.append(mapping[val.value])
+        return tags
+    
+class RoommateGroup(Base):
+    __tablename__ = "roommate_groups"
+
+    id = Column(Integer, primary_key=True)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    current_size = Column(Integer, nullable=False) 
+    spots_needed = Column(Integer, nullable=False)
+    total_capacity = Column(Integer, nullable=False)
+    # Listing details
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="SET NULL"), nullable=True)
+    rent_per_person = Column(Numeric(8, 2), nullable=True)
+    utilities_included = Column(Boolean, default=False, nullable=False)
+    move_in_timing = Column(Enum(RoommateTiming), nullable=True)
+    gender_preference = Column(Enum(GenderHousingPref), nullable=True)
+    # Location (if they have a place)
+    has_place = Column(Boolean, default=False, nullable=False)
+    address = Column(String(500), nullable=True)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    owner = relationship("User", back_populates="owned_roommate_groups")
+    members = relationship("RoommateGroupMember", back_populates="group", cascade="all, delete-orphan")
+    invites_sent = relationship("RoommateInvite", back_populates="group", cascade="all, delete-orphan")
+    requests_received = relationship("RoommateRequest", back_populates="group", cascade="all, delete-orphan")
+    listing = relationship("Listing", back_populates="roommate_group")
+
+
+    @property
+    def spots_remaining(self):
+        filled = len([m for m in self.members if m.is_active])
+        return self.total_capacity - filled
+
+    __table_args__ = (
+        Index("ix_roommate_groups_owner", "owner_id"),
+        Index("ix_roommate_groups_active", "is_active"),
+        Index("ix_roommate_groups_timing", "move_in_timing"),
+    )
+
+class RoommateGroupMember(Base):
+    __tablename__ = "roommate_group_members"
+
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("roommate_groups.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role = Column(Enum(GroupMemberRole), default=GroupMemberRole.MEMBER, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    joined_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    group = relationship("RoommateGroup", back_populates="members")
+    user = relationship("User", back_populates="roommate_memberships")
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_roommate_group_member"),
+    )
+
+class RoommateInvite(Base):
+    """Group owner invites an individual to join."""
+    __tablename__ = "roommate_invites"
+
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("roommate_groups.id", ondelete="CASCADE"), nullable=False)
+    invited_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    invited_by_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    message = Column(Text, nullable=True)
+    status = Column(Enum(InviteStatus), default=InviteStatus.PENDING, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    group = relationship("RoommateGroup", back_populates="invites_sent")
+    invited_user = relationship("User", foreign_keys=[invited_user_id], back_populates="roommate_invites_received")
+    invited_by = relationship("User", foreign_keys=[invited_by_id])
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "invited_user_id", name="uq_roommate_invite"),
+        Index("ix_roommate_invites_user", "invited_user_id"),
+        Index("ix_roommate_invites_status", "status"),
+    )
+
+class RoommateRequest(Base):
+    """Individual requests to join a group."""
+    __tablename__ = "roommate_requests"
+
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("roommate_groups.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    message = Column(Text, nullable=True)
+    status = Column(Enum(RequestStatus), default=RequestStatus.PENDING, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    group = relationship("RoommateGroup", back_populates="requests_received")
+    user = relationship("User", back_populates="roommate_requests_sent")
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_roommate_request"),
+        Index("ix_roommate_requests_group", "group_id"),
+        Index("ix_roommate_requests_status", "status"),
+    )
+
+class ViewingAvailability(Base):
+    """Landlord sets a date + time range. System generates 1hr slots from it."""
+    __tablename__ = "viewing_availabilities"
+
+    id = Column(Integer, primary_key=True)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
+    landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    listing = relationship("Listing", back_populates="viewing_availabilities")
+    landlord = relationship("Landlord", back_populates="viewing_availabilities")
+    slots = relationship("ViewingSlot", back_populates="availability", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("listing_id", "date", name="uq_viewing_availability_listing_date"),
+        Index("ix_viewing_availability_listing", "listing_id"),
+        Index("ix_viewing_availability_date", "date"),
+    )
+
+
+class ViewingSlot(Base):
+    """Individual 1hr slot generated from availability."""
+    __tablename__ = "viewing_slots"
+
+    id = Column(Integer, primary_key=True)
+    availability_id = Column(Integer, ForeignKey("viewing_availabilities.id", ondelete="CASCADE"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    status = Column(Enum(ViewingSlotStatus), default=ViewingSlotStatus.AVAILABLE, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    availability = relationship("ViewingAvailability", back_populates="slots")
+    listing = relationship("Listing", back_populates="viewing_slots")
+    booking = relationship("ViewingBooking", back_populates="slot", uselist=False)
+
+    __table_args__ = (
+        Index("ix_viewing_slots_listing_date", "listing_id", "date"),
+        Index("ix_viewing_slots_status", "status"),
+    )
+
+
+class ViewingBooking(Base):
+    """Student books a specific slot."""
+    __tablename__ = "viewing_bookings"
+
+    id = Column(Integer, primary_key=True)
+    slot_id = Column(Integer, ForeignKey("viewing_slots.id", ondelete="CASCADE"), nullable=False, unique=True)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=False)
+    status = Column(Enum(BookingStatus), default=BookingStatus.CONFIRMED, nullable=False)
+    notes = Column(Text, nullable=True)
+    cancelled_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    slot = relationship("ViewingSlot", back_populates="booking")
+    listing = relationship("Listing", back_populates="viewing_bookings")
+    student = relationship("User", back_populates="viewing_bookings")
+    landlord = relationship("Landlord", back_populates="viewing_bookings")
+
+    __table_args__ = (
+        UniqueConstraint("listing_id", "student_id", name="uq_viewing_booking_listing_student"),
+        Index("ix_viewing_bookings_student", "student_id"),
+        Index("ix_viewing_bookings_landlord", "landlord_id"),
+        Index("ix_viewing_bookings_status", "status"),
+    )
 
 Base.metadata.create_all(engine)
 

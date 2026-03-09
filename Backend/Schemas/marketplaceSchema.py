@@ -26,6 +26,7 @@ class ItemCondition(str, enum.Enum):
     POOR = "poor"
 
 class ItemStatus(str, enum.Enum):
+    DRAFT = "draft"
     AVAILABLE = "available"
     SOLD = "sold"
     RESERVED = "reserved"

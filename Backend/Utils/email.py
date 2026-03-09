@@ -445,3 +445,283 @@ def send_revoked_email(to_email: str, name: str, account_type: str):
         "subject": "Your write access has been revoked — FindYourCribb",
         "html": html_content,
     })
+
+# Booking confirmation
+def send_booking_confirmed_email(to_email: str, name: str, role: str, booking_details: dict):
+    """Notify both parties when a viewing is booked."""
+
+    if role == "student":
+        intro = "Your viewing has been confirmed! Here are the details:"
+    else:
+        intro = "A student has booked a viewing at your property. Here are the details:"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #dcfce7; color: #166534; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Viewing Confirmed
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Hi {name},
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    {intro}
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb; border-radius: 8px; margin-bottom: 24px;">
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Property</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e4e4e7;">{booking_details['listing_title']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Address</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; border-bottom: 1px solid #e4e4e7;">{booking_details['address']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Date</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e4e4e7;">{booking_details['date']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Time</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e4e4e7;">{booking_details['start_time']} - {booking_details['end_time']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px;">{'Landlord' if role == 'student' else 'Student'}</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px;">{booking_details['other_party_name']}</td>
+                                    </tr>
+                                </table>
+
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 13px; line-height: 1.6; text-align: center;">
+                                    Cancellations must be made at least 24 hours before the viewing.
+                                </p>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    If you have any questions, reach out at support@findyourcribb.com
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"Viewing Confirmed — {booking_details['listing_title']}",
+        "html": html_content,
+    })
+
+# Booking cancellation
+def send_booking_cancelled_email(to_email: str, name: str, cancelled_by: str, booking_details: dict):
+    """Notify both parties when a viewing is cancelled."""
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #fee2e2; color: #991b1b; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Viewing Cancelled
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Hi {name},
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    A viewing has been cancelled by the {cancelled_by}. Here were the details:
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb; border-radius: 8px; margin-bottom: 24px;">
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Property</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e4e4e7;">{booking_details['listing_title']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Date</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; border-bottom: 1px solid #e4e4e7;">{booking_details['date']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px;">Time</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px;">{booking_details['start_time']} - {booking_details['end_time']}</td>
+                                    </tr>
+                                </table>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    If you have any questions, reach out at support@findyourcribb.com
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"Viewing Cancelled — {booking_details['listing_title']}",
+        "html": html_content,
+    })
+
+def send_booking_reminder_email(to_email: str, name: str, role: str, booking_details: dict):
+    """Remind both parties 24hrs before a viewing."""
+
+    if role == "student":
+        intro = "Just a reminder — you have a viewing tomorrow!"
+    else:
+        intro = "Just a reminder — a student is coming for a viewing tomorrow!"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #dbeafe; color: #1e40af; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Viewing Tomorrow
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Hi {name},
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    {intro}
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb; border-radius: 8px; margin-bottom: 24px;">
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Property</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e4e4e7;">{booking_details['listing_title']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Address</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; border-bottom: 1px solid #e4e4e7;">{booking_details['address']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Date</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e4e4e7;">{booking_details['date']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px; border-bottom: 1px solid #e4e4e7;">Time</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px; font-weight: 600; border-bottom: 1px solid #e4e4e7;">{booking_details['start_time']} - {booking_details['end_time']}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px 16px; color: #71717a; font-size: 13px;">{'Landlord' if role == 'student' else 'Student'}</td>
+                                        <td style="padding: 12px 16px; color: #18181b; font-size: 14px;">{booking_details['other_party_name']}</td>
+                                    </tr>
+                                </table>
+
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 13px; line-height: 1.6; text-align: center;">
+                                    Note: This viewing can no longer be cancelled as it is within 24 hours.
+                                </p>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    If you have any questions, reach out at support@findyourcribb.com
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"Reminder: Viewing Tomorrow — {booking_details['listing_title']}",
+        "html": html_content,
+    })
+    
