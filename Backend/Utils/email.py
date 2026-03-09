@@ -89,6 +89,92 @@ def send_verification_email(to_email: str, first_name: str, token: str):
         "html": html_content,
     })
 
+# Password reset email
+def send_password_reset_email(to_email: str, first_name: str, token: str):
+    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <!-- Header -->
+                        <tr>
+                            <td style="background-color: #18181b; padding: 32px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
+                                    FindYourCribb
+                                </h1>
+                            </td>
+                        </tr>
+
+                        <!-- Body -->
+                        <tr>
+                            <td style="padding: 40px;">
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600;">
+                                    Reset your password
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6;">
+                                    Hey {first_name}, we received a request to reset your password. Click the button below to choose a new one.
+                                </p>
+
+                                <!-- Button -->
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td align="center" style="padding: 4px 0 24px;">
+                                            <a href="{reset_url}"
+                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                                Reset Password
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <p style="margin: 0 0 16px; color: #71717a; font-size: 13px; line-height: 1.6;">
+                                    Or copy and paste this link into your browser:
+                                </p>
+                                <p style="margin: 0 0 24px; color: #3b82f6; font-size: 13px; line-height: 1.6; word-break: break-all;">
+                                    {reset_url}
+                                </p>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6;">
+                                    This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email — your password won't be changed.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">
+                                    &copy; 2025 FindYourCribb. All rights reserved.
+                                </p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "to": [to_email],
+        "subject": "Reset your password — FindYourCribb",
+        "html": html_content,
+    })
+
 # Messsages notification
 def send_message_notification(
     to_email: str,
@@ -724,4 +810,3 @@ def send_booking_reminder_email(to_email: str, name: str, role: str, booking_det
         "subject": f"Reminder: Viewing Tomorrow — {booking_details['listing_title']}",
         "html": html_content,
     })
-    

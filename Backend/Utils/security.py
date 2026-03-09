@@ -25,13 +25,47 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 def validate_password(password: str) -> str:
+    errors = []
     if len(password) < 8:
-        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+        errors.append("at least 8 characters")
     if not re.search(r"[A-Z]", password):
-        raise HTTPException(status_code=400, detail="Password must contain at least 1 uppercase letter")
+        errors.append("one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        errors.append("one lowercase letter")
     if not re.search(r"[0-9]", password):
-        raise HTTPException(status_code=400, detail="Password must contain at least 1 number")
+        errors.append("one number")
+    if not re.search(r"[^A-Za-z0-9]", password):
+        errors.append("one special character")
+    if errors:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must contain: {', '.join(errors)}"
+        )
     return password
+
+
+def create_password_reset_token(email: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=1)
+    return jwt.encode(
+        {"email": email, "purpose": "password_reset", "exp": expire},
+        settings.JWT_SECRET,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+
+
+def decode_password_reset_token(token: str) -> str:
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("purpose") != "password_reset":
+            raise HTTPException(status_code=400, detail="Invalid reset token")
+        email = payload.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Invalid reset token")
+        return email
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=400, detail="Reset link has expired. Please request a new one.")
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid reset link. Please request a new one.")
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
@@ -75,7 +109,7 @@ def get_current_user(token: str = Depends(user_oauth2), db: Session = Depends(ge
 
     if role == UserRole.LANDLORD.value:
         user = db.query(Landlord).get(user_id)
-    if role =="writer":
+    elif role =="writer":
         user =db.query(Writer).get(user_id)
     else:
         user = db.query(User).get(user_id)

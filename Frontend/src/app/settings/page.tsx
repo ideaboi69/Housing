@@ -286,7 +286,6 @@ function RoommateTab() {
   const [noise, setNoise] = useState<string[]>([]);
   const [guests, setGuests] = useState<string[]>([]);
   const [lifestyle, setLifestyle] = useState<string[]>([]);
-  const [dealbreakers, setDealbreakers] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   return (
@@ -351,16 +350,6 @@ function RoommateTab() {
           { key: "420", label: "420 Friendly", emoji: "🌿" },
         ]} selected={lifestyle} onChange={(keys) => setLifestyle(keys.slice(0, 5))} />
         <p className="text-[#98A3B0] mt-2" style={{ fontSize: "10px" }}>{lifestyle.length}/5 selected</p>
-      </SectionCard>
-
-      <SectionCard title="Dealbreakers" description="Things you can't compromise on">
-        <PillSelector multi options={[
-          { key: "no-smoking", label: "No Smoking", emoji: "🚭" },
-          { key: "no-pets", label: "No Pets", emoji: "🚫🐱" },
-          { key: "no-parties", label: "No Loud Parties", emoji: "🔇" },
-          { key: "no-overnight", label: "No Overnight Guests", emoji: "🚪" },
-          { key: "same-gender", label: "Same Gender Only", emoji: "👤" },
-        ]} selected={dealbreakers} onChange={setDealbreakers} />
         <SaveBar onSave={() => {}} saving={saving} />
       </SectionCard>
     </div>

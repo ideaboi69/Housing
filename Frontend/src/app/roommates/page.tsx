@@ -132,34 +132,34 @@ function DossierGroupCard({
                   </motion.div>
                 ))}
               </div>
-              <span className="text-[#1B2D45]/25 ml-2" style={{ fontSize: "10px", fontWeight: 600 }}>{filled}/{group.groupSize}</span>
+              <span className="text-[#1B2D45]/50 ml-2" style={{ fontSize: "10px", fontWeight: 600 }}>{filled}/{group.groupSize}</span>
             </div>
 
             {/* Description */}
-            <p className="text-[#1B2D45]/45 mb-2.5" style={{ fontSize: "11px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
+            <p className="text-[#1B2D45]/60 mb-2.5" style={{ fontSize: "11px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
               {group.description}
             </p>
 
             {/* Snapshot list */}
             <div className="grid grid-cols-2 gap-2 mt-1">
               <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
-                <div className="text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 700 }}>Rent</div>
+                <div className="text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 700 }}>Rent</div>
                 <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>
                   {displayRent ? `$${displayRent}/mo` : `$${group.budgetMin}–$${group.budgetMax}`}
                 </div>
               </div>
               <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
-                <div className="text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 700 }}>Utilities</div>
+                <div className="text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 700 }}>Utilities</div>
                 <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>
                   {utilitiesIncluded == null ? "Not listed" : utilitiesIncluded ? "Included" : "Extra"}
                 </div>
               </div>
               <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
-                <div className="text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 700 }}>Move-in</div>
+                <div className="text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 700 }}>Move-in</div>
                 <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{group.moveIn}</div>
               </div>
               <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
-                <div className="text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 700 }}>Availability</div>
+                <div className="text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 700 }}>Availability</div>
                 <div
                   className="mt-0.5"
                   style={{
@@ -247,20 +247,20 @@ function IndividualCard({ profile }: { profile: LifestyleProfile }) {
             <h3 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{profile.firstName} {profile.initial}</h3>
             {profile.compatibility != null && <CompatRing score={profile.compatibility} size={34} />}
           </div>
-          <p className="text-[#1B2D45]/35" style={{ fontSize: "11px" }}>{profile.year} · {profile.program}</p>
+          <p className="text-[#1B2D45]/55" style={{ fontSize: "11px" }}>{profile.year} · {profile.program}</p>
         </div>
       </div>
-      <p className="text-[#1B2D45]/45 mt-2" style={{ fontSize: "11px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{profile.bio}</p>
+      <p className="text-[#1B2D45]/60 mt-2" style={{ fontSize: "11px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{profile.bio}</p>
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-        <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/45 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 600 }}>{budgetLabel}/mo</span>
-        <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/45 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 600 }}>{profile.moveIn}</span>
+        <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/60 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 600 }}>{budgetLabel}/mo</span>
+        <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/60 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 600 }}>{profile.moveIn}</span>
         {topTags.map((t) => <span key={t} className="px-2 py-0.5 rounded-lg bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 border border-[#FF6B35]/10" style={{ fontSize: "9px", fontWeight: 500 }}>{t}</span>)}
       </div>
       <div className="flex items-center gap-2 mt-3">
         <button className="flex-1 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all flex items-center justify-center gap-1.5" style={{ fontSize: "11px", fontWeight: 700, border: "2px solid #e55e2e" }}>
           <MessageCircle className="w-3 h-3" /> Invite to Group
         </button>
-        <button className="py-2 px-3 rounded-xl text-[#1B2D45]/40 hover:text-[#1B2D45] transition-all" style={{ fontSize: "11px", fontWeight: 600, border: "2px solid rgba(27,45,69,0.08)" }}>View</button>
+        <button className="py-2 px-3 rounded-xl text-[#1B2D45]/55 hover:text-[#1B2D45] transition-all" style={{ fontSize: "11px", fontWeight: 600, border: "2px solid rgba(27,45,69,0.08)" }}>View</button>
       </div>
     </motion.div>
   );
@@ -289,7 +289,7 @@ function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>
           <motion.div className="h-full bg-[#FF6B35] rounded-full" animate={{ width: `${progress}%` }} transition={{ type: "spring", stiffness: 300, damping: 30 }} />
         </div>
         <div className="flex items-center justify-between mt-2">
-          <span className="text-[#1B2D45]/30" style={{ fontSize: "11px", fontWeight: 500 }}>Step {step + 1} of {totalSteps}</span>
+          <span className="text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 500 }}>Step {step + 1} of {totalSteps}</span>
           {step > 0 && <button onClick={() => setStep(step - 1)} className="text-[#FF6B35] hover:underline" style={{ fontSize: "11px", fontWeight: 600 }}>← Back</button>}
         </div>
       </div>
@@ -298,7 +298,7 @@ function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>
           {currentCat && (
             <div>
               <div className="flex items-center gap-3 mb-2"><span style={{ fontSize: "28px" }}>{currentCat.emoji}</span><h2 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800 }}>{currentCat.label}</h2></div>
-              <p className="text-[#1B2D45]/40 mb-5" style={{ fontSize: "13px" }}>Pick what describes you best</p>
+              <p className="text-[#1B2D45]/55 mb-5" style={{ fontSize: "13px" }}>Pick what describes you best</p>
               <div className="space-y-2.5">
                 {currentCat.options.map((opt) => {
                   const sel = tags[currentCat.key] === opt;
@@ -310,7 +310,7 @@ function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>
           {step === LIFESTYLE_CATEGORIES.length && (
             <div>
               <h2 className="text-[#1B2D45] mb-1" style={{ fontSize: "22px", fontWeight: 800 }}>💰 Budget &amp; Timeline</h2>
-              <p className="text-[#1B2D45]/40 mb-5" style={{ fontSize: "13px" }}>Helps match you with students in the same range</p>
+              <p className="text-[#1B2D45]/55 mb-5" style={{ fontSize: "13px" }}>Helps match you with students in the same range</p>
               <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Monthly budget</label>
               <div className="grid grid-cols-2 gap-2 mb-5">
                 {BUDGET_OPTIONS.map((b) => { const sel = budget && budget[0] === b.range[0] && budget[1] === b.range[1]; return <motion.button key={b.label} onClick={() => setBudget(b.range)} className={`px-3 py-3 rounded-xl transition-all ${sel ? "bg-[#FF6B35]/[0.04]" : "bg-white"}`} style={{ fontSize: "13px", fontWeight: sel ? 600 : 400, color: sel ? "#FF6B35" : "#1B2D45aa", border: sel ? "2.5px solid #FF6B35" : "2.5px solid rgba(27,45,69,0.06)", boxShadow: sel ? "3px 3px 0px rgba(255,107,53,0.1)" : "2px 2px 0px rgba(27,45,69,0.04)" }} whileTap={{ scale: 0.98 }}>{b.label}</motion.button>; })}
@@ -324,13 +324,13 @@ function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>
           {step === LIFESTYLE_CATEGORIES.length + 1 && (
             <div>
               <h2 className="text-[#1B2D45] mb-1" style={{ fontSize: "22px", fontWeight: 800 }}>🏠 Housing Preference</h2>
-              <p className="text-[#1B2D45]/40 mb-5" style={{ fontSize: "13px" }}>Used to filter matches — never shown on your profile</p>
+              <p className="text-[#1B2D45]/55 mb-5" style={{ fontSize: "13px" }}>Used to filter matches — never shown on your profile</p>
               <div className="space-y-2.5 mb-6">
                 {GENDER_HOUSING_OPTIONS.map((opt) => { const sel = genderHousing === opt; return <motion.button key={opt} onClick={() => setGenderHousing(opt)} className={`w-full text-left px-4 py-3.5 rounded-xl transition-all ${sel ? "bg-[#FF6B35]/[0.04]" : "bg-white"}`} style={{ fontSize: "14px", fontWeight: sel ? 600 : 400, color: sel ? "#FF6B35" : "#1B2D45", border: sel ? "2.5px solid #FF6B35" : "2.5px solid rgba(27,45,69,0.06)", boxShadow: sel ? "3px 3px 0px rgba(255,107,53,0.1)" : "2px 2px 0px rgba(27,45,69,0.04)" }} whileTap={{ scale: 0.98 }}>{opt}</motion.button>; })}
               </div>
               <div className="rounded-xl p-4 flex items-start gap-2.5" style={{ background: "rgba(46,196,182,0.04)", border: "2px solid rgba(46,196,182,0.15)" }}>
                 <Shield className="w-4 h-4 text-[#2EC4B6] shrink-0 mt-0.5" />
-                <div><p className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>Your privacy is protected</p><p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>Only your first name and lifestyle tags are visible. Contact info is never shared publicly.</p></div>
+                <div><p className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>Your privacy is protected</p><p className="text-[#1B2D45]/55 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>Only your first name and lifestyle tags are visible. Contact info is never shared publicly.</p></div>
               </div>
             </div>
           )}
@@ -359,7 +359,7 @@ function GettingStarted({ onSelect }: { onSelect: (mode: Exclude<LookingMode, nu
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[#FF6B35] mb-4" style={{ fontSize: "11px", fontWeight: 700, background: "rgba(255,107,53,0.08)", border: "2px solid rgba(255,107,53,0.12)" }}><Sparkles className="w-3 h-3" /> Find your people</div>
         <h1 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 900, lineHeight: 1.2 }}>How are you looking<br />for roommates?</h1>
-        <p className="text-[#1B2D45]/40 mt-2" style={{ fontSize: "13px" }}>We&apos;ll set you up based on your situation</p>
+        <p className="text-[#1B2D45]/55 mt-2" style={{ fontSize: "13px" }}>We&apos;ll set you up based on your situation</p>
       </motion.div>
 
       {!mode && (
@@ -367,14 +367,14 @@ function GettingStarted({ onSelect }: { onSelect: (mode: Exclude<LookingMode, nu
           <motion.button onClick={() => setMode("solo")} className="w-full bg-white rounded-2xl p-5 text-left transition-all group" style={{ border: "2.5px solid rgba(27,45,69,0.06)", boxShadow: "4px 4px 0px rgba(27,45,69,0.06)" }} whileHover={{ y: -2, boxShadow: "6px 6px 0px rgba(27,45,69,0.1)" }} whileTap={{ y: 1, boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(255,107,53,0.08)", border: "2px solid rgba(255,107,53,0.12)" }}><User className="w-6 h-6 text-[#FF6B35]" /></div>
-              <div><h3 className="text-[#1B2D45] group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I&apos;m on my own</h3><p className="text-[#1B2D45]/35" style={{ fontSize: "12px" }}>Looking to join a house with availability</p></div>
+              <div><h3 className="text-[#1B2D45] group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I&apos;m on my own</h3><p className="text-[#1B2D45]/55" style={{ fontSize: "12px" }}>Looking to join a house with availability</p></div>
               <ChevronRight className="w-4 h-4 text-[#1B2D45]/15 ml-auto shrink-0" />
             </div>
           </motion.button>
           <motion.button onClick={() => setMode("with-friends")} className="w-full bg-white rounded-2xl p-5 text-left transition-all group" style={{ border: "2.5px solid rgba(27,45,69,0.06)", boxShadow: "4px 4px 0px rgba(27,45,69,0.06)" }} whileHover={{ y: -2, boxShadow: "6px 6px 0px rgba(27,45,69,0.1)" }} whileTap={{ y: 1, boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(46,196,182,0.08)", border: "2px solid rgba(46,196,182,0.12)" }}><Users className="w-6 h-6 text-[#2EC4B6]" /></div>
-              <div><h3 className="text-[#1B2D45] group-hover:text-[#2EC4B6] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I have friends already</h3><p className="text-[#1B2D45]/35" style={{ fontSize: "12px" }}>We already have a place and need to fill a room</p></div>
+              <div><h3 className="text-[#1B2D45] group-hover:text-[#2EC4B6] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I have friends already</h3><p className="text-[#1B2D45]/55" style={{ fontSize: "12px" }}>We already have a place and need to fill a room</p></div>
               <ChevronRight className="w-4 h-4 text-[#1B2D45]/15 ml-auto shrink-0" />
             </div>
           </motion.button>
@@ -386,7 +386,7 @@ function GettingStarted({ onSelect }: { onSelect: (mode: Exclude<LookingMode, nu
           <motion.div key="solo" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} className="text-left">
             <button onClick={() => setMode(null)} className="text-[#FF6B35] mb-4 hover:underline" style={{ fontSize: "11px", fontWeight: 600 }}>← Back</button>
             <h2 className="text-[#1B2D45] mb-1" style={{ fontSize: "20px", fontWeight: 800 }}>How many roommates do you need?</h2>
-            <p className="text-[#1B2D45]/35 mb-5" style={{ fontSize: "12px" }}>We&apos;ll show you groups that have room</p>
+            <p className="text-[#1B2D45]/55 mb-5" style={{ fontSize: "12px" }}>We&apos;ll show you groups that have room</p>
             <div className="grid grid-cols-4 gap-2 mb-6">
               {[1, 2, 3, 4].map((n) => <motion.button key={n} onClick={() => setNeedCount(n)} className="py-3 rounded-xl transition-all" style={{ fontSize: "18px", fontWeight: needCount === n ? 800 : 500, color: needCount === n ? "#FF6B35" : "#1B2D45aa", background: needCount === n ? "rgba(255,107,53,0.04)" : "white", border: needCount === n ? "2.5px solid #FF6B35" : "2.5px solid rgba(27,45,69,0.06)", boxShadow: needCount === n ? "3px 3px 0px rgba(255,107,53,0.1)" : "2px 2px 0px rgba(27,45,69,0.04)" }} whileTap={{ scale: 0.97 }}>{n}{n === 4 ? "+" : ""}</motion.button>)}
             </div>
@@ -588,7 +588,7 @@ export default function RoommatesPage() {
             <h1 className="text-[#1B2D45] mx-auto" style={{ fontSize: isMobile ? "34px" : "48px", fontWeight: 900, lineHeight: 1.08, letterSpacing: "-0.025em", maxWidth: "560px" }}>
               Find your perfect roommates
             </h1>
-            <p className="text-[#1B2D45]/40 mt-4 mx-auto" style={{ fontSize: "16px", lineHeight: 1.6, maxWidth: "420px" }}>
+            <p className="text-[#1B2D45]/55 mt-4 mx-auto" style={{ fontSize: "16px", lineHeight: 1.6, maxWidth: "420px" }}>
               Post your availability, share the student invite link, and find someone who fits the house vibe.
             </p>
             <motion.button
@@ -626,7 +626,7 @@ export default function RoommatesPage() {
                   </motion.div>
                   <div className="inline-block px-2 py-0.5 rounded-md mb-2" style={{ background: `${item.color}12`, border: `1.5px solid ${item.color}20`, fontSize: "9px", fontWeight: 800, color: item.color }}>STEP {item.step}</div>
                   <h3 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{item.title}</h3>
-                  <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "12px", lineHeight: 1.5 }}>{item.desc}</p>
+                  <p className="text-[#1B2D45]/55 mt-1" style={{ fontSize: "12px", lineHeight: 1.5 }}>{item.desc}</p>
                 </motion.div>
               ))}
             </div>
@@ -636,7 +636,7 @@ export default function RoommatesPage() {
           <RevealSection delay={0.1}>
             <div className="text-center mb-5">
               <h2 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Availability right now</h2>
-              <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "12px" }}>Take the quiz to see your compatibility score</p>
+              <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>Take the quiz to see your compatibility score</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
               {visibleGroups.slice(0, 4).map((g, i) => (
@@ -653,7 +653,7 @@ export default function RoommatesPage() {
                 <span className="text-[#2EC4B6]" style={{ fontSize: "12px", fontWeight: 700 }}>Verified UofG students only</span>
               </div>
               <h3 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Ready to find your people?</h3>
-              <p className="text-[#1B2D45]/35 mt-1 mb-4" style={{ fontSize: "12px" }}>Takes 2 minutes. Your info stays private.</p>
+              <p className="text-[#1B2D45]/55 mt-1 mb-4" style={{ fontSize: "12px" }}>Takes 2 minutes. Your info stays private.</p>
               <motion.button
                 onClick={() => setStarted(true)}
                 className="px-7 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
@@ -680,7 +680,7 @@ export default function RoommatesPage() {
         <div className="flex items-start justify-between flex-wrap gap-4 mb-5">
           <div>
             <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>Roommates</h1>
-            <p className="text-[#1B2D45]/35 mt-0.5" style={{ fontSize: "12px" }}>{myMode === "solo" ? "Browse houses with availability" : "Find someone for your current place"}</p>
+            <p className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px" }}>{myMode === "solo" ? "Browse houses with availability" : "Find someone for your current place"}</p>
           </div>
           <Link href="/roommates/groups/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "12px", fontWeight: 700, border: "2px solid #e55e2e", boxShadow: "3px 3px 0px rgba(255,107,53,0.15)" }}>
             <Plus className="w-3.5 h-3.5" /> Create Group
@@ -690,14 +690,14 @@ export default function RoommatesPage() {
         {/* Edit profile bar */}
         <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-white" style={{ border: "2px solid rgba(27,45,69,0.06)", boxShadow: "2px 2px 0px rgba(27,45,69,0.04)" }}>
           <Shield className="w-3.5 h-3.5 text-[#2EC4B6] shrink-0" />
-          <span className="text-[#1B2D45]/40 flex-1" style={{ fontSize: "11px" }}>Your roommate profile is active</span>
+          <span className="text-[#1B2D45]/55 flex-1" style={{ fontSize: "11px" }}>Your roommate profile is active</span>
           <button onClick={handleResetProfile} className="text-[#FF6B35] hover:underline shrink-0" style={{ fontSize: "11px", fontWeight: 600 }}>✏️ Redo Quiz</button>
         </div>
 
         {/* Tab toggle */}
         <div className="flex items-center gap-1 bg-white rounded-xl p-1 mb-4 w-fit" style={{ border: "2.5px solid #1B2D45", boxShadow: "3px 3px 0px rgba(27,45,69,0.06)" }}>
-          <button onClick={() => setTab("groups")} className={`px-4 py-2 rounded-lg transition-all ${tab === "groups" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><Users className="w-3.5 h-3.5 inline mr-1.5" />Groups</button>
-          <button onClick={() => setTab("individuals")} className={`px-4 py-2 rounded-lg transition-all ${tab === "individuals" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><User className="w-3.5 h-3.5 inline mr-1.5" />Individuals</button>
+          <button onClick={() => setTab("groups")} className={`px-4 py-2 rounded-lg transition-all ${tab === "groups" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><Users className="w-3.5 h-3.5 inline mr-1.5" />Groups</button>
+          <button onClick={() => setTab("individuals")} className={`px-4 py-2 rounded-lg transition-all ${tab === "individuals" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><User className="w-3.5 h-3.5 inline mr-1.5" />Individuals</button>
         </div>
 
         {/* Filter bar (groups tab only) */}
@@ -710,7 +710,7 @@ export default function RoommatesPage() {
                 <div className="bg-white rounded-2xl p-10 text-center" style={{ border: "2.5px dashed rgba(27,45,69,0.12)" }}>
                   <Users className="w-10 h-10 text-[#1B2D45]/10 mx-auto mb-2" />
                   <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No groups match this filter</h3>
-                  <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "12px" }}>Try another filter or create your own group.</p>
+                  <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>Try another filter or create your own group.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { api, ApiError } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
+import { MessageListSkeleton } from "@/components/ui/Skeletons";
 import type { ConversationResponse, ConversationDetailResponse, MessageResponse } from "@/types";
 
 /* ═══════════════════════════════════════════════════════
@@ -451,9 +452,7 @@ export default function MessagesPage() {
             {/* Conversation list */}
             <div className="flex-1 overflow-y-auto">
               {loading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-6 h-6 border-2 border-[#FF6B35]/30 border-t-[#FF6B35] rounded-full animate-spin" />
-                </div>
+                <MessageListSkeleton count={5} />
               ) : filtered.length === 0 ? (
                 <EmptyInbox />
               ) : (

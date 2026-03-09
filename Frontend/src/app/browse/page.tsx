@@ -20,6 +20,7 @@ import { MobileBottomTabs } from "@/components/browse/MobileBottomTabs";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { mockListings, mockHealthScores } from "@/lib/mock-data";
+import { BrowseGridSkeleton } from "@/components/ui/Skeletons";
 import type { ListingDetailResponse, ListingFilters } from "@/types";
 
 type ViewMode = "board" | "grid" | "map";
@@ -304,15 +305,12 @@ export default function BrowsePage() {
         {isLoading ? (
           <motion.div
             key="loading"
-            className="max-w-[1200px] mx-auto px-4 md:px-6 py-20 text-center"
+            className="max-w-[1200px] mx-auto px-4 md:px-6 py-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.1 } }}
           >
-            <div className="animate-pulse flex flex-col items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#FF6B35]/20" />
-              <div className="text-[#1B2D45]/30" style={{ fontSize: "14px" }}>Loading listings...</div>
-            </div>
+            <BrowseGridSkeleton count={6} />
           </motion.div>
         ) : viewMode === "board" ? (
           <motion.div

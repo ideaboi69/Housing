@@ -6,9 +6,9 @@ from tables import get_db
 from tables import User, Landlord
 from Schemas.userSchema import UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange
 from helpers import check_uoguelph_email
-from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password
+from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password, create_password_reset_token, decode_password_reset_token
 from Utils.email_token import create_email_verification_token, decode_email_verification_token
-from Utils.email import send_verification_email
+from Utils.email import send_verification_email, send_password_reset_email
 from config import settings
 
 user_router = APIRouter()
@@ -130,6 +130,33 @@ def resend_verification(email: str = Form(...), db: Session = Depends(get_db)):
 
     return {"message": "A verification link has been sent."}
 
+# Forgot Password — send reset link
+@user_router.post("/forgot-password", status_code=status.HTTP_200_OK)
+def forgot_password(email: str = Form(...), db: Session = Depends(get_db)):
+    # Always return success to prevent email enumeration
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        reset_token = create_password_reset_token(user.email)
+        send_password_reset_email(user.email, user.first_name, reset_token)
+
+    return {"message": "If an account exists with that email, a reset link has been sent."}
+
+# Reset Password — set new password using token
+@user_router.post("/reset-password", status_code=status.HTTP_200_OK)
+def reset_password(token: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
+    email = decode_password_reset_token(token)
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    validate_password(new_password)
+
+    user.password_hash = hash_password(new_password)
+    db.commit()
+
+    return {"message": "Password has been reset successfully. You can now log in."}
+
 # Viewing and updating user profiles
 @user_router.get("/me", response_model=UserResponse)
 def view_user_profile(current_user: User = Depends(get_current_user)):
@@ -163,6 +190,7 @@ def change_password(payload: PasswordChange, db: Session = Depends(get_db), curr
     if not verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
 
+    validate_password(payload.new_password)
     current_user.password_hash = hash_password(payload.new_password)
     db.commit()
 
