@@ -80,7 +80,7 @@ export default function ResetPasswordPage() {
     setIsLoading(true);
 
     try {
-      await api.post("/auth/reset-password", { token, new_password: password });
+      await api.auth.resetPassword(token, password);
       setSuccess(true);
     } catch {
       setError("This reset link has expired or is invalid. Please request a new one.");

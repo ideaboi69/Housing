@@ -5,7 +5,7 @@ from sqlalchemy import func as sql_func
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, LandlordDocuments
 from Schemas.landlordSchema import LandlordLogin, LandlordUpdate, LandlordResponse, LandlordPublicResponse, LandlordPropertyResponse, LandlordReviewResponse, PropertyRange, IDType, DocumentType, LandlordVerification, LandlordTokenResponse
 from Schemas.userSchema import UserRole, TokenResponse
-from Utils.security import get_current_user, hash_password, verify_password, create_access_token
+from Utils.security import get_current_user, hash_password, verify_password, create_access_token, validate_password
 from Utils.textract import extract_document_data
 from Utils.verification import compare_landlord_data
 from helpers import require_landlord, get_landlord_profile, compute_landlord_stats, upload_to_s3, BUCKET_NAME
@@ -27,6 +27,7 @@ def register_landlord(email: EmailStr = Form(...), password: str = Form(...), fi
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists",
         )
+    validate_password(password)
     try:
         landlord = Landlord(
             email=email,
@@ -198,4 +199,3 @@ def get_landlord_reviews(landlord_id: int, db: Session = Depends(get_db)):
 
     reviews = db.query(Review).filter(Review.landlord_id == landlord_id).all()
     return [LandlordReviewResponse.model_validate(r) for r in reviews]
-

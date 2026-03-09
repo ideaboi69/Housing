@@ -62,6 +62,20 @@ class PasswordChange(BaseModel):
             raise ValueError("Password must be at least 8 characters")
         return v
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_min_length(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
 #Request & Response    
 class UserResponse(BaseModel):
     id: int

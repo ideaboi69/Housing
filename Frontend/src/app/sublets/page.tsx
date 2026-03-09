@@ -13,109 +13,12 @@ import { getScoreColor, formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSavedStore } from "@/lib/saved-store";
-
-/* ════════════════════════════════════════════════════════
-   Types & Data
-   ════════════════════════════════════════════════════════ */
-
-interface SubletListing {
-  id: string;
-  listing_id?: number;
-  title: string;
-  street: string;
-  subletPrice: number;
-  originalPrice: number;
-  healthScore: number;
-  verified: boolean;
-  posterType: string;
-  posterIsStudent: boolean;
-  availableMonths: boolean[]; // [Jan ... Dec]
-  neighborhood: string;
-  furnished: boolean;
-  negotiablePrice: boolean;
-  flexibleDates: boolean;
-  roommatesStaying: number | null;
-  roommateDesc: string | null;
-  bedsAvailable: number;
-  bedsTotal: number;
-  distance: string;
-  walkTime: string;
-  amenities: string[];
-  views: number;
-  saves: number;
-  rotation: number;
-}
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-const subletListings: SubletListing[] = [
-  {
-    id: "s1", listing_id: 1001, title: "Furnished Room in 4BR House", street: "78 College Ave W",
-    subletPrice: 550, originalPrice: 720, healthScore: 91, verified: true,
-    posterType: "4th year, Engineering", posterIsStudent: true,
-    availableMonths: [false, false, false, false, true, true, true, false, false, false, false, false], neighborhood: "Campus",
-    furnished: true, negotiablePrice: true, flexibleDates: false,
-    roommatesStaying: 2, roommateDesc: "2 upper-year science students staying for summer",
-    bedsAvailable: 1, bedsTotal: 4, distance: "0.3 km", walkTime: "4 min",
-    amenities: ["Utilities Incl.", "Laundry", "Backyard"], views: 89, saves: 14, rotation: -2.2,
-  },
-  {
-    id: "s2", listing_id: 1002, title: "Entire 2BR Apartment", street: "155 Gordon St",
-    subletPrice: 1100, originalPrice: 1400, healthScore: 86, verified: true,
-    posterType: "Property Manager", posterIsStudent: false,
-    availableMonths: [false, false, false, false, true, true, true, true, false, false, false, false], neighborhood: "Stone Road",
-    furnished: true, negotiablePrice: true, flexibleDates: false,
-    roommatesStaying: null, roommateDesc: null,
-    bedsAvailable: 2, bedsTotal: 2, distance: "1.2 km", walkTime: "14 min",
-    amenities: ["Parking", "Dishwasher", "A/C"], views: 203, saves: 31, rotation: 1.5,
-  },
-  {
-    id: "s3", listing_id: 1003, title: "Private Room near Campus", street: "42 Suffolk St W",
-    subletPrice: 480, originalPrice: 680, healthScore: 68, verified: false,
-    posterType: "3rd year, Arts", posterIsStudent: true,
-    availableMonths: [false, false, false, false, true, true, true, false, false, false, false, false], neighborhood: "Campus",
-    furnished: false, negotiablePrice: false, flexibleDates: false,
-    roommatesStaying: 1, roommateDesc: "1 grad student staying for research term",
-    bedsAvailable: 1, bedsTotal: 3, distance: "0.5 km", walkTime: "6 min",
-    amenities: ["Laundry", "WiFi"], views: 47, saves: 5, rotation: -0.8,
-  },
-  {
-    id: "s4", listing_id: 1004, title: "Studio Apartment Downtown", street: "88 Macdonell St",
-    subletPrice: 700, originalPrice: 950, healthScore: 82, verified: true,
-    posterType: "Landlord", posterIsStudent: false,
-    availableMonths: [false, false, false, false, false, true, true, true, false, false, false, false], neighborhood: "Downtown",
-    furnished: false, negotiablePrice: false, flexibleDates: true,
-    roommatesStaying: null, roommateDesc: null,
-    bedsAvailable: 1, bedsTotal: 1, distance: "1.8 km", walkTime: "22 min",
-    amenities: ["A/C", "Gym", "Utilities Incl."], views: 134, saves: 22, rotation: 2.1,
-  },
-  {
-    id: "s5", listing_id: 1005, title: "Room in Townhouse", street: "31 Grange St",
-    subletPrice: 450, originalPrice: 640, healthScore: 64, verified: false,
-    posterType: "2nd year, Business", posterIsStudent: true,
-    availableMonths: [false, false, false, false, true, true, false, false, false, false, false, false], neighborhood: "South End",
-    furnished: true, negotiablePrice: false, flexibleDates: true,
-    roommatesStaying: 2, roommateDesc: "2 upper-year kinesiology students staying",
-    bedsAvailable: 1, bedsTotal: 4, distance: "2.1 km", walkTime: "26 min",
-    amenities: ["Parking", "Backyard"], views: 28, saves: 3, rotation: -1.4,
-  },
-  {
-    id: "s6", listing_id: 1006, title: "Master Bedroom in 5BR House", street: "62 Dean Ave",
-    subletPrice: 500, originalPrice: 600, healthScore: 88, verified: true,
-    posterType: "4th year, CompSci", posterIsStudent: true,
-    availableMonths: [false, false, false, false, true, true, true, true, false, false, false, false], neighborhood: "Campus",
-    furnished: true, negotiablePrice: true, flexibleDates: true,
-    roommatesStaying: 3, roommateDesc: "3 engineering students staying for internships",
-    bedsAvailable: 1, bedsTotal: 5, distance: "0.4 km", walkTime: "5 min",
-    amenities: ["Utilities Incl.", "Laundry", "WiFi", "Backyard"], views: 156, saves: 27, rotation: 0.6,
-  },
-];
-
-function getScoreLabel(score: number) {
-  if (score >= 85) return "Great Match";
-  if (score >= 65) return "Good Option";
-  return "Review First";
-}
+import { BrowseGridSkeleton } from "@/components/ui/Skeletons";
+import {
+  type SubletListing, type SubletViewMode, type SubletCellValue,
+  MONTHS, subletListings, getScoreLabel, filterOptions,
+  getSubletBestIndex, parseSubletDistance, parseSubletWalkTime, generateSubletCompareSummary,
+} from "@/components/sublets/sublet-data";
 
 /* ════════════════════════════════════════════════════════
    Sub-components
@@ -556,15 +459,6 @@ function DateRangeSelector({ selectedRange, onChange }: { selectedRange: [number
   );
 }
 
-const filterOptions = [
-  { label: "Furnished 🛋️", key: "furnished" },
-  { label: "Negotiable 💬", key: "negotiable" },
-  { label: "Verified ✓", key: "verified" },
-  { label: "Private Room 🚪", key: "private" },
-  { label: "Entire Place 🏠", key: "entire" },
-  { label: "Parking 🅿️", key: "parking" },
-];
-
 function SubletFiltersModal({
   open,
   activeFilters,
@@ -936,22 +830,12 @@ const desktopStaggers = [0, 18, 8, 14, 4, 20];
    Sublet Compare Modal (matches browse flow + AI summary)
    ════════════════════════════════════════════════════════ */
 
-type SubletCellValue = string | number | boolean | null | undefined;
-
 interface SubletCompareRow {
   label: string;
   icon?: React.ReactNode;
   values: SubletCellValue[];
   type: "text" | "price" | "boolean" | "score" | "distance" | "time";
   bestFn?: "lowest" | "highest";
-}
-
-function getSubletBestIndex(values: SubletCellValue[], fn: "lowest" | "highest"): number[] {
-  const nums = values.map((v) => (typeof v === "number" ? v : null));
-  const validNums = nums.filter((n): n is number => n !== null);
-  if (validNums.length === 0) return [];
-  const target = fn === "lowest" ? Math.min(...validNums) : Math.max(...validNums);
-  return nums.reduce<number[]>((acc, n, i) => (n === target ? [...acc, i] : acc), []);
 }
 
 function SubletCompareCell({
@@ -995,53 +879,6 @@ function SubletCompareCell({
   }
 
   return <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{String(value)}</span>;
-}
-
-function parseSubletDistance(distance: string): number | null {
-  const n = Number.parseFloat(distance);
-  return Number.isFinite(n) ? n : null;
-}
-
-function parseSubletWalkTime(walkTime: string): number | null {
-  const n = Number.parseInt(walkTime, 10);
-  return Number.isFinite(n) ? n : null;
-}
-
-function generateSubletCompareSummary(listings: SubletListing[]): string {
-  if (listings.length < 2) return "";
-
-  const enriched = listings.map((l) => ({
-    ...l,
-    dist: parseSubletDistance(l.distance) ?? 99,
-    walk: parseSubletWalkTime(l.walkTime) ?? 999,
-    savingsPct: Math.round(((l.originalPrice - l.subletPrice) / l.originalPrice) * 100),
-  }));
-
-  const cheapest = [...enriched].sort((a, b) => a.subletPrice - b.subletPrice)[0];
-  const bestScore = [...enriched].sort((a, b) => b.healthScore - a.healthScore)[0];
-  const closest = [...enriched].sort((a, b) => a.dist - b.dist)[0];
-
-  const parts: string[] = [];
-
-  if (bestScore.healthScore > 0) {
-    parts.push(`${bestScore.title} has the strongest Cribb Score (${bestScore.healthScore}), which makes it the safest all-around pick on paper.`);
-  }
-  parts.push(`${cheapest.title} is the cheapest option at ${formatPrice(cheapest.subletPrice)}/month.`);
-  if (closest.id !== cheapest.id) {
-    parts.push(`${closest.title} is the closest to campus at ${closest.distance}.`);
-  }
-
-  const verified = enriched.filter((l) => l.verified);
-  if (verified.length > 0 && verified.length < enriched.length) {
-    parts.push(`Verified listings in this set: ${verified.map((l) => l.title).join(" and ")}.`);
-  }
-
-  const negotiable = enriched.filter((l) => l.negotiablePrice);
-  if (negotiable.length > 0) {
-    parts.push(`${negotiable.map((l) => l.title).join(" and ")} ${negotiable.length === 1 ? "is" : "are"} marked negotiable, so you may be able to lower the price.`);
-  }
-
-  return parts.join(" ");
 }
 
 function SubletCompareModal({
@@ -1477,10 +1314,9 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
    Main Page
    ════════════════════════════════════════════════════════ */
 
-type SubletViewMode = "board" | "grid" | "map";
-
 export default function SubletsPage() {
   const isMobile = useIsMobile();
+  const [hydrated, setHydrated] = useState(false);
   const [showListForm, setShowListForm] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState<[number, number]>([4, 6]); // May-Jul default (summer feel)
@@ -1520,6 +1356,18 @@ export default function SubletsPage() {
       return true;
     });
   }, [selectedRange, activeFilters]);
+
+  useEffect(() => { setHydrated(true); }, []);
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-12">
+          <BrowseGridSkeleton count={6} />
+        </div>
+      </div>
+    );
+  }
 
   return (
       <div className="min-h-screen" style={{ background: "#FFFCF5" }}>

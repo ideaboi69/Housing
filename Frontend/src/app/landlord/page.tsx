@@ -20,6 +20,7 @@ import { EditListingModal } from "@/components/landlord/EditListingModal";
 import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
 import { ShowingsManager } from "@/components/landlord/ShowingsManager";
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
+import { LandlordOverviewSkeleton } from "@/components/ui/Skeletons";
 
 /* ════════════════════════════════════════════════════════
    Types
@@ -1141,8 +1142,8 @@ export default function LandlordDashboard() {
           setUnreadCount(unread_count);
         } catch { /* */ }
 
-      } catch (err) {
-        console.error("Dashboard load error:", err);
+      } catch {
+        // Dashboard load failed — will use fallback/empty state
       } finally {
         setIsLoading(false);
       }
@@ -1153,10 +1154,20 @@ export default function LandlordDashboard() {
 
   if (!user || authLoading || isLoading) {
     return (
-      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-[#1B2D45]/15 border-t-[#1B2D45] rounded-full animate-spin" />
-          <div className="text-[#1B2D45]/30" style={{ fontSize: "13px" }}>Loading dashboard...</div>
+      <div className="min-h-screen bg-[#FAF8F4]">
+        <div className="max-w-[1100px] mx-auto px-4 md:px-6 py-6 md:py-8">
+          <div className="flex gap-6">
+            {/* Sidebar skeleton */}
+            <div className="w-[220px] shrink-0 hidden md:block space-y-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 rounded-xl bg-[#1B2D45]/[0.04] animate-pulse" />
+              ))}
+            </div>
+            {/* Main content skeleton */}
+            <div className="flex-1">
+              <LandlordOverviewSkeleton />
+            </div>
+          </div>
         </div>
       </div>
     );

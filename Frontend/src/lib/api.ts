@@ -51,8 +51,38 @@ class ApiError extends Error {
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  // Check user token first, then writer token
   return localStorage.getItem("cribb_token") || localStorage.getItem("cribb_writer_token");
+}
+
+function setToken(token: string) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("cribb_token", token);
+  }
+}
+
+/** Try to refresh the access token silently. Returns true if successful. */
+async function tryRefreshToken(): Promise<boolean> {
+  const token = getToken();
+  if (!token) return false;
+
+  try {
+    const res = await fetch(`${API_URL}/api/users/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (data.access_token) {
+      setToken(data.access_token);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 async function request<T>(
@@ -69,10 +99,26 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  let res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
   });
+
+  // If 401 and we have a token, try refreshing once
+  if (res.status === 401 && token && !endpoint.includes("/login") && !endpoint.includes("/refresh")) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      // Retry the original request with the new token
+      const newToken = getToken();
+      if (newToken) {
+        headers["Authorization"] = `Bearer ${newToken}`;
+      }
+      res = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    }
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: "Request failed" }));
@@ -136,6 +182,23 @@ export const auth = {
 
   getUserById: (id: number) =>
     request<UserResponse>(`/api/users/${id}`),
+
+  forgotPassword: (email: string) =>
+    request<{ message: string }>("/api/users/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, new_password: string) =>
+    request<{ message: string }>("/api/users/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, new_password }),
+    }),
+
+  refreshToken: () =>
+    request<{ access_token: string; token_type: string }>("/api/users/refresh", {
+      method: "POST",
+    }),
 };
 
 // ── Listings ────────────────────────────────────────────

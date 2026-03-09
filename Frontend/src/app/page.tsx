@@ -38,7 +38,7 @@ const howItWorksSteps = [
 ];
 
 const founders = [
-  { name: "David", program: "Computer Science", image: "/gerald.jpg" },
+  { name: "David", program: "Computer Science", image: "/david.jpg" },
   { name: "OJ", program: "Computer Science", image: "/oj.jpg" },
 ];
 
@@ -57,9 +57,9 @@ const popularListings = [
 
 const footerColumns = [
   { title: "Browse", links: [{ label: "All Listings", to: "/browse" }, { label: "Sublets", to: "/sublets" }, { label: "Near Campus", to: "/browse" }, { label: "Downtown", to: "/browse" }] },
-  { title: "Community", links: [{ label: "Roommates", to: "/roommates" }, { label: "Demand Board", to: "/demand-board" }, { label: "Reviews", to: "#" }] },
+  { title: "Community", links: [{ label: "Roommates", to: "/roommates" }, { label: "The Bubble", to: "/the-bubble" }] },
   { title: "For Landlords", links: [{ label: "List a Property", to: "/landlord/login" }, { label: "Dashboard", to: "/landlord" }, { label: "How It Works", to: "/landlord/login" }] },
-  { title: "About", links: [{ label: "Our Story", to: "#" }, { label: "Contact", to: "#" }, { label: "Privacy", to: "#" }, { label: "Terms", to: "#" }] },
+  { title: "cribb", links: [{ label: "Sign Up", to: "/signup" }, { label: "Log In", to: "/login" }] },
 ];
 
 /* ════════════════════════════════════════════════════════

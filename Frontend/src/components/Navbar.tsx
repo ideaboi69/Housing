@@ -45,6 +45,12 @@ export function Navbar() {
   const { user, logout } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Hide navbar on auth pages and landing page
+  const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding"];
+  if (pathname === "/" || hideNavPaths.some((p) => pathname.startsWith(p))) {
+    return null;
+  }
+
   const isLandlord = user?.role === "landlord";
 
   const allNavItems = isLandlord

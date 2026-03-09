@@ -109,8 +109,8 @@ def get_current_user(token: str = Depends(user_oauth2), db: Session = Depends(ge
 
     if role == UserRole.LANDLORD.value:
         user = db.query(Landlord).get(user_id)
-    elif role =="writer":
-        user =db.query(Writer).get(user_id)
+    elif role == "writer":
+        user = db.query(Writer).get(user_id)
     else:
         user = db.query(User).get(user_id)
 

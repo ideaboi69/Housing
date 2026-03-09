@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import get_db
 from tables import User, Landlord
-from Schemas.userSchema import UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange
+from Schemas.userSchema import UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange, ForgotPasswordRequest, ResetPasswordRequest
 from helpers import check_uoguelph_email
 from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password, create_password_reset_token, decode_password_reset_token
 from Utils.email_token import create_email_verification_token, decode_email_verification_token
@@ -132,9 +132,9 @@ def resend_verification(email: str = Form(...), db: Session = Depends(get_db)):
 
 # Forgot Password — send reset link
 @user_router.post("/forgot-password", status_code=status.HTTP_200_OK)
-def forgot_password(email: str = Form(...), db: Session = Depends(get_db)):
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     # Always return success to prevent email enumeration
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == payload.email).first()
     if user:
         reset_token = create_password_reset_token(user.email)
         send_password_reset_email(user.email, user.first_name, reset_token)
@@ -143,19 +143,25 @@ def forgot_password(email: str = Form(...), db: Session = Depends(get_db)):
 
 # Reset Password — set new password using token
 @user_router.post("/reset-password", status_code=status.HTTP_200_OK)
-def reset_password(token: str = Form(...), new_password: str = Form(...), db: Session = Depends(get_db)):
-    email = decode_password_reset_token(token)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    email = decode_password_reset_token(payload.token)
 
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    validate_password(new_password)
+    validate_password(payload.new_password)
 
-    user.password_hash = hash_password(new_password)
+    user.password_hash = hash_password(payload.new_password)
     db.commit()
 
     return {"message": "Password has been reset successfully. You can now log in."}
+
+# Refresh Token — issue a new access token if the current one is still valid
+@user_router.post("/refresh", status_code=status.HTTP_200_OK)
+def refresh_token(current_user: User = Depends(get_current_user)):
+    token = create_access_token({"user_id": current_user.id, "role": current_user.role.value})
+    return {"access_token": token, "token_type": "bearer"}
 
 # Viewing and updating user profiles
 @user_router.get("/me", response_model=UserResponse)

@@ -123,8 +123,7 @@ export default function BrowsePage() {
         setHealthScores(mockHealthScores);
         setUseMock(true);
       }
-    } catch (err) {
-      console.error("[cribb] Browse fetch failed, using demo data:", err);
+    } catch {
       setListings(mockListings);
       setHealthScores(mockHealthScores);
       setUseMock(true);
