@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, X, ShieldCheck, Pin, LayoutGrid, MessageCircle } from "lucide-react";
+import { ArrowRight, X, ShieldCheck, Pin, LayoutGrid, MessageCircle, Users } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useAuthStore } from "@/lib/auth-store";
 import { usePathname } from "next/navigation";
@@ -40,6 +40,13 @@ const TOUR_STEPS: TourStep[] = [
     description: "Board view for visual browsing, grid for quick scanning, or map to see locations. Pick what works for you.",
     icon: <LayoutGrid className="w-5 h-5" />,
     color: "#1B2D45",
+  },
+  {
+    selector: "[data-tour='roommates']",
+    title: "Find Roommates",
+    description: "Take a 2-minute lifestyle quiz, get matched with compatible UofG students, and browse groups with open spots. Your vibe, your people.",
+    icon: <Users className="w-5 h-5" />,
+    color: "#2EC4B6",
   },
   {
     selector: "[data-tour='the-bubble']",

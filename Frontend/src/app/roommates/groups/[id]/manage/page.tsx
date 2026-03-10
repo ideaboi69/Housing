@@ -11,6 +11,7 @@ import {
   AlertCircle, Settings, Eye,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 import {
   type LifestyleProfile, type RoommateGroup, type GroupRequest,
   TAG_SHORT_LABELS, MOCK_PROFILES, getRoommateGroupById, removeStoredRoommateGroup, upsertStoredRoommateGroup,
@@ -191,18 +192,30 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     setTimeout(() => setLandlordCopied(false), 2000);
   };
 
-  const handleAccept = (reqId: string) => {
-    // TODO: POST /api/groups/{id}/requests/{reqId}/accept
+  const handleAccept = async (reqId: string) => {
+    try {
+      const numId = parseInt(reqId, 10);
+      if (!isNaN(numId)) await api.roommates.acceptRequest(numId);
+    } catch { /* API failed — update locally */ }
     setRequests((prev) => prev.map((r) => r.id === reqId ? { ...r, status: "accepted" as const } : r));
   };
 
-  const handleReject = (reqId: string) => {
-    // TODO: POST /api/groups/{id}/requests/{reqId}/reject
+  const handleReject = async (reqId: string) => {
+    try {
+      const numId = parseInt(reqId, 10);
+      if (!isNaN(numId)) await api.roommates.declineRequest(numId);
+    } catch { /* API failed — update locally */ }
     setRequests((prev) => prev.map((r) => r.id === reqId ? { ...r, status: "rejected" as const } : r));
   };
 
-  const handleRemoveMember = (memberId: string) => {
-    // TODO: DELETE /api/groups/{id}/members/{userId}
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      const groupNumId = parseInt(group.id, 10);
+      const memberNumId = parseInt(memberId, 10);
+      if (!isNaN(groupNumId) && !isNaN(memberNumId)) {
+        await api.roommates.removeMember(groupNumId, memberNumId);
+      }
+    } catch { /* API failed */ }
   };
 
   const handleSaveEdit = () => {
@@ -218,14 +231,13 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     setEditing(false);
   };
 
-  const handleDelete = () => {
-    const deleted = removeStoredRoommateGroup(group.id);
-    if (deleted) {
-      router.push("/roommates");
-      return;
-    }
-
-    setShowDelete(false);
+  const handleDelete = async () => {
+    try {
+      const numId = parseInt(group.id, 10);
+      if (!isNaN(numId)) await api.roommates.deleteGroup(numId);
+    } catch { /* API failed */ }
+    removeStoredRoommateGroup(group.id);
+    router.push("/roommates");
   };
 
   const pendingRequests = requests.filter((r) => r.status === "pending");

@@ -584,3 +584,214 @@ export interface ShowingSlotBulkCreate {
   dates: string[];
   time_slots: { start_time: string; end_time: string }[];
 }
+
+// ── Viewing Types (aligned with backend) ──────────────
+
+export interface ViewingSlotResponse {
+  id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  status: "available" | "booked" | "cancelled";
+}
+
+export interface ViewingAvailabilityResponse {
+  id: number;
+  listing_id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  slots: ViewingSlotResponse[];
+  created_at: string;
+}
+
+export interface ViewingBookingResponse {
+  id: number;
+  slot_id: number;
+  listing_id: number;
+  student_id: number;
+  student_name: string;
+  landlord_id: number;
+  landlord_name: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  status: "confirmed" | "cancelled_by_student" | "cancelled_by_landlord" | "completed";
+  notes?: string;
+  listing_title: string;
+  listing_address: string;
+  created_at: string;
+}
+
+export interface ViewingAvailabilityCreate {
+  listing_id: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+}
+
+export interface ViewingBookingCreate {
+  slot_id: number;
+  notes?: string;
+}
+
+// ── Roommate Types (aligned with backend) ─────────────
+
+export interface RoommateQuizSubmit {
+  sleep_schedule: string;
+  cleanliness: string;
+  noise_level: string;
+  guests: string;
+  study_habits: string;
+  smoking: string;
+  pets: string;
+  kitchen_use: string;
+  budget_range: string;
+  roommate_timing: string;
+  gender_housing_pref: string;
+  search_type: string;
+  roommates_needed?: number;
+}
+
+export interface RoommateProfileResponse {
+  id: number;
+  user_id: number;
+  is_visible: boolean;
+  sleep_schedule?: string;
+  cleanliness?: string;
+  noise_level?: string;
+  guests?: string;
+  study_habits?: string;
+  smoking?: string;
+  pets?: string;
+  kitchen_use?: string;
+  budget_range?: string;
+  roommate_timing?: string;
+  gender_housing_pref?: string;
+  search_type?: string;
+  roommates_needed?: number;
+  lifestyle_tags: string[];
+  quiz_completed: boolean;
+  created_at: string;
+}
+
+export interface ProfileCompletionCheck {
+  is_complete: boolean;
+  fields: Record<string, string | null>;
+  missing_fields: string[];
+}
+
+export interface ProfileCompletionSubmit {
+  first_name?: string;
+  last_name?: string;
+  program?: string;
+  year?: string;
+  bio?: string;
+}
+
+export interface GroupMemberResponse {
+  user_id: number;
+  first_name: string;
+  last_initial: string;
+  role: string;
+  profile_photo_url?: string;
+  joined_at: string;
+}
+
+export interface GroupCardResponse {
+  id: number;
+  name: string;
+  description?: string;
+  current_size: number;
+  total_capacity: number;
+  spots_remaining: number;
+  rent_per_person?: number;
+  utilities_included: boolean;
+  move_in_timing?: string;
+  gender_preference?: string;
+  has_place: boolean;
+  address?: string;
+  is_verified: boolean;
+  members: GroupMemberResponse[];
+  compatibility_score: number;
+  created_at: string;
+}
+
+export interface GroupDetailResponse extends GroupCardResponse {
+  owner_id: number;
+  is_active: boolean;
+}
+
+export interface GroupCreate {
+  name: string;
+  description?: string;
+  current_size: number;
+  spots_needed: number;
+  rent_per_person?: number;
+  utilities_included?: boolean;
+  move_in_timing?: string;
+  gender_preference?: string;
+  has_place?: boolean;
+  address?: string;
+}
+
+export interface GroupUpdate {
+  name?: string;
+  description?: string;
+  spots_needed?: number;
+  rent_per_person?: number;
+  utilities_included?: boolean;
+  move_in_timing?: string;
+  gender_preference?: string;
+  has_place?: boolean;
+  address?: string;
+}
+
+export interface IndividualCardResponse {
+  user_id: number;
+  first_name: string;
+  last_initial: string;
+  year?: string;
+  program?: string;
+  bio?: string;
+  budget_range?: string;
+  roommate_timing?: string;
+  lifestyle_tags: string[];
+  compatibility_score: number;
+  profile_photo_url?: string;
+}
+
+export interface InviteCreate {
+  invited_user_id: number;
+  message?: string;
+}
+
+export interface InviteResponse {
+  id: number;
+  group_id: number;
+  group_name: string;
+  invited_user_id: number;
+  invited_user_name: string;
+  invited_by_id: number;
+  message?: string;
+  status: "pending" | "accepted" | "declined" | "expired";
+  created_at: string;
+}
+
+export interface RoommateRequestCreate {
+  group_id: number;
+  message?: string;
+}
+
+export interface RoommateRequestResponse {
+  id: number;
+  group_id: number;
+  group_name: string;
+  user_id: number;
+  user_name: string;
+  message?: string;
+  status: "pending" | "accepted" | "declined";
+  lifestyle_tags: string[];
+  compatibility_score: number;
+  created_at: string;
+}

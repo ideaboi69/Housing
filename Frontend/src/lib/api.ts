@@ -32,6 +32,26 @@ import type {
   MessageResponse,
   ConversationResponse,
   ConversationDetailResponse,
+  // Roommates
+  RoommateQuizSubmit,
+  RoommateProfileResponse,
+  ProfileCompletionCheck,
+  ProfileCompletionSubmit,
+  GroupCardResponse,
+  GroupDetailResponse,
+  GroupCreate,
+  GroupUpdate,
+  IndividualCardResponse,
+  InviteCreate,
+  InviteResponse,
+  RoommateRequestCreate,
+  RoommateRequestResponse,
+  // Viewings
+  ViewingAvailabilityResponse,
+  ViewingAvailabilityCreate,
+  ViewingSlotResponse,
+  ViewingBookingResponse,
+  ViewingBookingCreate,
 } from "@/types";
 
 // ── Base ────────────────────────────────────────────────
@@ -494,6 +514,186 @@ export const messages = {
     request<null>(`/api/messages/landlord/conversations/${id}`, { method: "DELETE" }),
 };
 
+// ── Roommates ──────────────────────────────────────────
+
+export const roommates = {
+  // Profile
+  checkProfile: () =>
+    request<ProfileCompletionCheck>("/api/roommates/profile-check"),
+
+  completeProfile: (data: ProfileCompletionSubmit) =>
+    request<ProfileCompletionCheck>("/api/roommates/complete-profile", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  // Quiz
+  submitQuiz: (data: RoommateQuizSubmit) =>
+    request<RoommateProfileResponse>("/api/roommates/quiz", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getMyQuiz: () =>
+    request<RoommateProfileResponse>("/api/roommates/quiz/me"),
+
+  toggleVisibility: () =>
+    request<{ is_visible: boolean }>("/api/roommates/visibility", {
+      method: "PATCH",
+    }),
+
+  // Groups
+  createGroup: (data: GroupCreate) =>
+    request<GroupDetailResponse>("/api/roommates/groups", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateGroup: (groupId: number, data: GroupUpdate) =>
+    request<GroupDetailResponse>(`/api/roommates/groups/${groupId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteGroup: (groupId: number) =>
+    request<null>(`/api/roommates/groups/${groupId}`, { method: "DELETE" }),
+
+  getMyGroup: () =>
+    request<GroupDetailResponse>("/api/roommates/groups/my/group"),
+
+  browseGroups: (filters?: { gender?: string; timing?: string; max_rent?: number; has_place?: boolean }) =>
+    request<GroupCardResponse[]>(`/api/roommates/groups/browse${toQueryString(filters || {})}`),
+
+  getGroup: (groupId: number) =>
+    request<GroupDetailResponse>(`/api/roommates/groups/${groupId}`),
+
+  // Individuals
+  browseIndividuals: () =>
+    request<IndividualCardResponse[]>("/api/roommates/individuals"),
+
+  searchIndividuals: (filters?: Record<string, string>) =>
+    request<IndividualCardResponse[]>(`/api/roommates/individuals/search${toQueryString(filters || {})}`),
+
+  // Invites
+  sendInvite: (data: InviteCreate) =>
+    request<InviteResponse>("/api/roommates/invites", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  acceptInvite: (inviteId: number) =>
+    request<InviteResponse>(`/api/roommates/invites/${inviteId}/accept`, {
+      method: "PATCH",
+    }),
+
+  declineInvite: (inviteId: number) =>
+    request<InviteResponse>(`/api/roommates/invites/${inviteId}/decline`, {
+      method: "PATCH",
+    }),
+
+  getReceivedInvites: () =>
+    request<InviteResponse[]>("/api/roommates/invites/received"),
+
+  getSentInvites: () =>
+    request<InviteResponse[]>("/api/roommates/invites/sent"),
+
+  // Requests
+  sendRequest: (data: RoommateRequestCreate) =>
+    request<RoommateRequestResponse>("/api/roommates/requests", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  acceptRequest: (requestId: number) =>
+    request<RoommateRequestResponse>(`/api/roommates/requests/${requestId}/accept`, {
+      method: "PATCH",
+    }),
+
+  declineRequest: (requestId: number) =>
+    request<RoommateRequestResponse>(`/api/roommates/requests/${requestId}/decline`, {
+      method: "PATCH",
+    }),
+
+  getReceivedRequests: () =>
+    request<RoommateRequestResponse[]>("/api/roommates/requests/received"),
+
+  getSentRequests: () =>
+    request<RoommateRequestResponse[]>("/api/roommates/requests/sent"),
+
+  // Member management
+  removeMember: (groupId: number, userId: number) =>
+    request<null>(`/api/roommates/groups/${groupId}/members/${userId}`, {
+      method: "DELETE",
+    }),
+
+  leaveGroup: (groupId: number) =>
+    request<null>(`/api/roommates/groups/${groupId}/leave`, {
+      method: "DELETE",
+    }),
+};
+
+// ── Viewings / Showings ────────────────────────────────
+
+export const viewings = {
+  // Landlord: set availability
+  setAvailability: (data: ViewingAvailabilityCreate) =>
+    request<ViewingAvailabilityResponse>("/api/viewings/availability", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  setBulkAvailability: (data: { listing_id: number; dates: ViewingAvailabilityCreate[] }) =>
+    request<ViewingAvailabilityResponse[]>("/api/viewings/availability/bulk", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Get availability for a listing
+  getListingAvailability: (listingId: number, fromDate?: string) =>
+    request<ViewingAvailabilityResponse[]>(
+      `/api/viewings/availability/listing/${listingId}${fromDate ? `?from_date=${fromDate}` : ""}`
+    ),
+
+  // Get available slots
+  getAvailableSlots: (listingId: number, fromDate?: string) =>
+    request<ViewingSlotResponse[]>(
+      `/api/viewings/slots/listing/${listingId}${fromDate ? `?from_date=${fromDate}` : ""}`
+    ),
+
+  // Student: book a slot
+  bookSlot: (data: ViewingBookingCreate) =>
+    request<ViewingBookingResponse>("/api/viewings/book", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Cancel booking
+  studentCancel: (bookingId: number) =>
+    request<ViewingBookingResponse>(`/api/viewings/bookings/${bookingId}/cancel`, {
+      method: "PATCH",
+    }),
+
+  landlordCancel: (bookingId: number) =>
+    request<ViewingBookingResponse>(`/api/viewings/bookings/${bookingId}/landlord-cancel`, {
+      method: "PATCH",
+    }),
+
+  // Get bookings
+  getMyBookings: () =>
+    request<ViewingBookingResponse[]>("/api/viewings/bookings/my"),
+
+  getMyUpcoming: () =>
+    request<ViewingBookingResponse[]>("/api/viewings/bookings/my/upcoming"),
+
+  getLandlordBookings: (listingId?: number) =>
+    request<ViewingBookingResponse[]>(
+      `/api/viewings/bookings/landlord${listingId ? `?listing_id=${listingId}` : ""}`
+    ),
+
+  getLandlordUpcoming: () =>
+    request<ViewingBookingResponse[]>("/api/viewings/bookings/landlord/upcoming"),
+};
+
 // ── Export all as a single API object ───────────────────
 
 export const api = {
@@ -508,6 +708,8 @@ export const api = {
   writers,
   posts,
   messages,
+  roommates,
+  viewings,
 };
 
 export { ApiError };

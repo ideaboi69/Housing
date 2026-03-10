@@ -45,12 +45,6 @@ export function Navbar() {
   const { user, logout } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Hide navbar on auth pages and landing page
-  const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding"];
-  if (pathname === "/" || hideNavPaths.some((p) => pathname.startsWith(p))) {
-    return null;
-  }
-
   const isLandlord = user?.role === "landlord";
 
   const allNavItems = isLandlord
@@ -91,6 +85,12 @@ export function Navbar() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
+  // Hide navbar on auth pages and landing page — must be after all hooks
+  const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding"];
+  if (pathname === "/" || hideNavPaths.some((p) => pathname.startsWith(p))) {
+    return null;
+  }
+
   const dropdownLinks = isLandlord
     ? [
         { label: "Dashboard", href: "/landlord", icon: LayoutDashboard },
@@ -124,7 +124,7 @@ export function Navbar() {
               <Link
                 key={item.label}
                 href={item.path}
-                data-tour={item.label === "The Bubble" ? "the-bubble" : undefined}
+                data-tour={item.label === "The Bubble" ? "the-bubble" : item.label === "Roommates" ? "roommates" : undefined}
                 className={`px-4 py-2 rounded-lg transition-all ${
                   isActive
                     ? "bg-[#FF6B35]/10 text-[#FF6B35]"

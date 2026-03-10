@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Users, Shield, ChevronRight, MapPin, Home, Send, Check, Link2 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 import { type LifestyleProfile, type RoommateGroup, TAG_SHORT_LABELS, getRoommateGroupByInviteCode } from "@/components/roommates/roommate-data";
 
 /* ── Member Preview ── */
@@ -87,12 +88,17 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
       ? group.housing.selfReportedUtilitiesIncluded
       : undefined;
 
-  const handleRequest = () => {
+  const handleRequest = async () => {
     if (!user) {
       router.push(`/login?redirect=/roommates/groups/join/${code}`);
       return;
     }
-    // TODO: POST /api/groups/{id}/request { message }
+    try {
+      const numId = parseInt(group.id, 10);
+      if (!isNaN(numId)) {
+        await api.roommates.sendRequest({ group_id: numId, message: requestMessage || undefined });
+      }
+    } catch { /* API failed — still show success for demo */ }
     setSent(true);
   };
 

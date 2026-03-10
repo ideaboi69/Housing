@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin } from "lucide-react";
 import { useIsMobile } from "@/hooks";
+import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import {
   type LifestyleProfile, type RoommateGroup,
@@ -492,6 +494,7 @@ function clearRoommateProfile() {
 
 export default function RoommatesPage() {
   const isMobile = useIsMobile();
+  const { user } = useAuthStore();
   const [hydrated, setHydrated] = useState(false);
   const [started, setStarted] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
@@ -501,32 +504,172 @@ export default function RoommatesPage() {
   const [myBudget, setMyBudget] = useState<[number, number]>([500, 650]);
   const [tab, setTab] = useState<"groups" | "individuals">("groups");
   const [activeFilter, setActiveFilter] = useState("all");
-  const visibleGroups = useMemo(() => (hydrated ? getVisibleRoommateGroups() : []), [hydrated]);
+  const [apiGroups, setApiGroups] = useState<RoommateGroup[] | null>(null);
+  const [apiIndividuals, setApiIndividuals] = useState<LifestyleProfile[] | null>(null);
+  const visibleGroups = useMemo(() => (hydrated ? (apiGroups !== null ? [] : getVisibleRoommateGroups()) : []), [hydrated, apiGroups]);
   const claimState = useMemo(() => (hydrated ? getLandlordClaimState() : null), [hydrated]);
 
-  // Hydrate from localStorage on mount — skip straight to browse if profile exists
+  // Hydrate: try API quiz profile first, fall back to localStorage
   useEffect(() => {
-    const saved = loadProfile();
-    if (saved) {
-      setMyTags(saved.tags);
-      setMyBudget(saved.budget);
-      setMyMode(saved.mode);
-      setStarted(true);
-      setHasProfile(true);
-      setSetupDone(true);
-      setTab(saved.defaultTab);
-    }
-    setHydrated(true);
-  }, []);
+    async function init() {
+      if (user) {
+        try {
+          const profile = await api.roommates.getMyQuiz();
+          if (profile && profile.quiz_completed) {
+            // Map backend profile to local tag format
+            const tags: Record<string, string> = {};
+            const fieldMap: Record<string, string> = {
+              sleep_schedule: "sleep", cleanliness: "cleanliness", noise_level: "noise",
+              guests: "guests", study_habits: "study", smoking: "smoking",
+              pets: "pets", kitchen_use: "cooking",
+            };
+            for (const [backendField, localKey] of Object.entries(fieldMap)) {
+              const val = (profile as Record<string, unknown>)[backendField];
+              if (val) {
+                // Find the matching display label from LIFESTYLE_CATEGORIES
+                const cat = LIFESTYLE_CATEGORIES.find((c) => c.key === localKey);
+                if (cat) {
+                  // Try to match enum value to display option
+                  const matchedOption = cat.options.find((opt) => {
+                    const normalized = String(val).toLowerCase().replace(/_/g, " ");
+                    return opt.toLowerCase().includes(normalized) || normalized.includes(opt.toLowerCase().split(" ")[0]);
+                  });
+                  if (matchedOption) tags[localKey] = matchedOption;
+                }
+              }
+            }
 
-  const handleQuizComplete = (tags: Record<string, string>, budget: [number, number]) => { setMyTags(tags); setMyBudget(budget); setHasProfile(true); };
+            const budgetMap: Record<string, [number, number]> = {
+              under_500: [0, 500], "500_650": [500, 650], "650_800": [650, 800], "800_plus": [800, 2000],
+            };
+            const budget = profile.budget_range ? (budgetMap[profile.budget_range] || [500, 650]) : [500, 650];
+            const mode = profile.search_type === "have_friends" ? "with-friends" : "solo";
+            const defaultTab = mode === "solo" ? "groups" : "individuals";
+
+            setMyTags(tags);
+            setMyBudget(budget as [number, number]);
+            setMyMode(mode);
+            setStarted(true);
+            setHasProfile(true);
+            setSetupDone(true);
+            setTab(defaultTab);
+
+            // Cache locally too
+            saveProfile({ tags, budget: budget as [number, number], moveIn: "", genderHousing: "", mode, defaultTab });
+
+            // Try fetching API groups and individuals
+            try {
+              const groups = await api.roommates.browseGroups();
+              if (groups && groups.length > 0) {
+                // Convert API groups to local RoommateGroup format for display
+                setApiGroups(groups as unknown as RoommateGroup[]);
+              }
+            } catch { /* use mock */ }
+
+            try {
+              const individuals = await api.roommates.browseIndividuals();
+              if (individuals && individuals.length > 0) {
+                setApiIndividuals(individuals.map((p) => ({
+                  id: String(p.user_id),
+                  firstName: p.first_name,
+                  initial: p.last_initial,
+                  year: p.year || "",
+                  program: p.program || "",
+                  budget: [0, 0] as [number, number],
+                  moveIn: p.roommate_timing || "",
+                  leaseLength: "",
+                  bio: p.bio || "",
+                  tags: {},
+                  compatibility: p.compatibility_score,
+                  avatar: p.profile_photo_url || undefined,
+                })));
+              }
+            } catch { /* use mock */ }
+
+            setHydrated(true);
+            return;
+          }
+        } catch { /* no API profile — check localStorage */ }
+      }
+
+      // Fallback to localStorage
+      const saved = loadProfile();
+      if (saved) {
+        setMyTags(saved.tags);
+        setMyBudget(saved.budget);
+        setMyMode(saved.mode);
+        setStarted(true);
+        setHasProfile(true);
+        setSetupDone(true);
+        setTab(saved.defaultTab);
+      }
+      setHydrated(true);
+    }
+    init();
+  }, [user]);
+
+  const handleQuizComplete = useCallback(async (tags: Record<string, string>, budget: [number, number], moveIn: string, genderHousing: string) => {
+    setMyTags(tags);
+    setMyBudget(budget);
+    setHasProfile(true);
+
+    // Try submitting to API
+    if (user) {
+      try {
+        const tagToEnum: Record<string, Record<string, string>> = {
+          sleep: { "Early Bird (before 10pm)": "early_bird", "Night Owl (after midnight)": "night_owl", "Flexible": "flexible" },
+          cleanliness: { "Very Tidy": "very_tidy", "Reasonably Clean": "reasonably_clean", "Relaxed": "relaxed" },
+          noise: { "Quiet — I need silence": "quiet", "Moderate — music at a normal volume": "moderate", "Loud — I play music / have people over": "loud" },
+          guests: { "Rarely / Never": "rarely", "Sometimes (weekends)": "sometimes", "Often — I'm social": "often" },
+          study: { "Study at home": "at_home", "Library / campus mostly": "library", "Mix of both": "mix" },
+          smoking: { "No smoking at all": "no_smoking", "Outside only": "outside_only", "I smoke / vape": "i_smoke" },
+          pets: { "No pets please": "no_pets", "I'm fine with pets": "fine_with_pets", "I have a pet": "i_have_a_pet" },
+          cooking: { "I cook daily": "cook_daily", "A few times a week": "few_times_week", "Mostly takeout / meal plan": "takeout" },
+        };
+
+        const budgetToEnum = (b: [number, number]) => {
+          if (b[1] <= 500) return "under_500";
+          if (b[1] <= 650) return "500_650";
+          if (b[1] <= 800) return "650_800";
+          return "800_plus";
+        };
+
+        const moveInToEnum = (m: string) => {
+          if (m.includes("Fall")) return "fall_2026";
+          if (m.includes("Winter")) return "winter_2027";
+          if (m.includes("Summer")) return "summer_2026";
+          return "flexible";
+        };
+
+        const genderToEnum = (g: string) => {
+          if (g.includes("Mixed")) return "mixed_gender";
+          if (g.includes("Same")) return "same_gender";
+          return "no_preference";
+        };
+
+        await api.roommates.submitQuiz({
+          sleep_schedule: tagToEnum.sleep?.[tags.sleep] || "flexible",
+          cleanliness: tagToEnum.cleanliness?.[tags.cleanliness] || "reasonably_clean",
+          noise_level: tagToEnum.noise?.[tags.noise] || "moderate",
+          guests: tagToEnum.guests?.[tags.guests] || "sometimes",
+          study_habits: tagToEnum.study?.[tags.study] || "mix",
+          smoking: tagToEnum.smoking?.[tags.smoking] || "no_smoking",
+          pets: tagToEnum.pets?.[tags.pets] || "fine_with_pets",
+          kitchen_use: tagToEnum.cooking?.[tags.cooking] || "few_times_week",
+          budget_range: budgetToEnum(budget),
+          roommate_timing: moveInToEnum(moveIn),
+          gender_housing_pref: genderToEnum(genderHousing),
+          search_type: "on_my_own",
+        });
+      } catch { /* API failed — quiz still works locally */ }
+    }
+  }, [user]);
 
   const handleSetupSelect = (mode: Exclude<LookingMode, null>, have: number, need: number) => {
     setMyMode(mode);
     setSetupDone(true);
     const defaultTab = mode === "solo" ? "groups" : "individuals";
     setTab(defaultTab as "groups" | "individuals");
-    // Persist the completed profile
     saveProfile({ tags: myTags, budget: myBudget, moveIn: "", genderHousing: "", mode, defaultTab: defaultTab as "groups" | "individuals" });
   };
 
@@ -540,6 +683,8 @@ export default function RoommatesPage() {
     setMyBudget([500, 650]);
     setTab("groups");
     setActiveFilter("all");
+    setApiGroups(null);
+    setApiIndividuals(null);
   };
 
   const groupsWithCompat = useMemo(() => {
@@ -559,9 +704,10 @@ export default function RoommatesPage() {
   }, [hasProfile, myTags, myBudget, activeFilter, visibleGroups]);
 
   const individualsWithCompat = useMemo(() => {
+    if (apiIndividuals && apiIndividuals.length > 0) return apiIndividuals;
     if (!hasProfile) return MOCK_PROFILES;
     return MOCK_PROFILES.map((p) => ({ ...p, compatibility: computeCompatibility(myTags, p.tags, myBudget, p.budget) })).sort((a, b) => (b.compatibility ?? 0) - (a.compatibility ?? 0));
-  }, [hasProfile, myTags, myBudget]);
+  }, [hasProfile, myTags, myBudget, apiIndividuals]);
 
   /* ── Loading while hydrating from localStorage ── */
   if (!hydrated) {

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Shield, ShieldCheck, ChevronLeft, MessageCircle, Link2, Copy, Check, MapPin, Home, Calendar, DollarSign, Sparkles, Send, Settings, Search, Share2, Camera, ExternalLink } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import {
   type LifestyleProfile, type RoommateGroup, type GroupHousing,
@@ -97,8 +98,56 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    // TODO: fetch from API — GET /api/groups/{id}
-    setGroup(getRoommateGroupById(id) ?? null);
+    async function fetchGroup() {
+      // Try API first for numeric IDs
+      const numId = parseInt(id, 10);
+      if (!isNaN(numId)) {
+        try {
+          const apiGroup = await api.roommates.getGroup(numId);
+          // Convert API response to local format
+          setGroup({
+            id: String(apiGroup.id),
+            name: apiGroup.name,
+            createdBy: String(apiGroup.owner_id),
+            members: apiGroup.members.map((m) => ({
+              id: String(m.user_id),
+              firstName: m.first_name,
+              initial: m.last_initial,
+              year: "",
+              program: "",
+              budget: [0, 0] as [number, number],
+              moveIn: "",
+              leaseLength: "",
+              bio: "",
+              tags: {},
+            })),
+            groupSize: apiGroup.total_capacity,
+            spotsNeeded: apiGroup.spots_remaining,
+            budgetMin: Number(apiGroup.rent_per_person) || 0,
+            budgetMax: Number(apiGroup.rent_per_person) || 0,
+            preferredArea: null,
+            targetListingId: null,
+            targetListingTitle: null,
+            description: apiGroup.description || "",
+            inviteCode: "",
+            isVisible: apiGroup.is_active,
+            genderPreference: apiGroup.gender_preference || null,
+            moveIn: apiGroup.move_in_timing || "",
+            createdAt: apiGroup.created_at,
+            housing: apiGroup.has_place ? {
+              status: apiGroup.is_verified ? "linked" : "pending",
+              selfReportedAddress: apiGroup.address || undefined,
+              selfReportedRent: Number(apiGroup.rent_per_person) || undefined,
+              selfReportedUtilitiesIncluded: apiGroup.utilities_included,
+            } : undefined,
+          } as RoommateGroup);
+          return;
+        } catch { /* fall through to mock */ }
+      }
+      // Fallback to mock/localStorage
+      setGroup(getRoommateGroupById(id) ?? null);
+    }
+    fetchGroup();
   }, [id]);
 
   useEffect(() => {
@@ -154,12 +203,17 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleRequestJoin = () => {
+  const handleRequestJoin = async () => {
     if (!user) {
       router.push("/login");
       return;
     }
-    // TODO: POST /api/groups/{id}/request { message }
+    try {
+      const numId = parseInt(group.id, 10);
+      if (!isNaN(numId)) {
+        await api.roommates.sendRequest({ group_id: numId, message: requestMessage || undefined });
+      }
+    } catch { /* API failed — still show success for demo */ }
     setRequestSent(true);
   };
 

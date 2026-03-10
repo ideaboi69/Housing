@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ChevronLeft, Users, Copy, Check, Link2, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 import {
   type LifestyleProfile,
   type RoommateGroup,
@@ -73,18 +74,54 @@ export default function CreateGroupPage() {
     setTimeout(() => setter(false), 2000);
   };
 
-  const handleCreate = () => {
-    // TODO: POST /api/groups { name, group_size, rent_per_person, move_in, address, gender_preference, description, is_visible }
+  const handleCreate = async () => {
     if (!user) return;
     if (existingGroup) return;
 
     const code = name.replace(/[^a-zA-Z]/g, "").slice(0, 4).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
-    const groupId = `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    const members = Array.from({ length: haveCount }, (_, index) => buildMember(index));
     const landlordUrl = buildLandlordSignupUrl(code);
 
+    // Try API first
+    try {
+      const moveInToEnum = (m: string) => {
+        if (m.includes("Fall")) return "fall_2026";
+        if (m.includes("Winter")) return "winter_2027";
+        if (m.includes("Summer")) return "summer_2026";
+        return "flexible";
+      };
+      const genderToEnum = (g: string) => {
+        if (g.includes("Mixed")) return "mixed_gender";
+        if (g.includes("Same")) return "same_gender";
+        return "no_preference";
+      };
+
+      const apiGroup = await api.roommates.createGroup({
+        name: name.trim(),
+        description: description.trim(),
+        current_size: haveCount,
+        spots_needed: spotsNeeded,
+        rent_per_person: rentPerPerson,
+        utilities_included: utilitiesIncluded,
+        move_in_timing: moveInToEnum(moveIn),
+        gender_preference: genderToEnum(gender),
+        has_place: address.trim().length > 0,
+        address: address.trim() || undefined,
+      });
+
+      setCreatedGroupId(String(apiGroup.id));
+      setInviteCode(code);
+      setLandlordInviteUrl(landlordUrl);
+      setCreated(true);
+    } catch {
+      // API failed — fall back to localStorage
+    }
+
+    // Always save locally as cache/fallback
+    const groupId = `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const members = Array.from({ length: haveCount }, (_, index) => buildMember(index));
+
     const group: RoommateGroup = {
-      id: groupId,
+      id: createdGroupId || groupId,
       name: name.trim(),
       createdBy: ownerKey || `${user.id}-member-1`,
       members,
@@ -112,7 +149,7 @@ export default function CreateGroupPage() {
     };
 
     upsertStoredRoommateGroup(group);
-    setCreatedGroupId(groupId);
+    if (!createdGroupId) setCreatedGroupId(groupId);
     setInviteCode(code);
     setLandlordInviteUrl(landlordUrl);
     setCreated(true);

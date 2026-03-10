@@ -3,41 +3,38 @@
 import { useState, useEffect } from "react";
 import { X, Calendar, Clock, Check, Loader2, CalendarDays, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { api } from "@/lib/api";
 
 /* ────────────────────────────────────────────────────────
-   Types — matches ShowingsManager types
+   Types
    ──────────────────────────────────────────────────────── */
 
 interface ShowingSlot {
-  id: string;
+  id: string | number;
   listing_id: number;
   date: string;
   start_time: string;
   end_time: string;
-  booked_by?: {
-    student_id: number;
-    student_name: string;
-  } | null;
+  status: string;
 }
 
 /* ────────────────────────────────────────────────────────
-   Mock data — remove once backend is wired
+   Mock data — fallback when backend is not connected
    ──────────────────────────────────────────────────────── */
 
 function getMockSlots(listingId: number): ShowingSlot[] {
-  // Generate some demo slots for the next few days
   const today = new Date();
   const slots: ShowingSlot[] = [];
 
   for (let d = 1; d <= 5; d++) {
     const date = new Date(today);
     date.setDate(date.getDate() + d);
-    if (date.getDay() === 0) continue; // skip Sundays
+    if (date.getDay() === 0) continue;
 
     const dateStr = date.toISOString().split("T")[0];
     const times = d % 2 === 0
-      ? [["10:00", "10:30"], ["10:30", "11:00"], ["14:00", "14:30"], ["14:30", "15:00"]]
-      : [["11:00", "11:30"], ["13:00", "13:30"], ["15:00", "15:30"]];
+      ? [["10:00", "11:00"], ["11:00", "12:00"], ["14:00", "15:00"], ["15:00", "16:00"]]
+      : [["11:00", "12:00"], ["13:00", "14:00"], ["15:00", "16:00"]];
 
     times.forEach(([start, end], i) => {
       slots.push({
@@ -46,7 +43,7 @@ function getMockSlots(listingId: number): ShowingSlot[] {
         date: dateStr,
         start_time: start,
         end_time: end,
-        booked_by: (d === 2 && i === 0) ? { student_id: 99, student_name: "Already Booked" } : null,
+        status: (d === 2 && i === 0) ? "booked" : "available",
       });
     });
   }
@@ -68,22 +65,19 @@ interface BookShowingModalProps {
 export function BookShowingModal({ listingId, listingTitle, landlordName, onClose }: BookShowingModalProps) {
   const [loading, setLoading] = useState(true);
   const [slots, setSlots] = useState<ShowingSlot[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<string | number | null>(null);
   const [booking, setBooking] = useState(false);
   const [booked, setBooked] = useState(false);
 
   useEffect(() => {
     async function fetchSlots() {
       try {
-        // TODO: GET /api/showings?listing_id={listingId}
-        // const res = await api.showings.getForListing(listingId);
-        // setSlots(res);
-
-        // Mock for now
+        const res = await api.viewings.getAvailableSlots(listingId);
+        setSlots(res.map((s) => ({ ...s, id: s.id, listing_id: listingId })));
+      } catch {
+        // Fallback to mock data
         await new Promise((r) => setTimeout(r, 400));
         setSlots(getMockSlots(listingId));
-      } catch {
-        setSlots([]);
       } finally {
         setLoading(false);
       }
@@ -96,15 +90,20 @@ export function BookShowingModal({ listingId, listingTitle, landlordName, onClos
     setBooking(true);
 
     try {
-      // TODO: POST /api/showings/{slotId}/book
-      await new Promise((r) => setTimeout(r, 600));
+      const slotId = Number(selectedSlot);
+      if (!isNaN(slotId)) {
+        await api.viewings.bookSlot({ slot_id: slotId });
+      } else {
+        // Mock slot (string id) — simulate booking
+        await new Promise((r) => setTimeout(r, 600));
+      }
       setBooked(true);
     } catch { /* fail */ }
     finally { setBooking(false); }
   };
 
   // Only show available (unbooked) slots
-  const availableSlots = slots.filter((s) => !s.booked_by);
+  const availableSlots = slots.filter((s) => s.status === "available");
 
   // Group by date
   const grouped = availableSlots.reduce<Record<string, ShowingSlot[]>>((acc, slot) => {
