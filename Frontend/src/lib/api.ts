@@ -52,6 +52,12 @@ import type {
   ViewingSlotResponse,
   ViewingBookingResponse,
   ViewingBookingCreate,
+  // Admin
+  AdminStatsResponse,
+  AdminUserResponse,
+  AdminLandlordResponse,
+  AdminListingResponse,
+  AdminFlagResponse,
 } from "@/types";
 
 // ── Base ────────────────────────────────────────────────
@@ -694,6 +700,64 @@ export const viewings = {
     request<ViewingBookingResponse[]>("/api/viewings/bookings/landlord/upcoming"),
 };
 
+// ── Admin ──────────────────────────────────────────────
+
+export const admin = {
+  login: (data: { username: string; password: string }) => {
+    const formData = new URLSearchParams();
+    formData.append("username", data.username);
+    formData.append("password", data.password);
+    return request<{ access_token: string; token_type: string; admin: { id: number; email: string; first_name: string; last_name: string; is_active: boolean } }>("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData.toString(),
+    });
+  },
+
+  getStats: () => request<AdminStatsResponse>("/api/admin/stats"),
+
+  // Users
+  getUsers: () => request<AdminUserResponse[]>("/api/admin/users"),
+  getUser: (id: number) => request<AdminUserResponse>(`/api/admin/users/${id}`),
+  verifyUser: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/verify`, { method: "PATCH" }),
+  deleteUser: (id: number) => request<null>(`/api/admin/users/${id}`, { method: "DELETE" }),
+  grantWrite: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/grant-write`, { method: "PATCH" }),
+  rejectWrite: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/reject-write`, { method: "PATCH" }),
+  revokeWrite: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/revoke-write`, { method: "PATCH" }),
+  getPendingWriters: () => request<AdminUserResponse[]>("/api/admin/users/pending-writers"),
+
+  // Landlords
+  getLandlords: () => request<AdminLandlordResponse[]>("/api/admin/landlords"),
+  getLandlord: (id: number) => request<AdminLandlordResponse>(`/api/admin/landlords/${id}`),
+  verifyLandlord: (id: number) => request<{ message: string }>(`/api/admin/landlords/${id}/verify`, { method: "PATCH" }),
+  unverifyLandlord: (id: number) => request<{ message: string }>(`/api/admin/landlords/${id}/unverify`, { method: "PATCH" }),
+  deleteLandlord: (id: number) => request<null>(`/api/admin/landlords/${id}`, { method: "DELETE" }),
+
+  // Listings
+  getListings: () => request<AdminListingResponse[]>("/api/admin/listings"),
+  deleteListing: (id: number) => request<null>(`/api/admin/listings/${id}`, { method: "DELETE" }),
+
+  // Reviews
+  deleteReview: (id: number) => request<null>(`/api/admin/reviews/${id}`, { method: "DELETE" }),
+
+  // Flags
+  getFlags: () => request<AdminFlagResponse[]>("/api/admin/flags"),
+  resolveFlag: (id: number) => request<{ message: string }>(`/api/admin/flags/${id}/resolve`, { method: "PATCH" }),
+  dismissFlag: (id: number) => request<{ message: string }>(`/api/admin/flags/${id}/dismiss`, { method: "PATCH" }),
+
+  // Writers
+  getWriters: () => request<WriterResponse[]>("/api/admin/writers"),
+  getPendingWriterApps: () => request<WriterResponse[]>("/api/admin/writers/pending"),
+  approveWriter: (id: number) => request<{ message: string }>(`/api/admin/writers/${id}/approve`, { method: "PATCH" }),
+  rejectWriter: (id: number) => request<{ message: string }>(`/api/admin/writers/${id}/reject`, { method: "PATCH" }),
+  revokeWriter: (id: number) => request<{ message: string }>(`/api/admin/writers/${id}/revoke`, { method: "PATCH" }),
+  deleteWriter: (id: number) => request<null>(`/api/admin/writers/${id}`, { method: "DELETE" }),
+
+  // Posts
+  getPosts: () => request<PostListResponse[]>("/api/admin/posts"),
+  deletePost: (id: number) => request<null>(`/api/admin/posts/${id}`, { method: "DELETE" }),
+};
+
 // ── Export all as a single API object ───────────────────
 
 export const api = {
@@ -710,6 +774,7 @@ export const api = {
   messages,
   roommates,
   viewings,
+  admin,
 };
 
 export { ApiError };

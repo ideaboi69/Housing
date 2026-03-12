@@ -795,3 +795,58 @@ export interface RoommateRequestResponse {
   compatibility_score: number;
   created_at: string;
 }
+
+// ── Admin Types ───────────────────────────────────────
+
+export interface AdminStatsResponse {
+  total_users: number;
+  total_landlords: number;
+  total_properties: number;
+  total_listings: number;
+  total_reviews: number;
+  total_flags_pending: number;
+}
+
+export interface AdminUserResponse {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  email_verified: boolean;
+  is_writable?: boolean;
+  write_access_requested?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminLandlordResponse {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  company_name?: string;
+  phone?: string;
+  identity_verified: boolean;
+}
+
+export interface AdminListingResponse {
+  id: number;
+  property_id: number;
+  rent_per_room: number;
+  rent_total: number;
+  lease_type: string;
+  status: string;
+  is_sublet: boolean;
+  created_at: string;
+}
+
+export interface AdminFlagResponse {
+  id: number;
+  reporter_id: number;
+  listing_id?: number;
+  review_id?: number;
+  reason: string;
+  status: string;
+  created_at: string;
+}

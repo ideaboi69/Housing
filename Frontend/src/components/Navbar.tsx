@@ -86,7 +86,7 @@ export function Navbar() {
   }, [pathname]);
 
   // Hide navbar on auth pages and landing page — must be after all hooks
-  const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding"];
+  const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding", "/admin"];
   if (pathname === "/" || hideNavPaths.some((p) => pathname.startsWith(p))) {
     return null;
   }
