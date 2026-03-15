@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Menu, X, Settings, Bookmark, Heart, LogOut, ChevronDown,
-  User, Shield, LayoutDashboard, MessageCircle,
+  User, Shield, LayoutDashboard, MessageCircle, ShoppingBag,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 const navItems = [
   { label: "Browse", path: "/browse" },
   { label: "Sublets", path: "/sublets" },
+  { label: "Marketplace", path: "/marketplace" },
   { label: "Roommates", path: "/roommates" },
   { label: "The Bubble", path: "/the-bubble" },
 ];
@@ -100,6 +101,7 @@ export function Navbar() {
     : [
         { label: "Messages", href: "/messages", icon: MessageCircle },
         { label: "Saved Listings", href: "/saved", icon: Bookmark },
+        { label: "Your Listings", href: "/marketplace/my", icon: ShoppingBag },
         { label: "My Group", href: "/roommates", icon: Heart },
         { label: "Settings", href: "/settings", icon: Settings },
       ];

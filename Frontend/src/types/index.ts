@@ -850,3 +850,87 @@ export interface AdminFlagResponse {
   status: string;
   created_at: string;
 }
+
+// ── Marketplace Types ─────────────────────────────────
+
+export type MarketplaceCategory = "furniture" | "appliances" | "kitchenware" | "electronics" | "decor" | "cleaning" | "storage" | "lighting" | "bedding" | "bathroom" | "other";
+export type ItemCondition = "new" | "like_new" | "good" | "fair" | "poor";
+export type ItemStatus = "draft" | "available" | "sold" | "reserved" | "removed";
+export type PricingType = "free" | "fixed" | "negotiable";
+
+export interface MarketplaceImageResponse {
+  id: number;
+  image_url: string;
+  is_primary: boolean;
+}
+
+export interface MarketplaceItemResponse {
+  id: number;
+  seller_id: number;
+  seller_name: string;
+  title: string;
+  description?: string;
+  category: MarketplaceCategory;
+  condition: ItemCondition;
+  pricing_type: PricingType;
+  price?: number;
+  pickup_location: string;
+  pickup_notes?: string;
+  status: ItemStatus;
+  view_count: number;
+  images: MarketplaceImageResponse[];
+  primary_image?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarketplaceItemListResponse {
+  id: number;
+  title: string;
+  category: MarketplaceCategory;
+  condition: ItemCondition;
+  pricing_type: PricingType;
+  price?: number;
+  status: ItemStatus;
+  seller_name: string;
+  primary_image?: string;
+  view_count: number;
+  created_at: string;
+}
+
+export interface MarketplaceItemCreate {
+  title: string;
+  description?: string;
+  category: MarketplaceCategory;
+  condition: ItemCondition;
+  pricing_type: PricingType;
+  price?: number;
+  pickup_location: string;
+  pickup_notes?: string;
+}
+
+export interface MarketplaceItemUpdate {
+  title?: string;
+  description?: string;
+  category?: MarketplaceCategory;
+  condition?: ItemCondition;
+  pricing_type?: PricingType;
+  price?: number;
+  pickup_location?: string;
+  pickup_notes?: string;
+  status?: ItemStatus;
+}
+
+export interface MarketplaceConversationResponse {
+  id: number;
+  item_id: number;
+  item_title: string;
+  buyer_id: number;
+  buyer_name: string;
+  seller_id: number;
+  seller_name: string;
+  last_message?: { id: number; content: string; sender_id: number; is_read: boolean; created_at: string };
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+}

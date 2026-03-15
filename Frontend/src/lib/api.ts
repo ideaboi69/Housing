@@ -58,6 +58,13 @@ import type {
   AdminLandlordResponse,
   AdminListingResponse,
   AdminFlagResponse,
+  // Marketplace
+  MarketplaceItemResponse,
+  MarketplaceItemListResponse,
+  MarketplaceItemCreate,
+  MarketplaceItemUpdate,
+  MarketplaceImageResponse,
+  MarketplaceConversationResponse,
 } from "@/types";
 
 // ── Base ────────────────────────────────────────────────
@@ -758,6 +765,87 @@ export const admin = {
   deletePost: (id: number) => request<null>(`/api/admin/posts/${id}`, { method: "DELETE" }),
 };
 
+// ── Marketplace ────────────────────────────────────────
+
+export const marketplace = {
+  getItems: (filters?: { category?: string; condition?: string; pricing_type?: string; min_price?: number; max_price?: number; search?: string }) =>
+    request<MarketplaceItemListResponse[]>(`/api/marketplace/items${toQueryString(filters || {})}`),
+
+  getItem: (id: number) =>
+    request<MarketplaceItemResponse>(`/api/marketplace/items/${id}`),
+
+  createItem: (data: MarketplaceItemCreate) =>
+    request<MarketplaceItemResponse>("/api/marketplace/items", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateItem: (id: number, data: MarketplaceItemUpdate) =>
+    request<MarketplaceItemResponse>(`/api/marketplace/items/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteItem: (id: number) =>
+    request<null>(`/api/marketplace/items/${id}`, { method: "DELETE" }),
+
+  markSold: (id: number) =>
+    request<MarketplaceItemResponse>(`/api/marketplace/items/${id}/sold`, { method: "PATCH" }),
+
+  publishItem: (id: number) =>
+    request<MarketplaceItemResponse>(`/api/marketplace/items/${id}/publish`, { method: "PATCH" }),
+
+  unpublishItem: (id: number) =>
+    request<MarketplaceItemResponse>(`/api/marketplace/items/${id}/unpublish`, { method: "PATCH" }),
+
+  getMyItems: () =>
+    request<MarketplaceItemListResponse[]>("/api/marketplace/my/items"),
+
+  getMyDrafts: () =>
+    request<MarketplaceItemListResponse[]>("/api/marketplace/drafts/my"),
+
+  uploadImages: async (itemId: number, files: File[]) => {
+    const token = getToken();
+    const formData = new FormData();
+    files.forEach((f) => formData.append("files", f));
+    const res = await fetch(
+      `${API_URL}/api/marketplace/items/${itemId}/images`,
+      {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new ApiError(res.status, body.detail || "Upload failed");
+    }
+    return res.json() as Promise<MarketplaceImageResponse[]>;
+  },
+
+  deleteImage: (itemId: number, imageId: number) =>
+    request<null>(`/api/marketplace/items/${itemId}/images/${imageId}`, { method: "DELETE" }),
+
+  // Conversations
+  startConversation: (data: { item_id: number; content: string }) =>
+    request<unknown>("/api/marketplace/conversations/start", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  sendMessage: (conversationId: number, data: { content: string }) =>
+    request<unknown>(`/api/marketplace/conversations/${conversationId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getConversations: () =>
+    request<MarketplaceConversationResponse[]>("/api/marketplace/conversations"),
+
+  getUnreadCount: () =>
+    request<{ unread_count: number }>("/api/marketplace/unread-count"),
+};
+
 // ── Export all as a single API object ───────────────────
 
 export const api = {
@@ -775,6 +863,7 @@ export const api = {
   roommates,
   viewings,
   admin,
+  marketplace,
 };
 
 export { ApiError };
