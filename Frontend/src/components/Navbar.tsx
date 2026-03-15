@@ -45,6 +45,7 @@ export function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
+  const failCount = useRef(0);
 
   const isLandlord = user?.role === "landlord";
 
@@ -52,33 +53,36 @@ export function Navbar() {
     ? [{ label: "Dashboard", path: "/landlord" }, ...navItems]
     : navItems;
 
-  // Poll unread message count
+  // Poll unread message count — stops after 5 consecutive failures to avoid hammering a down API
   const fetchUnread = useCallback(async () => {
     if (!user) return;
     try {
       const data = await api.messages.getUnreadCount();
       setUnreadCount(data.unread_count);
+      failCount.current = 0;
     } catch {
-      // silently fail
+      failCount.current = Math.min(failCount.current + 1, 5);
     }
   }, [user]);
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(fetchUnread, 15000);
+    const interval = setInterval(() => {
+      if (failCount.current < 5) fetchUnread();
+    }, 15000);
     return () => clearInterval(interval);
   }, [fetchUnread]);
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click — listener always active, avoids add/remove churn
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
       }
     }
-    if (dropdownOpen) document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [dropdownOpen]);
+  }, []);
 
   // Close dropdown on route change
   useEffect(() => {

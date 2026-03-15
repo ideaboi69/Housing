@@ -107,16 +107,16 @@ export default function BrowsePage() {
       if (data && data.length > 0) {
         setListings(data);
         setUseMock(false);
-        // Fetch Cribb Scores
-        const scores: Record<number, number> = {};
-        await Promise.allSettled(
-          data.map(async (l) => {
-            try {
-              const hs = await api.healthScores.get(l.id);
-              if (hs?.overall_score) scores[l.id] = hs.overall_score;
-            } catch { /* not computed */ }
-          })
+        // Fetch Cribb Scores — allSettled already handles rejections, no inner try-catch needed
+        const scoreResults = await Promise.allSettled(
+          data.map((l) => api.healthScores.get(l.id))
         );
+        const scores: Record<number, number> = {};
+        scoreResults.forEach((result, i) => {
+          if (result.status === "fulfilled" && result.value?.overall_score) {
+            scores[data[i].id] = result.value.overall_score;
+          }
+        });
         setHealthScores(scores);
       } else {
         setListings(mockListings);

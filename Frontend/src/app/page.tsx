@@ -194,7 +194,7 @@ export default function HomePage() {
                       "https://images.unsplash.com/photo-1579632151052-92f741fb9b79?w=400&h=350&fit=crop",
                     ].map((url, i) => (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img key={`c1-${i}`} src={url} alt="" className="w-full rounded-xl object-cover" style={{ height: i % 2 === 0 ? "200px" : "240px" }} />
+                      <img key={`c1-${url}-${i}`} src={url} alt="" className="w-full rounded-xl object-cover" style={{ height: i % 2 === 0 ? "200px" : "240px" }} />
                     ))}
                   </div>
                   {/* Column 2 — scrolls down */}
@@ -208,7 +208,7 @@ export default function HomePage() {
                       "https://images.unsplash.com/photo-1760119097393-e022c73027d1?w=400&h=320&fit=crop",
                     ].map((url, i) => (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img key={`c2-${i}`} src={url} alt="" className="w-full rounded-xl object-cover" style={{ height: i % 2 === 0 ? "230px" : "190px" }} />
+                      <img key={`c2-${url}-${i}`} src={url} alt="" className="w-full rounded-xl object-cover" style={{ height: i % 2 === 0 ? "230px" : "190px" }} />
                     ))}
                   </div>
                   {/* Column 3 — scrolls up slower */}
@@ -222,7 +222,7 @@ export default function HomePage() {
                       "https://images.unsplash.com/photo-1554995207-c18c203602cb?w=400&h=280&fit=crop",
                     ].map((url, i) => (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img key={`c3-${i}`} src={url} alt="" className="w-full rounded-xl object-cover" style={{ height: i % 2 === 0 ? "210px" : "250px" }} />
+                      <img key={`c3-${url}-${i}`} src={url} alt="" className="w-full rounded-xl object-cover" style={{ height: i % 2 === 0 ? "210px" : "250px" }} />
                     ))}
                   </div>
                 </div>

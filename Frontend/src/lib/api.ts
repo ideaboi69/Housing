@@ -505,18 +505,24 @@ export const messages = {
     }),
 
   // Send message in existing conversation (student)
-  sendMessage: (conversationId: number, data: MessageCreate) =>
-    request<MessageResponse>(`/api/messages/conversations/${conversationId}`, {
+  sendMessage: (conversationId: number, data: MessageCreate) => {
+    if (!data.content?.trim()) throw new Error("Message content cannot be empty");
+    if (data.content.length > 5000) throw new Error("Message exceeds 5000 characters");
+    return request<MessageResponse>(`/api/messages/conversations/${conversationId}`, {
       method: "POST",
       body: JSON.stringify(data),
-    }),
+    });
+  },
 
   // Landlord replies
-  landlordReply: (conversationId: number, data: MessageCreate) =>
-    request<MessageResponse>(`/api/messages/landlord/conversations/${conversationId}`, {
+  landlordReply: (conversationId: number, data: MessageCreate) => {
+    if (!data.content?.trim()) throw new Error("Message content cannot be empty");
+    if (data.content.length > 5000) throw new Error("Message exceeds 5000 characters");
+    return request<MessageResponse>(`/api/messages/landlord/conversations/${conversationId}`, {
       method: "POST",
       body: JSON.stringify(data),
-    }),
+    });
+  },
 
   // Get all conversations (student)
   getConversations: () =>

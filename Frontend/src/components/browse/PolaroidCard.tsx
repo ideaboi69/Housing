@@ -70,8 +70,9 @@ export function PolaroidCard({
   if (listing.utilities_included) tags.push("Utilities Incl.");
 
   /* ── Format move-in date for display ────────────── */
-  const moveInLabel = listing.move_in_date
-    ? new Date(listing.move_in_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  const moveInDate = listing.move_in_date ? new Date(listing.move_in_date) : null;
+  const moveInLabel = moveInDate && !isNaN(moveInDate.getTime())
+    ? moveInDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
     : null;
 
   /* ── Lease type short label ─────────────────────── */

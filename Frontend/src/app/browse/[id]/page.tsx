@@ -148,6 +148,8 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const listingId = parseInt(id, 10);
   const router = useRouter();
 
+  const isInvalidId = isNaN(listingId) || listingId <= 0;
+
   const [listing, setListing] = useState<ListingDetailResponse | null>(null);
   const [healthScore, setHealthScore] = useState<HealthScoreResponse | null>(null);
   const [reviews, setReviews] = useState<ReviewResponse[]>([]);
@@ -179,6 +181,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
 
   // Fetch listing — backend first, mock fallback
   useEffect(() => {
+    if (isInvalidId) {
+      setError("Invalid listing ID");
+      setIsLoading(false);
+      return;
+    }
+
     async function load() {
       setIsLoading(true);
       let usedMock = false;
@@ -221,7 +229,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       }
     }
     load();
-  }, [listingId]);
+  }, [listingId, isInvalidId]);
 
   const handleContact = async () => {
     if (contactSending || contactSent) return;

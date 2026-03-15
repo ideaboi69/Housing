@@ -90,18 +90,16 @@ export const useSavedStore = create<SavedState>((set, get) => ({
 
     const wasSaved = savedIds.has(listingId);
 
-    // Optimistic update
-    const nextSaved = new Set(savedIds);
-    const nextToggling = new Set(togglingIds);
-    nextToggling.add(listingId);
-
-    if (wasSaved) {
-      nextSaved.delete(listingId);
-    } else {
-      nextSaved.add(listingId);
-    }
-    persistSavedIds(nextSaved);
-    set({ savedIds: nextSaved, togglingIds: nextToggling });
+    // Optimistic update — use functional set to avoid race conditions when
+    // multiple listings are toggled concurrently
+    set((state) => {
+      const nextSaved = new Set(state.savedIds);
+      if (wasSaved) nextSaved.delete(listingId); else nextSaved.add(listingId);
+      const nextToggling = new Set(state.togglingIds);
+      nextToggling.add(listingId);
+      persistSavedIds(nextSaved);
+      return { savedIds: nextSaved, togglingIds: nextToggling };
+    });
 
     try {
       if (wasSaved) {
@@ -112,22 +110,22 @@ export const useSavedStore = create<SavedState>((set, get) => ({
     } catch (err) {
       // Only revert on auth errors — keep optimistic state for network/backend failures
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        const revertSaved = new Set(get().savedIds);
-        if (wasSaved) {
-          revertSaved.add(listingId);
-        } else {
-          revertSaved.delete(listingId);
-        }
-        persistSavedIds(revertSaved);
-        set({ savedIds: revertSaved });
+        set((state) => {
+          const revertSaved = new Set(state.savedIds);
+          if (wasSaved) revertSaved.add(listingId); else revertSaved.delete(listingId);
+          persistSavedIds(revertSaved);
+          return { savedIds: revertSaved };
+        });
         throw new Error("auth_required");
       }
       // For other errors (network, backend down), keep the optimistic state
       // so the UI still works in dev/mock mode
     } finally {
-      const doneToggling = new Set(get().togglingIds);
-      doneToggling.delete(listingId);
-      set({ togglingIds: doneToggling });
+      set((state) => {
+        const doneToggling = new Set(state.togglingIds);
+        doneToggling.delete(listingId);
+        return { togglingIds: doneToggling };
+      });
     }
   },
 

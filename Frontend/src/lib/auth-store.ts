@@ -33,13 +33,14 @@ const LANDLORD_CACHE_KEY = "cribb_landlord_profile";
 
 function cacheLandlordProfile(profile: UserResponse) {
   try {
-    localStorage.setItem(LANDLORD_CACHE_KEY, JSON.stringify(profile));
+    // Use sessionStorage so PII is cleared when the browser session ends
+    sessionStorage.setItem(LANDLORD_CACHE_KEY, JSON.stringify(profile));
   } catch { /* ignore */ }
 }
 
 function getCachedLandlordProfile(): UserResponse | null {
   try {
-    const raw = localStorage.getItem(LANDLORD_CACHE_KEY);
+    const raw = sessionStorage.getItem(LANDLORD_CACHE_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -49,7 +50,7 @@ function getCachedLandlordProfile(): UserResponse | null {
 
 function clearLandlordCache() {
   try {
-    localStorage.removeItem(LANDLORD_CACHE_KEY);
+    sessionStorage.removeItem(LANDLORD_CACHE_KEY);
   } catch { /* ignore */ }
 }
 

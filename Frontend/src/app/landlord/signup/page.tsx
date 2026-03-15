@@ -40,11 +40,15 @@ function StepIndicator({ current }: { current: number }) {
    File upload component — navy theme
    ════════════════════════════════════════════════════════ */
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+
 function FileUploadBox({
-  label, description, accepted, file, onSelect, onRemove,
+  label, description, accepted, file, onSelect, onRemove, onError,
 }: {
   label: string; description: string; accepted: string;
   file: File | null; onSelect: (file: File) => void; onRemove: () => void;
+  onError?: (msg: string) => void;
 }) {
   return (
     <div className="space-y-2">
@@ -67,7 +71,13 @@ function FileUploadBox({
           <Upload className="w-6 h-6 text-[#1B2D45]/20" />
           <span className="text-[#1B2D45]/40" style={{ fontSize: "12px", fontWeight: 500 }}>Click to upload or drag and drop</span>
           <span className="text-[#1B2D45]/20" style={{ fontSize: "10px" }}>PDF, JPG, PNG up to 10MB</span>
-          <input type="file" accept={accepted} className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onSelect(f); }} />
+          <input type="file" accept={accepted} className="hidden" onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            if (f.size > MAX_FILE_SIZE) { onError?.("File must be smaller than 10 MB"); e.target.value = ""; return; }
+            if (!ALLOWED_MIME_TYPES.includes(f.type)) { onError?.("Only PDF, JPG, and PNG files are accepted"); e.target.value = ""; return; }
+            onSelect(f);
+          }} />
         </label>
       )}
     </div>
@@ -125,6 +135,12 @@ export default function LandlordSignupPage() {
   async function handleSubmit() {
     if (!govId) { setError("Government ID is required for verification"); return; }
     if (!proofOfOwnership) { setError("Proof of property ownership is required"); return; }
+    if (govId.size > MAX_FILE_SIZE || !ALLOWED_MIME_TYPES.includes(govId.type)) {
+      setError("Government ID must be a PDF, JPG, or PNG under 10 MB"); return;
+    }
+    if (proofOfOwnership.size > MAX_FILE_SIZE || !ALLOWED_MIME_TYPES.includes(proofOfOwnership.type)) {
+      setError("Proof of ownership must be a PDF, JPG, or PNG under 10 MB"); return;
+    }
     setIsLoading(true);
     setError("");
 
@@ -325,7 +341,7 @@ export default function LandlordSignupPage() {
                 </p>
               </div>
 
-              <FileUploadBox label="Government-issued ID *" description="Driver's license, passport, or provincial ID card. Must show your name clearly." accepted=".pdf,.jpg,.jpeg,.png" file={govId} onSelect={setGovId} onRemove={() => setGovId(null)} />
+              <FileUploadBox label="Government-issued ID *" description="Driver's license, passport, or provincial ID card. Must show your name clearly." accepted=".pdf,.jpg,.jpeg,.png" file={govId} onSelect={setGovId} onRemove={() => setGovId(null)} onError={setError} />
 
               <div>
                 <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>ID Type *</label>
@@ -344,7 +360,7 @@ export default function LandlordSignupPage() {
                 </div>
               </div>
 
-              <FileUploadBox label="Proof of property ownership *" description="Property tax bill, utility bill in your name at the property address, mortgage statement, or property management license." accepted=".pdf,.jpg,.jpeg,.png" file={proofOfOwnership} onSelect={setProofOfOwnership} onRemove={() => setProofOfOwnership(null)} />
+              <FileUploadBox label="Proof of property ownership *" description="Property tax bill, utility bill in your name at the property address, mortgage statement, or property management license." accepted=".pdf,.jpg,.jpeg,.png" file={proofOfOwnership} onSelect={setProofOfOwnership} onRemove={() => setProofOfOwnership(null)} onError={setError} />
 
               <div>
                 <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Document Type *</label>
