@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
+import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
 import type { PostListResponse, PostCategory as PostCategoryType } from "@/types";
 
@@ -585,7 +586,7 @@ function PostModal({ onClose }: { onClose: () => void }) {
     setSubmitting(true);
     setError("");
     try {
-      await api.posts.create({
+      const post = await api.posts.create({
         title,
         content: body,
         preview: body.slice(0, 160),
@@ -593,6 +594,12 @@ function PostModal({ onClose }: { onClose: () => void }) {
         event_date: eventDate || undefined,
         event_location: eventLocation || undefined,
       });
+      // Post is created as draft — publish it immediately
+      try {
+        await api.posts.publish(post.id);
+      } catch {
+        // Publish failed — post stays as draft, still close the modal
+      }
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Failed to create post.");
@@ -919,7 +926,27 @@ export default function TheBubblePage() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [showWriterModal, setShowWriterModal] = useState(false);
   const [isWriter, setIsWriter] = useState(false);
+  const [writerPending, setWriterPending] = useState(false);
+  const { user } = useAuthStore();
   const isMobile = useIsMobile();
+
+  // Check if user has write access (student with is_writable, or a writer token)
+  useEffect(() => {
+    if (!user) {
+      setIsWriter(false);
+      return;
+    }
+    // Check if user has student write access
+    if ((user as Record<string, unknown>).is_writable) {
+      setIsWriter(true);
+      return;
+    }
+    // Check if there's a writer token stored
+    try {
+      const writerToken = localStorage.getItem("cribb_writer_token");
+      if (writerToken) setIsWriter(true);
+    } catch {}
+  }, [user]);
 
   const filteredAndSorted = useMemo(() => {
     let posts = activeCategory === "all" ? [...POSTS] : POSTS.filter((p) => p.category === activeCategory);
@@ -941,7 +968,16 @@ export default function TheBubblePage() {
   }, [activeCategory, sortMode]);
 
   const handlePostClick = () => {
+    if (!user) {
+      // Could redirect to login, but for now just show writer modal
+      setShowWriterModal(true);
+      return;
+    }
     if (isWriter) setShowPostModal(true);
+    else if (writerPending) {
+      // Show a toast or message that their application is pending
+      import("sonner").then(({ toast }) => toast.info("Your writer application is being reviewed. We'll notify you once approved!"));
+    }
     else setShowWriterModal(true);
   };
 
@@ -1039,7 +1075,7 @@ export default function TheBubblePage() {
       </AnimatePresence>
       <AnimatePresence>
         {showWriterModal && (
-          <WriterModal onClose={() => setShowWriterModal(false)} onApproved={() => { setIsWriter(true); setShowWriterModal(false); }} />
+          <WriterModal onClose={() => setShowWriterModal(false)} onApproved={() => { setWriterPending(true); setShowWriterModal(false); }} />
         )}
       </AnimatePresence>
       </div>{/* end z-10 content wrapper */}

@@ -433,6 +433,20 @@ export const posts = {
   getMyPosts: () =>
     request<PostListResponse[]>("/api/posts/my/posts"),
 
+  getMyPublished: () =>
+    request<PostListResponse[]>("/api/posts/my/published"),
+
+  getMyArchived: () =>
+    request<PostListResponse[]>("/api/posts/my/archived"),
+
+  getMyStats: () =>
+    request<{ total_posts: number; published: number; drafts: number; archived: number; total_views: number; avg_views: number }>("/api/posts/my/stats"),
+
+  search: (q: string, category?: PostCategory) =>
+    request<PostListResponse[]>(
+      `/api/posts/search/posts?q=${encodeURIComponent(q)}${category ? `&category=${category}` : ""}`
+    ),
+
   create: (data: PostCreate) =>
     request<PostResponse>("/api/posts", {
       method: "POST",
@@ -447,6 +461,18 @@ export const posts = {
 
   delete: (id: number) =>
     request<null>(`/api/posts/${id}`, { method: "DELETE" }),
+
+  publish: (id: number) =>
+    request<PostResponse>(`/api/posts/${id}/publish`, { method: "PATCH" }),
+
+  unpublish: (id: number) =>
+    request<PostResponse>(`/api/posts/${id}/unpublish`, { method: "PATCH" }),
+
+  archive: (id: number) =>
+    request<PostResponse>(`/api/posts/${id}/archive`, { method: "PATCH" }),
+
+  unarchive: (id: number) =>
+    request<PostResponse>(`/api/posts/${id}/unarchive`, { method: "PATCH" }),
 
   uploadCoverImage: async (postId: number, file: File) => {
     const token = getToken();

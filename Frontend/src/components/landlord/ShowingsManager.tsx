@@ -1,32 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Plus, Calendar, Clock, Trash2, Loader2, Check, CalendarDays } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { api } from "@/lib/api";
 
 /* ────────────────────────────────────────────────────────
-   Types — will match backend schema once OJ builds it
+   Types
    ──────────────────────────────────────────────────────── */
 
 export interface ShowingSlot {
-  id: string;
+  id: string | number;
   listing_id: number;
-  date: string;        // "2026-05-15"
-  start_time: string;  // "14:00"
-  end_time: string;    // "14:30"
+  date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
   booked_by?: {
     student_id: number;
     student_name: string;
   } | null;
-}
-
-/* ────────────────────────────────────────────────────────
-   Mock data — remove once backend is wired
-   ──────────────────────────────────────────────────────── */
-
-function generateMockSlots(listingId: number): ShowingSlot[] {
-  // Start empty — landlord adds their own
-  return [];
 }
 
 /* ────────────────────────────────────────────────────────
@@ -40,66 +33,134 @@ interface ShowingsManagerProps {
 }
 
 export function ShowingsManager({ listingId, listingTitle, onClose }: ShowingsManagerProps) {
-  const [slots, setSlots] = useState<ShowingSlot[]>(generateMockSlots(listingId));
+  const [slots, setSlots] = useState<ShowingSlot[]>([]);
+  const [loading, setLoading] = useState(true);
   const [addingSlot, setAddingSlot] = useState(false);
   const [newDate, setNewDate] = useState("");
   const [newStart, setNewStart] = useState("10:00");
-  const [newEnd, setNewEnd] = useState("10:30");
+  const [newEnd, setNewEnd] = useState("11:00");
   const [saving, setSaving] = useState(false);
 
-  // Quick-add: generate 30-min slots for a full day
   const [bulkDate, setBulkDate] = useState("");
   const [showBulk, setShowBulk] = useState(false);
+
+  // Fetch existing availability/slots from API
+  useEffect(() => {
+    async function fetchSlots() {
+      try {
+        const availability = await api.viewings.getListingAvailability(listingId);
+        const allSlots: ShowingSlot[] = [];
+        for (const avail of availability) {
+          for (const slot of avail.slots) {
+            allSlots.push({
+              id: slot.id,
+              listing_id: listingId,
+              date: avail.date,
+              start_time: slot.start_time,
+              end_time: slot.end_time,
+              status: slot.status,
+              booked_by: slot.status === "booked" ? { student_id: 0, student_name: "Booked" } : null,
+            });
+          }
+        }
+        setSlots(allSlots);
+      } catch {
+        // API not available — start empty
+        setSlots([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSlots();
+  }, [listingId]);
 
   const handleAddSlot = async () => {
     if (!newDate || !newStart || !newEnd) return;
     setSaving(true);
 
-    // TODO: POST /api/showings with { listing_id, date, start_time, end_time }
-    // For now, add locally
-    const slot: ShowingSlot = {
-      id: `temp-${Date.now()}`,
-      listing_id: listingId,
-      date: newDate,
-      start_time: newStart,
-      end_time: newEnd,
-      booked_by: null,
-    };
-
-    setTimeout(() => {
+    try {
+      const result = await api.viewings.setAvailability({
+        listing_id: listingId,
+        date: newDate,
+        start_time: newStart,
+        end_time: newEnd,
+      });
+      // Add the generated slots from the response
+      const newSlots: ShowingSlot[] = result.slots.map((s) => ({
+        id: s.id,
+        listing_id: listingId,
+        date: result.date,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        status: s.status,
+        booked_by: null,
+      }));
+      setSlots((prev) => [...prev, ...newSlots].sort((a, b) => `${a.date}${a.start_time}`.localeCompare(`${b.date}${b.start_time}`)));
+    } catch {
+      // Fallback — add locally
+      const slot: ShowingSlot = {
+        id: `temp-${Date.now()}`,
+        listing_id: listingId,
+        date: newDate,
+        start_time: newStart,
+        end_time: newEnd,
+        status: "available",
+        booked_by: null,
+      };
       setSlots((prev) => [...prev, slot].sort((a, b) => `${a.date}${a.start_time}`.localeCompare(`${b.date}${b.start_time}`)));
+    } finally {
       setAddingSlot(false);
       setNewDate("");
       setNewStart("10:00");
-      setNewEnd("10:30");
+      setNewEnd("11:00");
       setSaving(false);
-    }, 300);
+    }
   };
 
-  const handleBulkAdd = () => {
+  const handleBulkAdd = async () => {
     if (!bulkDate) return;
-    const times = [
-      ["10:00", "10:30"], ["10:30", "11:00"], ["11:00", "11:30"], ["11:30", "12:00"],
-      ["13:00", "13:30"], ["13:30", "14:00"], ["14:00", "14:30"], ["14:30", "15:00"],
-      ["15:00", "15:30"], ["15:30", "16:00"],
-    ];
+    setSaving(true);
 
-    const newSlots: ShowingSlot[] = times.map(([start, end], i) => ({
-      id: `bulk-${Date.now()}-${i}`,
-      listing_id: listingId,
-      date: bulkDate,
-      start_time: start,
-      end_time: end,
-      booked_by: null,
-    }));
-
-    setSlots((prev) => [...prev, ...newSlots].sort((a, b) => `${a.date}${a.start_time}`.localeCompare(`${b.date}${b.start_time}`)));
-    setShowBulk(false);
-    setBulkDate("");
+    try {
+      const result = await api.viewings.setAvailability({
+        listing_id: listingId,
+        date: bulkDate,
+        start_time: "10:00",
+        end_time: "16:00",
+      });
+      const newSlots: ShowingSlot[] = result.slots.map((s) => ({
+        id: s.id,
+        listing_id: listingId,
+        date: result.date,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        status: s.status,
+        booked_by: null,
+      }));
+      setSlots((prev) => [...prev, ...newSlots].sort((a, b) => `${a.date}${a.start_time}`.localeCompare(`${b.date}${b.start_time}`)));
+    } catch {
+      // Fallback — add locally with hourly slots
+      const hours = [["10:00", "11:00"], ["11:00", "12:00"], ["12:00", "13:00"], ["13:00", "14:00"], ["14:00", "15:00"], ["15:00", "16:00"]];
+      const newSlots: ShowingSlot[] = hours.map(([start, end], i) => ({
+        id: `bulk-${Date.now()}-${i}`,
+        listing_id: listingId,
+        date: bulkDate,
+        start_time: start,
+        end_time: end,
+        status: "available",
+        booked_by: null,
+      }));
+      setSlots((prev) => [...prev, ...newSlots].sort((a, b) => `${a.date}${a.start_time}`.localeCompare(`${b.date}${b.start_time}`)));
+    } finally {
+      setShowBulk(false);
+      setBulkDate("");
+      setSaving(false);
+    }
   };
 
-  const handleDeleteSlot = (slotId: string) => {
-    // TODO: DELETE /api/showings/{slotId}
+  const handleDeleteSlot = async (slotId: string | number) => {
+    // Note: OJ's API doesn't have a delete-single-slot endpoint,
+    // but we can remove it locally. The availability delete would remove the whole day.
     setSlots((prev) => prev.filter((s) => s.id !== slotId));
   };
 
@@ -139,6 +200,12 @@ export function ShowingsManager({ listingId, listingTitle, onClose }: ShowingsMa
 
         {/* Body */}
         <div className="px-5 py-4 max-h-[55vh] overflow-y-auto">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-6 h-6 text-[#1B2D45]/20 animate-spin" />
+            </div>
+          ) : (
+          <>
           {/* Empty state */}
           {slots.length === 0 && !addingSlot && (
             <div className="text-center py-8">
@@ -226,7 +293,7 @@ export function ShowingsManager({ listingId, listingTitle, onClose }: ShowingsMa
                 className="overflow-hidden">
                 <div className="bg-[#1B2D45]/[0.03] rounded-xl p-4 space-y-3 mb-3">
                   <p className="text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>
-                    Quick-fill a full day with 30-minute slots (10am–4pm)
+                    Quick-fill a full day with hourly slots (10am–4pm)
                   </p>
                   <div>
                     <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "10px", fontWeight: 600 }}>Pick a date</label>
@@ -240,13 +307,15 @@ export function ShowingsManager({ listingId, listingTitle, onClose }: ShowingsMa
                     </button>
                     <button onClick={handleBulkAdd} disabled={!bulkDate}
                       className="px-4 py-1.5 rounded-lg bg-[#1B2D45] text-white hover:bg-[#152438] disabled:opacity-40 transition-all" style={{ fontSize: "11px", fontWeight: 700 }}>
-                      Generate 10 Slots
+                      Generate Slots
                     </button>
                   </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
+          </>
+          )}
         </div>
 
         {/* Footer — action buttons */}
