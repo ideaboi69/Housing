@@ -121,6 +121,12 @@ def list_all_users(db: Session = Depends(get_db), admin: User = Depends(require_
     users = db.query(User).all()
     return [AdminUserResponse.model_validate(u) for u in users]
 
+# MUST be above /users/{user_id} to avoid "pending-writers" being matched as a user_id
+@admin_router.get("/users/pending-writers", response_model=list[AdminUserResponse])
+def list_pending_write_requests(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    users = db.query(User).filter(User.write_access_requested == True,User.is_writable == False).all()
+    return [AdminUserResponse.model_validate(u) for u in users]
+
 @admin_router.get("/users/{user_id}", response_model=AdminUserResponse)
 def get_user_by_id(user_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -449,11 +455,6 @@ def revoke_write_access(user_id: int, background_tasks: BackgroundTasks, db: Ses
     )
 
     return {"message": f"Write access revoked for {user.first_name} {user.last_name}"}
-
-@admin_router.get("/users/pending-writers", response_model=list[AdminUserResponse])
-def list_pending_write_requests(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    users = db.query(User).filter(User.write_access_requested == True,User.is_writable == False).all()
-    return [AdminUserResponse.model_validate(u) for u in users]
 
 # POST ENDPOINTS
 @admin_router.get("/posts", response_model=list[PostListResponse])

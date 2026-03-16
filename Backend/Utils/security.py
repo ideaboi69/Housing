@@ -43,7 +43,6 @@ def validate_password(password: str) -> str:
         )
     return password
 
-
 def create_password_reset_token(email: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=1)
     return jwt.encode(
@@ -51,7 +50,6 @@ def create_password_reset_token(email: str) -> str:
         settings.JWT_SECRET,
         algorithm=settings.JWT_ALGORITHM,
     )
-
 
 def decode_password_reset_token(token: str) -> str:
     try:
@@ -109,7 +107,7 @@ def get_current_user(token: str = Depends(user_oauth2), db: Session = Depends(ge
 
     if role == UserRole.LANDLORD.value:
         user = db.query(Landlord).get(user_id)
-    elif role == "writer":
+    elif role == UserRole.WRITER.value:
         user = db.query(Writer).get(user_id)
     else:
         user = db.query(User).get(user_id)

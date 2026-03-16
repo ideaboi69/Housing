@@ -64,7 +64,8 @@ class User(Base):
     roommate_memberships = relationship("RoommateGroupMember", back_populates="user")
     roommate_invites_received = relationship("RoommateInvite", foreign_keys="[RoommateInvite.invited_user_id]", back_populates="invited_user")
     roommate_requests_sent = relationship("RoommateRequest", back_populates="user")
-    viewing_bookings = relationship("ViewingBooking", back_populates="student")
+    viewing_bookings = relationship("ViewingBooking", foreign_keys="[ViewingBooking.student_id]", back_populates="student")
+    viewing_availabilities = relationship("ViewingAvailability", foreign_keys="[ViewingAvailability.owner_id]", back_populates="owner")
 
     __table_args__ = (
         CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
@@ -352,6 +353,9 @@ class Sublet(Base):
 
     user = relationship("User", back_populates="sublets")
     images = relationship("SubletImage", back_populates="sublet", cascade="all, delete-orphan")
+    viewing_availabilities = relationship("ViewingAvailability", back_populates="sublet", cascade="all, delete-orphan")
+    viewing_slots = relationship("ViewingSlot", back_populates="sublet", cascade="all, delete-orphan")
+    viewing_bookings = relationship("ViewingBooking", back_populates="sublet", cascade="all, delete-orphan")
 
     @property
     def posted_by(self):
@@ -720,21 +724,27 @@ class ViewingAvailability(Base):
     __tablename__ = "viewing_availabilities"
 
     id = Column(Integer, primary_key=True)
-    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
-    landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=True)
+    sublet_id = Column(Integer, ForeignKey("sublets.id", ondelete="CASCADE"), nullable=True)
+    landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     date = Column(Date, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     listing = relationship("Listing", back_populates="viewing_availabilities")
+    sublet = relationship("Sublet", back_populates="viewing_availabilities")
     landlord = relationship("Landlord", back_populates="viewing_availabilities")
+    owner = relationship("User", foreign_keys="[ViewingAvailability.owner_id]", back_populates="viewing_availabilities")
     slots = relationship("ViewingSlot", back_populates="availability", cascade="all, delete-orphan")
 
     __table_args__ = (
+        CheckConstraint(
+            "(listing_id IS NOT NULL AND sublet_id IS NULL) OR (listing_id IS NULL AND sublet_id IS NOT NULL)",
+            name="ck_viewing_availability_type"),
         UniqueConstraint("listing_id", "date", name="uq_viewing_availability_listing_date"),
-        Index("ix_viewing_availability_listing", "listing_id"),
-        Index("ix_viewing_availability_date", "date"),
+        UniqueConstraint("sublet_id", "date", name="uq_viewing_availability_sublet_date"),
     )
 
 
@@ -744,7 +754,8 @@ class ViewingSlot(Base):
 
     id = Column(Integer, primary_key=True)
     availability_id = Column(Integer, ForeignKey("viewing_availabilities.id", ondelete="CASCADE"), nullable=False)
-    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
+    sublet_id = Column(Integer, ForeignKey("sublets.id", ondelete="CASCADE"), nullable=True)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=True)
     date = Column(Date, nullable=False)
     start_time = Column(Time, nullable=False)
     end_time = Column(Time, nullable=False)
@@ -752,6 +763,7 @@ class ViewingSlot(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     availability = relationship("ViewingAvailability", back_populates="slots")
+    sublet = relationship("Sublet", back_populates="viewing_slots")
     listing = relationship("Listing", back_populates="viewing_slots")
     booking = relationship("ViewingBooking", back_populates="slot", uselist=False)
 
@@ -767,9 +779,11 @@ class ViewingBooking(Base):
 
     id = Column(Integer, primary_key=True)
     slot_id = Column(Integer, ForeignKey("viewing_slots.id", ondelete="CASCADE"), nullable=False, unique=True)
-    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=True)
+    sublet_id = Column(Integer, ForeignKey("sublets.id", ondelete="CASCADE"), nullable=True)
     student_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=False)
+    landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     status = Column(Enum(BookingStatus), default=BookingStatus.CONFIRMED, nullable=False)
     notes = Column(Text, nullable=True)
     cancelled_at = Column(TIMESTAMP(timezone=True), nullable=True)
@@ -777,10 +791,16 @@ class ViewingBooking(Base):
 
     slot = relationship("ViewingSlot", back_populates="booking")
     listing = relationship("Listing", back_populates="viewing_bookings")
-    student = relationship("User", back_populates="viewing_bookings")
+    sublet = relationship("Sublet", back_populates="viewing_bookings")
+    student = relationship("User", foreign_keys="[ViewingBooking.student_id]", back_populates="viewing_bookings")
+    owner = relationship("User", foreign_keys="[ViewingBooking.owner_id]")
     landlord = relationship("Landlord", back_populates="viewing_bookings")
 
     __table_args__ = (
+        CheckConstraint(
+            "(listing_id IS NOT NULL AND sublet_id IS NULL) OR (listing_id IS NULL AND sublet_id IS NOT NULL)",
+            name="ck_viewing_booking_type",
+        ),
         UniqueConstraint("listing_id", "student_id", name="uq_viewing_booking_listing_student"),
         Index("ix_viewing_bookings_student", "student_id"),
         Index("ix_viewing_bookings_landlord", "landlord_id"),

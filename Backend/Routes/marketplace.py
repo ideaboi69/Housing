@@ -10,6 +10,8 @@ from Utils.email import send_message_notification
 
 marketplace_router = APIRouter()
 
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
 # Create a Marketplace item
 @marketplace_router.post("/items", response_model=MarketplaceItemResponse, status_code=status.HTTP_201_CREATED)
 def create_item(payload: MarketplaceItemCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
@@ -55,6 +57,9 @@ async def upload_item_images(item_id: int, files: list[UploadFile] = File(...), 
 
     images = []
     for i, file in enumerate(files):
+        if file.content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail=f"'{file.filename}' is not a valid image. Allowed: JPEG, PNG, WebP, GIF")
+
         image_url = upload_image_to_cloudinary(file, folder=f"marketplace/{item_id}")
 
         image = MarketplaceImage(
@@ -128,6 +133,23 @@ def get_all_items(
     items = query.order_by(MarketplaceItem.created_at.desc()).all()
     return [MarketplaceItemListResponse.model_validate(item) for item in items]
 
+# Get my items — MUST be above /items/{item_id}
+@marketplace_router.get("/my/items", response_model=list[MarketplaceItemListResponse])
+def get_my_items(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    items = db.query(MarketplaceItem).filter(MarketplaceItem.seller_id == current_user.id).order_by(MarketplaceItem.created_at.desc()).all()
+
+    return [MarketplaceItemListResponse.model_validate(item) for item in items]
+
+# Get my draft items — MUST be above /items/{item_id}
+@marketplace_router.get("/drafts/my", response_model=list[MarketplaceItemListResponse])
+def get_my_draft_items(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    items = db.query(MarketplaceItem).filter(
+        MarketplaceItem.seller_id == current_user.id,
+        MarketplaceItem.status == ItemStatus.DRAFT,
+    ).order_by(MarketplaceItem.created_at.desc()).all()
+
+    return [MarketplaceItemListResponse.model_validate(i) for i in items]
+
 # Get a specific item
 @marketplace_router.get("/items/{item_id}", response_model=MarketplaceItemResponse)
 def get_item(item_id: int, db: Session = Depends(get_db)):
@@ -139,13 +161,6 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return MarketplaceItemResponse.model_validate(item)
-
-# Get my items
-@marketplace_router.get("/my/items", response_model=list[MarketplaceItemListResponse])
-def get_my_items(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
-    items = db.query(MarketplaceItem).filter(MarketplaceItem.seller_id == current_user.id).order_by(MarketplaceItem.created_at.desc()).all()
-
-    return [MarketplaceItemListResponse.model_validate(item) for item in items]
 
 # Mark item as sold
 @marketplace_router.patch("/items/{item_id}/sold", response_model=MarketplaceItemResponse)
@@ -388,16 +403,6 @@ def get_marketplace_unread_count(db: Session = Depends(get_db), current_user: Us
     ).scalar()
 
     return {"unread_count": total}
-
-# Drafts
-@marketplace_router.get("/drafts/my", response_model=list[MarketplaceItemListResponse])
-def get_my_draft_items(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
-    items = db.query(MarketplaceItem).filter(
-        MarketplaceItem.seller_id == current_user.id,
-        MarketplaceItem.status == ItemStatus.DRAFT,
-    ).order_by(MarketplaceItem.created_at.desc()).all()
-
-    return [MarketplaceItemListResponse.model_validate(i) for i in items]
 
 @marketplace_router.patch("/items/{item_id}/publish", response_model=MarketplaceItemResponse)
 def publish_item(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):

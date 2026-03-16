@@ -2,13 +2,17 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from tables import get_db
-from tables import User, Landlord
+from tables import *
 from Schemas.userSchema import UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange, ForgotPasswordRequest, ResetPasswordRequest
-from helpers import check_uoguelph_email
+from helpers import check_uoguelph_email, cascade_delete_user
 from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password, create_password_reset_token, decode_password_reset_token
 from Utils.email_token import create_email_verification_token, decode_email_verification_token
 from Utils.email import send_verification_email, send_password_reset_email
+from Schemas.subletSchema import SubletStatus
+from Schemas.postSchema import PostStatus
+from Schemas.marketplaceSchema import ItemStatus
+from Schemas.convoSchema import SenderType
+from Schemas.viewingSchema import BookingStatus
 from config import settings
 
 user_router = APIRouter()
@@ -234,14 +238,48 @@ def request_write_access( reason: str = Form(...), db: Session = Depends(get_db)
 # Delete Account
 @user_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    landlord = db.query(Landlord).filter(Landlord.user_id == current_user.id).first() # if user has a landlord profile, delete that first
-    if landlord:
-        db.delete(landlord)
-
-    db.delete(current_user)
+    cascade_delete_user(current_user, db)
     db.commit()
 
-    return {"message": "Account has been deleted successfully"}
+# Dashboard
+@user_router.get("/me/dashboard")
+def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    user_id = current_user.id
+ 
+    sublet_count = db.query(Sublet).filter(Sublet.user_id == user_id).count()
+    post_count = db.query(Post).filter(Post.user_id == user_id).count()
+    marketplace_count = db.query(MarketplaceItem).filter(MarketplaceItem.seller_id == user_id).count()
+    saved_count = db.query(SavedListing).filter(SavedListing.student_id == user_id).count()
+ 
+    try:
+        upcoming_viewings = db.query(ViewingBooking).filter(
+            ViewingBooking.student_id == user_id,
+            ViewingBooking.status == BookingStatus.CONFIRMED,
+        ).count()
+    except Exception:
+        upcoming_viewings = 0
+ 
+    try:
+        convo_ids = [c.id for c in db.query(Conversation.id).filter(Conversation.user_id == user_id).all()]
+        if convo_ids:
+            unread_messages = db.query(Message).filter(
+                Message.conversation_id.in_(convo_ids),
+                Message.is_read == False,
+                Message.sender_type == SenderType.LANDLORD,
+            ).count()
+        else:
+            unread_messages = 0
+    except Exception:
+        unread_messages = 0
+ 
+    return {
+        "sublets": sublet_count,
+        "posts": post_count,
+        "marketplace_items": marketplace_count,
+        "saved_listings": saved_count,
+        "upcoming_viewings": upcoming_viewings,
+        "unread_messages": unread_messages,
+    }
 
 # Get user by ID
 @user_router.get("/{user_id}", response_model=UserResponse)

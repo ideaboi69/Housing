@@ -131,6 +131,20 @@ def get_all_sublets(
     
     return [SubletListResponse.model_validate(sublet) for sublet in sublets]
 
+# Get current user's sublets
+@sublet_router.get("/my/listings", response_model=list[SubletListResponse])
+def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
+
+    return [SubletListResponse.model_validate(sublet) for sublet in sublets]
+
+# Get current user's draft sublet listing
+@sublet_router.get("/drafts/my", response_model=list[SubletListResponse])
+def get_my_draft_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id, Sublet.status == SubletStatus.DRAFT).order_by(Sublet.created_at.desc()).all()
+
+    return [SubletListResponse.model_validate(s) for s in sublets]
+
 # Get a single sublet by ID
 @sublet_router.get("/{sublet_id}", response_model=SubletResponse)
 def get_sublet(sublet_id: int, db: Session = Depends(get_db)):
@@ -145,25 +159,6 @@ def get_sublet(sublet_id: int, db: Session = Depends(get_db)):
 
     response = SubletResponse.model_validate(sublet)
     return response
-
-# Get current user's sublets
-@sublet_router.get("/my/listings", response_model=list[SubletListResponse])
-def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
-
-    return [SubletListResponse.model_validate(sublet) for sublet in sublets]
-@sublet_router.get("/drafts/my", response_model=list[SubletListResponse])
-def get_my_draft_sublets(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    sublets = db.query(Sublet).filter(
-        Sublet.user_id == current_user.id,
-        Sublet.status == SubletStatus.DRAFT,
-    ).order_by(Sublet.created_at.desc()).all()
-
-    return [SubletListResponse.model_validate(s) for s in sublets]
-
 
 @sublet_router.patch("/{sublet_id}/publish", response_model=SubletResponse)
 def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):

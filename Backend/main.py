@@ -25,6 +25,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from Utils.scheduler import send_viewing_reminders
 import Utils.cloudinary_config
 import asyncio
+from config import settings
 
 app = FastAPI(title="Housing API")
 
@@ -47,10 +48,10 @@ class ConnectionManager:
 connection_manager = ConnectionManager()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],         
-    allow_credentials=False,      
-    allow_methods=["*"],          
-    allow_headers=["*"],           
+    allow_origins=[settings.FRONTEND_URL],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(user_router, prefix="/api/users", tags=["Users"])

@@ -2,24 +2,38 @@ from datetime import datetime, date, time, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
-from tables import get_db, Listing, Property, Landlord, User, ViewingAvailability, ViewingSlot, ViewingBooking, ViewingSlotStatus, BookingStatus
+from tables import get_db, Listing, Property, Landlord, User, ViewingAvailability, ViewingSlot, ViewingBooking, ViewingSlotStatus, BookingStatus, Sublet
 from Schemas.viewingSchema import AvailabilityCreate, BulkAvailabilityCreate, BookingCreate, AvailabilityResponse, ViewingSlotResponse, BookingResponse
-from Utils.security import get_current_user
+from Utils.security import get_current_user, get_current_student
 from Utils.email import send_booking_confirmed_email, send_booking_cancelled_email
-from helpers import require_landlord, generate_hourly_slots, build_booking_response
+from helpers import require_landlord, generate_hourly_slots, build_booking_response, get_booking_details, get_host_info
 
 viewing_router = APIRouter()
 
 # Set availability
 @viewing_router.post("/availability", response_model=AvailabilityResponse, status_code=status.HTTP_201_CREATED)
-def set_availability(payload: AvailabilityCreate, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    listing = db.query(Listing).filter(Listing.id == payload.listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
+def set_availability(payload: AvailabilityCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    # Determine if listing or sublet
+    if payload.listing_id:
+        listing = db.query(Listing).filter(Listing.id == payload.listing_id).first()
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
 
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
-    if prop.landlord_id != landlord.id:
-        raise HTTPException(status_code=403, detail="Not your listing")
+        prop = db.query(Property).filter(Property.id == listing.property_id).first()
+        if not isinstance(current_user, Landlord) or prop.landlord_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not your listing")
+
+        existing = db.query(ViewingAvailability).filter(ViewingAvailability.listing_id == payload.listing_id, ViewingAvailability.date == payload.date).first()
+
+    else:
+        sublet = db.query(Sublet).filter(Sublet.id == payload.sublet_id).first()
+        if not sublet:
+            raise HTTPException(status_code=404, detail="Sublet not found")
+
+        if not isinstance(current_user, User) or sublet.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not your sublet")
+
+        existing = db.query(ViewingAvailability).filter(ViewingAvailability.sublet_id == payload.sublet_id, ViewingAvailability.date == payload.date).first()
 
     if payload.date < date.today():
         raise HTTPException(status_code=400, detail="Cannot set availability in the past")
@@ -32,14 +46,14 @@ def set_availability(payload: AvailabilityCreate, db: Session = Depends(get_db),
     if (end_dt - start_dt) < timedelta(hours=1):
         raise HTTPException(status_code=400, detail="Time range must be at least 1 hour")
 
-    existing = db.query(ViewingAvailability).filter(ViewingAvailability.listing_id == payload.listing_id, ViewingAvailability.date == payload.date).first()
-
     if existing:
-        raise HTTPException(status_code=409, detail="Availability already set for this date. Delete it first to update.")
+        raise HTTPException(status_code=409, detail="Availability already set for this date")
 
     availability = ViewingAvailability(
         listing_id=payload.listing_id,
-        landlord_id=landlord.id,
+        sublet_id=payload.sublet_id,
+        landlord_id=current_user.id if isinstance(current_user, Landlord) else None,
+        owner_id=current_user.id if isinstance(current_user, User) else None,
         date=payload.date,
         start_time=payload.start_time,
         end_time=payload.end_time,
@@ -52,6 +66,7 @@ def set_availability(payload: AvailabilityCreate, db: Session = Depends(get_db),
         slot = ViewingSlot(
             availability_id=availability.id,
             listing_id=payload.listing_id,
+            sublet_id=payload.sublet_id,
             date=payload.date,
             start_time=s["start_time"],
             end_time=s["end_time"],
@@ -65,14 +80,20 @@ def set_availability(payload: AvailabilityCreate, db: Session = Depends(get_db),
 
 # Set bulk availability
 @viewing_router.post("/availability/bulk", response_model=list[AvailabilityResponse], status_code=status.HTTP_201_CREATED)
-def set_bulk_availability(payload: BulkAvailabilityCreate, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    listing = db.query(Listing).filter(Listing.id == payload.listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
-    if prop.landlord_id != landlord.id:
-        raise HTTPException(status_code=403, detail="Not your listing")
+def set_bulk_availability(payload: BulkAvailabilityCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    if payload.listing_id:
+        listing = db.query(Listing).filter(Listing.id == payload.listing_id).first()
+        if not listing:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        prop = db.query(Property).filter(Property.id == listing.property_id).first()
+        if not isinstance(current_user, Landlord) or prop.landlord_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not your listing")
+    else:
+        sublet = db.query(Sublet).filter(Sublet.id == payload.sublet_id).first()
+        if not sublet:
+            raise HTTPException(status_code=404, detail="Sublet not found")
+        if not isinstance(current_user, User) or sublet.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not your sublet")
 
     results = []
     for entry in payload.dates:
@@ -81,14 +102,19 @@ def set_bulk_availability(payload: BulkAvailabilityCreate, db: Session = Depends
         if entry.start_time >= entry.end_time:
             continue
 
-        existing = db.query(ViewingAvailability).filter(ViewingAvailability.listing_id == payload.listing_id, ViewingAvailability.date == entry.date).first()
+        if payload.listing_id:
+            existing = db.query(ViewingAvailability).filter(ViewingAvailability.listing_id == payload.listing_id, ViewingAvailability.date == entry.date).first()
+        else:
+            existing = db.query(ViewingAvailability).filter(ViewingAvailability.sublet_id == payload.sublet_id, ViewingAvailability.date == entry.date).first()
 
         if existing:
             continue
 
         availability = ViewingAvailability(
             listing_id=payload.listing_id,
-            landlord_id=landlord.id,
+            sublet_id=payload.sublet_id,
+            landlord_id=current_user.id if isinstance(current_user, Landlord) else None,
+            owner_id=current_user.id if isinstance(current_user, User) else None,
             date=entry.date,
             start_time=entry.start_time,
             end_time=entry.end_time,
@@ -101,6 +127,7 @@ def set_bulk_availability(payload: BulkAvailabilityCreate, db: Session = Depends
             slot = ViewingSlot(
                 availability_id=availability.id,
                 listing_id=payload.listing_id,
+                sublet_id=payload.sublet_id,
                 date=entry.date,
                 start_time=s["start_time"],
                 end_time=s["end_time"],
@@ -116,9 +143,18 @@ def set_bulk_availability(payload: BulkAvailabilityCreate, db: Session = Depends
     return [AvailabilityResponse.model_validate(a) for a in results]
 
 # Get availability for listing
-@viewing_router.get("/availability/listing/{listing_id}", response_model=list[AvailabilityResponse])
-def get_listing_availability(listing_id: int, from_date: Optional[date] = Query(None), db: Session = Depends(get_db)):
-    query = db.query(ViewingAvailability).filter(ViewingAvailability.listing_id == listing_id)
+@viewing_router.get("/availability", response_model=list[AvailabilityResponse])
+def get_availability(listing_id: Optional[int] = Query(None), sublet_id: Optional[int] = Query(None), from_date: Optional[date] = Query(None), db: Session = Depends(get_db)):
+    
+    if not listing_id and not sublet_id:
+        raise HTTPException(status_code=400, detail="Provide either listing_id or sublet_id")
+    if listing_id and sublet_id:
+        raise HTTPException(status_code=400, detail="Provide either listing_id or sublet_id, not both")
+
+    if listing_id:
+        query = db.query(ViewingAvailability).filter(ViewingAvailability.listing_id == listing_id)
+    else:
+        query = db.query(ViewingAvailability).filter(ViewingAvailability.sublet_id == sublet_id)
 
     if from_date:
         query = query.filter(ViewingAvailability.date >= from_date)
@@ -129,9 +165,17 @@ def get_listing_availability(listing_id: int, from_date: Optional[date] = Query(
     return [AvailabilityResponse.model_validate(a) for a in availabilities]
 
 # Get available slots for a listing
-@viewing_router.get("/slots/listing/{listing_id}", response_model=list[ViewingSlotResponse])
-def get_available_slots(listing_id: int, from_date: Optional[date] = Query(None), db: Session = Depends(get_db)):
-    query = db.query(ViewingSlot).filter(ViewingSlot.listing_id == listing_id, ViewingSlot.status == ViewingSlotStatus.AVAILABLE)
+@viewing_router.get("/slots", response_model=list[ViewingSlotResponse])
+def get_available_slots(listing_id: Optional[int] = Query(None), sublet_id: Optional[int] = Query(None), from_date: Optional[date] = Query(None), db: Session = Depends(get_db)):
+    if not listing_id and not sublet_id:
+        raise HTTPException(status_code=400, detail="Provide either listing_id or sublet_id")
+    if listing_id and sublet_id:
+        raise HTTPException(status_code=400, detail="Provide either listing_id or sublet_id, not both")
+
+    if listing_id:
+        query = db.query(ViewingSlot).filter(ViewingSlot.listing_id == listing_id, ViewingSlot.status == ViewingSlotStatus.AVAILABLE)
+    else:
+        query = db.query(ViewingSlot).filter(ViewingSlot.sublet_id == sublet_id, ViewingSlot.status == ViewingSlotStatus.AVAILABLE)
 
     if from_date:
         query = query.filter(ViewingSlot.date >= from_date)
@@ -151,69 +195,92 @@ def book_viewing(payload: BookingCreate, background_tasks: BackgroundTasks, db: 
     if slot.status != ViewingSlotStatus.AVAILABLE:
         raise HTTPException(status_code=400, detail="This slot is no longer available")
 
-    # Check slot is in the future
     slot_datetime = datetime.combine(slot.date, slot.start_time, tzinfo=timezone.utc)
     if slot_datetime <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Cannot book a slot in the past")
 
-    # One booking per listing per student
-    existing = db.query(ViewingBooking).filter(
-        ViewingBooking.listing_id == slot.listing_id,
-        ViewingBooking.student_id == current_user.id,
-        ViewingBooking.status == BookingStatus.CONFIRMED,
-    ).first()
+    # Determine type and check ownership
+    if slot.listing_id:
+        existing = db.query(ViewingBooking).filter(
+            ViewingBooking.listing_id == slot.listing_id,
+            ViewingBooking.student_id == current_user.id,
+            ViewingBooking.status == BookingStatus.CONFIRMED,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="You already have a viewing booked for this listing")
 
-    if existing:
-        raise HTTPException(status_code=409, detail="You already have a viewing booked for this listing")
+        listing = db.query(Listing).filter(Listing.id == slot.listing_id).first()
+        prop = db.query(Property).filter(Property.id == listing.property_id).first()
+        landlord = db.query(Landlord).filter(Landlord.id == prop.landlord_id).first()
 
-    listing = db.query(Listing).filter(Listing.id == slot.listing_id).first()
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
-    landlord = db.query(Landlord).filter(Landlord.id == prop.landlord_id).first()
+        booking = ViewingBooking(
+            slot_id=slot.id,
+            listing_id=slot.listing_id,
+            student_id=current_user.id,
+            landlord_id=landlord.id,
+            notes=payload.notes,
+        )
 
-    booking = ViewingBooking(
-        slot_id=slot.id,
-        listing_id=slot.listing_id,
-        student_id=current_user.id,
-        landlord_id=landlord.id,
-        notes=payload.notes,
-    )
+        host_email = landlord.email
+        host_name = landlord.first_name
+        host_full = f"{landlord.first_name} {landlord.last_name}"
+        title = prop.title
+        address = prop.address
+
+    else:
+        sublet = db.query(Sublet).filter(Sublet.id == slot.sublet_id).first()
+        if sublet.user_id == current_user.id:
+            raise HTTPException(status_code=400, detail="Can't book your own sublet")
+
+        existing = db.query(ViewingBooking).filter(
+            ViewingBooking.sublet_id == slot.sublet_id,
+            ViewingBooking.student_id == current_user.id,
+            ViewingBooking.status == BookingStatus.CONFIRMED,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="You already have a viewing booked for this sublet")
+
+        owner = db.query(User).filter(User.id == sublet.user_id).first()
+
+        booking = ViewingBooking(
+            slot_id=slot.id,
+            sublet_id=slot.sublet_id,
+            student_id=current_user.id,
+            owner_id=sublet.user_id,
+            notes=payload.notes,
+        )
+        host_email = owner.email
+        host_name = owner.first_name
+        host_full = f"{owner.first_name} {owner.last_name}"
+        title = sublet.title
+        address = sublet.address
+
     slot.status = ViewingSlotStatus.BOOKED
     db.add(booking)
     db.commit()
     db.refresh(booking)
 
     booking_details = {
-        "listing_title": prop.title,
-        "address": prop.address,
+        "listing_title": title,
+        "address": address,
         "date": str(slot.date),
         "start_time": str(slot.start_time),
         "end_time": str(slot.end_time),
     }
-
-    # Email student
     background_tasks.add_task(
         send_booking_confirmed_email,
         to_email=current_user.email,
         name=current_user.first_name,
         role="student",
-        booking_details={
-            **booking_details,
-            "other_party_name": f"{landlord.first_name} {landlord.last_name}",
-        },
+        booking_details={**booking_details, "other_party_name": host_full},
     )
-
-    # Email landlord
     background_tasks.add_task(
         send_booking_confirmed_email,
-        to_email=landlord.email,
-        name=landlord.first_name,
+        to_email=host_email,
+        name=host_name,
         role="landlord",
-        booking_details={
-            **booking_details,
-            "other_party_name": f"{current_user.first_name} {current_user.last_name}",
-        },
+        booking_details={**booking_details, "other_party_name": f"{current_user.first_name} {current_user.last_name}"},
     )
-
     return build_booking_response(booking, db)
 
 # USER - Cancel booking
@@ -239,42 +306,44 @@ def student_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, d
     db.commit()
     db.refresh(booking)
 
-    listing = db.query(Listing).filter(Listing.id == booking.listing_id).first()
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
-    landlord = db.query(Landlord).filter(Landlord.id == booking.landlord_id).first()
-
-    booking_details = {
-        "listing_title": prop.title,
-        "date": str(slot.date),
-        "start_time": str(slot.start_time),
-        "end_time": str(slot.end_time),
-    }
+    details = get_booking_details(booking, db)
+    host_email, host_name, _ = get_host_info(booking, db)
 
     background_tasks.add_task(
         send_booking_cancelled_email,
         to_email=current_user.email,
         name=current_user.first_name,
         cancelled_by="student",
-        booking_details=booking_details,
+        booking_details=details,
     )
 
     background_tasks.add_task(
         send_booking_cancelled_email,
-        to_email=landlord.email,
-        name=landlord.first_name,
+        to_email=host_email,
+        name=host_name,
         cancelled_by="student",
-        booking_details=booking_details,
+        booking_details=details,
     )
 
     return build_booking_response(booking, db)
 
-# Landlord - Cancel booking
-@viewing_router.patch("/bookings/{booking_id}/landlord-cancel", response_model=BookingResponse)
-def landlord_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    booking = db.query(ViewingBooking).filter(ViewingBooking.id == booking_id, ViewingBooking.landlord_id == landlord.id).first()
+# Landlord/Sublet owner - Cancel booking
+@viewing_router.patch("/bookings/{booking_id}/host-cancel", response_model=BookingResponse)
+def host_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    booking = db.query(ViewingBooking).filter(ViewingBooking.id == booking_id).first()
 
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
+
+    # Verify host ownership
+    is_host = False
+    if booking.landlord_id and isinstance(current_user, Landlord) and booking.landlord_id == current_user.id:
+        is_host = True
+    elif booking.owner_id and isinstance(current_user, User) and booking.owner_id == current_user.id:
+        is_host = True
+
+    if not is_host:
+        raise HTTPException(status_code=403, detail="Not your booking")
 
     if booking.status != BookingStatus.CONFIRMED:
         raise HTTPException(status_code=400, detail="Booking is not active")
@@ -290,31 +359,24 @@ def landlord_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, 
     db.commit()
     db.refresh(booking)
 
-    listing = db.query(Listing).filter(Listing.id == booking.listing_id).first()
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+    details = get_booking_details(booking, db)
     student = db.query(User).filter(User.id == booking.student_id).first()
-
-    booking_details = {
-        "listing_title": prop.title,
-        "date": str(slot.date),
-        "start_time": str(slot.start_time),
-        "end_time": str(slot.end_time),
-    }
+    host_email, host_name, _ = get_host_info(booking, db)
 
     background_tasks.add_task(
         send_booking_cancelled_email,
         to_email=student.email,
         name=student.first_name,
-        cancelled_by="landlord",
-        booking_details=booking_details,
+        cancelled_by="host",
+        booking_details=details,
     )
 
     background_tasks.add_task(
         send_booking_cancelled_email,
-        to_email=landlord.email,
-        name=landlord.first_name,
-        cancelled_by="landlord",
-        booking_details=booking_details,
+        to_email=host_email,
+        name=host_name,
+        cancelled_by="host",
+        booking_details=details,
     )
 
     return build_booking_response(booking, db)
@@ -326,32 +388,47 @@ def get_my_bookings(db: Session = Depends(get_db), current_user: User = Depends(
 
     return [build_booking_response(b, db) for b in bookings]
 
-# Landlord - Get my bookings
-@viewing_router.get("/bookings/landlord", response_model=list[BookingResponse])
-def get_landlord_bookings(listing_id: Optional[int] = Query(None), db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    query = db.query(ViewingBooking).filter(ViewingBooking.landlord_id == landlord.id)
-
-    if listing_id:
-        query = query.filter(ViewingBooking.listing_id == listing_id)
+# Landlord/Sublet owner - Get my bookings
+@viewing_router.get("/bookings/hosting", response_model=list[BookingResponse])
+def get_hosting_bookings(listing_id: Optional[int] = Query(None), sublet_id: Optional[int] = Query(None), db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    if isinstance(current_user, Landlord):
+        query = db.query(ViewingBooking).filter(ViewingBooking.landlord_id == current_user.id)
+        if listing_id:
+            query = query.filter(ViewingBooking.listing_id == listing_id)
+    elif isinstance(current_user, User):
+        query = db.query(ViewingBooking).filter(ViewingBooking.owner_id == current_user.id)
+        if sublet_id:
+            query = query.filter(ViewingBooking.sublet_id == sublet_id)
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     bookings = query.order_by(ViewingBooking.created_at.desc()).all()
-
     return [build_booking_response(b, db) for b in bookings]
 
-# Landlord - Get Upcoming Bookings
-@viewing_router.get("/bookings/landlord/upcoming", response_model=list[BookingResponse])
-def get_landlord_upcoming_bookings(db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    bookings = db.query(ViewingBooking).join(ViewingSlot).filter(
-        ViewingBooking.landlord_id == landlord.id,
-        ViewingBooking.status == BookingStatus.CONFIRMED,
-        ViewingSlot.date >= date.today(),
-    ).order_by(ViewingSlot.date, ViewingSlot.start_time).all()
+# Landlord/Sublet owner - Get Upcoming Bookings
+@viewing_router.get("/bookings/hosting/upcoming", response_model=list[BookingResponse])
+def get_hosting_upcoming_bookings(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    if isinstance(current_user, Landlord):
+        bookings = db.query(ViewingBooking).join(ViewingSlot).filter(
+            ViewingBooking.landlord_id == current_user.id,
+            ViewingBooking.status == BookingStatus.CONFIRMED,
+            ViewingSlot.date >= date.today(),
+        ).order_by(ViewingSlot.date, ViewingSlot.start_time).all()
+
+    elif isinstance(current_user, User):
+        bookings = db.query(ViewingBooking).join(ViewingSlot).filter(
+            ViewingBooking.owner_id == current_user.id,
+            ViewingBooking.status == BookingStatus.CONFIRMED,
+            ViewingSlot.date >= date.today(),
+        ).order_by(ViewingSlot.date, ViewingSlot.start_time).all()
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     return [build_booking_response(b, db) for b in bookings]
 
 # User - Get Upcoming Bookings
 @viewing_router.get("/bookings/my/upcoming", response_model=list[BookingResponse])
-def get_my_upcoming_bookings(db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
+def get_my_upcoming_bookings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     bookings = db.query(ViewingBooking).join(ViewingSlot).filter(
         ViewingBooking.student_id == current_user.id,
         ViewingBooking.status == BookingStatus.CONFIRMED,
@@ -359,3 +436,6 @@ def get_my_upcoming_bookings(db: Session = Depends(get_db),current_user: User = 
     ).order_by(ViewingSlot.date, ViewingSlot.start_time).all()
 
     return [build_booking_response(b, db) for b in bookings]
+
+
+

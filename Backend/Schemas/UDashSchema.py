@@ -4,9 +4,7 @@ from pydantic import BaseModel, Field
 from decimal import Decimal
 import enum
 
-# ──────────────────────────────────────────────
-# ENUMS
-# ──────────────────────────────────────────────
+# Enums
 class LeaseTermPreference(str, enum.Enum):
     FOUR_MONTHS = "4_months"
     EIGHT_MONTHS = "8_months"
@@ -66,9 +64,7 @@ class StudentYear(str, enum.Enum):
     MASTERS = "masters"
     PHD = "phd"
 
-# ──────────────────────────────────────────────
-# PROFILE
-# ──────────────────────────────────────────────
+# Profile
 class ProfileUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -92,9 +88,7 @@ class ProfileResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# ──────────────────────────────────────────────
-# HOUSING PREFERENCES
-# ──────────────────────────────────────────────
+# Housing preference
 class HousingPreferencesUpdate(BaseModel):
     budget: Optional[Decimal] = None
     move_in_date: Optional[date] = None
@@ -117,9 +111,7 @@ class HousingPreferencesResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# ──────────────────────────────────────────────
-# ROOMMATE PROFILE
-# ──────────────────────────────────────────────
+# Roommate profile
 class RoommateProfileUpdate(BaseModel):
     is_visible: Optional[bool] = None
     sleep_schedule: Optional[SleepSchedule] = None
@@ -142,9 +134,7 @@ class RoommateProfileResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# ──────────────────────────────────────────────
-# NOTIFICATION PREFERENCES
-# ──────────────────────────────────────────────
+# Notification Preferences
 class NotificationPreferencesUpdate(BaseModel):
     new_listings_matching: Optional[bool] = None
     price_drops_saved: Optional[bool] = None
@@ -165,9 +155,7 @@ class NotificationPreferencesResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# ──────────────────────────────────────────────
-# ACCOUNT & SECURITY
-# ──────────────────────────────────────────────
+# Account & Security
 class ChangePassword(BaseModel):
     current_password: str
     new_password: str
@@ -175,4 +163,4 @@ class ChangePassword(BaseModel):
 
 class ChangeEmail(BaseModel):
     new_email: str
-    password: str  # confirm identity
+    password: str 

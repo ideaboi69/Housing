@@ -135,52 +135,6 @@ def toggle_visibility(db: Session = Depends(get_db), current_user: User = Depend
 
 # Groups
 @roommate_router.post("/groups", response_model=GroupDetailResponse, status_code=status.HTTP_201_CREATED)
-def create_group(payload: GroupCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),):
-    
-    profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id,RoommateProfile.quiz_completed == True).first()
-
-    if not profile:
-        raise HTTPException(status_code=403, detail="Complete the quiz first")
-
-    # Check user doesn't already own an active group
-    existing = db.query(RoommateGroup).filter(
-        RoommateGroup.owner_id == current_user.id,
-        RoommateGroup.is_active == True,
-    ).first()
-
-    if existing:
-        raise HTTPException(status_code=409, detail="You already have an active group")
-
-    group = RoommateGroup(
-        owner_id=current_user.id,
-        name=payload.name,
-        description=payload.description,
-        current_size=payload.current_size,
-        spots_needed=payload.spots_needed,
-        total_capacity=payload.current_size + payload.spots_needed,
-        rent_per_person=payload.rent_per_person,
-        utilities_included=payload.utilities_included,
-        move_in_timing=payload.move_in_timing,
-        gender_preference=payload.gender_preference,
-        has_place=payload.has_place,
-        address=payload.address,
-    )
-    db.add(group)
-    db.flush()
-
-    # Add owner as member
-    owner_member = RoommateGroupMember(
-        group_id=group.id,
-        user_id=current_user.id,
-        role=GroupMemberRole.OWNER,
-    )
-    db.add(owner_member)
-    db.commit()
-    db.refresh(group)
-
-    return build_group_detail(group, db)
-
-@roommate_router.post("/groups", response_model=GroupDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_group(payload: GroupCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id,RoommateProfile.quiz_completed == True).first()
 

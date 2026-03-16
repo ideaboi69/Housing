@@ -4,7 +4,11 @@ from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, ViewingAvailability, ViewingBooking
 from dotenv import load_dotenv
 from sqlalchemy import text, func as sql_func
-from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin, Writer, Conversation, Message, RoommateProfile, RoommateGroup, Post
+from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin, Writer, Conversation, Message, RoommateProfile, RoommateGroup, Post, Sublet
+from tables import MarketplaceItem, MarketplaceImage, MarketplaceConversation, MarketplaceMessage
+from tables import SubletImage, ViewingSlot, ViewingBooking, ViewingAvailability
+from tables import RoommateGroupMember, RoommateInvite, RoommateRequest
+from tables import UserHousingPreferences, NotificationPreferences
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordVerification
 from Utils.security import get_current_user, decode_access_token
@@ -50,11 +54,10 @@ def require_landlord(token: str = Depends(landlord_oauth2), db: Session = Depend
 
     return landlord
 
-def get_landlord_profile(user: User, db: Session) -> Landlord:
-    """Fetch the landlord profile for a user, or 404."""
-    landlord = db.query(Landlord).filter(Landlord.user_id == user.id).first()
+def get_landlord_profile(current_user: Landlord, db: Session) -> Landlord:
+    landlord = db.query(Landlord).filter(Landlord.id == current_user.id).first()
     if not landlord:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Landlord profile not found")
+        raise HTTPException(status_code=404, detail="Landlord not found")
     return landlord
 
 def compute_landlord_stats(landlord_id: int, db: Session) -> dict:
@@ -138,13 +141,84 @@ def cascade_delete_landlord(landlord: Landlord, db: Session):
     db.query(Review).filter(Review.landlord_id == landlord.id).delete(synchronize_session=False)
     db.delete(landlord)
 
-# Property Helpers
-def get_landlord_for_user(user: User, db: Session) -> Landlord:
-    landlord = db.query(Landlord).filter(Landlord.user_id == user.id).first()
-    if not landlord:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Landlord profile not found")
-    return landlord
+def cascade_delete_user(user: User, db: Session):
+    """Delete a student user and all their related data in the correct order."""
+    user_id = user.id
 
+    # 1. Marketplace: messages → conversations → images → items
+    mp_item_ids = [i.id for i in db.query(MarketplaceItem.id).filter(MarketplaceItem.seller_id == user_id).all()]
+    if mp_item_ids:
+        mp_convo_ids = [c.id for c in db.query(MarketplaceConversation.id).filter(MarketplaceConversation.item_id.in_(mp_item_ids)).all()]
+        if mp_convo_ids:
+            db.query(MarketplaceMessage).filter(MarketplaceMessage.conversation_id.in_(mp_convo_ids)).delete(synchronize_session=False)
+        db.query(MarketplaceConversation).filter(MarketplaceConversation.item_id.in_(mp_item_ids)).delete(synchronize_session=False)
+        db.query(MarketplaceImage).filter(MarketplaceImage.item_id.in_(mp_item_ids)).delete(synchronize_session=False)
+        db.query(MarketplaceItem).filter(MarketplaceItem.seller_id == user_id).delete(synchronize_session=False)
+
+    # Also clean up marketplace conversations where user is buyer
+    buyer_convo_ids = [c.id for c in db.query(MarketplaceConversation.id).filter(MarketplaceConversation.buyer_id == user_id).all()]
+    if buyer_convo_ids:
+        db.query(MarketplaceMessage).filter(MarketplaceMessage.conversation_id.in_(buyer_convo_ids)).delete(synchronize_session=False)
+        db.query(MarketplaceConversation).filter(MarketplaceConversation.buyer_id == user_id).delete(synchronize_session=False)
+
+    # 2. Sublets: viewing bookings → viewing slots → viewing availabilities → images → sublets
+    sublet_ids = [s.id for s in db.query(Sublet.id).filter(Sublet.user_id == user_id).all()]
+    if sublet_ids:
+        db.query(ViewingBooking).filter(ViewingBooking.sublet_id.in_(sublet_ids)).delete(synchronize_session=False)
+        slot_ids = [s.id for s in db.query(ViewingSlot.id).filter(ViewingSlot.sublet_id.in_(sublet_ids)).all()]
+        if slot_ids:
+            db.query(ViewingBooking).filter(ViewingBooking.slot_id.in_(slot_ids)).delete(synchronize_session=False)
+        db.query(ViewingSlot).filter(ViewingSlot.sublet_id.in_(sublet_ids)).delete(synchronize_session=False)
+        db.query(ViewingAvailability).filter(ViewingAvailability.sublet_id.in_(sublet_ids)).delete(synchronize_session=False)
+        db.query(SubletImage).filter(SubletImage.sublet_id.in_(sublet_ids)).delete(synchronize_session=False)
+        db.query(Sublet).filter(Sublet.user_id == user_id).delete(synchronize_session=False)
+
+    # 3. Posts: set user_id to NULL (posts use ondelete="SET NULL")
+    db.query(Post).filter(Post.user_id == user_id).update({"user_id": None}, synchronize_session=False)
+
+    # 4. Profile photo cleanup would happen via Cloudinary — handled by caller if needed
+
+    # 5. Listing conversations: messages → conversations
+    convo_ids = [c.id for c in db.query(Conversation.id).filter(Conversation.user_id == user_id).all()]
+    if convo_ids:
+        db.query(Message).filter(Message.conversation_id.in_(convo_ids)).delete(synchronize_session=False)
+        db.query(Conversation).filter(Conversation.user_id == user_id).delete(synchronize_session=False)
+
+    # 6. Viewing bookings & availabilities (as student)
+    db.query(ViewingBooking).filter(ViewingBooking.student_id == user_id).delete(synchronize_session=False)
+    # Note: ViewingBooking.owner_id exists in the model but not in the actual DB table,
+    # so we skip it. ViewingAvailability.owner_id does exist for sublet owners.
+    db.query(ViewingAvailability).filter(ViewingAvailability.owner_id == user_id).delete(synchronize_session=False)
+
+    # 7. Saved listings, flags, reviews
+    db.query(SavedListing).filter(SavedListing.student_id == user_id).delete(synchronize_session=False)
+    db.query(Flag).filter(Flag.reporter_id == user_id).delete(synchronize_session=False)
+    db.query(Review).filter(Review.student_id == user_id).delete(synchronize_session=False)
+
+    # 8. Roommates: invites, requests, memberships, owned groups (cascade handles members/invites/requests)
+    db.query(RoommateInvite).filter(RoommateInvite.invited_user_id == user_id).delete(synchronize_session=False)
+    db.query(RoommateInvite).filter(RoommateInvite.invited_by_id == user_id).delete(synchronize_session=False)
+    db.query(RoommateRequest).filter(RoommateRequest.user_id == user_id).delete(synchronize_session=False)
+    db.query(RoommateGroupMember).filter(RoommateGroupMember.user_id == user_id).delete(synchronize_session=False)
+
+    # Delete owned groups (cascade will clean up their members/invites/requests)
+    owned_group_ids = [g.id for g in db.query(RoommateGroup.id).filter(RoommateGroup.owner_id == user_id).all()]
+    if owned_group_ids:
+        db.query(RoommateRequest).filter(RoommateRequest.group_id.in_(owned_group_ids)).delete(synchronize_session=False)
+        db.query(RoommateInvite).filter(RoommateInvite.group_id.in_(owned_group_ids)).delete(synchronize_session=False)
+        db.query(RoommateGroupMember).filter(RoommateGroupMember.group_id.in_(owned_group_ids)).delete(synchronize_session=False)
+        db.query(RoommateGroup).filter(RoommateGroup.owner_id == user_id).delete(synchronize_session=False)
+
+    # 9. Settings tables (these have cascade="all, delete-orphan" on the relationship,
+    #    but we delete explicitly to be safe with synchronize_session=False)
+    db.query(RoommateProfile).filter(RoommateProfile.user_id == user_id).delete(synchronize_session=False)
+    db.query(UserHousingPreferences).filter(UserHousingPreferences.user_id == user_id).delete(synchronize_session=False)
+    db.query(NotificationPreferences).filter(NotificationPreferences.user_id == user_id).delete(synchronize_session=False)
+
+    # 10. Delete the user
+    db.delete(user)
+
+# Property Helpers
 def get_property_owned_by(property_id: int, landlord_id: int, db: Session) -> Property:
     """Fetch a property and verify the landlord owns it."""
     prop = db.query(Property).filter(Property.id == property_id).first()
@@ -414,11 +488,16 @@ def calculate_group_compatibility(user_profile: RoommateProfile, group: Roommate
     return round(total / count) if count > 0 else 0
 
 # Writers Helper
-def get_owned_post(current_author, db: Session):
+def get_owned_post(post_id: int, current_author, db: Session) -> Post:
+    query = db.query(Post).filter(Post.id == post_id)
     if isinstance(current_author, User):
-        return db.query(Post).filter(Post.user_id == current_author.id)
+        query = query.filter(Post.user_id == current_author.id)
     else:
-        return db.query(Post).filter(Post.writer_id == current_author.id)
+        query = query.filter(Post.writer_id == current_author.id)
+    post = query.first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found or not yours")
+    return post
     
 # Vewing helpers
 def generate_hourly_slots(availability: ViewingAvailability) -> list[dict]:
@@ -439,24 +518,67 @@ def generate_hourly_slots(availability: ViewingAvailability) -> list[dict]:
 def build_booking_response(booking: ViewingBooking, db: Session) -> BookingResponse:
     slot = booking.slot
     student = db.query(User).filter(User.id == booking.student_id).first()
-    landlord = db.query(Landlord).filter(Landlord.id == booking.landlord_id).first()
-    listing = db.query(Listing).filter(Listing.id == booking.listing_id).first()
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+
+    if booking.listing_id:
+        landlord = db.query(Landlord).filter(Landlord.id == booking.landlord_id).first()
+        listing = db.query(Listing).filter(Listing.id == booking.listing_id).first()
+        prop = db.query(Property).filter(Property.id == listing.property_id).first()
+        host_id = landlord.id
+        host_name = f"{landlord.first_name} {landlord.last_name}"
+        title = prop.title
+        address = prop.address
+    else:
+        sublet = db.query(Sublet).filter(Sublet.id == booking.sublet_id).first()
+        owner = db.query(User).filter(User.id == booking.owner_id).first()
+        host_id = None
+        host_name = f"{owner.first_name} {owner.last_name}"
+        title = sublet.title
+        address = sublet.address
 
     return BookingResponse(
         id=booking.id,
         slot_id=booking.slot_id,
         listing_id=booking.listing_id,
+        sublet_id=booking.sublet_id,
         student_id=booking.student_id,
         student_name=f"{student.first_name} {student.last_name}",
-        landlord_id=booking.landlord_id,
-        landlord_name=f"{landlord.first_name} {landlord.last_name}",
+        landlord_id=host_id,
+        landlord_name=host_name,
         date=slot.date,
         start_time=slot.start_time,
         end_time=slot.end_time,
         status=booking.status,
         notes=booking.notes,
-        listing_title=prop.title,
-        listing_address=prop.address,
+        listing_title=title,
+        listing_address=address,
         created_at=booking.created_at,
     )
+
+def get_booking_details(booking: ViewingBooking, db: Session) -> dict:
+    slot = booking.slot
+
+    if booking.listing_id:
+        listing = db.query(Listing).filter(Listing.id == booking.listing_id).first()
+        prop = db.query(Property).filter(Property.id == listing.property_id).first()
+        title = prop.title
+        address = prop.address
+    else:
+        sublet = db.query(Sublet).filter(Sublet.id == booking.sublet_id).first()
+        title = sublet.title
+        address = sublet.address
+
+    return {
+        "listing_title": title,
+        "address": address,
+        "date": str(slot.date),
+        "start_time": str(slot.start_time),
+        "end_time": str(slot.end_time),
+    }
+
+def get_host_info(booking: ViewingBooking, db: Session):
+    if booking.landlord_id:
+        landlord = db.query(Landlord).filter(Landlord.id == booking.landlord_id).first()
+        return landlord.email, landlord.first_name, f"{landlord.first_name} {landlord.last_name}"
+    else:
+        owner = db.query(User).filter(User.id == booking.owner_id).first()
+        return owner.email, owner.first_name, f"{owner.first_name} {owner.last_name}"

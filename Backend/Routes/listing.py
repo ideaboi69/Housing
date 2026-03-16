@@ -6,9 +6,12 @@ from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation
 from Schemas.listingSchema import ListingCreate, ListingUpdate, ListingResponse, ListingDetailResponse, SubletConvert, ListingStatus, ListingImageResponse
 from Schemas.userSchema import UserRole
+from Schemas.propertySchema import PropertyType
 from Utils.security import get_current_user
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from helpers import get_landlord_for_user, require_landlord, build_listing_detail, get_listing_owned_by
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 listing_router = APIRouter()
 
@@ -58,6 +61,9 @@ async def upload_listing_images(listing_id: int, files: list[UploadFile] = File(
 
     images = []
     for i, file in enumerate(files):
+        if file.content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail=f"'{file.filename}' is not a valid image. Allowed: JPEG, PNG, WebP, GIF")
+
         image_url = upload_image_to_cloudinary(
             file,
             folder=f"listings/{listing_id}",
@@ -134,6 +140,10 @@ def list_listings(
 
     # property filters
     if property_type:
+        try:
+            PropertyType(property_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid property_type '{property_type}'. Valid values: {[e.value for e in PropertyType]}")
         query = query.filter(Property.property_type == property_type)
     if is_furnished is not None:
         query = query.filter(Property.is_furnished == is_furnished)
