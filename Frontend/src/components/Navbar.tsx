@@ -45,7 +45,6 @@ export function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
-  const failCount = useRef(0);
 
   const isLandlord = user?.role === "landlord";
 
@@ -53,36 +52,33 @@ export function Navbar() {
     ? [{ label: "Dashboard", path: "/landlord" }, ...navItems]
     : navItems;
 
-  // Poll unread message count — stops after 5 consecutive failures to avoid hammering a down API
+  // Poll unread message count
   const fetchUnread = useCallback(async () => {
     if (!user) return;
     try {
       const data = await api.messages.getUnreadCount();
       setUnreadCount(data.unread_count);
-      failCount.current = 0;
     } catch {
-      failCount.current = Math.min(failCount.current + 1, 5);
+      // silently fail
     }
   }, [user]);
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(() => {
-      if (failCount.current < 5) fetchUnread();
-    }, 15000);
+    const interval = setInterval(fetchUnread, 15000);
     return () => clearInterval(interval);
   }, [fetchUnread]);
 
-  // Close dropdown on outside click — listener always active, avoids add/remove churn
+  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
+    if (dropdownOpen) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [dropdownOpen]);
 
   // Close dropdown on route change
   useEffect(() => {
@@ -90,10 +86,39 @@ export function Navbar() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Hide navbar on auth pages and landing page — must be after all hooks
+  // Hide navbar on auth pages and admin — must be after all hooks
   const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding", "/admin"];
-  if (pathname === "/" || hideNavPaths.some((p) => pathname.startsWith(p))) {
+  if (hideNavPaths.some((p) => pathname.startsWith(p))) {
     return null;
+  }
+
+  // Minimal navbar on landing page — just logo + auth buttons
+  if (pathname === "/") {
+    return (
+      <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
+        <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[56px] md:h-[64px]">
+          <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.04em" }}>
+            cribb
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/login"
+              className="px-4 py-2 rounded-lg text-[#1B2D45]/70 hover:text-[#1B2D45] hover:bg-[#1B2D45]/5 transition-all"
+              style={{ fontSize: "14px", fontWeight: 600 }}
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              className="px-4 py-2 rounded-lg bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
+              style={{ fontSize: "14px", fontWeight: 700 }}
+            >
+              Sign up
+            </Link>
+          </div>
+        </div>
+      </nav>
+    );
   }
 
   const dropdownLinks = isLandlord

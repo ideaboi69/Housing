@@ -44,51 +44,79 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
   const [current, setCurrent] = useState(0);
   if (images.length === 0) {
     return (
-      <div className="w-full aspect-[4/3] bg-[#FAF8F4] rounded-2xl flex items-center justify-center">
-        <Package className="w-16 h-16 text-[#1B2D45]/10" />
+      <div className="w-full aspect-[16/10] bg-[#1B2D45]/[0.03] rounded-2xl flex items-center justify-center">
+        <Package className="w-20 h-20 text-[#1B2D45]/10" />
       </div>
     );
   }
 
   return (
-    <div className="relative rounded-2xl overflow-hidden bg-[#FAF8F4]">
+    <div className="relative rounded-2xl overflow-hidden bg-[#1B2D45]/[0.03] group">
       <img
         src={images[current]?.image_url}
         alt=""
-        className="w-full aspect-[4/3] object-cover"
+        className="w-full aspect-[16/10] object-cover"
       />
+      {/* Dark gradient at bottom for dots visibility */}
+      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+
       {images.length > 1 && (
         <>
+          {/* Large prev/next buttons — always visible */}
           <button
             onClick={() => setCurrent((p) => (p - 1 + images.length) % images.length)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center text-[#1B2D45]/60 hover:bg-white transition-all"
-            style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-[#1B2D45]/70 hover:text-[#1B2D45] transition-all"
+            style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-6 h-6" />
           </button>
           <button
             onClick={() => setCurrent((p) => (p + 1) % images.length)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 flex items-center justify-center text-[#1B2D45]/60 hover:bg-white transition-all"
-            style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-[#1B2D45]/70 hover:text-[#1B2D45] transition-all"
+            style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-6 h-6" />
           </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+
+          {/* Photo counter badge */}
+          <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-black/50 text-white backdrop-blur-sm" style={{ fontSize: "12px", fontWeight: 600 }}>
+            {current + 1} / {images.length}
+          </div>
+
+          {/* Dot indicators */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
             {images.map((_, i) => (
               <button
                 key={i}
                 onClick={() => setCurrent(i)}
                 className="transition-all"
                 style={{
-                  width: i === current ? 20 : 6,
-                  height: 6,
-                  borderRadius: 3,
+                  width: i === current ? 24 : 8,
+                  height: 8,
+                  borderRadius: 4,
                   background: i === current ? "white" : "rgba(255,255,255,0.5)",
                 }}
               />
             ))}
           </div>
         </>
+      )}
+
+      {/* Thumbnail strip below main image */}
+      {images.length > 1 && (
+        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-8 bg-gradient-to-t from-black/40 to-transparent hidden md:flex items-center justify-center gap-2">
+          {images.map((img, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              className={`w-16 h-12 rounded-lg overflow-hidden border-2 transition-all ${
+                i === current ? "border-white opacity-100" : "border-transparent opacity-60 hover:opacity-90"
+              }`}
+            >
+              <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -190,14 +218,14 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
-      <div className="max-w-[1000px] mx-auto px-4 md:px-6 py-6 md:py-8">
+      <div className="max-w-[1100px] mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Back */}
         <Link href="/marketplace" className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-5" style={{ fontSize: "12px", fontWeight: 600 }}>
           <ArrowLeft className="w-4 h-4" /> Back to Marketplace
         </Link>
 
-        {/* Main layout */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_380px] gap-6">
+        {/* Main layout — image takes more space */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-6">
           {/* Left — Images + Description */}
           <div>
             <ImageGallery images={item.images} />
