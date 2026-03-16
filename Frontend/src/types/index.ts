@@ -816,6 +816,7 @@ export interface AdminUserResponse {
   email_verified: boolean;
   is_writable?: boolean;
   write_access_requested?: boolean;
+  is_early_adopter?: boolean;
   created_at: string;
   updated_at: string;
 }

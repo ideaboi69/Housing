@@ -6,7 +6,8 @@ import {
   LayoutDashboard, Users, Building2, Home, Flag, PenLine, FileText,
   Shield, ShieldCheck, ShieldX, Trash2, Check, X, Search,
   LogOut, ChevronDown, Eye, Ban, UserCheck, UserX, Loader2,
-  Mail, Calendar, TrendingUp, AlertCircle, CheckCircle2,
+  Mail, Calendar, TrendingUp, AlertCircle, CheckCircle2, Star,
+  UsersRound, ShoppingBag,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
@@ -14,13 +15,14 @@ import { toast } from "sonner";
 import type {
   AdminStatsResponse, AdminUserResponse, AdminLandlordResponse,
   AdminListingResponse, AdminFlagResponse, WriterResponse, PostListResponse,
+  MarketplaceItemListResponse, GroupCardResponse,
 } from "@/types";
 
 /* ════════════════════════════════════════════════════════
    Helpers
    ════════════════════════════════════════════════════════ */
 
-type Tab = "overview" | "users" | "landlords" | "listings" | "flags" | "writers" | "posts";
+type Tab = "overview" | "users" | "landlords" | "listings" | "flags" | "writers" | "posts" | "groups" | "marketplace";
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -57,6 +59,8 @@ const TABS: { key: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "flags", label: "Flags", icon: Flag },
   { key: "writers", label: "Writers", icon: PenLine },
   { key: "posts", label: "Posts", icon: FileText },
+  { key: "groups", label: "Groups", icon: UsersRound },
+  { key: "marketplace", label: "Market", icon: ShoppingBag },
 ];
 
 function Sidebar({ active, onChange, flagCount, onLogout, adminName }: {
@@ -240,6 +244,12 @@ function UsersTab({ users, onRefresh }: { users: AdminUserResponse[]; onRefresh:
   const handleRevokeWrite = async (id: number) => {
     try { await api.admin.revokeWrite(id); toast.success("Write access revoked"); onRefresh(); } catch { toast.error("Failed"); }
   };
+  const handleGrantOG = async (id: number) => {
+    try { await api.admin.grantOG(id); toast.success("OG badge granted"); onRefresh(); } catch { toast.error("Failed"); }
+  };
+  const handleRevokeOG = async (id: number) => {
+    try { await api.admin.revokeOG(id); toast.success("OG badge revoked"); onRefresh(); } catch { toast.error("Failed"); }
+  };
 
   return (
     <div>
@@ -257,6 +267,9 @@ function UsersTab({ users, onRefresh }: { users: AdminUserResponse[]; onRefresh:
               <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
                 {u.first_name} {u.last_name}
                 {u.email_verified && <ShieldCheck className="w-3.5 h-3.5 text-[#4ADE80]" />}
+                {u.is_early_adopter && <span className="px-1.5 py-0.5 rounded text-white flex items-center gap-0.5" style={{ fontSize: "8px", fontWeight: 800, background: "linear-gradient(135deg, #3B82F6, #2563EB)", boxShadow: "0 1px 4px rgba(37,99,235,0.3)" }}>
+                  <Star className="w-2 h-2" fill="white" /> OG
+                </span>}
                 {u.is_writable && <Badge label="Writer" color="#A78BFA" />}
                 {u.write_access_requested && !u.is_writable && <Badge label="Write Requested" color="#FFB627" />}
               </div>
@@ -264,6 +277,11 @@ function UsersTab({ users, onRefresh }: { users: AdminUserResponse[]; onRefresh:
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {!u.email_verified && <ActionButton onClick={() => handleVerify(u.id)} icon={ShieldCheck} label="Verify" color="#4ADE80" />}
+              {!u.is_early_adopter ? (
+                <ActionButton onClick={() => handleGrantOG(u.id)} icon={Star} label="Grant OG" color="#3B82F6" />
+              ) : (
+                <ActionButton onClick={() => handleRevokeOG(u.id)} icon={Star} label="Revoke OG" color="#98A3B0" />
+              )}
               {u.write_access_requested && !u.is_writable && (
                 <>
                   <ActionButton onClick={() => handleGrantWrite(u.id)} icon={Check} label="Grant" color="#4ADE80" />
@@ -519,6 +537,113 @@ function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: 
 }
 
 /* ════════════════════════════════════════════════════════
+   Groups Tab
+   ════════════════════════════════════════════════════════ */
+
+function GroupsTab({ groups, onRefresh }: { groups: GroupCardResponse[]; onRefresh: () => void }) {
+  const [search, setSearch] = useState("");
+  const filtered = groups.filter((g) => {
+    const q = search.toLowerCase();
+    return g.name.toLowerCase().includes(q) || (g.description || "").toLowerCase().includes(q);
+  });
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this group? This cannot be undone.")) return;
+    try { await api.roommates.deleteGroup(id); toast.success("Group deleted"); onRefresh(); } catch { toast.error("Failed"); }
+  };
+
+  return (
+    <div>
+      <h2 className="text-white mb-4" style={{ fontSize: "20px", fontWeight: 800 }}>Roommate Groups ({groups.length})</h2>
+      <SearchBar value={search} onChange={setSearch} placeholder="Search by group name..." />
+      <div className="space-y-1">
+        {filtered.map((g) => (
+          <div key={g.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
+            <div className="w-9 h-9 rounded-full bg-[#2EC4B6]/10 flex items-center justify-center shrink-0">
+              <UsersRound className="w-4 h-4 text-[#2EC4B6]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
+                {g.name}
+                <Badge label={`${g.current_size}/${g.total_capacity}`} color="#2EC4B6" />
+                {g.spots_remaining > 0 && <Badge label={`${g.spots_remaining} open`} color="#FFB627" />}
+                {g.has_place && <Badge label="Has place" color="#4ADE80" />}
+              </div>
+              <div className="text-white/30" style={{ fontSize: "11px" }}>
+                {g.description ? g.description.slice(0, 80) + (g.description.length > 80 ? "..." : "") : "No description"}
+                {g.rent_per_person ? ` · $${g.rent_per_person}/person` : ""}
+                {g.move_in_timing ? ` · ${g.move_in_timing}` : ""}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <ActionButton onClick={() => handleDelete(g.id)} icon={Trash2} label="Delete" danger />
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <div className="text-center py-12 text-white/20" style={{ fontSize: "13px" }}>No groups found</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Marketplace Tab
+   ════════════════════════════════════════════════════════ */
+
+function MarketplaceTab({ items, onRefresh }: { items: MarketplaceItemListResponse[]; onRefresh: () => void }) {
+  const [search, setSearch] = useState("");
+  const filtered = items.filter((i) => {
+    const q = search.toLowerCase();
+    return i.title.toLowerCase().includes(q) || i.seller_name.toLowerCase().includes(q);
+  });
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this marketplace item?")) return;
+    try { await api.marketplace.deleteItem(id); toast.success("Item deleted"); onRefresh(); } catch { toast.error("Failed"); }
+  };
+
+  const statusColor = (s: string) => s === "available" ? "#4ADE80" : s === "sold" ? "#98A3B0" : s === "draft" ? "#FFB627" : "#98A3B0";
+  const pricingLabel = (i: MarketplaceItemListResponse) => {
+    if (i.pricing_type === "free") return "FREE";
+    return `$${i.price ?? 0}${i.pricing_type === "negotiable" ? " Neg" : ""}`;
+  };
+
+  return (
+    <div>
+      <h2 className="text-white mb-4" style={{ fontSize: "20px", fontWeight: 800 }}>Marketplace Items ({items.length})</h2>
+      <SearchBar value={search} onChange={setSearch} placeholder="Search by title or seller..." />
+      <div className="space-y-1">
+        {filtered.map((i) => (
+          <div key={i.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
+            {i.primary_image ? (
+              <img src={i.primary_image} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-[#FF6B35]/10 flex items-center justify-center shrink-0">
+                <ShoppingBag className="w-4 h-4 text-[#FF6B35]" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
+                {i.title}
+                <Badge label={i.status} color={statusColor(i.status)} />
+                <span className="text-[#4ADE80]" style={{ fontSize: "12px", fontWeight: 800 }}>{pricingLabel(i)}</span>
+              </div>
+              <div className="text-white/30" style={{ fontSize: "11px" }}>
+                By {i.seller_name} · {i.category} · {i.condition} · {i.view_count} views · {timeAgo(i.created_at)}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <ActionButton onClick={() => handleDelete(i.id)} icon={Trash2} label="Delete" danger />
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <div className="text-center py-12 text-white/20" style={{ fontSize: "13px" }}>No items found</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
    Main Dashboard Page
    ════════════════════════════════════════════════════════ */
 
@@ -536,6 +661,8 @@ export default function AdminDashboard() {
   const [flags, setFlags] = useState<AdminFlagResponse[]>([]);
   const [writers, setWriters] = useState<WriterResponse[]>([]);
   const [posts, setPosts] = useState<PostListResponse[]>([]);
+  const [groups, setGroups] = useState<GroupCardResponse[]>([]);
+  const [marketplaceItems, setMarketplaceItems] = useState<MarketplaceItemListResponse[]>([]);
 
   // Auth check
   useEffect(() => {
@@ -575,6 +702,10 @@ export default function AdminDashboard() {
       } else if (tab === "posts") {
         const p = await api.admin.getPosts();
         setPosts(p);
+      } else if (tab === "groups") {
+        try { const g = await api.roommates.browseGroups(); setGroups(g); } catch { setGroups([]); }
+      } else if (tab === "marketplace") {
+        try { const m = await api.marketplace.getItems(); setMarketplaceItems(m); } catch { setMarketplaceItems([]); }
       }
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -657,6 +788,8 @@ export default function AdminDashboard() {
             {tab === "flags" && <FlagsTab flags={flags} onRefresh={fetchData} />}
             {tab === "writers" && <WritersTab writers={writers} onRefresh={fetchData} />}
             {tab === "posts" && <PostsTab posts={posts} onRefresh={fetchData} />}
+            {tab === "groups" && <GroupsTab groups={groups} onRefresh={fetchData} />}
+            {tab === "marketplace" && <MarketplaceTab items={marketplaceItems} onRefresh={fetchData} />}
           </motion.div>
         </AnimatePresence>
       </main>

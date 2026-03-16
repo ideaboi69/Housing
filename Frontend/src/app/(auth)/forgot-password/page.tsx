@@ -1,4 +1,5 @@
 "use client";
+import { AuthBackground } from "@/components/ui/AuthBackground";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -34,8 +35,9 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
-      <div className="w-full max-w-[400px]">
+    <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4 relative">
+        <AuthBackground />
+      <div className="w-full max-w-[400px] relative z-10">
         <div className="text-center mb-8">
           <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "32px", fontWeight: 900, letterSpacing: "-0.04em" }}>
             cribb
@@ -52,7 +54,7 @@ export default function ForgotPasswordPage() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl border border-black/[0.06] p-6">
+              <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-white/60 p-6" style={{ boxShadow: "0 8px 40px rgba(27,45,69,0.08)" }}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Email</label>

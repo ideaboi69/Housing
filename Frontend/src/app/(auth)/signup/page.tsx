@@ -1,4 +1,5 @@
 "use client";
+import { AuthBackground } from "@/components/ui/AuthBackground";
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -108,8 +109,9 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
-      <div className="w-full max-w-[400px]">
+    <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4 relative">
+        <AuthBackground />
+      <div className="w-full max-w-[400px] relative z-10">
         <div className="text-center mb-8">
           <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "32px", fontWeight: 900, letterSpacing: "-0.04em" }}>
             cribb
@@ -124,7 +126,7 @@ export default function SignupPage() {
                 <p className="mt-1 text-[#1B2D45]/50" style={{ fontSize: "14px" }}>Create your account with your @uoguelph.ca email</p>
               </div>
 
-              <div className="bg-white rounded-xl border border-black/[0.06] p-6">
+              <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-white/60 p-6" style={{ boxShadow: "0 8px 40px rgba(27,45,69,0.08)" }}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div>

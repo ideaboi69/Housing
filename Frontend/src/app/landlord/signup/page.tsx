@@ -1,4 +1,5 @@
 "use client";
+import { AuthBackground } from "@/components/ui/AuthBackground";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -193,8 +194,9 @@ export default function LandlordSignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-[500px]">
+    <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4 py-10 relative">
+        <AuthBackground />
+      <div className="w-full max-w-[500px] relative z-10">
         <Link href="/" className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-6" style={{ fontSize: "13px", fontWeight: 500 }}>
           <ArrowLeft className="w-4 h-4" /> Back to cribb
         </Link>

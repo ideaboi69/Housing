@@ -505,24 +505,18 @@ export const messages = {
     }),
 
   // Send message in existing conversation (student)
-  sendMessage: (conversationId: number, data: MessageCreate) => {
-    if (!data.content?.trim()) throw new Error("Message content cannot be empty");
-    if (data.content.length > 5000) throw new Error("Message exceeds 5000 characters");
-    return request<MessageResponse>(`/api/messages/conversations/${conversationId}`, {
+  sendMessage: (conversationId: number, data: MessageCreate) =>
+    request<MessageResponse>(`/api/messages/conversations/${conversationId}`, {
       method: "POST",
       body: JSON.stringify(data),
-    });
-  },
+    }),
 
   // Landlord replies
-  landlordReply: (conversationId: number, data: MessageCreate) => {
-    if (!data.content?.trim()) throw new Error("Message content cannot be empty");
-    if (data.content.length > 5000) throw new Error("Message exceeds 5000 characters");
-    return request<MessageResponse>(`/api/messages/landlord/conversations/${conversationId}`, {
+  landlordReply: (conversationId: number, data: MessageCreate) =>
+    request<MessageResponse>(`/api/messages/landlord/conversations/${conversationId}`, {
       method: "POST",
       body: JSON.stringify(data),
-    });
-  },
+    }),
 
   // Get all conversations (student)
   getConversations: () =>
@@ -764,6 +758,8 @@ export const admin = {
   rejectWrite: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/reject-write`, { method: "PATCH" }),
   revokeWrite: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/revoke-write`, { method: "PATCH" }),
   getPendingWriters: () => request<AdminUserResponse[]>("/api/admin/users/pending-writers"),
+  grantOG: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/grant-og`, { method: "PATCH" }),
+  revokeOG: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/revoke-og`, { method: "PATCH" }),
 
   // Landlords
   getLandlords: () => request<AdminLandlordResponse[]>("/api/admin/landlords"),

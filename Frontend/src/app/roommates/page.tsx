@@ -116,10 +116,14 @@ function DossierGroupCard({
                 {group.members.map((m) => (
                   <div
                     key={m.id}
-                    className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/25 to-[#FFB627]/25 flex items-center justify-center border-[3px] border-white relative"
+                    className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/25 to-[#FFB627]/25 flex items-center justify-center border-[3px] border-white relative overflow-hidden"
                     style={{ boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}
                   >
-                    <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{m.firstName[0]}</span>
+                    {(m as typeof m & { avatar?: string }).avatar ? (
+                      <img src={(m as typeof m & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{m.firstName[0]}</span>
+                    )}
                   </div>
                 ))}
                 {/* Empty seat(s) */}
@@ -241,8 +245,12 @@ function IndividualCard({ profile }: { profile: LifestyleProfile }) {
       whileHover={{ boxShadow: "7px 7px 0px rgba(27,45,69,0.12)" }}
     >
       <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 border-[2.5px] border-[#1B2D45]/10" style={{ boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
-          <span style={{ fontSize: "15px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 border-[2.5px] border-[#1B2D45]/10 overflow-hidden" style={{ boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
+          {(profile as typeof profile & { avatar?: string }).avatar ? (
+            <img src={(profile as typeof profile & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span style={{ fontSize: "15px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">

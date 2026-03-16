@@ -693,6 +693,117 @@ function PostModal({ onClose }: { onClose: () => void }) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   TIP MODAL
+   ═══════════════════════════════════════════════════════ */
+
+function TipModal({ onClose }: { onClose: () => void }) {
+  const [tip, setTip] = useState("");
+  const [category, setCategory] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const tipCategories = [
+    { key: "event", label: "Event", emoji: "🎉" },
+    { key: "deal", label: "Deal / Discount", emoji: "💰" },
+    { key: "news", label: "Campus News", emoji: "📰" },
+    { key: "food", label: "Food Spot", emoji: "🍕" },
+    { key: "warning", label: "Heads Up", emoji: "⚠️" },
+    { key: "other", label: "Other", emoji: "💡" },
+  ];
+
+  const handleSubmit = async () => {
+    if (!tip.trim() || submitting) return;
+    setSubmitting(true);
+    // Send tip to Formspree or backend
+    try {
+      await fetch("https://formspree.io/f/xbdazpzg", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "Bubble Tip",
+          category: category || "general",
+          tip: tip.trim(),
+        }),
+      });
+    } catch { /* still show success */ }
+    setSent(true);
+    setSubmitting(false);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <motion.div initial={{ scale: 0.92, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.92, opacity: 0, y: 30 }}
+        transition={{ type: "spring", stiffness: 350, damping: 28 }}
+        className="bg-white rounded-2xl w-full overflow-hidden" style={{ maxWidth: "440px", boxShadow: "0 24px 80px rgba(0,0,0,0.15)" }}>
+
+        <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
+          <div>
+            <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>Submit a Tip</h3>
+            <p className="text-[#98A3B0]" style={{ fontSize: "10px" }}>A writer may feature your tip in a post</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-[#98A3B0] hover:bg-[#1B2D45]/5 transition-colors"><X className="w-4 h-4" /></button>
+        </div>
+
+        {sent ? (
+          <div className="px-5 py-10 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#4ADE80]/10 flex items-center justify-center mx-auto mb-3">
+              <Sparkles className="w-7 h-7 text-[#4ADE80]" />
+            </div>
+            <h4 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>Tip submitted!</h4>
+            <p className="text-[#98A3B0] mt-1 mb-4" style={{ fontSize: "12px" }}>Thanks for sharing. A writer will review this and may feature it.</p>
+            <button onClick={onClose} className="px-5 py-2 rounded-xl bg-[#1B2D45] text-white" style={{ fontSize: "13px", fontWeight: 700 }}>Done</button>
+          </div>
+        ) : (
+          <div className="px-5 py-4 space-y-4">
+            {/* Category */}
+            <div>
+              <label className="text-[#5C6B7A] block mb-2" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>What kind of tip?</label>
+              <div className="flex flex-wrap gap-1.5">
+                {tipCategories.map((cat) => (
+                  <button key={cat.key} onClick={() => setCategory(cat.key)}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full border transition-colors ${category === cat.key ? "border-[#FF6B35] bg-[#FF6B35]/[0.06] text-[#FF6B35]" : "border-black/[0.06] text-[#5C6B7A] hover:border-black/15 bg-white"}`}
+                    style={{ fontSize: "11px", fontWeight: 600 }}>
+                    {cat.emoji} {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tip content */}
+            <div>
+              <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Your tip</label>
+              <textarea
+                value={tip}
+                onChange={(e) => setTip(e.target.value)}
+                placeholder="What should the community know about? An upcoming event, a deal, campus news..."
+                rows={4}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all resize-none"
+                style={{ fontSize: "13px", lineHeight: 1.6 }}
+              />
+            </div>
+
+            {/* Submit */}
+            <button
+              onClick={handleSubmit}
+              disabled={!tip.trim() || submitting}
+              className="w-full py-2.5 rounded-xl bg-[#FFB627] text-white hover:bg-[#e5a420] disabled:opacity-40 transition-all"
+              style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,182,39,0.3)" }}
+            >
+              {submitting ? "Sending..." : "💡 Submit Tip"}
+            </button>
+
+            <p className="text-[#98A3B0] text-center" style={{ fontSize: "10px" }}>Tips are anonymous. Writers will credit you if they use your tip.</p>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
    HERO
    ═══════════════════════════════════════════════════════ */
 
@@ -831,7 +942,7 @@ function FilterBar({ activeCategory, onSelectCategory, sortMode, onSelectSort, i
    SIDEBAR
    ═══════════════════════════════════════════════════════ */
 
-function Sidebar({ isWriter, onCreatePost, onApply }: { isWriter: boolean; onCreatePost: () => void; onApply: () => void }) {
+function Sidebar({ isWriter, onCreatePost, onApply, onTip }: { isWriter: boolean; onCreatePost: () => void; onApply: () => void; onTip: () => void }) {
   const trendingPosts = useMemo(() => [...POSTS].sort((a, b) => b.upvotes - a.upvotes).slice(0, 5), []);
 
   return (
@@ -876,7 +987,7 @@ function Sidebar({ isWriter, onCreatePost, onApply }: { isWriter: boolean; onCre
           <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Submit a Tip</h4>
         </div>
         <p className="text-[#98A3B0] mb-3" style={{ fontSize: "11px", lineHeight: 1.5 }}>Know something the community should hear? Send us a tip and a writer may feature it.</p>
-        <button className="w-full py-2 rounded-xl border border-[#FFB627]/20 text-[#B8860B] hover:bg-[#FFB627]/5 transition-colors" style={{ fontSize: "12px", fontWeight: 600 }}>
+        <button onClick={onTip} className="w-full py-2 rounded-xl border border-[#FFB627]/20 text-[#B8860B] hover:bg-[#FFB627]/5 transition-colors" style={{ fontSize: "12px", fontWeight: 600 }}>
           💡 Send a Tip
         </button>
       </div>
@@ -925,6 +1036,7 @@ export default function TheBubblePage() {
   const [sortMode, setSortMode] = useState<SortMode>("trending");
   const [showPostModal, setShowPostModal] = useState(false);
   const [showWriterModal, setShowWriterModal] = useState(false);
+  const [showTipModal, setShowTipModal] = useState(false);
   const [isWriter, setIsWriter] = useState(false);
   const [writerPending, setWriterPending] = useState(false);
   const { user } = useAuthStore();
@@ -1055,7 +1167,7 @@ export default function TheBubblePage() {
             )}
           </div>
 
-          {!isMobile && <Sidebar isWriter={isWriter} onCreatePost={() => setShowPostModal(true)} onApply={() => setShowWriterModal(true)} />}
+          {!isMobile && <Sidebar isWriter={isWriter} onCreatePost={() => setShowPostModal(true)} onApply={() => setShowWriterModal(true)} onTip={() => setShowTipModal(true)} />}
         </div>
       </div>
 
@@ -1076,6 +1188,11 @@ export default function TheBubblePage() {
       <AnimatePresence>
         {showWriterModal && (
           <WriterModal onClose={() => setShowWriterModal(false)} onApproved={() => { setWriterPending(true); setShowWriterModal(false); }} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showTipModal && (
+          <TipModal onClose={() => setShowTipModal(false)} />
         )}
       </AnimatePresence>
       </div>{/* end z-10 content wrapper */}
