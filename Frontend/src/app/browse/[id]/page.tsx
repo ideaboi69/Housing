@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { getAmenityChecklist } from "@/lib/amenities";
+import { CribbMap } from "@/components/ui/CribbMap";
+import { mockCoordinates } from "@/lib/mock-data";
 import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
 
 /* ── Animation helpers ─────────────────────────── */
@@ -430,16 +432,16 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   </h3>
                   <div className="space-y-3 mt-3">
                     {[
-                      { label: "Price vs Market", score: healthScore.price_vs_market_score, emoji: "📊" },
-                      { label: "Landlord Reputation", score: healthScore.landlord_reputation_score, emoji: "⭐" },
-                      { label: "Maintenance", score: healthScore.maintenance_score, emoji: "🔧" },
-                      { label: "Lease Clarity", score: healthScore.lease_clarity_score, emoji: "📋" },
+                      { label: "Price", score: healthScore.price_vs_market_score, emoji: "📊" },
+                      { label: "Location", score: (healthScore as any).proximity_score ?? healthScore.lease_clarity_score, emoji: "📍" },
+                      { label: "Amenities", score: (healthScore as any).amenity_score ?? 50, emoji: "🏠" },
+                      { label: "Tenant Reviews", score: healthScore.landlord_reputation_score, emoji: "⭐" },
                     ].map((item, i) => (
                       <motion.div key={item.label} className="flex items-center gap-3"
                         initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }} transition={{ delay: i * 0.1, type: "spring", stiffness: 200 }}>
                         <span style={{ fontSize: "14px" }}>{item.emoji}</span>
-                        <span className="text-[#1B2D45]/60 w-[130px] shrink-0" style={{ fontSize: "12px", fontWeight: 500 }}>{item.label}</span>
+                        <span className="text-[#1B2D45]/60 w-[120px] shrink-0" style={{ fontSize: "12px", fontWeight: 500 }}>{item.label}</span>
                         <AnimatedBar score={item.score ?? 0} color={getScoreColor(item.score ?? 0)} />
                         <span className="w-8 text-right shrink-0" style={{ fontSize: "13px", fontWeight: 800, color: getScoreColor(item.score ?? 0) }}>
                           {item.score ?? "—"}
@@ -447,6 +449,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                       </motion.div>
                     ))}
                   </div>
+                  {healthScore.landlord_reputation_score === 50 && (
+                    <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>New listing — review score will update as tenants leave ratings.</p>
+                  )}
                 </motion.div>
               )}
 
@@ -586,15 +591,13 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             {/* Map */}
             <div className="rounded-xl border border-black/[0.04] overflow-hidden bg-white/90 backdrop-blur-xl"
               style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-              <div className="h-[160px] bg-[#f0ece6] flex items-center justify-center">
-                <div className="text-center">
-                  <span style={{ fontSize: "28px" }}>📍</span>
-                  <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px", fontWeight: 500 }}>Guelph, ON</p>
-                </div>
-              </div>
-              <div className="p-2.5">
-                <p className="text-[#1B2D45]/40" style={{ fontSize: "10px" }}>{listing.address}</p>
-              </div>
+              <CribbMap
+                lat={mockCoordinates[listing.id]?.lat}
+                lng={mockCoordinates[listing.id]?.lng}
+                address={listing.address}
+                height="200px"
+                zoom={15}
+              />
             </div>
           </motion.div>
         </motion.div>

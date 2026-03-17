@@ -25,10 +25,10 @@ const landmarks = [
 ];
 
 const healthBreakdowns = [
-  { emoji: "📊", label: "Price vs Market", weight: 30, score: 82, color: "#2EC4B6" },
-  { emoji: "⭐", label: "Landlord Reputation", weight: 30, score: 91, color: "#4ADE80" },
-  { emoji: "🔧", label: "Maintenance Speed", weight: 20, score: 88, color: "#4ADE80" },
-  { emoji: "📋", label: "Lease Clarity", weight: 20, score: 85, color: "#2EC4B6" },
+  { emoji: "📊", label: "Price", score: 82, color: "#2EC4B6" },
+  { emoji: "📍", label: "Location", score: 91, color: "#4ADE80" },
+  { emoji: "🏠", label: "Amenities", score: 78, color: "#2EC4B6" },
+  { emoji: "⭐", label: "Tenant Reviews", score: 88, color: "#4ADE80" },
 ];
 
 const howItWorksSteps = [
@@ -298,13 +298,13 @@ export default function HomePage() {
           <div className="bg-white rounded-3xl border border-black/5 p-10 flex flex-col md:flex-row gap-10 md:gap-16 items-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <div className="flex-1 min-w-0">
               <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.2 }}>Every listing gets<br />a Cribb Score</h2>
-              <p className="mt-4 text-[#1B2D45]/50 max-w-[440px]" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.7 }}>No more guessing. Every score is computed from real data and student reviews — so you can compare listings with confidence.</p>
+              <p className="mt-4 text-[#1B2D45]/50 max-w-[440px]" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.7 }}>No more guessing. Every listing is scored 0-100 based on price, location, amenities, and real tenant reviews — so you can compare with confidence.</p>
               <div className="flex items-center gap-5 mt-7 flex-wrap">
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#4ADE80]" /><span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>85+ Great Match</span></div>
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#FFB627]" /><span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>65-84 Good Option</span></div>
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#E71D36]" /><span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>&lt;65 Review Carefully</span></div>
               </div>
-              <p className="mt-5 text-[#1B2D45]/35" style={{ fontSize: "12px", fontWeight: 400, fontStyle: "italic" }}>No hidden ratings. No fake reviews. Just transparent data.</p>
+              <p className="mt-5 text-[#1B2D45]/35" style={{ fontSize: "12px", fontWeight: 400, fontStyle: "italic" }}>Scores update as tenant reviews come in. New listings are scored on property data alone.</p>
             </div>
             <div className="w-full md:w-[380px] shrink-0">
               <div className="bg-white rounded-2xl border border-black/[0.06] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
@@ -318,7 +318,6 @@ export default function HomePage() {
                           <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>{b.label}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 500 }}>{b.weight}%</span>
                           <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{b.score}</span>
                         </div>
                       </div>

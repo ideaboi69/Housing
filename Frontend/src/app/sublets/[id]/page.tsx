@@ -20,6 +20,7 @@ import {
   GraduationCap, Zap, Star,
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
+import { CribbMap } from "@/components/ui/CribbMap";
 import type { ReviewResponse } from "@/types";
 
 /* ── Helpers ───────────────────────────────────── */
@@ -397,15 +398,11 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
 
               {/* Map */}
               <div className="mt-4 rounded-xl border border-black/[0.04] overflow-hidden">
-                <div className="h-[160px] bg-[#f0ece6] flex items-center justify-center">
-                  <div className="text-center">
-                    <span style={{ fontSize: "28px" }}>📍</span>
-                    <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px", fontWeight: 500 }}>{sublet.neighborhood}, Guelph</p>
-                  </div>
-                </div>
-                <div className="p-2.5">
-                  <p className="text-[#1B2D45]/40" style={{ fontSize: "10px" }}>{sublet.address}</p>
-                </div>
+                <CribbMap
+                  address={sublet.address}
+                  height="180px"
+                  zoom={15}
+                />
               </div>
 
               {/* Contact Card */}

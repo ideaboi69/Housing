@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Heart, Pin, X, ZoomIn, ZoomOut } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Pin, X, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { formatPrice, formatPropertyType } from "@/lib/utils";
 import { mockHealthScores, mockCoordinates } from "@/lib/mock-data";
+import { GUELPH_LANDMARKS } from "@/components/ui/CribbMap";
 import type { ListingDetailResponse } from "@/types";
 
-// UofG campus center
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
 const GUELPH_CENTER = { lat: 43.5305, lng: -80.2262 };
 
 interface MapViewProps {
@@ -19,245 +20,174 @@ interface MapViewProps {
 
 export function MapView({ listings, pinnedIds, onTogglePin }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletMap = useRef<any>(null);
+  const mapInstance = useRef<any>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mapReady, setMapReady] = useState(false);
-
+  const [mapError, setMapError] = useState(false);
   const selectedListing = listings.find((l) => l.id === selectedId);
 
-  // Load Leaflet dynamically (client-side only)
   useEffect(() => {
-    if (typeof window === "undefined" || !mapRef.current) return;
-
-    // Add Leaflet CSS
-    if (!document.querySelector('link[href*="leaflet"]')) {
-      const link = document.createElement("link");
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
+    if (typeof window === "undefined" || !mapRef.current || !MAPBOX_TOKEN) {
+      setMapError(true);
+      return;
     }
 
-    // Load Leaflet JS
-    const loadLeaflet = async () => {
-      const L = (await import("leaflet")).default;
+    let cancelled = false;
+    let map: any = null;
 
-      // Fix default marker icons
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      });
-
-      if (leafletMap.current) return; // Already initialized
-
-      const map = L.map(mapRef.current!, {
-        center: [GUELPH_CENTER.lat, GUELPH_CENTER.lng],
-        zoom: 14,
-        zoomControl: false,
-      });
-
-      // Use CartoDB Voyager tiles — clean, modern look, free
-      L.tileLayer(
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-        {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-          maxZoom: 19,
+    async function initMap() {
+      try {
+        // Load CSS
+        if (!document.querySelector('link[href*="mapbox-gl"]')) {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = "https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css";
+          document.head.appendChild(link);
+          // Wait for CSS to load
+          await new Promise((resolve) => { link.onload = resolve; setTimeout(resolve, 1000); });
         }
-      ).addTo(map);
 
-      // UofG campus marker
-      const campusIcon = L.divIcon({
-        html: `<div style="
-          width: 32px; height: 32px; background: #1B2D45; border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 16px; border: 3px solid white;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        ">🎓</div>`,
-        className: "",
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      });
+        // Dynamic import with workaround for Next.js SSR
+        const mapboxModule = await import("mapbox-gl");
+        const mapboxgl = (mapboxModule as any).default || mapboxModule;
 
-      L.marker([43.5305, -80.2262], { icon: campusIcon })
-        .addTo(map)
-        .bindTooltip("University of Guelph", {
-          permanent: false,
-          direction: "top",
-          offset: [0, -16],
+        if (cancelled || !mapRef.current) return;
+
+        (mapboxgl as any).accessToken = MAPBOX_TOKEN;
+
+        map = new mapboxgl.Map({
+          container: mapRef.current,
+          style: "mapbox://styles/mapbox/light-v11",
+          center: [GUELPH_CENTER.lng, GUELPH_CENTER.lat],
+          zoom: 14,
+          attributionControl: false,
         });
 
-      // Add listing markers
-      listings.forEach((listing) => {
-        const coords = mockCoordinates[listing.id];
-        if (!coords) return;
+        map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-left");
 
-        const score = mockHealthScores[listing.id] ?? 0;
-        const color = score >= 85 ? "#4ADE80" : score >= 65 ? "#FFB627" : "#E71D36";
-        const price = Math.round(Number(listing.rent_per_room));
+        map.on("load", () => {
+          if (cancelled) return;
 
-        const icon = L.divIcon({
-          html: `<div style="
-            background: white; border-radius: 20px; padding: 4px 10px;
-            font-size: 13px; font-weight: 800; color: #FF6B35;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-            border: 2px solid ${color};
-            cursor: pointer; white-space: nowrap;
-            display: flex; align-items: center; gap: 4px;
-            transition: transform 0.15s ease;
-          " class="listing-pin" data-id="${listing.id}">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${color}; display: inline-block;"></span>
-            $${price}
-          </div>`,
-          className: "",
-          iconSize: [80, 30],
-          iconAnchor: [40, 15],
+          // Campus marker
+          const campusEl = document.createElement("div");
+          campusEl.innerHTML = '<div style="width:36px;height:36px;background:#1B2D45;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 3px 12px rgba(0,0,0,0.2);">🎓</div>';
+          new mapboxgl.Marker({ element: campusEl })
+            .setLngLat([GUELPH_CENTER.lng, GUELPH_CENTER.lat])
+            .setPopup(new mapboxgl.Popup({ offset: 20, closeButton: false }).setHTML('<div style="font-size:12px;font-weight:600;padding:2px 4px;">University of Guelph</div>'))
+            .addTo(map);
+
+          // Landmarks
+          GUELPH_LANDMARKS.filter((lm) => lm.type !== "campus").forEach((lm) => {
+            const el = document.createElement("div");
+            el.innerHTML = '<div style="width:26px;height:26px;background:#1B2D45;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.12);cursor:pointer;">' + lm.emoji + '</div>';
+            new mapboxgl.Marker({ element: el })
+              .setLngLat([lm.lng, lm.lat])
+              .setPopup(new mapboxgl.Popup({ offset: 16, closeButton: false }).setHTML('<div style="font-size:11px;font-weight:600;padding:2px 4px;">' + lm.name + '</div>'))
+              .addTo(map);
+          });
+
+          // Listing pins
+          listings.forEach((listing) => {
+            const coords = mockCoordinates[listing.id];
+            if (!coords) return;
+            const score = mockHealthScores[listing.id] ?? 0;
+            const color = score >= 85 ? "#4ADE80" : score >= 65 ? "#FFB627" : "#E71D36";
+            const price = Math.round(Number(listing.rent_per_room));
+            const el = document.createElement("div");
+            el.innerHTML = '<div style="background:white;border-radius:20px;padding:4px 10px;font-size:13px;font-weight:800;color:#FF6B35;box-shadow:0 2px 12px rgba(0,0,0,0.15);border:2px solid ' + color + ';cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;transition:transform 0.15s;"><span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block;"></span>$' + price + '</div>';
+            el.addEventListener("click", () => setSelectedId(listing.id));
+            new mapboxgl.Marker({ element: el }).setLngLat([coords.lng, coords.lat]).addTo(map);
+          });
+
+          setMapReady(true);
         });
 
-        const marker = L.marker([coords.lat, coords.lng], { icon }).addTo(map);
-
-        marker.on("click", () => {
-          setSelectedId(listing.id);
+        map.on("error", () => {
+          if (!cancelled) setMapError(true);
         });
-      });
 
-      leafletMap.current = map;
-      setMapReady(true);
-    };
+        mapInstance.current = map;
+      } catch (err) {
+        console.error("Map init failed:", err);
+        if (!cancelled) setMapError(true);
+      }
+    }
 
-    loadLeaflet();
+    initMap();
 
     return () => {
-      if (leafletMap.current) {
-        leafletMap.current.remove();
-        leafletMap.current = null;
-      }
+      cancelled = true;
+      if (map) { try { map.remove(); } catch {} }
+      mapInstance.current = null;
     };
   }, [listings]);
 
   return (
     <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6">
       <div className="relative rounded-xl overflow-hidden border border-black/[0.06]" style={{ height: "600px" }}>
-        {/* Map container */}
         <div ref={mapRef} className="w-full h-full" />
 
         {/* Zoom controls */}
-        <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-1">
-          <button
-            onClick={() => leafletMap.current?.zoomIn()}
-            className="w-9 h-9 bg-white rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
-          >
-            <ZoomIn className="w-4 h-4 text-[#1B2D45]" />
-          </button>
-          <button
-            onClick={() => leafletMap.current?.zoomOut()}
-            className="w-9 h-9 bg-white rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
-          >
-            <ZoomOut className="w-4 h-4 text-[#1B2D45]" />
-          </button>
-        </div>
+        {mapReady && (
+          <div className="absolute top-4 right-4 z-[10] flex flex-col gap-1">
+            <button onClick={() => mapInstance.current?.zoomIn()} className="w-9 h-9 bg-white rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50"><ZoomIn className="w-4 h-4 text-[#1B2D45]" /></button>
+            <button onClick={() => mapInstance.current?.zoomOut()} className="w-9 h-9 bg-white rounded-lg shadow-md flex items-center justify-center hover:bg-gray-50"><ZoomOut className="w-4 h-4 text-[#1B2D45]" /></button>
+          </div>
+        )}
 
         {/* Legend */}
-        <div className="absolute top-4 left-4 z-[1000] bg-white/90 backdrop-blur-sm rounded-xl px-4 py-3 shadow-md">
-          <div className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>Cribb Score</div>
-          <div className="flex items-center gap-3 mt-1.5">
-            {[
-              { color: "#4ADE80", label: "85+" },
-              { color: "#FFB627", label: "65–84" },
-              { color: "#E71D36", label: "<65" },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
-                <span className="text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 500 }}>{item.label}</span>
-              </div>
-            ))}
+        {mapReady && (
+          <div className="absolute top-4 left-4 z-[10] bg-white/90 backdrop-blur-sm rounded-xl px-4 py-3 shadow-md">
+            <div className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>Cribb Score</div>
+            <div className="flex items-center gap-3 mt-1.5">
+              {[{ color: "#4ADE80", label: "85+" }, { color: "#FFB627", label: "65–84" }, { color: "#E71D36", label: "<65" }].map((item) => (
+                <div key={item.label} className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} /><span className="text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 500 }}>{item.label}</span></div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Selected listing card */}
         {selectedListing && (
-          <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[340px] z-[1000] bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
+          <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[340px] z-[10] bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
             <div className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
-                  <Link href={`/browse/${selectedListing.id}`} className="hover:underline">
-                    <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "15px", fontWeight: 700 }}>
-                      {selectedListing.title}
-                    </h3>
-                  </Link>
-                  <p className="text-[#1B2D45]/40 truncate mt-0.5" style={{ fontSize: "12px" }}>
-                    {selectedListing.address}
-                  </p>
+                  <Link href={`/browse/${selectedListing.id}`} className="hover:underline"><h3 className="text-[#1B2D45] truncate" style={{ fontSize: "15px", fontWeight: 700 }}>{selectedListing.title}</h3></Link>
+                  <p className="text-[#1B2D45]/40 truncate mt-0.5" style={{ fontSize: "12px" }}>{selectedListing.address}</p>
                 </div>
-                <button
-                  onClick={() => setSelectedId(null)}
-                  className="ml-2 w-7 h-7 rounded-full bg-[#1B2D45]/5 flex items-center justify-center hover:bg-[#1B2D45]/10 transition-colors shrink-0"
-                >
-                  <X className="w-3.5 h-3.5 text-[#1B2D45]/40" />
-                </button>
+                <button onClick={() => setSelectedId(null)} className="ml-2 w-7 h-7 rounded-full bg-[#1B2D45]/5 flex items-center justify-center hover:bg-[#1B2D45]/10 shrink-0"><X className="w-3.5 h-3.5 text-[#1B2D45]/40" /></button>
               </div>
-
               <div className="flex items-center justify-between mt-3">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-[#FF6B35]" style={{ fontSize: "22px", fontWeight: 800 }}>
-                    {formatPrice(Number(selectedListing.rent_per_room))}
-                  </span>
-                  <span className="text-[#1B2D45]/30" style={{ fontSize: "11px" }}>/room/mo</span>
-                </div>
+                <div className="flex items-baseline gap-1"><span className="text-[#FF6B35]" style={{ fontSize: "22px", fontWeight: 800 }}>{formatPrice(Number(selectedListing.rent_per_room))}</span><span className="text-[#1B2D45]/30" style={{ fontSize: "11px" }}>/room/mo</span></div>
                 <ScoreRing score={mockHealthScores[selectedListing.id] ?? 0} size={40} />
               </div>
-
-              <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-                <span className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>
-                  {formatPropertyType(selectedListing.property_type)}
-                </span>
-                <span className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>
-                  {selectedListing.total_rooms} bed
-                </span>
-                {selectedListing.walk_time_minutes && (
-                  <span className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>
-                    🚶 {selectedListing.walk_time_minutes} min
-                  </span>
-                )}
-                {selectedListing.is_furnished && (
-                  <span className="bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 px-2 py-0.5 rounded border border-[#FF6B35]/10" style={{ fontSize: "10px", fontWeight: 500 }}>
-                    Furnished
-                  </span>
-                )}
-              </div>
-
               <div className="flex items-center gap-2 mt-3">
-                <Link
-                  href={`/browse/${selectedListing.id}`}
-                  className="flex-1 py-2 rounded-lg bg-[#FF6B35] text-white text-center hover:bg-[#e55e2e] transition-all"
-                  style={{ fontSize: "12px", fontWeight: 600 }}
-                >
-                  View Details
-                </Link>
-                <button
-                  onClick={() => onTogglePin(selectedListing.id)}
-                  className={`px-3 py-2 rounded-lg border transition-all flex items-center gap-1 ${
-                    pinnedIds.includes(selectedListing.id)
-                      ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
-                      : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20"
-                  }`}
-                  style={{ fontSize: "12px", fontWeight: 600 }}
-                >
-                  <Pin className="w-3 h-3" />
-                  {pinnedIds.includes(selectedListing.id) ? "Pinned" : "Pin"}
+                <Link href={`/browse/${selectedListing.id}`} className="flex-1 py-2 rounded-lg bg-[#FF6B35] text-white text-center hover:bg-[#e55e2e]" style={{ fontSize: "12px", fontWeight: 600 }}>View Details</Link>
+                <button onClick={() => onTogglePin(selectedListing.id)} className={`px-3 py-2 rounded-lg border flex items-center gap-1 ${pinnedIds.includes(selectedListing.id) ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/40"}`} style={{ fontSize: "12px", fontWeight: 600 }}>
+                  <Pin className="w-3 h-3" /> {pinnedIds.includes(selectedListing.id) ? "Pinned" : "Pin"}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Loading overlay */}
+        {/* Loading / Error overlay */}
         {!mapReady && (
-          <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center z-[999]">
+          <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center z-[5]">
             <div className="text-center">
-              <div className="animate-pulse w-10 h-10 rounded-full bg-[#FF6B35]/20 mx-auto mb-3" />
-              <p className="text-[#1B2D45]/30" style={{ fontSize: "13px" }}>Loading map...</p>
+              {mapError ? (
+                <>
+                  <div className="w-10 h-10 rounded-full bg-[#1B2D45]/[0.06] mx-auto mb-3 flex items-center justify-center"><ZoomIn className="w-5 h-5 text-[#1B2D45]/20" /></div>
+                  <p className="text-[#1B2D45]/40" style={{ fontSize: "13px", fontWeight: 600 }}>Map couldn&apos;t load</p>
+                  <p className="text-[#1B2D45]/25 mt-1" style={{ fontSize: "11px" }}>Try refreshing the page</p>
+                </>
+              ) : (
+                <>
+                  <div className="animate-pulse w-10 h-10 rounded-full bg-[#FF6B35]/20 mx-auto mb-3" />
+                  <p className="text-[#1B2D45]/30" style={{ fontSize: "13px" }}>Loading map...</p>
+                </>
+              )}
             </div>
           </div>
         )}
