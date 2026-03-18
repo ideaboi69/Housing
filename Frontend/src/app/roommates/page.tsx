@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion, AnimatePresence, useInView } from "framer-motion";
 import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin } from "lucide-react";
 import { useIsMobile } from "@/hooks";
+import { EarlyAdopterBadge } from "@/components/ui/Badges";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
@@ -93,12 +94,17 @@ function DossierGroupCard({
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
         >
           {/* Banner */}
-          <div className="relative h-[70px] overflow-hidden" style={{ background: group.bannerGradient || defaultGradient }}>
-            {/* Dot pattern overlay */}
-            <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)", backgroundSize: "12px 12px" }} />
+          <div className="relative h-[70px] overflow-hidden" style={{ background: (group as any).groupImage ? undefined : (group.bannerGradient || defaultGradient) }}>
+            {(group as any).groupImage ? (
+              <img src={(group as any).groupImage} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)", backgroundSize: "12px 12px" }} />
+            )}
+            {/* Dark overlay for text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
             {/* Group name on banner */}
             <div className="absolute bottom-2.5 left-3.5">
-              <h3 className="text-white" style={{ fontSize: "15px", fontWeight: 800, textShadow: "0 1px 3px rgba(0,0,0,0.2)" }}>{group.name}</h3>
+              <h3 className="text-white" style={{ fontSize: "15px", fontWeight: 800, textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>{group.name}</h3>
             </div>
             {/* Compat ring on banner */}
             {compatibility != null && compatibility > 0 && (
@@ -254,7 +260,10 @@ function IndividualCard({ profile }: { profile: LifestyleProfile }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <h3 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{profile.firstName} {profile.initial}</h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{profile.firstName} {profile.initial}</h3>
+              {profile.isEarlyAdopter && <EarlyAdopterBadge size="sm" />}
+            </div>
             {profile.compatibility != null && <CompatRing score={profile.compatibility} size={34} />}
           </div>
           <p className="text-[#1B2D45]/55" style={{ fontSize: "11px" }}>{profile.year} · {profile.program}</p>

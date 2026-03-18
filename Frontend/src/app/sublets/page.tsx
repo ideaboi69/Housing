@@ -1,95 +1,104 @@
 "use client";
 
-import { use, useState, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import {
+  Heart, Check, ChevronRight, SlidersHorizontal, X, ArrowRight, ChevronDown,
+  Sparkles, ExternalLink, Minus, MapPin, DollarSign, Clock, ShieldCheck,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useIsMobile } from "@/hooks";
 import { ScoreRing } from "@/components/ui/ScoreRing";
-import { ReportModal } from "@/components/ui/ReportModal";
-import { ReviewModal } from "@/components/ui/ReviewModal";
-import { ShareButton } from "@/components/ui/ShareButton";
-import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
-import { getScoreColor } from "@/lib/utils";
-import { getAmenityChecklist } from "@/lib/amenities";
-import { getMockSublet } from "@/lib/mock-sublets";
-import { getMockReviews } from "@/lib/mock-data";
-import { useSavedStore } from "@/lib/saved-store";
-import { useAuthStore } from "@/lib/auth-store";
+import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
+import { getScoreColor, formatPrice } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSavedStore } from "@/lib/saved-store";
+import { BrowseGridSkeleton } from "@/components/ui/Skeletons";
 import {
-  ArrowLeft, MapPin, Heart, Check, ChevronLeft, ChevronRight,
-  Bed, Bath, Calendar, MessageCircle, Share2, Flag, Tag, Users,
-  GraduationCap, Zap, Star,
-} from "lucide-react";
-import { motion, useInView, AnimatePresence } from "framer-motion";
-import { CribbMap } from "@/components/ui/CribbMap";
-import type { ReviewResponse } from "@/types";
+  type SubletListing, type SubletViewMode, type SubletCellValue,
+  MONTHS, subletListings, getScoreLabel, filterOptions,
+  getSubletBestIndex, parseSubletDistance, parseSubletWalkTime, generateSubletCompareSummary,
+} from "@/components/sublets/sublet-data";
 
-/* ── Helpers ───────────────────────────────────── */
+/* ════════════════════════════════════════════════════════
+   Sub-components
+   ════════════════════════════════════════════════════════ */
 
-const MONTHS = ["May", "Jun", "Jul", "Aug", "Sep"];
-
-const stagger = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.05 } } };
-const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 200, damping: 22 } } };
-
-function getScoreLabel(score: number) { return score >= 85 ? "Great" : score >= 65 ? "Good" : "Caution"; }
-
-function formatDateRange(start: string, end: string) {
-  const s = new Date(start + "T00:00:00");
-  const e = new Date(end + "T00:00:00");
-  return `${s.toLocaleDateString("en-CA", { month: "short", day: "numeric" })} – ${e.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}`;
-}
-
-function AnimatedBar({ score, color }: { score: number; color: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-20px" });
+function SummerBanner() {
   return (
-    <div ref={ref} className="flex-1 h-2 rounded-full bg-[#1B2D45]/5 overflow-hidden">
-      <motion.div className="h-full rounded-full" style={{ backgroundColor: color }}
-        initial={{ width: 0 }} animate={isInView ? { width: `${score}%` } : { width: 0 }}
-        transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }} />
-    </div>
-  );
-}
-
-/* ── Image Gallery ─────────────────────────────── */
-
-function ImageGallery({ images }: { images: string[] }) {
-  const [current, setCurrent] = useState(0);
-  if (images.length === 0) return <div className="h-[300px] md:h-[420px] bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] rounded-xl flex items-center justify-center"><span style={{ fontSize: "64px" }}>☀️</span></div>;
-  return (
-    <div className="relative rounded-xl overflow-hidden group">
-      <div className="h-[300px] md:h-[420px] relative">
-        <AnimatePresence mode="wait">
-          <motion.img key={current} src={images[current]} alt={`Photo ${current + 1}`} className="w-full h-full object-cover" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} />
-        </AnimatePresence>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+    <motion.div
+      className="mx-auto max-w-[1200px] px-4 md:px-6 mt-4"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <div
+        className="rounded-xl border border-[#FF6B35]/15 px-4 py-3 flex items-center gap-3 flex-wrap"
+        style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.08) 0%, rgba(46,196,182,0.08) 100%)" }}
+      >
+        <span style={{ fontSize: "20px" }}>☀️</span>
+        <span className="text-[#FF6B35]" style={{ fontSize: "14px", fontWeight: 700 }}>Summer 2026 Sublet Season</span>
+        <span className="text-[#1B2D45]/50" style={{ fontSize: "13px", fontWeight: 400 }}>Listings go fast — check back daily</span>
       </div>
-      {images.length > 1 && (<>
-        <button onClick={() => setCurrent((current - 1 + images.length) % images.length)} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-[#1B2D45]/70 opacity-0 group-hover:opacity-100 hover:bg-white transition-all shadow-md"><ChevronLeft className="w-4 h-4" /></button>
-        <button onClick={() => setCurrent((current + 1) % images.length)} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-[#1B2D45]/70 opacity-0 group-hover:opacity-100 hover:bg-white transition-all shadow-md"><ChevronRight className="w-4 h-4" /></button>
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">{images.map((_, i) => <button key={i} onClick={() => setCurrent(i)} className={`rounded-full transition-all ${i === current ? "w-6 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50"}`} />)}</div>
-        <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm text-white px-2.5 py-1 rounded-full" style={{ fontSize: "11px", fontWeight: 600 }}>{current + 1} / {images.length}</div>
-      </>)}
-    </div>
+    </motion.div>
   );
 }
 
-/* ── Star Rating (no comments) ─────────────────── */
-
-function ReviewCard({ review, index }: { review: ReviewResponse; index: number }) {
+function SubletHero({ onListClick }: { onListClick: () => void }) {
+  const isMobile = useIsMobile();
   return (
-    <motion.div className="bg-[#FAF8F4] rounded-xl p-4" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.08 }}>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>{new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}</p>
-        <div className={`px-2 py-0.5 rounded-full ${review.would_rent_again ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#E71D36]/10 text-[#E71D36]"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
-          {review.would_rent_again ? "Would rent again ✓" : "Would not rent again"}
+    <motion.div
+      className="max-w-[1200px] mx-auto px-4 md:px-6 pt-6 md:pt-10 pb-4 md:pb-6"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.4 }}
+    >
+      <div className={`flex ${isMobile ? "flex-col gap-4" : "items-start justify-between"}`}>
+        <div style={{ maxWidth: "480px" }}>
+          <h1 className="text-[#1B2D45]" style={{ fontSize: isMobile ? "24px" : "30px", fontWeight: 900, lineHeight: 1.15 }}>
+            Summer Sublets in Guelph
+          </h1>
+          <p className="text-[#1B2D45]/50 mt-2" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.6 }}>
+            Find short-term housing from students leaving for co-op, or list your place while you&apos;re away.
+          </p>
         </div>
+        <motion.button
+          onClick={onListClick}
+          className="border-2 border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35]/5 transition-colors px-5 py-2.5 rounded-xl shrink-0"
+          style={{ fontSize: "14px", fontWeight: 700 }}
+          whileTap={{ scale: 0.97 }}
+        >
+          ☀️ List Your Sublet
+        </motion.button>
       </div>
-      <div className="grid grid-cols-4 gap-3">
-        {[{ label: "Response", val: review.responsiveness }, { label: "Maintenance", val: review.maintenance_speed }, { label: "Privacy", val: review.respect_privacy }, { label: "Fairness", val: review.fairness_of_charges }].map((r) => (
-          <div key={r.label} className="text-center">
-            <div className="text-[#1B2D45]/30" style={{ fontSize: "9px", fontWeight: 600 }}>{r.label}</div>
-            <div className="flex items-center justify-center gap-0.5 mt-1">{[1,2,3,4,5].map((s) => <span key={s} style={{ fontSize: "12px", color: s <= r.val ? "#FFB627" : "#1B2D45" + "15" }}>★</span>)}</div>
-            <div className="text-[#1B2D45]/50 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{r.val}/5</div>
+    </motion.div>
+  );
+}
+
+function InsightStats() {
+  const isMobile = useIsMobile();
+  const stats = [
+    { emoji: "☀️", bgColor: "rgba(255,107,53,0.12)", label: "Available now", value: "24 sublets" },
+    { emoji: "💰", bgColor: "rgba(46,196,182,0.12)", label: "Avg. savings", value: "28% off regular rent" },
+    { emoji: "🛋️", bgColor: "rgba(255,182,39,0.12)", label: "Furnished", value: "18 of 24" },
+    { emoji: "✓", bgColor: "rgba(46,196,182,0.12)", label: "Landlord approved", value: "16 verified" },
+  ];
+
+  return (
+    <motion.div
+      className="max-w-[1200px] mx-auto px-4 md:px-6 pb-4"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2, duration: 0.4 }}
+    >
+      <div className={`grid gap-3 ${isMobile ? "grid-cols-2" : "grid-cols-4"}`}>
+        {stats.map((s) => (
+          <div key={s.label} className="bg-white rounded-xl border border-black/[0.04] px-3.5 py-3 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: s.bgColor, fontSize: "16px" }}>{s.emoji}</div>
+            <div className="min-w-0">
+              <div className="text-[#1B2D45]/40 truncate" style={{ fontSize: "11px", fontWeight: 500 }}>{s.label}</div>
+              <div className="text-[#1B2D45] truncate" style={{ fontSize: "13px", fontWeight: 700 }}>{s.value}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -97,367 +106,1504 @@ function ReviewCard({ review, index }: { review: ReviewResponse; index: number }
   );
 }
 
-/* ════════════════════════════════════════════════════
-   SUBLET DETAIL PAGE
-   ════════════════════════════════════════════════════ */
+function ListSubletForm({ visible }: { visible: boolean }) {
+  const isMobile = useIsMobile();
+  const [photos, setPhotos] = useState<File[]>([]);
 
-export default function SubletDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const router = useRouter();
-  const sublet = getMockSublet(id);
+  const [form, setForm] = useState({
+    // Basic info
+    title: "",
+    address: "",
+    postal_code: "",
+    description: "",
+    // Pricing
+    rent_per_month: "",
+    estimated_utility_cost: "",
+    // Dates
+    sublet_start_date: "",
+    sublet_end_date: "",
+    move_in_date: "",
+    // Room details
+    room_type: "private" as "private" | "shared",
+    total_rooms: "1",
+    bathrooms: "1",
+    beds_available: "1",
+    // Commute
+    distance_to_campus_km: "",
+    walk_time_minutes: "",
+    drive_time_minutes: "",
+    bus_time_minutes: "",
+    nearest_bus_route: "",
+    // Amenities (booleans)
+    is_furnished: false,
+    has_parking: false,
+    has_laundry: false,
+    utilities_included: false,
+    // Preferences
+    gender_preference: "any",
+  });
 
-  const [saved, setSaved] = useState(false);  // fallback for sublets without listing_id
-  const [messageSending, setMessageSending] = useState(false);
-  const [messageSent, setMessageSent] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const roommatesStaying = Math.max(0, Number(form.total_rooms) - Number(form.beds_available));
 
-  const user = useAuthStore((s) => s.user);
+  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
 
-  // Use saved store if sublet has a listing_id, otherwise local toggle
-  const hasListingId = sublet && typeof sublet.listing_id === "number";
-  const storeSaved = useSavedStore((s) => hasListingId ? s.savedIds.has(sublet.listing_id!) : false);
-  const storeToggling = useSavedStore((s) => hasListingId ? s.togglingIds.has(sublet.listing_id!) : false);
-  const storeToggle = useSavedStore((s) => s.toggleSave);
+  function addPhotos(files: FileList | null) {
+    if (!files) return;
+    const newPhotos = Array.from(files).slice(0, 5 - photos.length);
+    setPhotos((prev) => [...prev, ...newPhotos].slice(0, 5));
+  }
 
-  const isSaved = hasListingId ? storeSaved : saved;
+  function removePhoto(idx: number) {
+    setPhotos((prev) => prev.filter((_, i) => i !== idx));
+  }
 
-  const handleToggleSave = useCallback(async () => {
-    if (hasListingId) {
-      try {
-        await storeToggle(sublet!.listing_id!);
-      } catch (err) {
-        if (err instanceof Error && err.message === "auth_required") {
-          router.push("/login");
-        }
-      }
-    } else {
-      setSaved(!saved);
+  const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45] placeholder:text-[#1B2D45]/30 focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
+  const labelClass = "text-[#1B2D45] block mb-1.5";
+  const labelStyle = { fontSize: "12px" as const, fontWeight: 600 as const };
+
+  const amenities = [
+    { key: "is_furnished" as const, label: "Furnished", emoji: "🛋️" },
+    { key: "utilities_included" as const, label: "Utilities Incl.", emoji: "💡" },
+    { key: "has_parking" as const, label: "Parking", emoji: "🅿️" },
+    { key: "has_laundry" as const, label: "Laundry", emoji: "🧺" },
+  ];
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          className="max-w-[1200px] mx-auto px-4 md:px-6 pb-6"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        >
+          <div className="bg-white rounded-2xl border border-[#FF6B35]/20 p-5 md:p-7" style={{ boxShadow: "0 4px 24px rgba(255,107,53,0.06)" }}>
+            <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 700 }}>List your sublet ☀️</h3>
+            <p className="text-[#1B2D45]/50 mt-1 mb-5" style={{ fontSize: "13px", fontWeight: 400 }}>
+              Leaving Guelph for the summer? Every field here shows up on your listing — the more you fill, the better.
+            </p>
+
+            {/* ─── Photos ─── */}
+            <div className="mb-5">
+              <label className={labelClass} style={labelStyle}>Photos (up to 5)</label>
+              <div className="flex gap-2 flex-wrap">
+                {photos.map((file, i) => (
+                  <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-black/[0.06] group">
+                    <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span style={{ fontSize: "10px", fontWeight: 700 }}>✕</span>
+                    </button>
+                  </div>
+                ))}
+                {photos.length < 5 && (
+                  <label className="w-20 h-20 rounded-xl border-2 border-dashed border-black/[0.08] flex flex-col items-center justify-center cursor-pointer hover:border-[#FF6B35]/30 hover:bg-[#FF6B35]/[0.02] transition-all">
+                    <span className="text-[#1B2D45]/20" style={{ fontSize: "20px" }}>+</span>
+                    <span className="text-[#1B2D45]/20" style={{ fontSize: "8px", fontWeight: 500 }}>Add</span>
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => addPhotos(e.target.files)} />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* ─── Title & Location ─── */}
+            <div className="border-t border-black/[0.04] pt-5 mb-5">
+              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>LISTING INFO</div>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                <div className={isMobile ? "" : "col-span-2"}>
+                  <label className={labelClass} style={labelStyle}>Title *</label>
+                  <input type="text" value={form.title} onChange={(e) => update("title", e.target.value)} placeholder="e.g. Furnished Room in 4BR House" className={inputClass} style={{ fontSize: "13px" }} />
+                  <p className="text-[#1B2D45]/20 mt-1" style={{ fontSize: "10px" }}>Give students a quick idea of what you&apos;re subletting</p>
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Address *</label>
+                  <input type="text" value={form.address} onChange={(e) => update("address", e.target.value)} placeholder="e.g. 78 College Ave W, Guelph" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Postal code *</label>
+                  <input type="text" value={form.postal_code} onChange={(e) => update("postal_code", e.target.value)} placeholder="e.g. N1G 2W1" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div className={isMobile ? "" : "col-span-2"}>
+                  <label className={labelClass} style={labelStyle}>Description</label>
+                  <textarea value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="Anything else students should know — vibe, move-in flexibility, etc." rows={2} className={`${inputClass} resize-none`} style={{ fontSize: "13px" }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ─── Pricing ─── */}
+            <div className="border-t border-black/[0.04] pt-5 mb-5">
+              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>PRICING</div>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Monthly sublet rent *</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "13px", fontWeight: 600 }}>$</span>
+                    <input type="number" value={form.rent_per_month} onChange={(e) => update("rent_per_month", e.target.value)} placeholder="550" className={`${inputClass} pl-7`} style={{ fontSize: "13px" }} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Est. monthly utilities</label>
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "13px", fontWeight: 600 }}>$</span>
+                    <input type="number" value={form.estimated_utility_cost} onChange={(e) => update("estimated_utility_cost", e.target.value)} placeholder="150" className={`${inputClass} pl-7`} style={{ fontSize: "13px" }} />
+                  </div>
+                  <p className="text-[#1B2D45]/20 mt-1" style={{ fontSize: "10px" }}>Skip if utilities are included</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ─── Dates ─── */}
+            <div className="border-t border-black/[0.04] pt-5 mb-5">
+              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>AVAILABILITY</div>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Sublet start date *</label>
+                  <input type="date" value={form.sublet_start_date} onChange={(e) => update("sublet_start_date", e.target.value)} className={`${inputClass} bg-white`} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Sublet end date *</label>
+                  <input type="date" value={form.sublet_end_date} onChange={(e) => update("sublet_end_date", e.target.value)} className={`${inputClass} bg-white`} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Move-in date *</label>
+                  <input type="date" value={form.move_in_date} onChange={(e) => update("move_in_date", e.target.value)} className={`${inputClass} bg-white`} style={{ fontSize: "13px" }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ─── Room Details ─── */}
+            <div className="border-t border-black/[0.04] pt-5 mb-5">
+              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>ROOM DETAILS</div>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Room type *</label>
+                  <div className="flex gap-2">
+                    {(["private", "shared"] as const).map((t) => (
+                      <button key={t} type="button" onClick={() => update("room_type", t)} className={`flex-1 py-2.5 rounded-xl border transition-all text-center ${form.room_type === t ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/15"}`} style={{ fontSize: "13px", fontWeight: form.room_type === t ? 600 : 500 }}>
+                        {t === "private" ? "🚪 Private Room" : "🛏️ Shared Room"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass} style={labelStyle}>Total rooms *</label>
+                    <select value={form.total_rooms} onChange={(e) => update("total_rooms", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
+                      {["1", "2", "3", "4", "5", "6"].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass} style={labelStyle}>Bathrooms *</label>
+                    <select value={form.bathrooms} onChange={(e) => update("bathrooms", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
+                      {["1", "2", "3", "4"].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className={`grid gap-4 mt-4 ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Beds you&apos;re subletting *</label>
+                  <select value={form.beds_available} onChange={(e) => update("beds_available", e.target.value)} className={`${inputClass} appearance-none bg-white`} style={{ fontSize: "13px" }}>
+                    {Array.from({ length: Number(form.total_rooms) }, (_, i) => String(i + 1)).map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-end pb-2.5">
+                  <div className={`px-4 py-2.5 rounded-xl ${roommatesStaying > 0 ? "bg-[#FFB627]/[0.08] text-[#D4990F]" : "bg-[#4ADE80]/[0.08] text-[#4ADE80]"}`} style={{ fontSize: "12px", fontWeight: 600 }}>
+                    {roommatesStaying > 0 ? `👥 ${roommatesStaying} roommate${roommatesStaying > 1 ? "s" : ""} staying` : "🏠 Place will be empty"}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className={labelClass} style={labelStyle}>Gender preference</label>
+                <div className="flex gap-2">
+                  {[{ v: "any", l: "Any" }, { v: "male", l: "Male" }, { v: "female", l: "Female" }, { v: "other", l: "Other" }].map((g) => (
+                    <button key={g.v} type="button" onClick={() => update("gender_preference", g.v)} className={`px-3.5 py-2 rounded-xl border transition-all ${form.gender_preference === g.v ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/15"}`} style={{ fontSize: "12px", fontWeight: form.gender_preference === g.v ? 600 : 500 }}>
+                      {g.l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ─── Getting to Campus ─── */}
+            <div className="border-t border-black/[0.04] pt-5 mb-5">
+              <div className="text-[#1B2D45]/40 mb-1" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>GETTING TO CAMPUS</div>
+              <p className="text-[#1B2D45]/20 mb-3" style={{ fontSize: "10px" }}>Helps students compare commute times</p>
+              <div className={`grid gap-4 ${isMobile ? "grid-cols-1" : "grid-cols-3"}`}>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Distance to campus (km) *</label>
+                  <input type="number" step="0.1" value={form.distance_to_campus_km} onChange={(e) => update("distance_to_campus_km", e.target.value)} placeholder="1.2" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Walk time (min) *</label>
+                  <input type="number" value={form.walk_time_minutes} onChange={(e) => update("walk_time_minutes", e.target.value)} placeholder="15" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Drive time (min) *</label>
+                  <input type="number" value={form.drive_time_minutes} onChange={(e) => update("drive_time_minutes", e.target.value)} placeholder="5" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div>
+                  <label className={labelClass} style={labelStyle}>Bus time (min) *</label>
+                  <input type="number" value={form.bus_time_minutes} onChange={(e) => update("bus_time_minutes", e.target.value)} placeholder="8" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+                <div className={isMobile ? "" : "col-span-2"}>
+                  <label className={labelClass} style={labelStyle}>Nearest bus route *</label>
+                  <input type="text" value={form.nearest_bus_route} onChange={(e) => update("nearest_bus_route", e.target.value)} placeholder="e.g. Route 99" className={inputClass} style={{ fontSize: "13px" }} />
+                </div>
+              </div>
+            </div>
+
+            {/* ─── Amenities ─── */}
+            <div className="border-t border-black/[0.04] pt-5 mb-5">
+              <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em" }}>AMENITIES</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {amenities.map((a) => (
+                  <button
+                    key={a.key}
+                    onClick={() => update(a.key, !form[a.key])}
+                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all ${
+                      form[a.key]
+                        ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]"
+                        : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/15"
+                    }`}
+                    style={{ fontSize: "12px", fontWeight: 600 }}
+                  >
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${form[a.key] ? "bg-[#FF6B35] border-[#FF6B35]" : "border-[#1B2D45]/15"}`}>
+                      {form[a.key] && <Check className="w-2.5 h-2.5 text-white" />}
+                    </div>
+                    <span>{a.emoji}</span>
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ─── Submit ─── */}
+            <div className="border-t border-black/[0.04] pt-5 flex items-center gap-3">
+              <button
+                className="flex-1 px-6 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors active:scale-[0.98]"
+                style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
+              >
+                Post Sublet →
+              </button>
+              <p className="text-[#1B2D45]/20 shrink-0" style={{ fontSize: "10px", maxWidth: "140px", lineHeight: 1.4 }}>
+                * Required fields. You can edit after posting.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function DateRangeSelector({ selectedRange, onChange }: { selectedRange: [number, number]; onChange: (range: [number, number]) => void }) {
+  const isMobile = useIsMobile();
+  const [start, end] = selectedRange;
+  const [anchorMonth, setAnchorMonth] = useState<number | null>(null);
+  const duration = end - start + 1;
+
+  const handleMonthClick = (idx: number) => {
+    if (anchorMonth === null) {
+      setAnchorMonth(idx);
+      return;
     }
-  }, [hasListingId, sublet, storeToggle, saved, router]);
 
-  // TODO: fetch real reviews for the property once backend links sublets to properties
-  const [reviews, setReviews] = useState<ReviewResponse[]>(sublet ? getMockReviews(1) : []);
-
-  const handleMessage = async () => {
-    if (messageSending || messageSent) return;
-    setMessageSending(true);
-    setTimeout(() => { setMessageSent(true); setMessageSending(false); setTimeout(() => router.push("/messages"), 1500); }, 800);
+    const nextStart = Math.min(anchorMonth, idx);
+    const nextEnd = Math.max(anchorMonth, idx);
+    onChange([nextStart, nextEnd]);
+    setAnchorMonth(null);
   };
 
-  if (!sublet) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
-        <motion.div className="text-center" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <p className="text-[#E71D36]" style={{ fontSize: "16px", fontWeight: 600 }}>Sublet not found</p>
-          <Link href="/sublets" className="mt-4 inline-block text-[#FF6B35]" style={{ fontSize: "14px", fontWeight: 600 }}>← Back to Sublets</Link>
+  return (
+    <div className="max-w-[1200px] mx-auto px-4 md:px-6 pb-4">
+      <div className="bg-white rounded-2xl border border-black/[0.04] px-4 md:px-6 py-4 flex items-center gap-3 flex-wrap" style={{ boxShadow: "0 2px 12px rgba(27,45,69,0.04)" }}>
+        <span style={{ fontSize: "18px" }}>📅</span>
+        <span className="text-[#1B2D45] mr-2" style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 600 }}>I need a place</span>
+        <div className="flex items-center overflow-x-auto no-scrollbar max-w-full">
+          {MONTHS.map((m, i) => {
+            const isSelected = i >= start && i <= end;
+            const isAnchor = anchorMonth === i;
+            const isStart = i === start;
+            const isEnd = i === end;
+            const isMiddle = isSelected && !isStart && !isEnd;
+            return (
+              <button
+                key={m}
+                onClick={() => handleMonthClick(i)}
+                className={`relative px-3 md:px-4 py-1.5 transition-all ${isSelected ? "text-white" : "text-[#1B2D45]/50 hover:text-[#FF6B35]"}`}
+                style={{
+                  fontSize: isMobile ? "12px" : "13px", fontWeight: isSelected ? 700 : 500,
+                  background: isSelected ? "#FF6B35" : "transparent",
+                  borderRadius: isStart && isEnd ? "10px" : isStart ? "10px 0 0 10px" : isEnd ? "0 10px 10px 0" : isMiddle ? "0" : "10px",
+                  boxShadow: isAnchor ? "inset 0 0 0 2px rgba(255,255,255,0.9), 0 0 0 2px rgba(255,107,53,0.35)" : undefined,
+                }}
+              >
+                {m}
+              </button>
+            );
+          })}
+        </div>
+        <span className="text-[#1B2D45]/30 ml-1" style={{ fontSize: "12px", fontWeight: 500 }}>
+          {anchorMonth === null
+            ? `(${duration} ${duration === 1 ? "month" : "months"})`
+            : `(Start: ${MONTHS[anchorMonth]} · pick end)`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SubletFiltersModal({
+  open,
+  activeFilters,
+  selectedRange,
+  filteredCount,
+  onToggleFilter,
+  onClear,
+  onClose,
+}: {
+  open: boolean;
+  activeFilters: string[];
+  selectedRange: [number, number];
+  filteredCount: number;
+  onToggleFilter: (key: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  const isMobile = useIsMobile();
+  const [start, end] = selectedRange;
+  const monthLabel = `${MONTHS[start]}-${MONTHS[end]}`;
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-[100] flex items-end md:items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{ backgroundColor: "rgba(0,0,0,0.35)", backdropFilter: "blur(4px)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
+          <motion.div
+            className={`z-[101] bg-white border border-black/[0.04] overflow-hidden flex flex-col ${
+              isMobile
+                ? "w-full rounded-t-2xl max-h-[78vh]"
+                : "rounded-2xl w-[520px] max-w-[calc(100vw-2rem)] max-h-[78vh]"
+            }`}
+            initial={isMobile ? { y: "100%", opacity: 0 } : { y: 20, opacity: 0, scale: 0.96 }}
+            animate={isMobile ? { y: 0, opacity: 1 } : { y: 0, opacity: 1, scale: 1 }}
+            exit={isMobile ? { y: "100%", opacity: 0 } : { y: 20, opacity: 0, scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            style={{ boxShadow: "0 24px 80px rgba(0,0,0,0.15)" }}
+          >
+            <div className="p-4 md:p-5 border-b border-black/[0.05] flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>
+                  Sublet Filters
+                </h3>
+                <p className="text-[#1B2D45]/35" style={{ fontSize: "11px" }}>
+                  {filteredCount} matches · {monthLabel}
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-black/5 hover:bg-black/10 text-[#1B2D45]/50 flex items-center justify-center"
+                aria-label="Close filters"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 md:p-5 space-y-4 overflow-y-auto">
+              <div className="rounded-xl border border-black/[0.05] bg-[#FAF8F4] p-3">
+                <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>
+                  Date Range
+                </div>
+                <div className="text-[#1B2D45]/45 mt-1" style={{ fontSize: "12px" }}>
+                  Using {MONTHS[start]} through {MONTHS[end]} from the timeline selector above.
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                    Amenities & Match Filters
+                  </div>
+                  {activeFilters.length > 0 && (
+                    <button
+                      onClick={onClear}
+                      className="text-[#FF6B35] hover:text-[#e55e2e]"
+                      style={{ fontSize: "12px", fontWeight: 600 }}
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {filterOptions.map((f) => {
+                    const active = activeFilters.includes(f.key);
+                    return (
+                      <button
+                        key={f.key}
+                        onClick={() => onToggleFilter(f.key)}
+                        className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
+                          active
+                            ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
+                            : "border-black/[0.06] text-[#1B2D45]/55 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]"
+                        }`}
+                        style={{ fontSize: "12px", fontWeight: active ? 700 : 500 }}
+                      >
+                        {f.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 md:p-5 border-t border-black/[0.05] flex items-center gap-2">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2.5 rounded-xl border border-black/[0.08] text-[#1B2D45]/60 hover:bg-black/[0.02]"
+                style={{ fontSize: "13px", fontWeight: 600 }}
+              >
+                Done
+              </button>
+              <div
+                className="px-3 py-2.5 rounded-xl bg-[#FF6B35] text-white"
+                style={{ fontSize: "13px", fontWeight: 700 }}
+              >
+                {filteredCount} match{filteredCount !== 1 ? "es" : ""}
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function TimelineLegend() {
+  return (
+    <div className="max-w-[1200px] mx-auto px-4 md:px-6 pb-4">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-2 rounded-full bg-[#FF6B35]" />
+          <span className="text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 500 }}>Available in your dates</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-2 rounded-full bg-[#1B2D45]/[0.08]" />
+          <span className="text-[#1B2D45]/30" style={{ fontSize: "11px", fontWeight: 500 }}>Not available</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AvailabilityTimeline({ months, selectedRange }: { months: boolean[]; selectedRange: [number, number] }) {
+  return (
+    <div className="mt-2.5">
+      <div className="flex gap-1">
+        {months.map((available, i) => {
+          const inRange = i >= selectedRange[0] && i <= selectedRange[1];
+          const matchesSearch = available && inRange;
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+              <div className="w-full h-2 rounded-full" style={{ background: matchesSearch ? "#FF6B35" : available ? "rgba(255,107,53,0.25)" : "rgba(27,45,69,0.08)" }} />
+              <span className="text-[#1B2D45]/30" style={{ fontSize: "8px", fontWeight: 500 }}>{MONTHS[i]}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Sublet Card
+   ════════════════════════════════════════════════════════ */
+
+function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }: { listing: SubletListing; selectedRange: [number, number]; isMobile: boolean; isPinned?: boolean; onTogglePin?: (id: string) => void }) {
+  const router = useRouter();
+  const [savedFallback, setSavedFallback] = useState(false);
+  const hasListingId = typeof listing.listing_id === "number";
+  const saved = useSavedStore((s) => hasListingId ? s.savedIds.has(listing.listing_id!) : false);
+  const toggling = useSavedStore((s) => hasListingId ? s.togglingIds.has(listing.listing_id!) : false);
+  const toggleSave = useSavedStore((s) => s.toggleSave);
+  const discount = Math.round(((listing.originalPrice - listing.subletPrice) / listing.originalPrice) * 100);
+  const scoreColor = getScoreColor(listing.healthScore);
+  const scoreLabel = getScoreLabel(listing.healthScore);
+  const isSaved = hasListingId ? saved : savedFallback;
+
+  const handleSaveClick = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!hasListingId) {
+      setSavedFallback((current) => !current);
+      return;
+    }
+
+    try {
+      await toggleSave(listing.listing_id!);
+    } catch (err) {
+      if (err instanceof Error && err.message === "auth_required") {
+        router.push("/login");
+      }
+    }
+  }, [hasListingId, listing.listing_id, toggleSave, router]);
+
+  return (
+    <motion.div
+      className="relative group"
+      initial={{ opacity: 0, y: 20, rotate: listing.rotation }}
+      animate={{ opacity: 1, y: 0, rotate: listing.rotation }}
+      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+      whileHover={isMobile ? undefined : { y: -8, rotate: 0, scale: 1.01, transition: { type: "spring", stiffness: 300, damping: 24 } }}
+    >
+      {/* Pushpin */}
+      <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.15))" }}>
+        <Pushpin />
+      </div>
+      <TapeStrip side="left" rotation={-8} />
+      <TapeStrip side="right" rotation={6} />
+
+      <Link href={`/sublets/${listing.id}`} className="bg-white rounded-sm overflow-hidden cursor-pointer hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-shadow block" style={{ padding: "8px 8px 14px 8px", boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)" }}>
+        {/* Image area */}
+        <div className="relative rounded-sm overflow-hidden" style={{ height: isMobile ? "130px" : "150px" }}>
+          <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.15) 0%, rgba(46,196,182,0.15) 100%)" }}>
+            <span style={{ fontSize: "36px", opacity: 0.3 }}>☀️</span>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
+
+          {/* Score + discount */}
+          <div className="absolute top-2 left-2 flex items-center gap-1.5">
+            <ScoreRing score={listing.healthScore} size={isMobile ? 30 : 34} />
+            <div className="px-2 py-0.5 rounded-full text-white" style={{ fontSize: "9px", fontWeight: 700, background: "rgba(46,196,182,0.9)" }}>
+              ↓ {discount}% off
+            </div>
+          </div>
+
+          {/* Save */}
+          <div className="absolute top-2 right-2">
+            <motion.button onClick={handleSaveClick} disabled={toggling} className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm disabled:opacity-50" whileTap={{ scale: 0.85 }}>
+              <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-[#E71D36] text-[#E71D36]" : "text-[#1B2D45]/40"}`} />
+            </motion.button>
+          </div>
+
+          {/* Bottom badges */}
+          <div className="absolute bottom-2 left-2 flex flex-col gap-1">
+            {listing.verified && (
+              <div className="px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: "rgba(46,196,182,0.85)", fontSize: "9px", fontWeight: 600, color: "white" }}>✓ Landlord Approved</div>
+            )}
+            {listing.posterIsStudent && (
+              <div className="px-2 py-0.5 rounded-full" style={{ background: "rgba(27,45,69,0.75)", fontSize: "9px", fontWeight: 600, color: "white" }}>👤 {listing.posterType}</div>
+            )}
+          </div>
+          <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded-full bg-white/90 backdrop-blur-sm" style={{ fontSize: "9px", fontWeight: 600, color: "#1B2D45" }}>{listing.neighborhood}</div>
+        </div>
+
+        {/* Content */}
+        <div className="pt-3 px-1">
+          <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.title}</h3>
+          <p className="text-[#1B2D45]/40 truncate mt-0.5" style={{ fontSize: "11px", fontWeight: 400 }}>{listing.street}</p>
+
+          <AvailabilityTimeline months={listing.availableMonths} selectedRange={selectedRange} />
+
+          {/* Price */}
+          <div className="flex items-baseline gap-2 mt-2.5">
+            <span className="text-[#FF6B35]" style={{ fontSize: "22px", fontWeight: 800 }}>
+              ${listing.subletPrice}<span style={{ fontSize: "12px", fontWeight: 500 }}>/mo</span>
+            </span>
+            <span className="text-[#1B2D45]/30 line-through" style={{ fontSize: "13px", fontWeight: 500 }}>${listing.originalPrice}</span>
+          </div>
+
+          {/* Flexibility badges */}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {listing.negotiablePrice && (
+              <span className="px-2 py-0.5 rounded-full border" style={{ fontSize: "9px", fontWeight: 600, background: "rgba(46,196,182,0.08)", borderColor: "rgba(46,196,182,0.2)", color: "#2EC4B6" }}>💬 Price Negotiable</span>
+            )}
+            {listing.flexibleDates && (
+              <span className="px-2 py-0.5 rounded-full border" style={{ fontSize: "9px", fontWeight: 600, background: "rgba(255,182,39,0.08)", borderColor: "rgba(255,182,39,0.2)", color: "#D4990F" }}>📅 Flexible Dates</span>
+            )}
+            {listing.furnished && (
+              <span className="px-2 py-0.5 rounded-full border" style={{ fontSize: "9px", fontWeight: 600, background: "rgba(27,45,69,0.06)", borderColor: "rgba(27,45,69,0.12)", color: "#1B2D45" }}>🛋️ Furnished</span>
+            )}
+          </div>
+
+          {/* Roommate info */}
+          {listing.roommatesStaying !== null && listing.roommatesStaying > 0 && (
+            <div className="mt-2.5 rounded-lg px-3 py-2" style={{ background: "rgba(27,45,69,0.04)" }}>
+              <div className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>
+                🏠 {listing.roommatesStaying} roommate{listing.roommatesStaying > 1 ? "s" : ""} staying
+              </div>
+              {listing.roommateDesc && <div className="text-[#1B2D45]/40 mt-0.5" style={{ fontSize: "10px", fontWeight: 400 }}>{listing.roommateDesc}</div>}
+            </div>
+          )}
+
+          {/* Meta */}
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
+            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>📍 {listing.distance}</span>
+            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>🚶 {listing.walkTime}</span>
+            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>{listing.bedsAvailable}/{listing.bedsTotal} beds</span>
+          </div>
+
+          {/* Amenities */}
+          <div className="flex flex-wrap gap-1 mt-2">
+            {listing.amenities.map((a) => (
+              <span key={a} className="px-2 py-0.5 rounded border border-black/[0.04] text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 500 }}>{a}</span>
+            ))}
+          </div>
+
+          {/* Pin to board */}
+          {onTogglePin && (
+            <button
+              onClick={(e) => { e.preventDefault(); onTogglePin(listing.id); }}
+              className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-all active:scale-[0.97] ${
+                isPinned
+                  ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
+                  : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]/60"
+              }`}
+              style={{ fontSize: "10px", fontWeight: 600 }}
+            >
+              📌 {isPinned ? "Pinned" : "Pin to board"}
+            </button>
+          )}
+
+          {/* Bottom bar */}
+          <div className="mt-3 pt-2.5 border-t border-black/[0.04] flex items-center justify-between">
+            <span className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 500 }}>👁 {listing.views} viewed · ❤️ {listing.saves} saved</span>
+            <span style={{ fontSize: "10px", fontWeight: 700, color: scoreColor }}>{scoreLabel}</span>
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
+function BottomCTA({ onListClick }: { onListClick: () => void }) {
+  const isMobile = useIsMobile();
+  return (
+    <motion.div
+      className="max-w-[1200px] mx-auto px-4 md:px-6 pb-10"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className={`bg-white rounded-2xl border border-black/[0.04] p-6 md:p-8 flex ${isMobile ? "flex-col gap-4" : "items-center justify-between"}`} style={{ boxShadow: "0 2px 16px rgba(27,45,69,0.04)" }}>
+        <div style={{ maxWidth: "480px" }}>
+          <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Leaving Guelph for the summer? ✈️</h3>
+          <p className="text-[#1B2D45]/45 mt-1.5" style={{ fontSize: "13px", fontWeight: 400, lineHeight: 1.6 }}>
+            Don&apos;t pay rent on an empty room. List your sublet in 2 minutes — it&apos;s free, and we&apos;ll help you find someone.
+          </p>
+        </div>
+        <motion.button
+          onClick={onListClick}
+          className="px-6 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors shrink-0"
+          style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
+          whileTap={{ scale: 0.97 }}
+        >
+          List Your Sublet →
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   PAGE
+   ════════════════════════════════════════════════════════ */
+
+const desktopStaggers = [0, 18, 8, 14, 4, 20];
+
+/* ════════════════════════════════════════════════════════
+   Sublet Compare Modal (matches browse flow + AI summary)
+   ════════════════════════════════════════════════════════ */
+
+interface SubletCompareRow {
+  label: string;
+  icon?: React.ReactNode;
+  values: SubletCellValue[];
+  type: "text" | "price" | "boolean" | "score" | "distance" | "time";
+  bestFn?: "lowest" | "highest";
+}
+
+function SubletCompareCell({
+  value,
+  type,
+  isBest,
+}: {
+  value: SubletCellValue;
+  type: SubletCompareRow["type"];
+  isBest: boolean;
+}) {
+  const bestClass = isBest ? "text-[#4ADE80] font-bold" : "text-[#1B2D45]";
+
+  if (value === null || value === undefined) {
+    return <span className="text-[#1B2D45]/20" style={{ fontSize: "13px" }}>—</span>;
+  }
+
+  if (type === "boolean") {
+    return value ? (
+      <Check className={`w-4 h-4 ${isBest ? "text-[#4ADE80]" : "text-[#2EC4B6]"}`} />
+    ) : (
+      <Minus className="w-4 h-4 text-[#1B2D45]/15" />
+    );
+  }
+
+  if (type === "price") {
+    return <span className={bestClass} style={{ fontSize: "14px", fontWeight: 700 }}>{formatPrice(value as number)}</span>;
+  }
+
+  if (type === "score") {
+    const score = value as number;
+    return <span style={{ fontSize: "14px", fontWeight: 700, color: getScoreColor(score) }}>{score}</span>;
+  }
+
+  if (type === "distance") {
+    return <span className={bestClass} style={{ fontSize: "13px", fontWeight: 600 }}>{value} km</span>;
+  }
+
+  if (type === "time") {
+    return <span className={bestClass} style={{ fontSize: "13px", fontWeight: 600 }}>{value} min</span>;
+  }
+
+  return <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{String(value)}</span>;
+}
+
+function SubletCompareModal({
+  isOpen,
+  onClose,
+  listings,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  listings: SubletListing[];
+}) {
+  const [showAI, setShowAI] = useState(false);
+  const [aiText, setAiText] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && listings.length >= 2) {
+      setAiLoading(true);
+      setShowAI(true);
+      const timer = setTimeout(() => {
+        setAiText(generateSubletCompareSummary(listings));
+        setAiLoading(false);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+    setShowAI(false);
+    setAiText("");
+  }, [isOpen, listings]);
+
+  const rows: SubletCompareRow[] = useMemo(() => {
+    const vals = (fn: (l: SubletListing) => SubletCellValue) => listings.map(fn);
+    return [
+      { label: "Sublet Price", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => l.subletPrice), type: "price", bestFn: "lowest" },
+      { label: "Original Rent", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => l.originalPrice), type: "price", bestFn: "lowest" },
+      { label: "Cribb Score", icon: <ShieldCheck className="w-3.5 h-3.5" />, values: vals((l) => l.healthScore), type: "score", bestFn: "highest" },
+      { label: "Distance", icon: <MapPin className="w-3.5 h-3.5" />, values: vals((l) => parseSubletDistance(l.distance)), type: "distance", bestFn: "lowest" },
+      { label: "Walk Time", icon: <Clock className="w-3.5 h-3.5" />, values: vals((l) => parseSubletWalkTime(l.walkTime)), type: "time", bestFn: "lowest" },
+      { label: "Neighborhood", values: vals((l) => l.neighborhood), type: "text" },
+      { label: "Type", values: vals((l) => (l.roommatesStaying === null ? "Entire place" : "Private room")), type: "text" },
+      { label: "Beds", values: vals((l) => `${l.bedsAvailable} of ${l.bedsTotal}`), type: "text" },
+      { label: "Furnished", values: vals((l) => l.furnished), type: "boolean" },
+      { label: "Negotiable", values: vals((l) => l.negotiablePrice), type: "boolean" },
+      { label: "Verified", values: vals((l) => l.verified), type: "boolean" },
+      { label: "Parking", values: vals((l) => l.amenities.includes("Parking")), type: "boolean" },
+      { label: "Utilities Incl.", values: vals((l) => l.amenities.includes("Utilities Incl.")), type: "boolean" },
+      { label: "Poster", values: vals((l) => l.posterType), type: "text" },
+    ];
+  }, [listings]);
+
+  if (!isOpen || listings.length === 0) return null;
+
+  const colWidth = listings.length <= 2 ? "min-w-[220px]" : listings.length === 3 ? "min-w-[180px]" : "min-w-[160px]";
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[120] flex flex-col"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)" }}
+        >
+          <motion.div
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-white border-b border-black/[0.06] px-5 py-4 flex items-center justify-between shrink-0"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#FF6B35]/10 flex items-center justify-center">
+                <span style={{ fontSize: "16px" }}>📊</span>
+              </div>
+              <div>
+                <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>
+                  Compare Sublets
+                </h2>
+                <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>
+                  {listings.length} picks · Best values highlighted in green
+                </p>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-9 h-9 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors">
+              <X className="w-4 h-4 text-[#1B2D45]/50" />
+            </button>
+          </motion.div>
+
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.05 }}
+            className="flex-1 overflow-auto bg-[#FAF8F4]"
+          >
+            <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-5">
+              <AnimatePresence>
+                {showAI && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    className="mb-5 bg-gradient-to-br from-[#FF6B35]/[0.04] to-[#FFB627]/[0.04] rounded-xl border border-[#FF6B35]/10 p-5"
+                  >
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <Sparkles className="w-4 h-4 text-[#FF6B35]" />
+                      <span className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 700 }}>AI Analysis</span>
+                    </div>
+                    {aiLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map((i) => (
+                            <motion.div
+                              key={i}
+                              className="w-1.5 h-1.5 rounded-full bg-[#FF6B35]/40"
+                              animate={{ opacity: [0.3, 1, 0.3] }}
+                              transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>Analyzing your picks...</span>
+                      </div>
+                    ) : (
+                      <p className="text-[#1B2D45]/70" style={{ fontSize: "13px", lineHeight: 1.7 }}>{aiText}</p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="bg-white rounded-xl border border-black/[0.04] overflow-hidden" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
+                <div className="overflow-x-auto">
+                  <table className="w-full" style={{ minWidth: `${140 + listings.length * 180}px` }}>
+                    <thead>
+                      <tr className="border-b border-black/[0.04]">
+                        <th className="w-[140px] min-w-[140px] p-4 text-left sticky left-0 bg-white z-10" />
+                        {listings.map((l) => (
+                          <th key={l.id} className={`${colWidth} p-4 text-center`}>
+                            <Link href={`/sublets/${l.id}`} className="group block">
+                              <div className="w-full h-[100px] rounded-lg bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] mb-2.5 overflow-hidden relative">
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span style={{ fontSize: "24px" }}>☀️</span>
+                                </div>
+                                <div
+                                  className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center text-white"
+                                  style={{ fontSize: "10px", fontWeight: 800, backgroundColor: getScoreColor(l.healthScore) }}
+                                >
+                                  {l.healthScore}
+                                </div>
+                              </div>
+                              <p className="text-[#1B2D45] truncate group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "13px", fontWeight: 700 }}>
+                                {l.title}
+                              </p>
+                              <p className="text-[#1B2D45]/30 truncate mt-0.5" style={{ fontSize: "10px" }}>
+                                {l.street}
+                              </p>
+                              <div className="flex items-center justify-center gap-1 mt-1.5 text-[#FF6B35] opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: "10px", fontWeight: 600 }}>
+                                View sublet <ExternalLink className="w-2.5 h-2.5" />
+                              </div>
+                            </Link>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, ri) => {
+                        const bestIndices = row.bestFn ? getSubletBestIndex(row.values, row.bestFn) : [];
+                        return (
+                          <tr key={row.label} className={`border-b border-black/[0.02] ${ri % 2 === 0 ? "bg-white" : "bg-[#FAF8F4]/50"}`}>
+                            <td className="px-4 py-3 sticky left-0 z-10" style={{ backgroundColor: ri % 2 === 0 ? "white" : "#FDFCFA" }}>
+                              <div className="flex items-center gap-2">
+                                {row.icon && <span className="text-[#1B2D45]/25">{row.icon}</span>}
+                                <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 600 }}>{row.label}</span>
+                              </div>
+                            </td>
+                            {row.values.map((val, ci) => (
+                              <td key={ci} className="px-4 py-3 text-center">
+                                <SubletCompareCell value={val} type={row.type} isBest={bestIndices.includes(ci)} />
+                              </td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <p className="text-center text-[#1B2D45]/25 mt-4" style={{ fontSize: "11px" }}>
+                Tap any sublet header to view full details · Green highlights indicate best value in each row
+              </p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Sublet Picks Tray
+   ════════════════════════════════════════════════════════ */
+
+function SubletPickCard({ listing, onRemove }: { listing: SubletListing; onRemove: () => void }) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+      className="flex items-center gap-3 bg-[#FAF8F4] rounded-xl px-3 py-2 shrink-0 border border-black/[0.04]"
+    >
+      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center shrink-0">
+        <span style={{ fontSize: "14px" }}>🏠</span>
+      </div>
+      <div className="min-w-0">
+        <Link
+          href={`/sublets/${listing.id}`}
+          className="text-[#1B2D45] truncate block max-w-[140px] hover:underline"
+          style={{ fontSize: "12px", fontWeight: 600 }}
+        >
+          {listing.title}
+        </Link>
+        <div className="flex items-center gap-2">
+          <span className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 800 }}>
+            ${listing.subletPrice}
+          </span>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getScoreColor(listing.healthScore) }} />
+          <span className="text-[#1B2D45]/40" style={{ fontSize: "10px", fontWeight: 600 }}>
+            {listing.healthScore}
+          </span>
+        </div>
+      </div>
+      <button
+        onClick={onRemove}
+        className="w-5 h-5 rounded-full bg-black/5 hover:bg-black/10 flex items-center justify-center transition-colors ml-1 shrink-0"
+        aria-label={`Remove ${listing.title} from picks`}
+      >
+        <X className="w-3 h-3 text-[#1B2D45]/40" />
+      </button>
+    </motion.div>
+  );
+}
+
+function SubletPicksTray({ picks, onRemove, onCompare, showSheet, onCloseSheet }: { picks: SubletListing[]; onRemove: (id: string) => void; onCompare: () => void; showSheet: boolean; onCloseSheet: () => void }) {
+  const isMobile = useIsMobile();
+
+  if (picks.length === 0) return null;
+
+  // Desktop: horizontal tray (matches browse)
+  if (!isMobile) {
+    return (
+      <AnimatePresence>
+        {picks.length > 0 && (
+          <motion.div
+            className="max-w-[1200px] mx-auto px-4 md:px-6 pb-4"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+          >
+            <div className="bg-white rounded-2xl border border-[#FF6B35]/15 p-4 shadow-[0_2px_12px_rgba(255,107,53,0.08)]">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span style={{ fontSize: "15px" }}>📌</span>
+                  <span className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>
+                    My Picks
+                  </span>
+                  <motion.span
+                    key={picks.length}
+                    className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-full"
+                    style={{ fontSize: "10px", fontWeight: 700 }}
+                    initial={{ scale: 1.3 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 400 }}
+                  >
+                    {picks.length}
+                  </motion.span>
+                </div>
+                <button onClick={onCompare} className="flex items-center gap-1.5 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 600 }}>
+                  Compare all
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
+                <AnimatePresence>
+                  {picks.map((s) => (
+                    <SubletPickCard key={s.id} listing={s} onRemove={() => onRemove(s.id)} />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
+
+  // Mobile: bottom sheet
+  return (
+    <AnimatePresence>
+      {showSheet && (
+        <>
+          <motion.div className="fixed inset-0 bg-black/30 z-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onCloseSheet} />
+          <motion.div
+            className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl z-50 max-h-[70vh] flex flex-col"
+            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 rounded-full bg-black/10" />
+            </div>
+            <div className="flex items-center justify-between px-4 pb-3 border-b border-black/5">
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: "15px" }}>📌</span>
+                <span className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>My Picks</span>
+                <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-full" style={{ fontSize: "10px", fontWeight: 700 }}>
+                  {picks.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={onCompare} className="flex items-center gap-1.5 text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 600 }}>
+                  Compare
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={onCloseSheet} className="w-7 h-7 rounded-full bg-black/5 flex items-center justify-center ml-1" aria-label="Close picks">
+                  <ChevronDown className="w-4 h-4 text-[#1B2D45]/40" />
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto no-scrollbar p-4">
+              <div className="flex gap-3">
+                <AnimatePresence>
+                  {picks.map((s) => (
+                    <SubletPickCard key={s.id} listing={s} onRemove={() => onRemove(s.id)} />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Sublet Grid Card (compact, no rotation)
+   ════════════════════════════════════════════════════════ */
+
+function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { listing: SubletListing; selectedRange: [number, number]; isPinned?: boolean; onTogglePin?: (id: string) => void }) {
+  const discount = Math.round(((listing.originalPrice - listing.subletPrice) / listing.originalPrice) * 100);
+  const scoreColor = getScoreColor(listing.healthScore);
+
+  return (
+    <Link href={`/sublets/${listing.id}`} className="bg-white rounded-xl border border-black/[0.04] overflow-hidden hover:shadow-md hover:border-[#FF6B35]/15 transition-all group block">
+      {/* Image placeholder */}
+      <div className="h-[130px] bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center relative">
+        <span style={{ fontSize: "28px" }}>🏠</span>
+        <div className="absolute top-2 left-2">
+          <ScoreRing score={listing.healthScore} size={30} />
+        </div>
+        {discount > 0 && (
+          <div className="absolute top-2 right-2 bg-[#2EC4B6] text-white px-1.5 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 700 }}>
+            ↓ {discount}%
+          </div>
+        )}
+      </div>
+      <div className="p-3">
+        <h4 className="text-[#1B2D45] truncate" style={{ fontSize: "12px", fontWeight: 700 }}>{listing.title}</h4>
+        <p className="text-[#1B2D45]/30 truncate" style={{ fontSize: "10px" }}>{listing.street} · {listing.neighborhood}</p>
+        <div className="flex items-baseline gap-1.5 mt-1">
+          <span className="text-[#FF6B35]" style={{ fontSize: "16px", fontWeight: 800 }}>${listing.subletPrice}</span>
+          <span className="text-[#1B2D45]/20 line-through" style={{ fontSize: "10px" }}>${listing.originalPrice}</span>
+          <span className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>/mo</span>
+        </div>
+        <div className="flex flex-wrap gap-1 mt-2">
+          {listing.furnished && <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>Furnished</span>}
+          <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>{listing.bedsAvailable} bed</span>
+          <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>{listing.walkTime}</span>
+        </div>
+        {/* Availability mini-bar */}
+        <div className="flex gap-0.5 mt-2">
+          {MONTHS.map((m, idx) => (
+            <div key={m} className="flex-1 h-1.5 rounded-full" style={{ background: listing.availableMonths[idx] ? (idx >= selectedRange[0] && idx <= selectedRange[1] ? "#FF6B35" : "#FF6B35" + "40") : "#e5e5e5" }} />
+          ))}
+        </div>
+        {onTogglePin && (
+          <button onClick={(e) => { e.preventDefault(); onTogglePin(listing.id); }} className={`mt-2 w-full py-1.5 rounded-lg border text-center transition-all active:scale-[0.97] ${isPinned ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/30 hover:border-[#FF6B35]/20"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
+            📌 {isPinned ? "Pinned" : "Pin"}
+          </button>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Sublet Map View (UofG campus)
+   ════════════════════════════════════════════════════════ */
+
+function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { listings: SubletListing[]; pinnedIds: string[]; onTogglePin: (id: string) => void; selectedRange: [number, number] }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<any>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedSublet = listings.find((l) => l.id === selectedId);
+
+  // Mock coords for sublets based on neighborhood
+  const subletCoords: Record<string, { lat: number; lng: number }> = {
+    s1: { lat: 43.5310, lng: -80.2240 },
+    s2: { lat: 43.5220, lng: -80.2450 },
+    s3: { lat: 43.5290, lng: -80.2210 },
+    s4: { lat: 43.5470, lng: -80.2490 },
+    s5: { lat: 43.5350, lng: -80.2180 },
+    s6: { lat: 43.5190, lng: -80.2500 },
+    s7: { lat: 43.5260, lng: -80.2350 },
+    s8: { lat: 43.5400, lng: -80.2600 },
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !mapRef.current) return;
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    if (!token) return;
+
+    let cancelled = false;
+
+    async function initMap() {
+      if (!document.querySelector('link[href*="mapbox-gl"]')) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css";
+        document.head.appendChild(link);
+      }
+
+      try {
+        const mapboxModule = await import("mapbox-gl");
+        const mapboxgl = (mapboxModule as any).default || mapboxModule;
+        if (cancelled) return;
+
+        (mapboxgl as any).accessToken = token;
+        const map = new (mapboxgl as any).Map({
+          container: mapRef.current!,
+          style: "mapbox://styles/mapbox/light-v11",
+          center: [-80.2262, 43.5305],
+          zoom: 14,
+          attributionControl: false,
+        });
+        map.addControl(new (mapboxgl as any).AttributionControl({ compact: true }), "bottom-left");
+
+        map.on("load", () => {
+          if (cancelled) return;
+
+          // Campus marker
+          const campusEl = document.createElement("div");
+          campusEl.innerHTML = '<div style="width:32px;height:32px;background:#1B2D45;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.2);">🎓</div>';
+          new (mapboxgl as any).Marker({ element: campusEl }).setLngLat([-80.2262, 43.5305])
+            .setPopup(new (mapboxgl as any).Popup({ offset: 20, closeButton: false }).setHTML('<div style="font-size:12px;font-weight:600;padding:2px 4px;">University of Guelph</div>'))
+            .addTo(map);
+
+          // Sublet pins
+          listings.forEach((sublet) => {
+            const coords = subletCoords[sublet.id];
+            if (!coords) return;
+            const el = document.createElement("div");
+            el.innerHTML = '<div style="background:white;border-radius:20px;padding:4px 10px;font-size:13px;font-weight:800;color:#2EC4B6;box-shadow:0 2px 12px rgba(0,0,0,0.15);border:2px solid #2EC4B6;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#2EC4B6;display:inline-block;"></span>$' + sublet.subletPrice + '</div>';
+            el.addEventListener("click", () => setSelectedId(sublet.id));
+            new (mapboxgl as any).Marker({ element: el }).setLngLat([coords.lng, coords.lat]).addTo(map);
+          });
+
+          setMapReady(true);
+        });
+
+        mapInstance.current = map;
+      } catch (err) {
+        console.error("Sublet map failed:", err);
+      }
+    }
+
+    initMap();
+    return () => { cancelled = true; if (mapInstance.current) { try { mapInstance.current.remove(); } catch {} mapInstance.current = null; } };
+  }, [listings]);
+
+  return (
+    <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4">
+      <div className="relative w-full rounded-2xl overflow-hidden border border-black/[0.04]" style={{ height: "500px" }}>
+        <div ref={mapRef} className="w-full h-full" />
+
+        {/* Selected sublet card */}
+        {selectedSublet && (
+          <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[300px] z-[10] bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.15)] p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <Link href={`/sublets/${selectedSublet.id}`} className="hover:underline">
+                  <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{selectedSublet.title}</h3>
+                </Link>
+                <p className="text-[#1B2D45]/40 truncate" style={{ fontSize: "11px" }}>{selectedSublet.street}</p>
+              </div>
+              <button onClick={() => setSelectedId(null)} className="ml-2 w-6 h-6 rounded-full bg-[#1B2D45]/5 flex items-center justify-center shrink-0">
+                <X className="w-3 h-3 text-[#1B2D45]/40" />
+              </button>
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-[#2EC4B6]" style={{ fontSize: "20px", fontWeight: 800 }}>${selectedSublet.subletPrice}<span className="text-[#1B2D45]/30" style={{ fontSize: "11px", fontWeight: 500 }}>/mo</span></span>
+              <span className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{selectedSublet.neighborhood}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-3">
+              <Link href={`/sublets/${selectedSublet.id}`} className="flex-1 py-2 rounded-lg bg-[#2EC4B6] text-white text-center hover:bg-[#28b0a3]" style={{ fontSize: "12px", fontWeight: 600 }}>View Sublet</Link>
+              <button onClick={() => onTogglePin(selectedSublet.id)} className={`px-3 py-2 rounded-lg border flex items-center gap-1 ${pinnedIds.includes(selectedSublet.id) ? "border-[#2EC4B6]/30 bg-[#2EC4B6]/[0.08] text-[#2EC4B6]" : "border-black/[0.06] text-[#1B2D45]/40"}`} style={{ fontSize: "12px", fontWeight: 600 }}>
+                📌 {pinnedIds.includes(selectedSublet.id) ? "Pinned" : "Pin"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!mapReady && (
+          <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center z-[5]">
+            <div className="animate-pulse w-10 h-10 rounded-full bg-[#2EC4B6]/20 mx-auto mb-3" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Main Page
+   ════════════════════════════════════════════════════════ */
+
+export default function SubletsPage() {
+  const isMobile = useIsMobile();
+  const [hydrated, setHydrated] = useState(false);
+  const [showListForm, setShowListForm] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [selectedRange, setSelectedRange] = useState<[number, number]>([4, 6]); // May-Jul default (summer feel)
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<SubletViewMode>("board");
+  const [showPicksSheet, setShowPicksSheet] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  const handleListClick = () => setShowListForm((prev) => !prev);
+
+  const toggleFilter = (key: string) => {
+    setActiveFilters((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
+  };
+  const clearFilters = () => setActiveFilters([]);
+
+  const togglePin = (id: string) => {
+    setPinnedIds((prev) => prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]);
+  };
+
+  const pinnedListings = useMemo(() => subletListings.filter((l) => pinnedIds.includes(l.id)), [pinnedIds]);
+
+  const filteredListings = useMemo(() => {
+    return subletListings.filter((listing) => {
+      const [start, end] = selectedRange;
+      let hasOverlap = false;
+      for (let i = start; i <= end; i++) {
+        if (listing.availableMonths[i]) { hasOverlap = true; break; }
+      }
+      if (!hasOverlap) return false;
+      if (activeFilters.includes("furnished") && !listing.furnished) return false;
+      if (activeFilters.includes("negotiable") && !listing.negotiablePrice) return false;
+      if (activeFilters.includes("verified") && !listing.verified) return false;
+      if (activeFilters.includes("private") && listing.roommatesStaying === null) return false;
+      if (activeFilters.includes("entire") && listing.roommatesStaying !== null) return false;
+      if (activeFilters.includes("parking") && !listing.amenities.includes("Parking")) return false;
+      return true;
+    });
+  }, [selectedRange, activeFilters]);
+
+  useEffect(() => { setHydrated(true); }, []);
+
+  if (!hydrated) {
+    return (
+      <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-12">
+          <BrowseGridSkeleton count={6} />
+        </div>
       </div>
     );
   }
 
-  const discount = Math.round(((sublet.originalPrice - sublet.subletPrice) / sublet.originalPrice) * 100);
-  const score = sublet.healthScore;
-  const scoreColor = getScoreColor(score);
-
-  const amenities = getAmenityChecklist(sublet as unknown as Record<string, unknown>);
-  const hasAmenities = amenities.filter((a) => a.has);
-  const noAmenities = amenities.filter((a) => !a.has);
-
   return (
-    <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
-      <motion.div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6" variants={stagger} initial="hidden" animate="visible">
-        <motion.div variants={fadeUp}>
-          <Link href="/sublets" className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-5 group" style={{ fontSize: "13px", fontWeight: 500 }}>
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Sublets
-          </Link>
-        </motion.div>
+      <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
+      <SummerBanner />
+      <SubletHero onListClick={handleListClick} />
+      <InsightStats />
+      <ListSubletForm visible={showListForm} />
+      <DateRangeSelector selectedRange={selectedRange} onChange={setSelectedRange} />
 
-        <div className="grid lg:grid-cols-[1fr_360px] gap-6">
-          {/* ─── Main ─── */}
-          <div>
-            <motion.div variants={fadeUp}><ImageGallery images={sublet.images} /></motion.div>
+      {/* View toggle + filter bar */}
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 pb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap flex-1">
+          <motion.button
+            onClick={() => setShowFiltersModal(true)}
+            className="relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border bg-white text-[#1B2D45]/60 hover:border-[#FF6B35]/20 hover:text-[#FF6B35] transition-all"
+            style={{ fontSize: "12px", fontWeight: 600 }}
+            whileTap={{ scale: 0.97 }}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Filters
+            {activeFilters.length > 0 && (
+              <span
+                className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FF6B35] text-white flex items-center justify-center"
+                style={{ fontSize: "10px", fontWeight: 700 }}
+              >
+                {activeFilters.length}
+              </span>
+            )}
+          </motion.button>
 
-            <motion.div variants={fadeUp} className="mt-6 bg-white rounded-xl border border-black/[0.04] p-5 md:p-6" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.03)" }}>
-              {/* Badges */}
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2.5 py-0.5 rounded-full text-white" style={{ fontSize: "10px", fontWeight: 700, background: "linear-gradient(135deg, #FF6B35, #E55E2E)" }}>☀️ Summer Sublet</span>
-                {sublet.verified && <span className="px-2 py-0.5 rounded-full flex items-center gap-1 text-[#2EC4B6]" style={{ fontSize: "10px", fontWeight: 600, background: "rgba(46,196,182,0.1)" }}><Check className="w-3 h-3" /> Landlord Approved</span>}
-              </div>
-
-              {/* Title */}
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.3px" }}>{sublet.title}</h1>
-                  <div className="flex items-center gap-2 mt-1.5 text-[#1B2D45]/50"><MapPin className="w-3.5 h-3.5 shrink-0" /><span style={{ fontSize: "13px" }}>{sublet.address}</span></div>
-                </div>
-                {score > 0 && <div className="shrink-0 text-center"><ScoreRing score={score} size={56} /><p className="mt-1" style={{ fontSize: "9px", fontWeight: 700, color: scoreColor }}>{getScoreLabel(score)}</p></div>}
-              </div>
-
-              {/* Savings */}
-              <motion.div className="mt-4 rounded-xl p-3 flex items-center gap-3" style={{ background: "linear-gradient(135deg, rgba(46,196,182,0.08), rgba(46,196,182,0.03))", border: "1px solid rgba(46,196,182,0.15)" }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <div className="w-10 h-10 rounded-xl bg-[#2EC4B6]/15 flex items-center justify-center shrink-0"><Tag className="w-5 h-5 text-[#2EC4B6]" /></div>
-                <div>
-                  <p className="text-[#2EC4B6]" style={{ fontSize: "14px", fontWeight: 800 }}>Save {discount}% off regular rent</p>
-                  <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}><span className="line-through">${sublet.originalPrice}/mo</span> → <strong className="text-[#FF6B35]">${sublet.subletPrice}/mo</strong></p>
-                </div>
-              </motion.div>
-
-              {/* Availability */}
-              <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Availability</h3>
-              <div className="flex gap-2 mt-3">
-                {sublet.availableMonths.map((available, i) => (
-                  <div key={i} className="flex-1">
-                    <div className={`h-3 rounded-full ${available ? "bg-[#FF6B35]" : "bg-[#1B2D45]/[0.06]"}`} />
-                    <p className="text-center mt-1" style={{ fontSize: "10px", fontWeight: available ? 700 : 400, color: available ? "#FF6B35" : "#1B2D45" + "30" }}>{MONTHS[i]}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 mt-2.5"><Calendar className="w-3.5 h-3.5 text-[#FF6B35]/50" /><span className="text-[#1B2D45]/60" style={{ fontSize: "12px" }}>{formatDateRange(sublet.subletStart, sublet.subletEnd)}</span></div>
-
-              {/* Flexibility badges */}
-              <div className="flex flex-wrap gap-2 mt-3">
-                {sublet.negotiablePrice && <span className="px-3 py-1.5 rounded-full border" style={{ fontSize: "11px", fontWeight: 600, background: "rgba(46,196,182,0.06)", borderColor: "rgba(46,196,182,0.2)", color: "#2EC4B6" }}>💬 Price Negotiable</span>}
-                {sublet.flexibleDates && <span className="px-3 py-1.5 rounded-full border" style={{ fontSize: "11px", fontWeight: 600, background: "rgba(255,182,39,0.06)", borderColor: "rgba(255,182,39,0.2)", color: "#D4990F" }}>📅 Flexible Dates</span>}
-                {sublet.genderPreference !== "any" && <span className="px-3 py-1.5 rounded-full border" style={{ fontSize: "11px", fontWeight: 600, background: "rgba(168,85,247,0.06)", borderColor: "rgba(168,85,247,0.2)", color: "#A855F7" }}>Preferred: {sublet.genderPreference}</span>}
-              </div>
-
-              {/* Quick facts */}
-              <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                {[{ label: "Beds", value: `${sublet.bedsAvailable} of ${sublet.bedsTotal}`, icon: Bed }, { label: "Bath", value: `${sublet.bathrooms}`, icon: Bath }, { label: "Type", value: sublet.propertyType.charAt(0).toUpperCase() + sublet.propertyType.slice(1), icon: MapPin }, { label: "Area", value: sublet.neighborhood, icon: MapPin }].map((fact) => {
-                  const Icon = fact.icon;
-                  return <motion.div key={fact.label} variants={fadeUp} className="bg-[#FAF8F4] rounded-xl p-3"><div className="flex items-center gap-1.5"><Icon className="w-3 h-3 text-[#FF6B35]/50" /><span className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 600 }}>{fact.label}</span></div><div className="text-[#1B2D45] mt-1" style={{ fontSize: "13px", fontWeight: 700 }}>{fact.value}</div></motion.div>;
-                })}
-              </motion.div>
-
-              {/* Roommates */}
-              {sublet.roommatesStaying !== null && sublet.roommatesStaying > 0 && (
-                <motion.div className="mt-5 rounded-xl border border-[#1B2D45]/[0.06] p-4" initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-lg bg-[#6C5CE7]/10 flex items-center justify-center"><Users className="w-4 h-4 text-[#6C5CE7]" /></div>
-                    <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{sublet.roommatesStaying} roommate{sublet.roommatesStaying > 1 ? "s" : ""} staying for summer</p>
-                  </div>
-                  {sublet.roommateDesc && <p className="text-[#1B2D45]/50 ml-10" style={{ fontSize: "12px", lineHeight: 1.5 }}>{sublet.roommateDesc}</p>}
-                </motion.div>
-              )}
-
-              {/* Description */}
-              {sublet.description && (<div className="mt-5"><h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>About this sublet</h3><p className="text-[#1B2D45]/60 mt-2" style={{ fontSize: "13px", lineHeight: 1.7 }}>{sublet.description}</p></div>)}
-
-              {/* Amenities — same checklist as listings */}
-              <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Amenities</h3>
-              <div className="grid grid-cols-2 gap-2.5 mt-3">
-                {hasAmenities.map((a) => { const Icon = a.icon; return (
-                  <motion.div key={a.key} className="flex items-center gap-2.5 py-2" initial={{ opacity: 0, x: -8 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ type: "spring", stiffness: 200 }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#4ADE80]/10"><Icon className="w-3.5 h-3.5 text-[#4ADE80]" /></div>
-                    <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{a.label}</span>
-                  </motion.div>);
-                })}
-                {noAmenities.map((a) => { const Icon = a.icon; return (
-                  <div key={a.key} className="flex items-center gap-2.5 py-2">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#1B2D45]/[0.03]"><Icon className="w-3.5 h-3.5 text-[#1B2D45]/15" /></div>
-                    <span className="text-[#1B2D45]/25 line-through" style={{ fontSize: "13px", fontWeight: 500 }}>{a.label}</span>
-                  </div>);
-                })}
-              </div>
-
-              {/* Estimated utilities */}
-              {sublet.estimated_utility_cost && !sublet.utilities_included && (
-                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FFB627]/[0.06] border border-[#FFB627]/10">
-                  <Zap className="w-3.5 h-3.5 text-[#FFB627]" />
-                  <span className="text-[#1B2D45]/60" style={{ fontSize: "11px" }}>Estimated utilities: <strong className="text-[#1B2D45]">${sublet.estimated_utility_cost}/mo</strong> per person</span>
-                </div>
-              )}
-
-              {/* Getting to campus */}
-              <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Getting to Campus</h3>
-              <div className="flex items-center gap-4 mt-3 flex-wrap">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚶</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.walkTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p></div></div>
-                {sublet.busTime && <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚌</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.busTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p></div></div>}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>📍</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.distanceKm} km</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to UofG</p></div></div>
-              </div>
-
-              {/* Cribb Score Breakdown */}
-              <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.4 }}>
-                <h3 className="mt-8 text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-                  Cribb Score Breakdown
-                  <span className="px-2 py-0.5 rounded-full text-white" style={{ fontSize: "10px", fontWeight: 700, backgroundColor: scoreColor }}>{score}/100</span>
-                </h3>
-                <div className="space-y-3 mt-3">
-                  {[
-                    { label: "Price", score: sublet.price_vs_market_score, emoji: "📊" },
-                    { label: "Location", score: sublet.lease_clarity_score, emoji: "📍" },
-                    { label: "Amenities", score: 50, emoji: "🏠" },
-                    { label: "Tenant Reviews", score: sublet.landlord_reputation_score, emoji: "⭐" },
-                  ].map((item, i) => (
-                    <motion.div key={item.label} className="flex items-center gap-3" initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1, type: "spring", stiffness: 200 }}>
-                      <span style={{ fontSize: "14px" }}>{item.emoji}</span>
-                      <span className="text-[#1B2D45]/60 w-[120px] shrink-0" style={{ fontSize: "12px", fontWeight: 500 }}>{item.label}</span>
-                      <AnimatedBar score={item.score} color={getScoreColor(item.score)} />
-                      <span className="w-8 text-right shrink-0" style={{ fontSize: "13px", fontWeight: 800, color: getScoreColor(item.score) }}>{item.score}</span>
-                    </motion.div>
-                  ))}
-                </div>
-                {sublet.landlord_reputation_score === 50 && (
-                  <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>New listing — review score will update as tenants leave ratings.</p>
-                )}
-              </motion.div>
-
-              {/* Reviews — stars only, no comments */}
-              <div className="mt-8">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-                    Property Reviews
-                    {reviews.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/5 text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 700 }}>{reviews.length}</span>
-                    )}
-                  </h3>
-                  {user ? (
-                    <motion.button
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => setReviewOpen(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FFB627]/10 text-[#FFB627] hover:bg-[#FFB627]/15 transition-colors"
-                      style={{ fontSize: "12px", fontWeight: 600 }}
-                    >
-                      <Star className="w-3.5 h-3.5" /> Leave a Review
-                    </motion.button>
-                  ) : (
-                    <Link
-                      href="/login"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1B2D45]/[0.04] text-[#1B2D45]/40 hover:text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.06] transition-colors"
-                      style={{ fontSize: "12px", fontWeight: 500 }}
-                    >
-                      Sign in to review
-                    </Link>
-                  )}
-                </div>
-                {reviews.length > 0 ? (
-                  <div className="space-y-3 mt-3">{reviews.map((r, i) => <ReviewCard key={r.id} review={r} index={i} />)}</div>
-                ) : (
-                  <div className="mt-4 py-8 text-center rounded-xl border border-dashed border-[#1B2D45]/10 bg-[#FAF8F4]/50">
-                    <span style={{ fontSize: "28px" }}>⭐</span>
-                    <p className="text-[#1B2D45]/40 mt-2" style={{ fontSize: "13px", fontWeight: 500 }}>No reviews yet</p>
-                    <p className="text-[#1B2D45]/25 mt-1" style={{ fontSize: "12px" }}>Lived here? Be the first to rate this property.</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-
-          {/* ─── Sidebar ─── */}
-          <motion.div className="space-y-4 sticky top-[80px] self-start" variants={fadeUp}>
-            {/* Price card */}
-            <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5" style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>
-              <div className="flex items-baseline gap-2">
-                <span className="text-[#FF6B35]" style={{ fontSize: "32px", fontWeight: 800 }}>${sublet.subletPrice}</span>
-                <span className="text-[#1B2D45]/30" style={{ fontSize: "14px" }}>/mo</span>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[#1B2D45]/30 line-through" style={{ fontSize: "13px" }}>${sublet.originalPrice}/mo</span>
-                <span className="px-2 py-0.5 rounded-full text-white" style={{ fontSize: "10px", fontWeight: 700, backgroundColor: "#2EC4B6" }}>Save {discount}%</span>
-              </div>
-
-              {/* Posted by */}
-              <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-[#FAF8F4]">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: sublet.posterIsStudent ? "#6C5CE7" + "15" : "#FF6B35" + "15" }}>
-                  {sublet.posterIsStudent ? <GraduationCap className="w-5 h-5" style={{ color: "#6C5CE7" }} /> : <Users className="w-5 h-5 text-[#FF6B35]" />}
-                </div>
-                <div>
-                  <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{sublet.posterName}</p>
-                  <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{sublet.posterType}</p>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2 text-[#1B2D45]/50"><Calendar className="w-3.5 h-3.5 text-[#FF6B35]/50" /><span style={{ fontSize: "12px" }}>{formatDateRange(sublet.subletStart, sublet.subletEnd)}</span></div>
-
-              {/* Message */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleMessage} disabled={messageSending || messageSent}
-                className="relative w-full mt-5 py-3 rounded-xl bg-[#FF6B35] text-white overflow-hidden hover:bg-[#e55e2e] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
-                style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
-                {messageSent ? <><Check className="w-4 h-4" /> Message Sent</> : messageSending ? "Sending..." : <><MessageCircle className="w-4 h-4" /> Message {sublet.posterName}</>}
-              </motion.button>
-
-              {/* Save */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave}
-                disabled={storeToggling}
-                className={`w-full mt-2 py-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${isSaved ? "border-[#E71D36]/20 bg-[#E71D36]/[0.04] text-[#E71D36]" : "border-black/[0.06] text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.03]"}`}
-                style={{ fontSize: "14px", fontWeight: 500 }}>
-                <Heart className={`w-4 h-4 ${isSaved ? "fill-[#E71D36]" : ""}`} /> {isSaved ? "Saved" : "Save Sublet"}
-              </motion.button>
-
-              {/* Share + Report */}
-              <div className="flex items-center gap-2 mt-3">
-                <ShareButton path={`/sublets/${id}`} title={sublet.title} variant="inline" />
-                <button
-                  onClick={() => setReportOpen(true)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
-                  style={{ fontSize: "11px", fontWeight: 500 }}
-                >
-                  <Flag className="w-3 h-3" /> Report
-                </button>
-              </div>
-
-              <div className="text-[#1B2D45]/25 text-center mt-4" style={{ fontSize: "11px" }}>{sublet.views} viewed · {sublet.saves} saved</div>
-
-              {/* Map */}
-              <div className="mt-4 rounded-xl border border-black/[0.04] overflow-hidden">
-                <CribbMap
-                  address={sublet.address}
-                  height="180px"
-                  zoom={15}
-                />
-              </div>
-
-              {/* Contact Card */}
-              {hasListingId ? (
-                <LandlordContactCard
-                  landlordId={sublet.listing_id!}
-                  landlordName={sublet.posterName}
-                  landlordVerified={false}
-                />
-              ) : (
-                <div className="mt-4 bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-4"
-                  style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2EC4B6]/20 to-[#4ADE80]/20 flex items-center justify-center">
-                      <span className="text-[#2EC4B6]" style={{ fontSize: "16px", fontWeight: 800 }}>
-                        {sublet.posterName.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.posterName}</p>
-                      <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{sublet.posterType}</p>
-                    </div>
-                  </div>
-                  {sublet.posterIsStudent && sublet.posterYear && sublet.posterProgram && (
-                    <p className="text-[#1B2D45]/30 mt-3 pt-3 border-t border-[#1B2D45]/[0.04]" style={{ fontSize: "11px" }}>
-                      🎓 {sublet.posterYear} year · {sublet.posterProgram}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </motion.div>
+          {filterOptions.map((f) => {
+            const active = activeFilters.includes(f.key);
+            return (
+              <button key={f.key} onClick={() => toggleFilter(f.key)} className={`px-3 py-1.5 rounded-full border transition-all ${active ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]"} ${isMobile ? "hidden sm:inline-flex" : ""}`} style={{ fontSize: "12px", fontWeight: active ? 600 : 500 }}>
+                {f.label}
+              </button>
+            );
+          })}
+          {isMobile && activeFilters.length > 0 && (
+            <button
+              onClick={clearFilters}
+              className="px-3 py-1.5 rounded-full border border-black/[0.06] text-[#1B2D45]/40 hover:text-[#E71D36] hover:border-[#E71D36]/15 transition-all"
+              style={{ fontSize: "12px", fontWeight: 500 }}
+            >
+              Clear
+            </button>
+          )}
+          <span className="text-[#1B2D45]/30 ml-1" style={{ fontSize: "12px", fontWeight: 500 }}>{filteredListings.length} available</span>
         </div>
-      </motion.div>
+        {/* View toggle */}
+        <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0">
+          {(["board", "grid", "map"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`px-3 py-1.5 rounded-md transition-all duration-200 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
+              style={{ fontSize: "12px", fontWeight: 600 }}
+            >
+              {mode === "board" ? "📌 Board" : mode === "grid" ? "▦ Grid" : "🗺 Map"}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {/* Report Modal */}
-      <ReportModal
-        isOpen={reportOpen}
-        onClose={() => setReportOpen(false)}
-        listingId={hasListingId ? sublet.listing_id! : parseInt(id, 10)}
-        listingTitle={sublet.title}
+      <TimelineLegend />
+
+      <SubletFiltersModal
+        open={showFiltersModal}
+        activeFilters={activeFilters}
+        selectedRange={selectedRange}
+        filteredCount={filteredListings.length}
+        onToggleFilter={toggleFilter}
+        onClear={clearFilters}
+        onClose={() => setShowFiltersModal(false)}
       />
 
-      {/* Review Modal */}
-      <ReviewModal
-        isOpen={reviewOpen}
-        onClose={() => setReviewOpen(false)}
-        propertyId={1}
-        propertyTitle={sublet.title}
-        onReviewSubmitted={(newReview) => {
-          setReviews((prev) => [newReview, ...prev]);
-        }}
+      <SubletPicksTray
+        picks={pinnedListings}
+        onRemove={togglePin}
+        onCompare={() => setCompareOpen(true)}
+        showSheet={showPicksSheet}
+        onCloseSheet={() => setShowPicksSheet(false)}
+      />
+
+      {/* Content */}
+      {filteredListings.length === 0 ? (
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-10">
+          <div className="flex flex-col items-center justify-center py-14 px-6 bg-white rounded-2xl border-2 border-dashed border-black/[0.06]">
+            <span style={{ fontSize: "40px" }}>🔍</span>
+            <h3 className="text-[#1B2D45] mt-3 text-center" style={{ fontSize: "18px", fontWeight: 700 }}>No sublets match those dates</h3>
+            <p className="text-[#1B2D45]/40 mt-1.5 text-center max-w-[360px]" style={{ fontSize: "13px", fontWeight: 400, lineHeight: 1.6 }}>
+              Try expanding your date range or check back soon — new sublets are posted daily.
+            </p>
+          </div>
+        </div>
+      ) : viewMode === "board" ? (
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6 cork-bg">
+          <div className={isMobile ? "flex flex-col gap-6" : "grid grid-cols-3 gap-6"}>
+            {filteredListings.map((listing, i) => (
+              <div key={listing.id} style={isMobile ? undefined : { marginTop: `${desktopStaggers[i % desktopStaggers.length]}px` }}>
+                <SubletCard listing={listing} selectedRange={selectedRange} isMobile={isMobile} isPinned={pinnedIds.includes(listing.id)} onTogglePin={togglePin} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredListings.map((listing) => (
+              <SubletGridCard key={listing.id} listing={listing} selectedRange={selectedRange} isPinned={pinnedIds.includes(listing.id)} onTogglePin={togglePin} />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <SubletMapView listings={filteredListings} pinnedIds={pinnedIds} onTogglePin={togglePin} selectedRange={selectedRange} />
+      )}
+
+      {/* Mobile floating picks badge */}
+      <AnimatePresence>
+        {isMobile && pinnedIds.length > 0 && !showPicksSheet && (
+          <motion.div
+            className="fixed bottom-4 right-4 z-30"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          >
+            <button
+              onClick={() => setShowPicksSheet(true)}
+              className="flex items-center gap-1.5 bg-[#FF6B35] text-white px-4 py-2 rounded-full shadow-[0_2px_12px_rgba(255,107,53,0.4)] active:scale-95 transition-transform"
+              style={{ fontSize: "13px", fontWeight: 700 }}
+            >
+              📌 {pinnedIds.length} pick{pinnedIds.length !== 1 ? "s" : ""}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <BottomCTA onListClick={handleListClick} />
+
+      <SubletCompareModal
+        isOpen={compareOpen}
+        onClose={() => setCompareOpen(false)}
+        listings={pinnedListings}
       />
     </div>
   );

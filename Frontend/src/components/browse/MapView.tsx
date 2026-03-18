@@ -76,13 +76,15 @@ export function MapView({ listings, pinnedIds, onTogglePin }: MapViewProps) {
             .setPopup(new mapboxgl.Popup({ offset: 20, closeButton: false }).setHTML('<div style="font-size:12px;font-weight:600;padding:2px 4px;">University of Guelph</div>'))
             .addTo(map);
 
-          // Landmarks
+          // Landmarks — colored dots
+          const landmarkColors: Record<string, string> = { grocery: "#4ADE80", gym: "#2EC4B6", shopping: "#FF6B35", transit: "#1B2D45", park: "#86EFAC", recreation: "#2EC4B6", food: "#FFB627", health: "#E71D36", library: "#A78BFA", area: "#98A3B0" };
           GUELPH_LANDMARKS.filter((lm) => lm.type !== "campus").forEach((lm) => {
+            const dotColor = landmarkColors[lm.type] || "#98A3B0";
             const el = document.createElement("div");
-            el.innerHTML = '<div style="width:26px;height:26px;background:#1B2D45;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.12);cursor:pointer;">' + lm.emoji + '</div>';
+            el.innerHTML = '<div style="width:12px;height:12px;background:' + dotColor + ';border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15);cursor:pointer;transition:transform 0.15s;" onmouseenter="this.style.transform=\'scale(1.4)\'" onmouseleave="this.style.transform=\'scale(1)\'"></div>';
             new mapboxgl.Marker({ element: el })
               .setLngLat([lm.lng, lm.lat])
-              .setPopup(new mapboxgl.Popup({ offset: 16, closeButton: false }).setHTML('<div style="font-size:11px;font-weight:600;padding:2px 4px;">' + lm.name + '</div>'))
+              .setPopup(new mapboxgl.Popup({ offset: 10, closeButton: false }).setHTML('<div style="font-size:11px;font-weight:600;padding:2px 4px;">' + lm.name + '</div>'))
               .addTo(map);
           });
 

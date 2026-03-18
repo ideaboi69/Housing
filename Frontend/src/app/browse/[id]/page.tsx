@@ -507,7 +507,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* ─── Sidebar ─── */}
-          <motion.div className="space-y-4 sticky top-[80px] self-start" variants={fadeUp}>
+          <motion.div className="space-y-4 sticky top-[80px] self-start max-h-[calc(100vh-100px)] overflow-y-auto no-scrollbar" variants={fadeUp}>
             {/* Price card */}
             <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5"
               style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>

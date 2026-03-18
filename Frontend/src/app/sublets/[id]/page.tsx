@@ -285,19 +285,22 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 </h3>
                 <div className="space-y-3 mt-3">
                   {[
-                    { label: "Price vs Market", score: sublet.price_vs_market_score, emoji: "📊" },
-                    { label: "Landlord Reputation", score: sublet.landlord_reputation_score, emoji: "⭐" },
-                    { label: "Maintenance", score: sublet.maintenance_score, emoji: "🔧" },
-                    { label: "Lease Clarity", score: sublet.lease_clarity_score, emoji: "📋" },
+                    { label: "Price", score: sublet.price_vs_market_score, emoji: "📊" },
+                    { label: "Location", score: sublet.lease_clarity_score, emoji: "📍" },
+                    { label: "Amenities", score: 50, emoji: "🏠" },
+                    { label: "Tenant Reviews", score: sublet.landlord_reputation_score, emoji: "⭐" },
                   ].map((item, i) => (
                     <motion.div key={item.label} className="flex items-center gap-3" initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1, type: "spring", stiffness: 200 }}>
                       <span style={{ fontSize: "14px" }}>{item.emoji}</span>
-                      <span className="text-[#1B2D45]/60 w-[130px] shrink-0" style={{ fontSize: "12px", fontWeight: 500 }}>{item.label}</span>
+                      <span className="text-[#1B2D45]/60 w-[120px] shrink-0" style={{ fontSize: "12px", fontWeight: 500 }}>{item.label}</span>
                       <AnimatedBar score={item.score} color={getScoreColor(item.score)} />
                       <span className="w-8 text-right shrink-0" style={{ fontSize: "13px", fontWeight: 800, color: getScoreColor(item.score) }}>{item.score}</span>
                     </motion.div>
                   ))}
                 </div>
+                {sublet.landlord_reputation_score === 50 && (
+                  <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>New listing — review score will update as tenants leave ratings.</p>
+                )}
               </motion.div>
 
               {/* Reviews — stars only, no comments */}
@@ -342,7 +345,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* ─── Sidebar ─── */}
-          <motion.div className="space-y-4 sticky top-[80px] self-start" variants={fadeUp}>
+          <motion.div className="space-y-4 sticky top-[80px] self-start max-h-[calc(100vh-100px)] overflow-y-auto no-scrollbar" variants={fadeUp}>
             {/* Price card */}
             <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5" style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>
               <div className="flex items-baseline gap-2">

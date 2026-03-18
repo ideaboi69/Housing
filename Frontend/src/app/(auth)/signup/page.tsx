@@ -126,7 +126,7 @@ export default function SignupPage() {
                 <p className="mt-1 text-[#1B2D45]/50" style={{ fontSize: "14px" }}>Create your account with your @uoguelph.ca email</p>
               </div>
 
-              <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-white/60 p-6" style={{ boxShadow: "0 8px 40px rgba(27,45,69,0.08)" }}>
+              <div className="bg-white rounded-xl border border-black/[0.06] p-6" style={{ boxShadow: "0 4px 20px rgba(0,0,0,0.04)" }}>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div>

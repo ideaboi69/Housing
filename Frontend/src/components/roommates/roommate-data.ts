@@ -16,6 +16,7 @@ export interface LifestyleProfile {
   compatibility?: number;
   gender?: string;
   avatar?: string;
+  isEarlyAdopter?: boolean;
 }
 
 export interface GroupHousing {
@@ -54,6 +55,7 @@ export interface RoommateGroup {
   createdAt: string;
   housing?: GroupHousing;
   bannerGradient?: string;
+  groupImage?: string;
 }
 
 export interface GroupRequest {
@@ -165,13 +167,13 @@ export function computeGroupCompatibility(
 /* ── Mock Profiles ── */
 
 export const MOCK_PROFILES: LifestyleProfile[] = [
-  { id: "r1", firstName: "Alex", initial: "T.", year: "3rd year", program: "Computer Science", budget: [500, 650], moveIn: "Fall 2026", leaseLength: "8-month", bio: "Looking for a chill roommate for a 2BR near campus. I'm pretty quiet during the week but love going out on weekends.", tags: { sleep: "Night Owl (after midnight)", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Mix of both", smoking: "No smoking at all", pets: "I'm fine with pets", cooking: "I cook daily" }, gender: "male" },
-  { id: "r2", firstName: "Jordan", initial: "K.", year: "2nd year", program: "Business Administration", budget: [650, 800], moveIn: "Fall 2026", leaseLength: "12-month", bio: "Transfer student looking for a clean, organized living situation. I keep to myself mostly but enjoy the occasional movie night.", tags: { sleep: "Early Bird (before 10pm)", cleanliness: "Very Tidy", noise: "Quiet — I need silence", guests: "Rarely / Never", study: "Library / campus mostly", smoking: "No smoking at all", pets: "No pets please", cooking: "A few times a week" }, gender: "male" },
-  { id: "r3", firstName: "Sam", initial: "W.", year: "4th year", program: "Engineering", budget: [500, 650], moveIn: "Fall 2026", leaseLength: "8-month", bio: "Social butterfly who loves hosting. Looking for roommates who are cool with people coming over. I'll cook for the house!", tags: { sleep: "Night Owl (after midnight)", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Often — I'm social", study: "Study at home", smoking: "Outside only", pets: "I'm fine with pets", cooking: "Mostly takeout / meal plan" }, gender: "male" },
-  { id: "r4", firstName: "Riley", initial: "M.", year: "2nd year", program: "Kinesiology", budget: [650, 800], moveIn: "Winter 2027", leaseLength: "8-month", bio: "Early riser, gym every morning. I have a small cat named Mochi. Looking for someone who's tidy and respectful of shared spaces.", tags: { sleep: "Early Bird (before 10pm)", cleanliness: "Very Tidy", noise: "Quiet — I need silence", guests: "Sometimes (weekends)", study: "Library / campus mostly", smoking: "No smoking at all", pets: "I have a pet", cooking: "I cook daily" }, gender: "female" },
-  { id: "r5", firstName: "Taylor", initial: "R.", year: "3rd year", program: "Environmental Science", budget: [500, 650], moveIn: "Fall 2026", leaseLength: "12-month", bio: "Plant parent looking for a relaxed living situation. I'm flexible on most things and easy to get along with.", tags: { sleep: "Flexible", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Mix of both", smoking: "No smoking at all", pets: "I'm fine with pets", cooking: "A few times a week" }, gender: "female" },
+  { id: "r1", firstName: "Alex", initial: "T.", year: "3rd year", program: "Computer Science", budget: [500, 650], moveIn: "Fall 2026", leaseLength: "8-month", bio: "Looking for a chill roommate for a 2BR near campus. I'm pretty quiet during the week but love going out on weekends.", tags: { sleep: "Night Owl (after midnight)", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Mix of both", smoking: "No smoking at all", pets: "I'm fine with pets", cooking: "I cook daily" }, gender: "male", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face", isEarlyAdopter: true },
+  { id: "r2", firstName: "Jordan", initial: "K.", year: "2nd year", program: "Business Administration", budget: [650, 800], moveIn: "Fall 2026", leaseLength: "12-month", bio: "Transfer student looking for a clean, organized living situation. I keep to myself mostly but enjoy the occasional movie night.", tags: { sleep: "Early Bird (before 10pm)", cleanliness: "Very Tidy", noise: "Quiet — I need silence", guests: "Rarely / Never", study: "Library / campus mostly", smoking: "No smoking at all", pets: "No pets please", cooking: "A few times a week" }, gender: "male", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop&crop=face" },
+  { id: "r3", firstName: "Sam", initial: "W.", year: "4th year", program: "Engineering", budget: [500, 650], moveIn: "Fall 2026", leaseLength: "8-month", bio: "Social butterfly who loves hosting. Looking for roommates who are cool with people coming over. I'll cook for the house!", tags: { sleep: "Night Owl (after midnight)", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Often — I'm social", study: "Study at home", smoking: "Outside only", pets: "I'm fine with pets", cooking: "Mostly takeout / meal plan" }, gender: "male", avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=100&h=100&fit=crop&crop=face", isEarlyAdopter: true },
+  { id: "r4", firstName: "Riley", initial: "M.", year: "2nd year", program: "Kinesiology", budget: [650, 800], moveIn: "Winter 2027", leaseLength: "8-month", bio: "Early riser, gym every morning. I have a small cat named Mochi. Looking for someone who's tidy and respectful of shared spaces.", tags: { sleep: "Early Bird (before 10pm)", cleanliness: "Very Tidy", noise: "Quiet — I need silence", guests: "Sometimes (weekends)", study: "Library / campus mostly", smoking: "No smoking at all", pets: "I have a pet", cooking: "I cook daily" }, gender: "female", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&crop=face" },
+  { id: "r5", firstName: "Taylor", initial: "R.", year: "3rd year", program: "Environmental Science", budget: [500, 650], moveIn: "Fall 2026", leaseLength: "12-month", bio: "Plant parent looking for a relaxed living situation. I'm flexible on most things and easy to get along with.", tags: { sleep: "Flexible", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Mix of both", smoking: "No smoking at all", pets: "I'm fine with pets", cooking: "A few times a week" }, gender: "female", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face" },
   { id: "r6", firstName: "Morgan", initial: "L.", year: "1st year", program: "Psychology", budget: [800, 2000], moveIn: "Fall 2026", leaseLength: "12-month", bio: "First time living off campus! I'm quiet, love journaling and late-night walks. Looking for a calm, safe space.", tags: { sleep: "Night Owl (after midnight)", cleanliness: "Relaxed", noise: "Quiet — I need silence", guests: "Rarely / Never", study: "Mix of both", smoking: "No smoking at all", pets: "I'm fine with pets", cooking: "Mostly takeout / meal plan" }, gender: "female" },
-  { id: "r7", firstName: "Quinn", initial: "B.", year: "4th year", program: "Arts", budget: [500, 650], moveIn: "Summer 2026", leaseLength: "4-month", bio: "Looking for a summer sublet roommate. I'm in the studio most days so I'm barely home. Clean and quiet.", tags: { sleep: "Flexible", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Study at home", smoking: "No smoking at all", pets: "No pets please", cooking: "I cook daily" }, gender: "female" },
+  { id: "r7", firstName: "Quinn", initial: "B.", year: "4th year", program: "Arts", budget: [500, 650], moveIn: "Summer 2026", leaseLength: "4-month", bio: "Looking for a summer sublet roommate. I'm in the studio most days so I'm barely home. Clean and quiet.", tags: { sleep: "Flexible", cleanliness: "Reasonably Clean", noise: "Moderate — music at a normal volume", guests: "Sometimes (weekends)", study: "Study at home", smoking: "No smoking at all", pets: "No pets please", cooking: "I cook daily" }, gender: "female", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face" },
   { id: "r8", firstName: "Priya", initial: "S.", year: "3rd year", program: "Biochemistry", budget: [500, 650], moveIn: "Fall 2026", leaseLength: "8-month", bio: "I spend most of my time in the lab. Looking for quiet, clean roommates. I'm vegetarian and cook a lot!", tags: { sleep: "Early Bird (before 10pm)", cleanliness: "Very Tidy", noise: "Quiet — I need silence", guests: "Rarely / Never", study: "Library / campus mostly", smoking: "No smoking at all", pets: "No pets please", cooking: "I cook daily" }, gender: "female" },
 ];
 
@@ -197,7 +199,7 @@ export const MOCK_GROUPS: RoommateGroup[] = [
       linkedListingScore: 86,
       linkedListingImage: "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&h=300&fit=crop",
     },
-    bannerGradient: "linear-gradient(135deg, #FF6B35 0%, #FFB627 100%)",
+    bannerGradient: "linear-gradient(135deg, #FF6B35 0%, #FFB627 100%)", groupImage: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&h=250&fit=crop",
   },
   {
     id: "g2", name: "CompSci House", createdBy: "r1",
@@ -258,7 +260,7 @@ export const MOCK_GROUPS: RoommateGroup[] = [
       linkedListingScore: 88,
       linkedListingImage: "https://images.unsplash.com/photo-1579632151052-92f741fb9b79?w=400&h=300&fit=crop",
     },
-    bannerGradient: "linear-gradient(135deg, #E71D36 0%, #FF6B35 100%)",
+    bannerGradient: "linear-gradient(135deg, #E71D36 0%, #FF6B35 100%)", groupImage: "https://images.unsplash.com/photo-1543269865-cbf427effbad?w=400&h=250&fit=crop",
   },
 ];
 
