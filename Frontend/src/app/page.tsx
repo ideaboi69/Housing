@@ -1,40 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { Search, Pin, MessageCircle, ChevronRight, Heart, User } from "lucide-react";
+import { Heart, User } from "lucide-react";
 
 /* ════════════════════════════════════════════════════════
    Images / Data
    ════════════════════════════════════════════════════════ */
-
-const neighborhoods = [
-  { name: "Campus", listings: 24, avgRent: "$620", x: 48, y: 42, w: 22, h: 28, color: "rgba(46,196,182,0.25)", borderColor: "rgba(46,196,182,0.5)", labelColor: "#2EC4B6" },
-  { name: "Stone Road", listings: 18, avgRent: "$580", x: 38, y: 12, w: 26, h: 22, color: "rgba(255,107,53,0.2)", borderColor: "rgba(255,107,53,0.45)", labelColor: "#FF6B35" },
-  { name: "South End", listings: 31, avgRent: "$640", x: 58, y: 60, w: 24, h: 26, color: "rgba(46,196,182,0.18)", borderColor: "rgba(46,196,182,0.4)", labelColor: "#4ADE80" },
-  { name: "Downtown", listings: 15, avgRent: "$710", x: 16, y: 35, w: 24, h: 30, color: "rgba(255,182,39,0.2)", borderColor: "rgba(255,182,39,0.45)", labelColor: "#FFB627" },
-  { name: "Exhibition", listings: 12, avgRent: "$550", x: 72, y: 30, w: 18, h: 24, color: "rgba(168,85,247,0.2)", borderColor: "rgba(168,85,247,0.4)", labelColor: "#A855F7" },
-];
-
-const landmarks = [
-  { name: "UoG Main", x: 52, y: 48, size: 6 },
-  { name: "Stone Rd Mall", x: 45, y: 20, size: 4 },
-  { name: "Bus Terminal", x: 24, y: 42, size: 4 },
-  { name: "Exhibition Park", x: 78, y: 38, size: 4 },
-  { name: "Guelph Lake", x: 85, y: 15, size: 5 },
-];
 
 const healthBreakdowns = [
   { emoji: "📊", label: "Price", score: 82, color: "#2EC4B6" },
   { emoji: "📍", label: "Location", score: 91, color: "#4ADE80" },
   { emoji: "🏠", label: "Amenities", score: 78, color: "#2EC4B6" },
   { emoji: "⭐", label: "Tenant Reviews", score: 88, color: "#4ADE80" },
-];
-
-const howItWorksSteps = [
-  { icon: <Search className="w-6 h-6 text-white" />, bg: "#FF6B35", title: "Browse & Filter", desc: "Search by price, distance, lease type, furnishing, and more. Every listing shows walk time and bus time to campus." },
-  { icon: <Pin className="w-6 h-6 text-white" />, bg: "#2EC4B6", title: "Save & Compare", desc: "Pin listings to your board. Compare Cribb Scores, prices, and reviews side by side." },
-  { icon: <MessageCircle className="w-6 h-6 text-white" />, bg: "#1B2D45", title: "Contact with Confidence", desc: "Reach out to verified landlords. You'll know their ratings, response time, and what other students say." },
 ];
 
 const founders = [
@@ -61,6 +40,45 @@ const footerColumns = [
   { title: "For Landlords", links: [{ label: "List a Property", to: "/landlord/login" }, { label: "Dashboard", to: "/landlord" }, { label: "How It Works", to: "/landlord/login" }] },
   { title: "cribb", links: [{ label: "Sign Up", to: "/signup" }, { label: "Log In", to: "/login" }] },
 ];
+
+const showcaseFeatures = [
+  {
+    id: "compare",
+    title: "Pin & Compare",
+    eyebrow: "Decision Mode",
+    desc: "Save listings to your board, line them up side by side, and stop bouncing between tabs, screenshots, and spreadsheets.",
+    accent: "#FF6B35",
+    bg: "rgba(255,107,53,0.10)",
+    bullets: ["Saved picks tray", "Quick price checks", "Side-by-side decisions"],
+  },
+  {
+    id: "bubble",
+    title: "The Bubble",
+    eyebrow: "Campus Pulse",
+    desc: "A student-first feed for housing tips, local deals, and what's happening around Guelph so the app feels useful even before you sign a lease.",
+    accent: "#2EC4B6",
+    bg: "rgba(46,196,182,0.10)",
+    bullets: ["Housing tips", "Campus news", "Student deals"],
+  },
+  {
+    id: "marketplace",
+    title: "Cribb Marketplace",
+    eyebrow: "Move-In Utility",
+    desc: "Furniture, textbooks, and move-out essentials in the same ecosystem, right when students are setting up or clearing out their place.",
+    accent: "#FFB627",
+    bg: "rgba(255,182,39,0.12)",
+    bullets: ["Buy & sell fast", "Move-in essentials", "No random middlemen"],
+  },
+  {
+    id: "roommates",
+    title: "Roommate Matching",
+    eyebrow: "Build Your Group",
+    desc: "Help students go from solo searchers to complete groups with compatibility cues, shareable invites, and a clearer path to filling a place.",
+    accent: "#4ADE80",
+    bg: "rgba(74,222,128,0.10)",
+    bullets: ["Compatibility cues", "Invite links", "Group discovery"],
+  },
+] as const;
 
 /* ════════════════════════════════════════════════════════
    Helper Components
@@ -130,11 +148,411 @@ function ListingPreviewCard({ listing }: { listing: typeof popularListings[0] })
   );
 }
 
+function ShowcaseVisual({ featureId }: { featureId: (typeof showcaseFeatures)[number]["id"] }) {
+  if (featureId === "compare") {
+    return (
+      <div className="rounded-[28px] border border-[#1B2D45]/10 bg-[linear-gradient(180deg,#fff7f1_0%,#fffdf9_100%)] p-4 md:p-5">
+        <div className="flex items-center justify-between rounded-[24px] border border-black/[0.05] bg-white px-4 py-4 shadow-[0_1px_4px_rgba(27,45,69,0.04)]">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FFEEE5]" style={{ fontSize: "18px" }}>📊</div>
+            <div>
+              <div className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>Compare Listings</div>
+              <div className="text-[#98A3B0]" style={{ fontSize: "11px", fontWeight: 500 }}>2 listings · Best values highlighted in green</div>
+            </div>
+          </div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-black/[0.04] text-[#98A3B0]" style={{ fontSize: "18px" }}>×</div>
+        </div>
+
+        <div className="mt-4 rounded-[24px] border border-[#FF6B35]/12 bg-[linear-gradient(135deg,rgba(255,107,53,0.04)_0%,rgba(255,182,39,0.04)_100%)] p-5">
+          <div className="flex items-center gap-2">
+            <span className="text-[#FF6B35]" style={{ fontSize: "15px" }}>✦</span>
+            <span className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 700 }}>AI Analysis</span>
+          </div>
+          <p className="mt-3 text-[#5C6B7A]" style={{ fontSize: "14px", lineHeight: 1.7 }}>
+            Cozy Townhouse on College Ave has the strongest Cribb Score (88), suggesting better overall quality and landlord reputation. Bright Studio on Gordon St is the most budget-friendly at $680/room.
+          </p>
+        </div>
+
+        <div className="mt-4 rounded-[24px] border border-black/[0.05] bg-white p-5 shadow-[0_1px_4px_rgba(27,45,69,0.04)]">
+          <div className="grid gap-4 md:grid-cols-[190px_1fr_1fr]">
+            <div />
+            {[
+              { title: "Cozy Townhouse on College Ave", address: "118 College Ave W, Guelph", score: 88, color: "#4ADE80", link: false },
+              { title: "Bright Studio on Gordon St", address: "220 Gordon St, Unit 4B, Guelph", score: 79, color: "#FFB627", link: true },
+            ].map((listing) => (
+              <div key={listing.title}>
+                <div className="relative h-[120px] rounded-[18px] bg-[linear-gradient(135deg,#F5F0E8_0%,#EEE7DC_100%)]">
+                  <div className="absolute inset-0 flex items-center justify-center text-[34px]">🏡</div>
+                  <div
+                    className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full text-white"
+                    style={{ backgroundColor: listing.color, fontSize: "14px", fontWeight: 800 }}
+                  >
+                    {listing.score}
+                  </div>
+                </div>
+                <div className="mt-4 text-center">
+                  <div className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>{listing.title}</div>
+                  <div className="mt-1 text-[#B4BBC4]" style={{ fontSize: "11px", fontWeight: 600 }}>{listing.address}</div>
+                  {listing.link && (
+                    <div className="mt-2 text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 700 }}>View listing ↗</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 overflow-hidden rounded-[18px] border border-black/[0.04]">
+            {[
+              { label: "Price / Room", a: "$725", b: "$680", best: "b" },
+              { label: "Total Rent", a: "$2,175", b: "$680", best: "b" },
+              { label: "Cribb Score", a: "88", b: "79", best: "a" },
+              { label: "Distance", a: "0.4 km", b: "0.5 km", best: "a" },
+              { label: "Walk Time", a: "5 min", b: "6 min", best: "a" },
+              { label: "Type", a: "townhouse", b: "apartment", best: "" },
+            ].map((row) => (
+              <div key={row.label} className="grid grid-cols-[190px_1fr_1fr] border-t border-black/[0.04] first:border-t-0">
+                <div className="bg-[#FCFBF8] px-5 py-4 text-[#7E8896]" style={{ fontSize: "12px", fontWeight: 700 }}>{row.label}</div>
+                <div className="px-5 py-4 text-center" style={{ fontSize: "14px", fontWeight: 700, color: row.best === "a" ? "#4ADE80" : "#1B2D45" }}>{row.a}</div>
+                <div className="px-5 py-4 text-center" style={{ fontSize: "14px", fontWeight: 700, color: row.best === "b" ? "#4ADE80" : row.label === "Cribb Score" ? "#FFB627" : "#1B2D45" }}>{row.b}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (featureId === "bubble") {
+    return (
+      <div className="rounded-[28px] border border-[#1B2D45]/10 bg-[radial-gradient(circle_at_top,#fff3eb_0%,#fffaf7_36%,#ffffff_100%)] p-4 md:p-5">
+        <div className="rounded-[24px] border border-[#FF6B35]/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(255,248,243,0.82)_100%)] p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="text-[#1B2D45]" style={{ fontSize: "32px", fontWeight: 900, letterSpacing: "-0.03em" }}>
+                The Bubble <span className="text-[#FF6B35]/55">◌◌</span>
+              </div>
+              <p className="mt-2 text-[#1B2D45]/45" style={{ fontSize: "14px", lineHeight: 1.6 }}>
+                What&apos;s happening in Guelph — events, deals, tips & more
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {["🎉 Homecoming", "🍕 New Eats", "☀️ Patio Season", "🎓 Campus News"].map((item) => (
+                  <span key={item} className="rounded-full bg-white px-3 py-1.5 text-[#1B2D45]/70 shadow-[0_1px_4px_rgba(27,45,69,0.06)]" style={{ fontSize: "11px", fontWeight: 700 }}>
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[18px] bg-[#FF6B35] px-4 py-3 text-white shadow-[0_10px_24px_rgba(255,107,53,0.2)]" style={{ fontSize: "13px", fontWeight: 700 }}>
+              Become a Writer
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: "All Posts", active: true },
+              { label: "Events" },
+              { label: "Deals" },
+              { label: "News" },
+              { label: "Lifestyle" },
+            ].map((item) => (
+              <span
+                key={item.label}
+                className={`rounded-full px-4 py-2 ${item.active ? "bg-[#FF6B35] text-white" : "bg-white text-[#8190A3] border border-black/[0.05]"}`}
+                style={{ fontSize: "12px", fontWeight: 700 }}
+              >
+                {item.label}
+              </span>
+            ))}
+          </div>
+          <div className="flex items-center rounded-full border border-black/[0.05] bg-white p-1">
+            {["Trending", "New", "Top"].map((item, index) => (
+              <span
+                key={item}
+                className={`rounded-full px-4 py-1.5 ${index === 0 ? "bg-[#FF6B35] text-white" : "text-[#A3ACB8]"}`}
+                style={{ fontSize: "11px", fontWeight: 700 }}
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-[24px] border border-[#FFB627]/20 bg-[linear-gradient(135deg,#FAF8F4_0%,#FFF8E8_100%)] p-4 shadow-[0_2px_8px_rgba(255,182,39,0.08)]" style={{ borderLeft: "4px solid #FFB627" }}>
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>📌 This Week in Guelph</h4>
+              <span className="rounded-full bg-[#FFB627]/12 px-3 py-1 text-[#B8860B]" style={{ fontSize: "10px", fontWeight: 700 }}>Curated by cribb</span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {[
+                "Homecoming 2026 lineup announced — tickets March 1st",
+                "Yuki Ramen opens on Gordon St with student discounts",
+                "UC south entrance closed for March renovations",
+                "Patios are open — see the community's top picks",
+              ].map((item, index) => (
+                <div key={item} className="flex items-start gap-3 text-[#5C6B7A]" style={{ fontSize: "13px", lineHeight: 1.5 }}>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFB627]/15 text-[#B8860B]" style={{ fontSize: "10px", fontWeight: 800 }}>
+                    {index + 1}
+                  </span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            <div className="rounded-[22px] border border-[#FF6B35]/15 bg-[linear-gradient(135deg,#FFFAF7_0%,#FFFFFF_100%)] p-4 shadow-[0_2px_12px_rgba(255,107,53,0.08)]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FF6B35]/10 text-[#FF6B35]" style={{ fontSize: "16px" }}>✦</div>
+                <div>
+                  <div className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Become a Writer</div>
+                  <div className="mt-1 text-[#5C6B7A]" style={{ fontSize: "12px", lineHeight: 1.5 }}>Get the verified badge and share with the UofG community</div>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-[22px] border border-black/[0.05] bg-white p-4 shadow-[0_1px_4px_rgba(27,45,69,0.04)]">
+              <div className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>↗ Trending This Week</div>
+              <div className="mt-3 space-y-3">
+                {[
+                  { title: "Homecoming 2026 lineup just dropped", votes: 248 },
+                  { title: "Best patios to hit up this spring", votes: 201 },
+                  { title: "New ramen spot on Gordon St is amazing", votes: 192 },
+                ].map((item, index) => (
+                  <div key={item.title} className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFEDE5] text-[#FF6B35]" style={{ fontSize: "10px", fontWeight: 800 }}>
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{item.title}</div>
+                      <div className="mt-1 text-[#98A3B0]" style={{ fontSize: "11px", fontWeight: 600 }}>▲ {item.votes}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-[24px] border border-black/[0.05] bg-white p-5 shadow-[0_1px_4px_rgba(27,45,69,0.04)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#FF6B35,#FFB627)] text-white" style={{ fontSize: "15px", fontWeight: 800 }}>
+                J
+              </div>
+              <div>
+                <div className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>Jordan</div>
+                <div className="text-[#98A3B0]" style={{ fontSize: "11px", fontWeight: 600 }}>2h ago</div>
+              </div>
+            </div>
+            <span className="rounded-full bg-[#F2EEFF] px-3 py-1 text-[#6C5CE7]" style={{ fontSize: "10px", fontWeight: 700 }}>🎉 Events</span>
+          </div>
+          <div className="mt-4 text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 800, lineHeight: 1.2 }}>
+            Homecoming 2026 lineup just dropped!
+          </div>
+          <p className="mt-3 text-[#5C6B7A]" style={{ fontSize: "14px", lineHeight: 1.7 }}>
+            They got Tory Lanez and bbno$ headlining at Alumni Stadium. Tickets go live March 1st for students...
+          </p>
+          <div className="mt-4 flex items-center gap-4 text-[#5C6B7A]" style={{ fontSize: "12px", fontWeight: 600 }}>
+            <span>📅 Sep 27, 2026</span>
+            <span>📍 Alumni Stadium</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (featureId === "marketplace") {
+    return (
+      <div className="rounded-[28px] border border-[#1B2D45]/10 bg-[linear-gradient(180deg,#fffaf0_0%,#ffffff_100%)] p-4 md:p-5">
+        <div className="rounded-[24px] border border-[#FFB627]/15 bg-white p-4 shadow-[0_10px_30px_rgba(255,182,39,0.10)]">
+          <div className="mb-4 rounded-[22px] border-[2px] border-[#1B2D45] bg-[linear-gradient(135deg,#FF6B35_0%,#FFB627_100%)] px-4 py-4 text-white shadow-[5px_5px_0px_#1B2D45]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div style={{ fontSize: "16px", fontWeight: 800 }}>Moving out? Sell your stuff before you leave.</div>
+                <div className="mt-1 text-white/75" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                  Spring move-out season is here. List items in 60 seconds.
+                </div>
+              </div>
+              <div className="rounded-xl bg-white px-3 py-2 text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 700 }}>
+                Sell Something
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em" }}>MOVE-IN / MOVE-OUT</div>
+              <div className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Marketplace that feels built into the housing flow</div>
+            </div>
+            <div className="rounded-full bg-[#FFB627]/15 px-3 py-1 text-[#C88700]" style={{ fontSize: "11px", fontWeight: 700 }}>
+              Zero fees
+            </div>
+          </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[
+              { title: "Desk Lamp", price: "$18", tone: "#FFB627", badge: "Like New" },
+              { title: "Mini Fridge", price: "$60", tone: "#FF6B35", badge: "Popular" },
+              { title: "Textbook Set", price: "$35", tone: "#2EC4B6", badge: "Bundle" },
+              { title: "Office Chair", price: "$40", tone: "#1B2D45", badge: "Fast pickup" },
+              ].map((item) => (
+              <div key={item.title} className="rounded-[22px] border border-black/[0.05] bg-[#FAF8F4] p-3">
+                <div className="relative h-24 rounded-[18px]" style={{ background: `linear-gradient(135deg, ${item.tone}22 0%, #ffffff 100%)` }}>
+                  <div className="absolute left-2.5 top-2.5 rounded-full bg-white/95 px-2.5 py-1" style={{ fontSize: "9px", fontWeight: 700, color: item.tone }}>
+                    {item.badge}
+                  </div>
+                </div>
+                <div className="mt-3 text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{item.title}</div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-[#FF6B35]" style={{ fontSize: "13px", fontWeight: 800 }}>{item.price}</span>
+                  <span className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700 }}>24h</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 rounded-[22px] bg-[#1B2D45] px-4 py-4 text-white">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div style={{ fontSize: "15px", fontWeight: 700 }}>Moving out? Sell your stuff before you leave.</div>
+                <div className="mt-1 text-white/55" style={{ fontSize: "12px", lineHeight: 1.6 }}>
+                  Makes Cribb useful beyond discovery and helps students finish the move, not just find the place.
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/10 px-3 py-2 text-center" style={{ fontSize: "11px", fontWeight: 700 }}>
+                List in 60s
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-[28px] border border-[#1B2D45]/10 bg-[linear-gradient(180deg,#fdfbf7_0%,#ffffff_100%)] p-4 md:p-5">
+      <div className="rounded-[24px] border border-black/[0.04] bg-white p-5 shadow-[0_1px_4px_rgba(27,45,69,0.04)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Roommates</div>
+            <div className="mt-1 text-[#98A3B0]" style={{ fontSize: "12px", fontWeight: 500 }}>Browse houses with availability</div>
+          </div>
+          <div className="rounded-[18px] bg-[#FF6B35] px-4 py-3 text-white shadow-[0_6px_0px_rgba(229,94,46,0.55)]" style={{ fontSize: "12px", fontWeight: 700 }}>
+            + Create Group
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between rounded-[18px] border border-black/[0.05] bg-[#FAF8F4] px-4 py-3">
+          <span className="text-[#8190A3]" style={{ fontSize: "12px", fontWeight: 500 }}>🛡 Your roommate profile is active</span>
+          <span className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 700 }}>✏️ Redo Quiz</span>
+        </div>
+
+        <div className="mt-4 inline-flex rounded-[18px] border-[3px] border-[#1B2D45] bg-white p-1.5 shadow-[2px_2px_0px_rgba(27,45,69,0.06)]">
+          <span className="rounded-[14px] bg-[#1B2D45] px-5 py-3 text-white" style={{ fontSize: "12px", fontWeight: 700 }}>👥 Groups</span>
+          <span className="px-5 py-3 text-[#8190A3]" style={{ fontSize: "12px", fontWeight: 700 }}>Individuals</span>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {["All Groups", "Need 1 More", "All Girls", "Co-ed", "Near Campus", "Downtown", "Under $700"].map((item, index) => (
+            <span
+              key={item}
+              className={`rounded-full px-4 py-2 ${index === 0 ? "bg-[#FF6B35] text-white border-[#E55E2E]" : "bg-white text-[#1B2D45] border-[#1B2D45]"}`}
+              style={{ fontSize: "11px", fontWeight: 700, borderWidth: "2.5px", boxShadow: index === 0 ? "3px 3px 0px rgba(255,107,53,0.15)" : "2px 2px 0px rgba(27,45,69,0.06)" }}
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {[
+            {
+              name: "REDF HOY",
+              score: 71,
+              banner: "linear-gradient(135deg, #FF6B35 0%, #FFB627 100%)",
+              text: "2/4",
+              price: "$674/mo",
+              utilities: "Extra",
+              moveIn: "Fall 2026",
+              availability: "⏳ Has a place",
+              address: "📍 Availability at BFBFFVHNVNN",
+              accent: "#FFB627",
+            },
+            {
+              name: "The Edinburgh Girls",
+              score: 67,
+              banner: "linear-gradient(135deg, #8294A8 0%, #C9D2DD 100%)",
+              text: "3/4",
+              price: "$690/mo",
+              utilities: "Extra",
+              moveIn: "Fall 2026",
+              availability: "Verified place",
+              address: "📍 Availability at 87 Edinburgh Rd S, Guelph, ON",
+              accent: "#4ADE80",
+            },
+          ].map((group, index) => (
+            <div key={group.name} className="overflow-hidden rounded-[24px] border-[3px] border-[#1B2D45] bg-white shadow-[6px_6px_0px_rgba(27,45,69,0.08)]">
+              <div className="relative h-[96px] px-5 py-4 text-white" style={{ background: group.banner }}>
+                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: index === 0 ? "radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 1px)" : undefined, backgroundSize: index === 0 ? "12px 12px" : undefined }} />
+                <div className="relative z-10 flex items-start justify-between">
+                  <div style={{ fontSize: "14px", fontWeight: 800 }}>{group.name}</div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border-[5px] border-white bg-[#FFF7EA] text-[#FFB627]" style={{ fontSize: "13px", fontWeight: 800 }}>
+                    {group.score}
+                  </div>
+                </div>
+              </div>
+              <div className="p-5">
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border-[4px] border-white bg-[#FFE7DA] text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 800 }}>D</div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border-[4px] border-white bg-[#FFE7DA] text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 800 }}>{index === 0 ? "R" : "A"}</div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border-[4px] border-dashed border-[#F2D9CB] bg-[#FFF7F1] text-[#FFB08B]" style={{ fontSize: "14px", fontWeight: 700 }}>+</div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border-[4px] border-dashed border-[#F2D9CB] bg-[#FFF7F1] text-[#FFB08B]" style={{ fontSize: "14px", fontWeight: 700 }}>{index === 0 ? "+" : ""}</div>
+                  </div>
+                  <span className="text-[#98A3B0]" style={{ fontSize: "12px", fontWeight: 700 }}>{group.text}</span>
+                </div>
+                <p className="mt-4 text-[#8190A3]" style={{ fontSize: "12px", lineHeight: 1.6 }}>
+                  {index === 0
+                    ? "Looking for a couple more people to fill a place with a calm, tidy vibe."
+                    : "3 girls looking for 1 more to fill our 4-bedroom on Edinburgh."}
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Rent", value: group.price },
+                    { label: "Utilities", value: group.utilities },
+                    { label: "Move-in", value: group.moveIn },
+                    { label: "Availability", value: group.availability },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-[18px] border border-black/[0.05] bg-[#FAF8F4] px-4 py-3">
+                      <div className="text-[#98A3B0]" style={{ fontSize: "10px", fontWeight: 700 }}>{item.label}</div>
+                      <div className={`${item.label === "Availability" ? "" : "text-[#6C7787]"}`} style={{ fontSize: "12px", fontWeight: 700, color: item.label === "Availability" ? group.accent : undefined }}>
+                        {item.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 rounded-[16px] border px-4 py-3" style={{ borderColor: `${group.accent}30`, background: `${group.accent}10`, color: group.accent, fontSize: "12px", fontWeight: 700 }}>
+                  {group.address}
+                </div>
+                <div className="mt-4 text-right text-[#FF6B35]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                  View group →
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ════════════════════════════════════════════════════════
    LANDING PAGE
    ════════════════════════════════════════════════════════ */
 
 export default function HomePage() {
+  const [activeShowcase, setActiveShowcase] = useState<(typeof showcaseFeatures)[number]["id"]>("compare");
+  const activeFeature = showcaseFeatures.find((feature) => feature.id === activeShowcase) ?? showcaseFeatures[0];
+
   return (
     <>
       {/* ═══ 1. HERO ═══════════════════════════════════════ */}
@@ -232,68 +650,118 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ 2. NEIGHBORHOOD MAP ═══════════════════════════ */}
-      <section className="max-w-[1200px] mx-auto px-6 py-20">
-        <div className="text-center mb-10">
-          <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800, letterSpacing: "-0.01em" }}>Explore by neighborhood</h2>
-          <p className="text-[#1B2D45]/50 mt-2" style={{ fontSize: "15px", fontWeight: 400 }}>Click a neighborhood to see listings in that area.</p>
-        </div>
-        <div className="relative w-full rounded-2xl border border-white/10 overflow-hidden mx-auto" style={{ background: "#0D1B2A", height: "360px", maxWidth: "1000px" }}>
-          {/* Grid */}
-          <svg className="absolute inset-0 w-full h-full opacity-[0.04]" preserveAspectRatio="none">
-            {Array.from({ length: 20 }).map((_, i) => <line key={`h-${i}`} x1="0" y1={`${(i + 1) * 5}%`} x2="100%" y2={`${(i + 1) * 5}%`} stroke="white" strokeWidth="1" />)}
-            {Array.from({ length: 20 }).map((_, i) => <line key={`v-${i}`} x1={`${(i + 1) * 5}%`} y1="0" x2={`${(i + 1) * 5}%`} y2="100%" stroke="white" strokeWidth="1" />)}
-          </svg>
-          {/* Roads */}
-          <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-            <line x1="5%" y1="50%" x2="95%" y2="50%" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-            <line x1="10%" y1="30%" x2="90%" y2="30%" stroke="rgba(255,255,255,0.06)" strokeWidth="2" />
-            <line x1="15%" y1="70%" x2="85%" y2="70%" stroke="rgba(255,255,255,0.06)" strokeWidth="2" />
-            <line x1="50%" y1="5%" x2="50%" y2="95%" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-            <line x1="30%" y1="10%" x2="30%" y2="90%" stroke="rgba(255,255,255,0.06)" strokeWidth="2" />
-            <line x1="70%" y1="10%" x2="70%" y2="90%" stroke="rgba(255,255,255,0.06)" strokeWidth="2" />
-            <line x1="20%" y1="20%" x2="80%" y2="80%" stroke="rgba(255,255,255,0.04)" strokeWidth="1.5" />
-          </svg>
-          {/* Neighborhood zones */}
-          {neighborhoods.map((n) => (
-            <div key={n.name} className="absolute rounded-xl cursor-pointer transition-all hover:scale-105 group" style={{ left: `${n.x}%`, top: `${n.y}%`, width: `${n.w}%`, height: `${n.h}%`, transform: "translate(-50%, -50%)", background: n.color, border: `1.5px solid ${n.borderColor}` }}>
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
-                <span style={{ fontSize: "12px", fontWeight: 700, color: n.labelColor, textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>{n.name}</span>
-                <span style={{ fontSize: "10px", fontWeight: 500, color: "rgba(255,255,255,0.5)" }}>{n.listings} listings</span>
-                <span style={{ fontSize: "10px", fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>avg. {n.avgRent}/rm</span>
-              </div>
-            </div>
-          ))}
-          {/* Landmarks */}
-          {landmarks.map((l) => (
-            <div key={l.name} className="absolute group" style={{ left: `${l.x}%`, top: `${l.y}%`, transform: "translate(-50%, -50%)" }}>
-              <div className="rounded-full bg-white/20 border border-white/30" style={{ width: l.size, height: l.size }} />
-              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap bg-white/10 backdrop-blur-sm text-white/70 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>{l.name}</div>
-            </div>
-          ))}
-          {/* UoG marker */}
-          <div className="absolute" style={{ left: "52%", top: "48%", transform: "translate(-50%, -50%)" }}>
-            <div className="relative">
-              <div className="w-3 h-3 rounded-full bg-[#2EC4B6] animate-ping absolute inset-0 opacity-40" />
-              <div className="w-3 h-3 rounded-full bg-[#2EC4B6] border-2 border-white/40 relative z-10" />
-            </div>
+      {/* ═══ 2. FEATURE SHOWCASE ══════════════════════════ */}
+      <section className="bg-[#FAF8F4] py-24">
+        <div className="max-w-[1200px] mx-auto px-6">
+          <div className="text-center">
+            <h2 className="text-[#1B2D45]" style={{ fontSize: "36px", fontWeight: 800, letterSpacing: "-0.02em" }}>
+              More than just listings.
+            </h2>
+            <p className="text-[#1B2D45]/60 mt-4 max-w-2xl mx-auto" style={{ fontSize: "16px", lineHeight: 1.7 }}>
+              Cribb works best when it feels like your housing control center: compare options, stay plugged into student life, and handle everything around the move.
+            </p>
           </div>
-          {/* Legend */}
-          <div className="absolute bottom-3 left-4 flex items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-[#2EC4B6]" />
-              <span style={{ fontSize: "9px", fontWeight: 500, color: "rgba(255,255,255,0.4)" }}>University of Guelph</span>
+
+          <div className="mt-14 grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              {showcaseFeatures.map((feature) => {
+                const isActive = feature.id === activeFeature.id;
+                return (
+                  <motion.button
+                    key={feature.id}
+                    type="button"
+                    onClick={() => setActiveShowcase(feature.id)}
+                    onMouseEnter={() => setActiveShowcase(feature.id)}
+                    onFocus={() => setActiveShowcase(feature.id)}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.99 }}
+                    className={`rounded-[26px] border p-5 text-left transition-all ${
+                      isActive
+                        ? "bg-white shadow-[0_18px_40px_rgba(27,45,69,0.10)]"
+                        : "bg-white/65 hover:bg-white hover:shadow-[0_12px_28px_rgba(27,45,69,0.08)]"
+                    }`}
+                    style={{ borderColor: isActive ? `${feature.accent}45` : "rgba(27,45,69,0.06)" }}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="inline-flex rounded-full px-2.5 py-1" style={{ background: feature.bg, color: feature.accent, fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em" }}>
+                          {feature.eyebrow}
+                        </div>
+                        <h3 className="mt-3 text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800, lineHeight: 1.15 }}>
+                          {feature.title}
+                        </h3>
+                      </div>
+                      <div
+                        className="mt-1 h-3.5 w-3.5 rounded-full border-[3px] shrink-0"
+                        style={{
+                          borderColor: isActive ? feature.accent : "rgba(27,45,69,0.18)",
+                          backgroundColor: isActive ? feature.accent : "transparent",
+                        }}
+                      />
+                    </div>
+                    <p className="mt-3 text-[#1B2D45]/55" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+                      {feature.desc}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {feature.bullets.map((bullet) => (
+                        <span key={bullet} className="rounded-full border border-black/[0.05] bg-[#FAF8F4] px-2.5 py-1 text-[#1B2D45]/55" style={{ fontSize: "10px", fontWeight: 700 }}>
+                          {bullet}
+                        </span>
+                      ))}
+                    </div>
+                  </motion.button>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-              <span style={{ fontSize: "9px", fontWeight: 500, color: "rgba(255,255,255,0.3)" }}>Landmark</span>
+
+            <div className="rounded-[34px] border border-black/[0.06] bg-white p-4 md:p-5 shadow-[0_24px_60px_rgba(27,45,69,0.08)]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="rounded-full px-3 py-1"
+                  style={{
+                    background: activeFeature.bg,
+                    color: activeFeature.accent,
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {activeFeature.eyebrow}
+                </span>
+                <span className="rounded-full bg-[#1B2D45]/[0.05] px-3 py-1 text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 700 }}>
+                  Featured workflow
+                </span>
+              </div>
+
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={activeFeature.id}
+                  initial={{ opacity: 0, y: 16, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.985 }}
+                  transition={{ duration: 0.28, ease: "easeOut" }}
+                >
+                  <div className="mt-4 max-w-[620px]">
+                    <h3 className="text-[#1B2D45]" style={{ fontSize: "30px", fontWeight: 800, lineHeight: 1.1 }}>
+                      {activeFeature.title}
+                    </h3>
+                    <p className="mt-3 text-[#1B2D45]/55" style={{ fontSize: "15px", lineHeight: 1.7 }}>
+                      {activeFeature.desc}
+                    </p>
+                  </div>
+
+                  <div className="mt-7">
+                    <ShowcaseVisual featureId={activeFeature.id} />
+                  </div>
+                </motion.div>
+              </AnimatePresence>
             </div>
           </div>
         </div>
       </section>
 
       {/* ═══ 3. HEALTH SCORE ═══════════════════════════════ */}
-      <section className="bg-[#FAF8F4]">
+      <section className="bg-white">
         <div className="max-w-[1200px] mx-auto px-6 py-20">
           <div className="bg-white rounded-3xl border border-black/5 p-10 flex flex-col md:flex-row gap-10 md:gap-16 items-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
             <div className="flex-1 min-w-0">
@@ -333,31 +801,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ 4. HOW IT WORKS ═══════════════════════════════ */}
-      <section className="max-w-[1200px] mx-auto px-6 py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800 }}>How it works</h2>
-        </div>
-        <div className="flex flex-col md:flex-row items-start gap-4">
-          {howItWorksSteps.map((step, i) => (
-            <div key={step.title} className="flex items-start flex-1">
-              <div className="bg-white rounded-2xl border border-black/5 p-7 shadow-[0_1px_4px_rgba(0,0,0,0.04)] flex-1 text-center hover:shadow-[0_4px_20px_rgba(0,0,0,0.07)] transition-shadow">
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ backgroundColor: step.bg }}>{step.icon}</div>
-                <h3 className="text-[#1B2D45] mb-2" style={{ fontSize: "17px", fontWeight: 700 }}>{step.title}</h3>
-                <p className="text-[#1B2D45]/50" style={{ fontSize: "13px", fontWeight: 400, lineHeight: 1.7 }}>{step.desc}</p>
-              </div>
-              {i < howItWorksSteps.length - 1 && (
-                <div className="hidden md:flex items-center px-2 mt-20 shrink-0">
-                  <div className="w-8 border-t-2 border-dashed border-[#1B2D45]/10" />
-                  <ChevronRight className="w-4 h-4 text-[#1B2D45]/15 -ml-1" />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ═══ 5. BUILT BY STUDENTS ═════════════════════════ */}
+      {/* ═══ 4. BUILT BY STUDENTS ═════════════════════════ */}
       <section style={{ backgroundColor: "#F5F0E8" }}>
         <div className="max-w-[1200px] mx-auto px-6 py-20 text-center">
           <h2 className="text-[#1B2D45] max-w-[600px] mx-auto" style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.25 }}>Built by students who got tired of the housing search.</h2>

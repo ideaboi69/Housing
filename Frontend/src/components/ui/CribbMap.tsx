@@ -83,25 +83,17 @@ export const GUELPH_LANDMARKS = [
    Helper: create a colored dot marker element
    ════════════════════════════════════════════════════════ */
 
-function createLandmarkDot(type: string, isCampus: boolean): HTMLDivElement {
+function createLandmarkMarker(emoji: string, isCampus: boolean): HTMLDivElement {
   const el = document.createElement("div");
-  const config = LANDMARK_TYPES[type] || LANDMARK_TYPES.area;
-
-  if (isCampus) {
-    // Campus keeps the emoji
-    el.innerHTML = `<div style="
-      width: 32px; height: 32px; background: #1B2D45; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px; border: 2.5px solid white;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2); cursor: pointer;
-    ">🎓</div>`;
-  } else {
-    el.innerHTML = `<div style="
-      width: 12px; height: 12px; background: ${config.color}; border-radius: 50%;
-      border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-      cursor: pointer; transition: transform 0.15s;
-    " onmouseenter="this.style.transform='scale(1.4)'" onmouseleave="this.style.transform='scale(1)'"></div>`;
-  }
+  const size = isCampus ? 32 : 28;
+  const fontSize = isCampus ? 16 : 14;
+  const border = isCampus ? 2.5 : 2;
+  el.innerHTML = `<div style="
+    width: ${size}px; height: ${size}px; background: #1B2D45; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: ${fontSize}px; border: ${border}px solid white;
+    box-shadow: 0 2px ${isCampus ? 10 : 8}px rgba(0,0,0,${isCampus ? 0.2 : 0.15}); cursor: pointer;
+  ">${emoji}</div>`;
   return el;
 }
 
@@ -248,7 +240,7 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
 
             GUELPH_LANDMARKS.forEach((lm) => {
               const isCampus = lm.type === "campus" && lm.name === "University of Guelph";
-              const el = createLandmarkDot(lm.type, isCampus);
+              const el = createLandmarkMarker(lm.emoji, isCampus);
 
               const popup = new (mapboxgl as any).Popup({ offset: isCampus ? 20 : 10, closeButton: false })
                 .setHTML(`<div style="font-size: 11px; font-weight: 600; color: #1B2D45; padding: 2px 6px;">${lm.name}</div>`);
@@ -282,6 +274,8 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
     };
   }, [lat, lng, zoom, showLandmarks]);
 
+  const [expanded, setExpanded] = useState(false);
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="rounded-xl bg-[#FAF8F4] flex items-center justify-center border border-black/[0.06]" style={{ height }}>
@@ -294,23 +288,113 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
   }
 
   return (
-    <div className="relative rounded-xl overflow-hidden border border-black/[0.06]" style={{ height }}>
-      <div ref={mapRef} className="w-full h-full" />
-      {!ready && (
-        <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center">
-          <div className="animate-pulse w-8 h-8 rounded-full bg-[#FF6B35]/20" />
-        </div>
-      )}
-      {address && (
-        <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-sm">
-          <div className="flex items-center gap-1.5">
-            <MapPin className="w-3 h-3 text-[#FF6B35]" />
-            <span className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 600 }}>{address}</span>
+    <>
+      <div className="relative rounded-xl overflow-hidden border border-black/[0.06] cursor-pointer group" style={{ height }} onClick={() => setExpanded(true)}>
+        <div ref={mapRef} className="w-full h-full" />
+        {!ready && (
+          <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center">
+            <div className="animate-pulse w-8 h-8 rounded-full bg-[#FF6B35]/20" />
+          </div>
+        )}
+        {address && (
+          <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3 h-3 text-[#FF6B35]" />
+              <span className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 600 }}>{address}</span>
+            </div>
+          </div>
+        )}
+        {/* Expand hint */}
+        {ready && (
+          <div className="absolute bottom-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-[#1B2D45]/60" style={{ fontSize: "10px", fontWeight: 600 }}>Click to expand</span>
+          </div>
+        )}
+      </div>
+
+      {/* Expanded map modal */}
+      {expanded && (
+        <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4" onClick={() => setExpanded(false)}>
+          <div className="w-full max-w-[900px] h-[80vh] bg-white rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-[#FF6B35]" />
+                <span className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{address || "Location"}</span>
+              </div>
+              <button onClick={() => setExpanded(false)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[#1B2D45]/30 hover:bg-[#1B2D45]/5 transition-colors">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="w-full" style={{ height: "calc(80vh - 52px)" }}>
+              <CribbMapExpanded lat={lat} lng={lng} showLandmarks={showLandmarks} zoom={zoom} />
+            </div>
           </div>
         </div>
       )}
-      {showLandmarks && ready && (
-        <MapLegend activeFilters={activeFilters} onToggle={toggleFilter} />
+    </>
+  );
+}
+
+/* Expanded map rendered in modal — separate instance so it fills the modal */
+function CribbMapExpanded({ lat, lng, showLandmarks = true, zoom = 15 }: { lat?: number; lng?: number; showLandmarks?: boolean; zoom?: number }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<any>(null);
+  const [ready, setReady] = useState(false);
+  const center = lat && lng ? { lat, lng } : GUELPH_CENTER;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !mapRef.current || !MAPBOX_TOKEN) return;
+    let cancelled = false;
+
+    async function initMap() {
+      try {
+        const mapboxModule = await import("mapbox-gl");
+        const mapboxgl = (mapboxModule as any).default || mapboxModule;
+        if (cancelled) return;
+        (mapboxgl as any).accessToken = MAPBOX_TOKEN;
+
+        const map = new (mapboxgl as any).Map({
+          container: mapRef.current!,
+          style: MAPBOX_STYLE,
+          center: [center.lng, center.lat],
+          zoom,
+          attributionControl: false,
+        });
+        map.addControl(new (mapboxgl as any).NavigationControl({ showCompass: false }), "top-right");
+        map.addControl(new (mapboxgl as any).AttributionControl({ compact: true }), "bottom-right");
+
+        map.on("load", () => {
+          if (cancelled) return;
+          if (lat && lng) {
+            const el = document.createElement("div");
+            el.innerHTML = '<div style="width:36px;height:36px;background:#FF6B35;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 3px 12px rgba(255,107,53,0.35);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>';
+            new (mapboxgl as any).Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+          }
+          if (showLandmarks) {
+            GUELPH_LANDMARKS.forEach((lm) => {
+              const isCampus = lm.type === "campus" && lm.name === "University of Guelph";
+              const el = createLandmarkMarker(lm.emoji, isCampus);
+              const popup = new (mapboxgl as any).Popup({ offset: isCampus ? 20 : 16, closeButton: false })
+                .setHTML('<div style="font-size:12px;font-weight:600;color:#1B2D45;padding:2px 6px;">' + lm.name + '</div>');
+              new (mapboxgl as any).Marker({ element: el }).setLngLat([lm.lng, lm.lat]).setPopup(popup).addTo(map);
+            });
+          }
+          setReady(true);
+        });
+        mapInstance.current = map;
+      } catch {}
+    }
+    initMap();
+    return () => { cancelled = true; if (mapInstance.current) { try { mapInstance.current.remove(); } catch {} } };
+  }, [lat, lng, zoom, showLandmarks]);
+
+  return (
+    <div className="relative w-full h-full">
+      <div ref={mapRef} className="w-full h-full" />
+      {!ready && (
+        <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center">
+          <div className="animate-pulse w-10 h-10 rounded-full bg-[#FF6B35]/20" />
+        </div>
       )}
     </div>
   );

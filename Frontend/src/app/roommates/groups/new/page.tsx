@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ChevronLeft, Users, Copy, Check, Link2, Sparkles } from "lucide-react";
+import { ChevronLeft, Users, Copy, Check, Link2, Sparkles, Camera, X } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import {
@@ -29,6 +29,8 @@ export default function CreateGroupPage() {
   const [gender, setGender] = useState("No preference");
   const [description, setDescription] = useState("");
   const [isVisible, setIsVisible] = useState(true);
+  const [groupImage, setGroupImage] = useState<string | null>(null);
+  const [groupImageFile, setGroupImageFile] = useState<File | null>(null);
 
   // Result
   const [created, setCreated] = useState(false);
@@ -348,6 +350,42 @@ export default function CreateGroupPage() {
             <div>
               <h2 className="text-[#1B2D45] mb-1" style={{ fontSize: "22px", fontWeight: 800 }}>Name your group</h2>
               <p className="text-[#1B2D45]/40 mb-5" style={{ fontSize: "13px" }}>Something fun that people will remember</p>
+
+              {/* Group photo (optional) */}
+              <div className="mb-5">
+                <label className="text-[#1B2D45]/50 block mb-2" style={{ fontSize: "11px", fontWeight: 600 }}>Group photo <span className="text-[#1B2D45]/25">(optional)</span></label>
+                {groupImage ? (
+                  <div className="relative w-full h-[120px] rounded-xl overflow-hidden border-2 border-black/[0.04]">
+                    <img src={groupImage} alt="" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => { setGroupImage(null); setGroupImageFile(null); }}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/40 flex items-center justify-center hover:bg-black/60 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5 text-white" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 w-full h-[100px] rounded-xl border-2 border-dashed border-[#1B2D45]/10 bg-white cursor-pointer hover:border-[#FF6B35]/30 hover:bg-[#FF6B35]/[0.02] transition-all">
+                    <Camera className="w-5 h-5 text-[#1B2D45]/20" />
+                    <span className="text-[#1B2D45]/30" style={{ fontSize: "13px", fontWeight: 500 }}>Add a group photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setGroupImageFile(file);
+                          const reader = new FileReader();
+                          reader.onload = (ev) => setGroupImage(ev.target?.result as string);
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+
               <input
                 type="text"
                 value={name}
