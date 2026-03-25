@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Admin, Writer, Post
@@ -12,6 +12,7 @@ from helpers import require_admin, cascade_delete_landlord
 from Utils.security import get_current_user, hash_password, create_access_token, verify_password, validate_password
 from Utils.cloudinary import delete_image_from_cloudinary
 from Utils.email import send_approval_email, send_rejection_email, send_revoked_email
+from Utils.rate_limit import limiter
 from config import settings
 
 admin_router = APIRouter()
@@ -39,7 +40,8 @@ def create_admin(payload: AdminCreate, db: Session = Depends(get_db), current_ad
 
 # ADMIN LOGIN
 @admin_router.post("/login")
-def admin_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def admin_login(request: Request,form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     admin = db.query(Admin).filter(Admin.email == form_data.username).first()
 
     if not admin or not verify_password(form_data.password, admin.password_hash):
@@ -455,6 +457,34 @@ def revoke_write_access(user_id: int, background_tasks: BackgroundTasks, db: Ses
     )
 
     return {"message": f"Write access revoked for {user.first_name} {user.last_name}"}
+
+@admin_router.patch("/users/{user_id}/grant-og", status_code=status.HTTP_200_OK)
+def grant_og_badge(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+ 
+    if user.is_early_adopter:
+        raise HTTPException(status_code=400, detail="User already has OG badge")
+ 
+    user.is_early_adopter = True
+    db.commit()
+ 
+    return {"message": f"OG badge granted to {user.first_name} {user.last_name}"}
+ 
+@admin_router.patch("/users/{user_id}/revoke-og", status_code=status.HTTP_200_OK)
+def revoke_og_badge(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+ 
+    if not user.is_early_adopter:
+        raise HTTPException(status_code=400, detail="User doesn't have OG badge")
+ 
+    user.is_early_adopter = False
+    db.commit()
+ 
+    return {"message": f"OG badge revoked for {user.first_name} {user.last_name}"}
 
 # POST ENDPOINTS
 @admin_router.get("/posts", response_model=list[PostListResponse])

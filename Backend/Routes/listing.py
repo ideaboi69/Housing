@@ -19,7 +19,9 @@ listing_router = APIRouter()
 @listing_router.post("/", response_model=ListingResponse, status_code=status.HTTP_201_CREATED)
 def create_listing(payload: ListingCreate, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
     landlord = get_landlord_for_user(current_user, db)
-
+    if not landlord.identity_verified:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You must be verified before creating listings")
+    
     # verify the landlord owns the property
     prop = db.query(Property).filter(Property.id == payload.property_id).first()
     if not prop:

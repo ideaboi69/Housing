@@ -33,7 +33,6 @@ class UserCreate(BaseModel):
             raise ValueError("Must use a @uoguelph.ca email")
         return v
 
-
 class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -45,7 +44,6 @@ class UserUpdate(BaseModel):
         if v and not v.endswith("@uoguelph.ca"):
             raise ValueError("Must use a @uoguelph.ca email")
         return v
-
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -84,6 +82,7 @@ class UserResponse(BaseModel):
     last_name: str
     role: str
     email_verified: bool
+    is_early_adopter: bool = False
     created_at: datetime
     updated_at: datetime
 

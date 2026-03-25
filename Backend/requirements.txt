@@ -15,3 +15,4 @@ httpx
 email_validator
 cloudinary
 apscheduler
+slowapi

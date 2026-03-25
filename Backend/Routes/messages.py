@@ -80,7 +80,7 @@ def send_message( conversation_id: int, payload: MessageCreate, background_tasks
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Determine sender type and verify access
-    if hasattr(current_user, "identity_verified") and conversation.landlord_id == current_user.id:
+    if isinstance(current_user,landlord) and conversation.landlord_id == current_user.id:
         sender_type = SenderType.LANDLORD
     elif conversation.user_id == current_user.id:
         sender_type = SenderType.STUDENT
@@ -247,7 +247,7 @@ def get_specific_conversation( conversation_id: int, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     is_user = conversation.user_id == current_user.id
-    is_landlord = hasattr(current_user, "identity_verified") and conversation.landlord_id == current_user.id
+    is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id == current_user.id
     if not is_user and not is_landlord:
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -324,7 +324,7 @@ def delete_message(conversation_id: int, message_id: int, db: Session = Depends(
 
     # Verify access
     is_user = conversation.user_id == current_user.id
-    is_landlord = hasattr(current_user, "identity_verified") and conversation.landlord_id == current_user.id
+    is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id == current_user.id
     if not is_user and not is_landlord:
         raise HTTPException(status_code=403, detail="Access denied")
 

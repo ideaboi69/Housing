@@ -23,11 +23,16 @@ from Routes.viewing import viewing_router
 from dataclasses import dataclass
 from apscheduler.schedulers.background import BackgroundScheduler
 from Utils.scheduler import send_viewing_reminders
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from Utils.rate_limit import limiter 
 import Utils.cloudinary_config
 import asyncio
 from config import settings
 
-app = FastAPI(title="Housing API")
+app = FastAPI(title="Cribb API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @dataclass
 class ConnectionManager:

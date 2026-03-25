@@ -43,6 +43,7 @@ class User(Base):
     email_verified = Column(Boolean, default=False, nullable=False)
     is_writable = Column(Boolean, default=False, nullable=False)
     write_access_requested = Column(Boolean, default=False, nullable=False)
+    is_early_adopter = Column(Boolean, default=False, nullable=False)
     profile_photo_url = Column(String(500), nullable=True)
     program = Column(String(255), nullable=True)
     year = Column(Enum(StudentYear), nullable=True)
@@ -84,6 +85,7 @@ class Landlord(Base):
     company_name = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=False)
     no_of_property = Column(Enum(PropertyRange), nullable=False)
+    profile_photo_url = Column(String(500), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -255,19 +257,23 @@ class HousingHealthScore(Base):
 
 class Flag(Base):
     __tablename__ = "flags"
-
+ 
     id = Column(Integer, primary_key=True)
     reporter_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     listing_id = Column(Integer, ForeignKey("listings.id", ondelete="SET NULL"), nullable=True)
     review_id = Column(Integer, ForeignKey("reviews.id", ondelete="SET NULL"), nullable=True)
+    marketplace_item_id = Column(Integer, ForeignKey("marketplace_items.id", ondelete="SET NULL"), nullable=True)
+    sublet_id = Column(Integer, ForeignKey("sublets.id", ondelete="SET NULL"), nullable=True)
     reason = Column(Text, nullable=False)
     status = Column(Enum(FlagStatus), default=FlagStatus.PENDING, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
-
+ 
     reporter = relationship("User", back_populates="flags")
     listing = relationship("Listing", back_populates="flags")
     review = relationship("Review", back_populates="flags")
-
+    marketplace_item = relationship("MarketplaceItem", back_populates="flags")
+    sublet = relationship("Sublet", back_populates="flags")
+ 
     __table_args__ = (
         Index("ix_flags_status", "status"),
     )
@@ -402,6 +408,7 @@ class Writer(Base):
     phone = Column(String(20), nullable=True)
     reason = Column(Text, nullable=False)
     status = Column(Enum(WriterStatus), default=WriterStatus.PENDING, nullable=False)
+    profile_photo_url = Column(String(500), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -637,6 +644,7 @@ class RoommateGroup(Base):
     address = Column(String(500), nullable=True)
     is_verified = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    profile_photo_url = Column(String(500), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 

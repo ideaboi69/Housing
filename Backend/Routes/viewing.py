@@ -188,7 +188,7 @@ def get_available_slots(listing_id: Optional[int] = Query(None), sublet_id: Opti
 # USER - book viewing
 @viewing_router.post("/book", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
 def book_viewing(payload: BookingCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    slot = db.query(ViewingSlot).filter(ViewingSlot.id == payload.slot_id).first()
+    slot = db.query(ViewingSlot).filter(ViewingSlot.id == payload.slot_id).with_for_update().first()
     if not slot:
         raise HTTPException(status_code=404, detail="Slot not found")
 

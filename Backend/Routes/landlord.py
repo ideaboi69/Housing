@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, Form, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, Form, UploadFile, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
@@ -11,6 +11,8 @@ from Utils.verification import compare_landlord_data
 from helpers import require_landlord, get_landlord_profile, compute_landlord_stats, upload_to_s3, BUCKET_NAME
 from typing import Optional
 from pydantic import EmailStr
+from Utils.rate_limit import limiter
+from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 import uuid
 import json
 
@@ -18,7 +20,8 @@ landlord_router = APIRouter()
 
 # Register a Landlord Profile
 @landlord_router.post("/register", response_model=LandlordTokenResponse, status_code=status.HTTP_201_CREATED)
-def register_landlord(email: EmailStr = Form(...), password: str = Form(...), first_name: str = Form(...), last_name: str = Form(...), phone: str = Form(...), no_of_property: PropertyRange = Form(...), 
+@limiter.limit("5/minute")
+def register_landlord(request: Request, email: EmailStr = Form(...), password: str = Form(...), first_name: str = Form(...), last_name: str = Form(...), phone: str = Form(...), no_of_property: PropertyRange = Form(...), 
                     id_type: IDType = Form(...), document_type: DocumentType = Form(...), company_name: Optional[str] = Form(None), id_file: UploadFile = File(...), document_file: UploadFile = File(...), db: Session = Depends(get_db)):
     
     existing = db.query(Landlord).filter(Landlord.email == email).first()
@@ -92,7 +95,8 @@ def register_landlord(email: EmailStr = Form(...), password: str = Form(...), fi
 
 # Landlord Login
 @landlord_router.post("/login")
-def login_landlord(payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login_landlord(request: Request, payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     landlord = db.query(Landlord).filter(Landlord.email == payload.username).first()
 
     if not landlord or not verify_password(payload.password, landlord.password_hash):
@@ -133,6 +137,39 @@ def update_my_landlord_profile(payload: LandlordUpdate, db: Session = Depends(ge
     db.refresh(landlord)
 
     return LandlordResponse.model_validate(landlord)
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ 
+# Upload profile photo
+@landlord_router.post("/me/profile-photo", status_code=status.HTTP_200_OK)
+async def upload_landlord_profile_photo(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_profile(current_user, db)
+ 
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image type. Allowed: JPEG, PNG, WebP")
+ 
+    if landlord.profile_photo_url:
+        delete_image_from_cloudinary(landlord.profile_photo_url)
+ 
+    image_url = upload_image_to_cloudinary(file, folder=f"landlords/{landlord.id}")
+    landlord.profile_photo_url = image_url
+    db.commit()
+ 
+    return {"profile_photo_url": image_url}
+ 
+# Delete profile photo
+@landlord_router.delete("/me/profile-photo", status_code=status.HTTP_200_OK)
+def delete_landlord_profile_photo(db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_profile(current_user, db)
+ 
+    if not landlord.profile_photo_url:
+        raise HTTPException(status_code=400, detail="No profile photo to delete")
+ 
+    delete_image_from_cloudinary(landlord.profile_photo_url)
+    landlord.profile_photo_url = None
+    db.commit()
+ 
+    return {"message": "Profile photo removed"}
 
 @landlord_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_my_landlord_profile(db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):

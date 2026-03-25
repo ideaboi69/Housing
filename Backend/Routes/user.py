@@ -1,5 +1,5 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Form, Request, UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import *
@@ -13,13 +13,16 @@ from Schemas.postSchema import PostStatus
 from Schemas.marketplaceSchema import ItemStatus
 from Schemas.convoSchema import SenderType
 from Schemas.viewingSchema import BookingStatus
+from Utils.rate_limit import limiter
+from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from config import settings
 
 user_router = APIRouter()
 
 # Create User Account
 @user_router.post("/register", status_code=status.HTTP_201_CREATED)
-def register_users(payload: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register_users(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
 
     if not check_uoguelph_email(payload.email):
         raise HTTPException(status_code=400, detail="Only @uoguelph.ca emails are allowed")
@@ -32,6 +35,9 @@ def register_users(payload: UserCreate, db: Session = Depends(get_db)):
         )
     
     validate_password(payload.password)
+
+    user_count = db.query(User).count()
+    is_og = user_count < 100
 
     user = User(
         email=payload.email,
@@ -56,7 +62,8 @@ def register_users(payload: UserCreate, db: Session = Depends(get_db)):
 # User Login
 # JSON login for frontend
 @user_router.post("/login")
-def user_login(payload: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def user_login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
 
     if not user or not verify_password(payload.password, user.password_hash):
@@ -83,7 +90,8 @@ def user_login(payload: UserLogin, db: Session = Depends(get_db)):
 
 # Login for swagger 
 @user_router.post("/login/swagger")
-def user_login_swagger(payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def user_login_swagger(request: Request, payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.username).first()
 
     if not user or not verify_password(payload.password, user.password_hash):
@@ -136,7 +144,8 @@ def resend_verification(email: str = Form(...), db: Session = Depends(get_db)):
 
 # Forgot Password — send reset link
 @user_router.post("/forgot-password", status_code=status.HTTP_200_OK)
-def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     # Always return success to prevent email enumeration
     user = db.query(User).filter(User.email == payload.email).first()
     if user:
@@ -147,7 +156,8 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
 
 # Reset Password — set new password using token
 @user_router.post("/reset-password", status_code=status.HTTP_200_OK)
-def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def reset_password(request: Request, payload: ResetPasswordRequest, db: Session = Depends(get_db)):
     email = decode_password_reset_token(payload.token)
 
     user = db.query(User).filter(User.email == email).first()
@@ -205,6 +215,36 @@ def change_password(payload: PasswordChange, db: Session = Depends(get_db), curr
     db.commit()
 
     return {"message": "Password updated successfully"}
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ 
+# Upload profile photo
+@user_router.post("/me/profile-photo", status_code=status.HTTP_200_OK)
+async def upload_profile_photo(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image type. Allowed: JPEG, PNG, WebP")
+ 
+    # Delete old photo if exists
+    if current_user.profile_photo_url:
+        delete_image_from_cloudinary(current_user.profile_photo_url)
+ 
+    image_url = upload_image_to_cloudinary(file, folder=f"users/{current_user.id}")
+    current_user.profile_photo_url = image_url
+    db.commit()
+ 
+    return {"profile_photo_url": image_url}
+ 
+# Delete profile photo
+@user_router.delete("/me/profile-photo", status_code=status.HTTP_200_OK)
+def delete_profile_photo(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not current_user.profile_photo_url:
+        raise HTTPException(status_code=400, detail="No profile photo to delete")
+ 
+    delete_image_from_cloudinary(current_user.profile_photo_url)
+    current_user.profile_photo_url = None
+    db.commit()
+ 
+    return {"message": "Profile photo removed"}
 
 @user_router.post("/request-write-access", status_code=status.HTTP_200_OK)
 def request_write_access( reason: str = Form(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

@@ -36,6 +36,7 @@ class AdminUserResponse(BaseModel):
     last_name: str
     role: str
     email_verified: bool
+    is_early_adopter: bool = False
     created_at: datetime
     updated_at: datetime
 

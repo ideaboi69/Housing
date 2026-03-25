@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from typing import Optional
@@ -7,6 +7,8 @@ from Schemas.roommateSchema import *
 from helpers import *
 from Utils.security import get_current_user
 from Utils.roommate import build_group_card, build_group_detail, build_invite_response, build_listing_detail, build_request_response
+from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
+
 roommate_router = APIRouter()
 
 REQUIRED_FIELDS = ["first_name", "last_name", "program", "year"]
@@ -204,6 +206,43 @@ def delete_group(group_id: int, db: Session = Depends(get_db), current_user: Use
 
     db.delete(group)
     db.commit()
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ 
+# Upload group photo (owner only)
+@roommate_router.post("/groups/{group_id}/photo", status_code=status.HTTP_200_OK)
+async def upload_group_photo(group_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found or not yours")
+ 
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image type. Allowed: JPEG, PNG, WebP")
+ 
+    if group.group_photo_url:
+        delete_image_from_cloudinary(group.group_photo_url)
+ 
+    image_url = upload_image_to_cloudinary(file, folder=f"roommate-groups/{group_id}")
+    group.group_photo_url = image_url
+    db.commit()
+ 
+    return {"group_photo_url": image_url}
+ 
+# Delete group photo (owner only)
+@roommate_router.delete("/groups/{group_id}/photo", status_code=status.HTTP_200_OK)
+def delete_group_photo(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found or not yours")
+ 
+    if not group.group_photo_url:
+        raise HTTPException(status_code=400, detail="No group photo to delete")
+ 
+    delete_image_from_cloudinary(group.group_photo_url)
+    group.group_photo_url = None
+    db.commit()
+ 
+    return {"message": "Group photo removed"}
 
 @roommate_router.get("/groups/my/group", response_model=GroupDetailResponse)
 def get_my_group(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
