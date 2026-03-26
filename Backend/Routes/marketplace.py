@@ -162,6 +162,20 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
 
     return MarketplaceItemResponse.model_validate(item)
 
+@marketplace_router.get("/items/{item_id}/similar", response_model=list[MarketplaceItemListResponse])
+def get_similar_items(item_id: int, db: Session = Depends(get_db)):
+    item = db.query(MarketplaceItem).filter(MarketplaceItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+ 
+    similar = db.query(MarketplaceItem).filter(
+        MarketplaceItem.category == item.category,
+        MarketplaceItem.id != item_id,
+        MarketplaceItem.status == ItemStatus.AVAILABLE,
+    ).order_by(MarketplaceItem.created_at.desc()).limit(8).all()
+ 
+    return [MarketplaceItemListResponse.model_validate(i) for i in similar]
+
 # Mark item as sold
 @marketplace_router.patch("/items/{item_id}/sold", response_model=MarketplaceItemResponse)
 def mark_item_sold(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
