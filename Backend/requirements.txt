@@ -16,3 +16,4 @@ email_validator
 cloudinary
 apscheduler
 slowapi
+anthropic

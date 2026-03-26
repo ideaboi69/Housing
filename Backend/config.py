@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     CRIBB_CLOUDINARY_API_SECRET: str
 
     FORMSPREE_ENDPOINT: str
+    ANTHROPIC_API_KEY: str
 
     @computed_field
     @property

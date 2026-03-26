@@ -815,6 +815,45 @@ class ViewingBooking(Base):
         Index("ix_viewing_bookings_status", "status"),
     )
 
+class LandlordInvite(Base):
+    """Group owner invites a landlord to claim a listing via a unique link."""
+    __tablename__ = "landlord_invites"
+ 
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("roommate_groups.id", ondelete="CASCADE"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    group_slug = Column(String(255), nullable=False)
+    status = Column(String(20), default="pending", nullable=False)  # pending, claimed, cancelled
+    claimed_by = Column(Integer, ForeignKey("landlords.id", ondelete="SET NULL"), nullable=True)
+    claimed_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="SET NULL"), nullable=True)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="SET NULL"), nullable=True)
+    # Prefilled property info from group owner
+    address = Column(String(500), nullable=False)
+    postal_code = Column(String(20), nullable=True)
+    property_type = Column(String(50), nullable=True)
+    total_rooms = Column(Integer, nullable=True)
+    bathrooms = Column(Integer, nullable=True)
+    is_furnished = Column(Boolean, default=False)
+    has_parking = Column(Boolean, default=False)
+    has_laundry = Column(Boolean, default=False)
+    utilities_included = Column(Boolean, default=False)
+    estimated_utility_cost = Column(Numeric(8, 2), nullable=True)
+    distance_to_campus_km = Column(Numeric(5, 2), nullable=True)
+    nearest_bus_route = Column(String(100), nullable=True)
+    # Prefilled listing info
+    rent_per_room = Column(Numeric(8, 2), nullable=True)
+    rent_total = Column(Numeric(8, 2), nullable=True)
+    lease_type = Column(String(50), nullable=True)
+    move_in_date = Column(Date, nullable=True)
+    gender_preference = Column(String(50), nullable=True)
+ 
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+ 
+    group = relationship("RoommateGroup", backref="landlord_invite")
+    creator = relationship("User", foreign_keys=[created_by])
+
 Base.metadata.create_all(engine)
 
 def get_db():

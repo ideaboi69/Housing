@@ -415,12 +415,17 @@ def upload_to_s3(file: UploadFile, landlord_id: int, folder: str) -> tuple[str, 
     s3_url = f"https://{BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{s3_key}"
     return s3_key, s3_url
 
-# Slug helper
+# Slug helpers
 def generate_slug(title: str) -> str:
     slug = re.sub(r"[^\w\s-]", "", title.lower())
     slug = re.sub(r"[\s_]+", "-", slug).strip("-")
     return f"{slug}-{uuid.uuid4().hex[:8]}"
 
+def slugify_group_name(name: str) -> str:
+    """Convert group name to URL-safe slug."""
+    slug = re.sub(r"[^\w\s-]", "", name.lower())
+    slug = re.sub(r"[\s_]+", "-", slug).strip("-")
+    return slug
 # Helpers calculating compatibility 
 def calculate_compatibility(profile_a: RoommateProfile, profile_b: RoommateProfile) -> int:
     if not profile_a or not profile_b:
@@ -582,3 +587,50 @@ def get_host_info(booking: ViewingBooking, db: Session):
     else:
         owner = db.query(User).filter(User.id == booking.owner_id).first()
         return owner.email, owner.first_name, f"{owner.first_name} {owner.last_name}"
+
+# AI Compare helper (Prompt builder)
+def build_listing_prompt_data(listing: Listing, prop: Property, landlord: Landlord, score: Optional[int]) -> str:
+    """Format a single listing's data for the AI prompt."""
+    amenities = []
+    if prop.is_furnished:
+        amenities.append("Furnished")
+    if prop.has_parking:
+        amenities.append("Parking")
+    if prop.has_laundry:
+        amenities.append("Laundry")
+    if prop.utilities_included:
+        amenities.append("Utilities included")
+
+    gender_pref = listing.gender_preference
+    if hasattr(gender_pref, "value"):
+        gender_pref = gender_pref.value
+
+    lease = listing.lease_type
+    if hasattr(lease, "value"):
+        lease = lease.value
+
+    prop_type = prop.property_type
+    if hasattr(prop_type, "value"):
+        prop_type = prop_type.value
+
+    lines = [
+        f"LISTING #{listing.id}: {prop.title}",
+        f"  Address: {prop.address}",
+        f"  Type: {prop_type}",
+        f"  Rent: ${listing.rent_per_room}/room, ${listing.rent_total}/total",
+        f"  Rooms: {prop.total_rooms} bed, {prop.bathrooms} bath",
+        f"  Lease: {lease}",
+        f"  Move-in: {listing.move_in_date}",
+        f"  Amenities: {', '.join(amenities) if amenities else 'None listed'}",
+        f"  Distance to campus: {prop.distance_to_campus_km}km" if prop.distance_to_campus_km else "",
+        f"  Walk time: {prop.walk_time_minutes} min" if prop.walk_time_minutes else "",
+        f"  Bus time: {prop.bus_time_minutes} min" if prop.bus_time_minutes else "",
+        f"  Nearest bus: {prop.nearest_bus_route}" if prop.nearest_bus_route else "",
+        f"  Estimated utilities: ${prop.estimated_utility_cost}/month" if prop.estimated_utility_cost and not prop.utilities_included else "",
+        f"  Gender preference: {gender_pref}" if gender_pref else "",
+        f"  Cribb Score: {score}/100" if score else "",
+        f"  Landlord: {landlord.first_name} {landlord.last_name} ({'Verified' if landlord.identity_verified else 'Unverified'})",
+        f"  Views: {listing.view_count}",
+    ]
+
+    return "\n".join(line for line in lines if line)

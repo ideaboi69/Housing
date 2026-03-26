@@ -1,5 +1,5 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import get_db, Writer
@@ -14,7 +14,7 @@ writer_router = APIRouter()
 # Register as a writer
 @writer_router.post("/register", response_model=WriterResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
-def register_writer(payload: WriterRegister, db: Session = Depends(get_db)):
+def register_writer(request: Request, payload: WriterRegister, db: Session = Depends(get_db)):
     existing = db.query(Writer).filter(Writer.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -60,7 +60,7 @@ def register_writer(payload: WriterRegister, db: Session = Depends(get_db)):
 # Writer Login
 @writer_router.post("/login", response_model=WriterTokenResponse)
 @limiter.limit("10/minute")
-def writer_login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def writer_login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     writer = db.query(Writer).filter(Writer.email == form_data.username).first()
 
     if not writer or not verify_password(form_data.password, writer.password_hash):

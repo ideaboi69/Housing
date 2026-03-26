@@ -20,6 +20,8 @@ from Routes.post import post_router
 from Routes.marketplace import marketplace_router
 from Routes.roommates import roommate_router
 from Routes.viewing import viewing_router
+from Routes.landlord_invite import landlord_invite_router
+from Routes.ai import ai_router
 from dataclasses import dataclass
 from apscheduler.schedulers.background import BackgroundScheduler
 from Utils.scheduler import send_viewing_reminders
@@ -75,6 +77,8 @@ app.include_router(post_router, prefix="/api/posts", tags=["Posts"])
 app.include_router(marketplace_router, prefix="/api/marketplace", tags=["Marketplace"])
 app.include_router(roommate_router, prefix="/api/roommates", tags=["Roommates"])
 app.include_router(viewing_router, prefix="/api/viewings", tags=["Viewings"])
+app.include_router(landlord_invite_router, prefix="/api/roommates", tags=["Landlord Invites"])
+app.include_router(ai_router, prefix="/api/ai", tags=["AI"])
 
 # Email scheduler
 scheduler = BackgroundScheduler()
