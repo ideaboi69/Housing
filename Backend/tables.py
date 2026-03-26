@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey,
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime, time 
-from Schemas.userSchema import UserRole, StudentYear
+from Schemas.userSchema import UserRole, StudentYear, LeaseTermPreference
 from Schemas.landlordSchema import DocumentType, IDType, LandlordVerification
 from Schemas.propertySchema import PropertyType, PropertyRange 
 from Schemas.listingSchema import LeaseType, GenderPreference, ListingStatus

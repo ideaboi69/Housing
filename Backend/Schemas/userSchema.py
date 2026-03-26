@@ -13,6 +13,7 @@ class UserRole(str, enum.Enum):
     WRITER = "writer"
     ADMIN = "admin"
 
+# UDashboard Enums 
 class StudentYear(str, enum.Enum):
     FIRST = "1st"
     SECOND = "2nd"
@@ -21,6 +22,12 @@ class StudentYear(str, enum.Enum):
     FIFTH_PLUS = "5th+"
     MASTERS = "masters"
     PHD = "phd"
+
+class LeaseTermPreference(str, enum.Enum):
+    FOUR_MONTHS = "4_months"
+    EIGHT_MONTHS = "8_months"
+    TWELVE_MONTHS = "12_months"
+    FLEXIBLE = "flexible"
 
 # Request
 class UserCreate(BaseModel):
