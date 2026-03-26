@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Admin, Writer, Post
+from tables import *
 from Schemas.adminSchema import AdminCreate, AdminLogin, AdminResponse, AdminTokenResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordUpdate, LandlordResponse
@@ -101,6 +101,12 @@ def get_website_stats(db: Session = Depends(get_db), admin: User = Depends(requi
         total_listings=db.query(Listing).count(),
         total_reviews=db.query(Review).count(),
         total_flags_pending=db.query(Flag).filter(Flag.status == FlagStatus.PENDING).count(),
+        total_marketplace_items=db.query(MarketplaceItem).count(),
+        total_sublets=db.query(Sublet).count(),
+        total_posts=db.query(Post).count(),
+        total_writers=db.query(Writer).count(),
+        total_roommate_groups=db.query(RoommateGroup).count(),
+        total_roommate_profiles=db.query(RoommateProfile).count(),
     )
 
 # USER ENDPOINTS
@@ -123,7 +129,6 @@ def list_all_users(db: Session = Depends(get_db), admin: User = Depends(require_
     users = db.query(User).all()
     return [AdminUserResponse.model_validate(u) for u in users]
 
-# MUST be above /users/{user_id} to avoid "pending-writers" being matched as a user_id
 @admin_router.get("/users/pending-writers", response_model=list[AdminUserResponse])
 def list_pending_write_requests(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     users = db.query(User).filter(User.write_access_requested == True,User.is_writable == False).all()
@@ -269,18 +274,43 @@ def delete_review(review_id: int, db: Session = Depends(get_db), admin: User = D
 @admin_router.get("/flags", response_model=None)
 def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     flags = db.query(Flag).filter(Flag.status == FlagStatus.PENDING).all()
-    return [
-        {
+    results = []
+    for f in flags:
+        if f.listing_id:
+            flag_type = "listing"
+        elif f.review_id:
+            flag_type = "review"
+        elif f.marketplace_item_id:
+            flag_type = "marketplace_item"
+        elif f.sublet_id:
+            flag_type = "sublet"
+        else:
+            flag_type = "unknown"
+ 
+        results.append({
             "id": f.id,
             "reporter_id": f.reporter_id,
+            "flag_type": flag_type,
             "listing_id": f.listing_id,
             "review_id": f.review_id,
+            "marketplace_item_id": f.marketplace_item_id,
+            "sublet_id": f.sublet_id,
             "reason": f.reason,
             "status": f.status.value if hasattr(f.status, "value") else f.status,
             "created_at": str(f.created_at),
-        }
-        for f in flags
-    ]
+        })
+    return results
+ 
+@admin_router.patch("/flags/{flag_id}/resolve", status_code=status.HTTP_200_OK)
+def resolve_flag(flag_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    flag = db.query(Flag).filter(Flag.id == flag_id).first()
+    if not flag:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
+ 
+    flag.status = FlagStatus.RESOLVED  
+    db.commit()
+ 
+    return {"message": f"Flag {flag_id} resolved"}
 
 
 @admin_router.patch("/flags/{flag_id}/resolve", status_code=status.HTTP_200_OK)
@@ -503,3 +533,29 @@ def admin_delete_post(post_id: int, db: Session = Depends(get_db), admin: Admin 
 
     db.delete(post)
     db.commit()
+
+# ROOMMATE GROUP ENDPOINTS
+@admin_router.get("/roommate-groups")
+def list_all_roommate_groups(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    groups = db.query(RoommateGroup).order_by(RoommateGroup.created_at.desc()).all()
+    results = []
+    for group in groups:
+        owner = db.query(User).filter(User.id == group.owner_id).first()
+        active_members = [m for m in group.members if m.is_active] if hasattr(group, "members") else []
+        results.append({
+            "id": group.id,
+            "name": group.name,
+            "description": group.description,
+            "owner_id": group.owner_id,
+            "owner_name": f"{owner.first_name} {owner.last_name}" if owner else "Unknown",
+            "current_size": group.current_size,
+            "spots_needed": group.spots_needed,
+            "total_capacity": group.total_capacity,
+            "has_place": group.has_place,
+            "address": group.address,
+            "is_verified": group.is_verified,
+            "is_active": group.is_active,
+            "listing_id": group.listing_id,
+            "created_at": group.created_at,
+        })
+    return results

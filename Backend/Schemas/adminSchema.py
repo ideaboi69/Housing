@@ -75,3 +75,9 @@ class AdminStatsResponse(BaseModel):
     total_listings: int
     total_reviews: int
     total_flags_pending: int
+    total_marketplace_items: int = 0
+    total_sublets: int = 0
+    total_posts: int = 0
+    total_writers: int = 0
+    total_roommate_groups: int = 0
+    total_roommate_profiles: int = 0

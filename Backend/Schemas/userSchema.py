@@ -13,6 +13,16 @@ class UserRole(str, enum.Enum):
     WRITER = "writer"
     ADMIN = "admin"
 
+class StudentYear(str, enum.Enum):
+    FIRST = "1st"
+    SECOND = "2nd"
+    THIRD = "3rd"
+    FOURTH = "4th"
+    FIFTH_PLUS = "5th+"
+    MASTERS = "masters"
+    PHD = "phd"
+
+# Request
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -37,12 +47,22 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
-
+    program: Optional[str] = None
+    year: Optional[StudentYear] = None
+    bio: Optional[str] = None
+ 
     @field_validator("email")
     @classmethod
     def email_must_be_uoguelph(cls, v):
         if v and not v.endswith("@uoguelph.ca"):
             raise ValueError("Must use a @uoguelph.ca email")
+        return v
+ 
+    @field_validator("bio")
+    @classmethod
+    def bio_max_length(cls, v):
+        if v and len(v) > 200:
+            raise ValueError("Bio must be 200 characters or less")
         return v
 
 class UserLogin(BaseModel):
@@ -74,7 +94,7 @@ class ResetPasswordRequest(BaseModel):
             raise ValueError("Password must be at least 8 characters")
         return v
 
-#Request & Response    
+# Response    
 class UserResponse(BaseModel):
     id: int
     email: str
@@ -83,6 +103,10 @@ class UserResponse(BaseModel):
     role: str
     email_verified: bool
     is_early_adopter: bool = False
+    profile_photo_url: Optional[str] = None
+    program: Optional[str] = None
+    year: Optional[StudentYear] = None
+    bio: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -93,3 +117,24 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+# User Notification Preferences 
+class NotificationPreferencesUpdate(BaseModel):
+    new_listings_matching: Optional[bool] = None
+    price_drops_saved: Optional[bool] = None
+    new_roommate_matches: Optional[bool] = None
+    weekly_bubble_digest: Optional[bool] = None
+    cribb_news_updates: Optional[bool] = None
+
+class NotificationPreferencesResponse(BaseModel):
+    id: int
+    user_id: int
+    new_listings_matching: bool
+    price_drops_saved: bool
+    new_roommate_matches: bool
+    weekly_bubble_digest: bool
+    cribb_news_updates: bool
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

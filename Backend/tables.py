@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey,
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime, time 
-from Schemas.userSchema import UserRole
+from Schemas.userSchema import UserRole, StudentYear
 from Schemas.landlordSchema import DocumentType, IDType, LandlordVerification
 from Schemas.propertySchema import PropertyType, PropertyRange 
 from Schemas.listingSchema import LeaseType, GenderPreference, ListingStatus
@@ -12,7 +12,6 @@ from Schemas.writerSchema import WriterStatus
 from Schemas.postSchema import PostCategory, PostStatus
 from Schemas.marketplaceSchema import MarketplaceCategory, ItemCondition, PricingType, ItemStatus
 from Schemas.roommateSchema import *
-from Schemas.UDashSchema import *
 from Schemas.viewingSchema import *
 import os
 from sqlalchemy import JSON
