@@ -358,6 +358,7 @@ class Sublet(Base):
 
     user = relationship("User", back_populates="sublets")
     images = relationship("SubletImage", back_populates="sublet", cascade="all, delete-orphan")
+    flags = relationship("Flag", back_populates="sublet")
     viewing_availabilities = relationship("ViewingAvailability", back_populates="sublet", cascade="all, delete-orphan")
     viewing_slots = relationship("ViewingSlot", back_populates="sublet", cascade="all, delete-orphan")
     viewing_bookings = relationship("ViewingBooking", back_populates="sublet", cascade="all, delete-orphan")
@@ -481,6 +482,7 @@ class MarketplaceItem(Base):
 
     seller = relationship("User", back_populates="marketplace_items")
     images = relationship("MarketplaceImage", back_populates="item", cascade="all, delete-orphan")
+    flags = relationship("Flag", back_populates="marketplace_item")
     conversations = relationship("MarketplaceConversation", back_populates="item", cascade="all, delete-orphan")
 
     @property
