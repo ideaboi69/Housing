@@ -589,7 +589,6 @@ def get_host_info(booking: ViewingBooking, db: Session):
     else:
         owner = db.query(User).filter(User.id == booking.owner_id).first()
         return owner.email, owner.first_name, f"{owner.first_name} {owner.last_name}"
-<<<<<<< HEAD
 
 # AI Compare helper (Prompt builder)
 def build_listing_prompt_data(listing: Listing, prop: Property, landlord: Landlord, score: Optional[int]) -> str:
@@ -637,5 +636,3 @@ def build_listing_prompt_data(listing: Listing, prop: Property, landlord: Landlo
     ]
 
     return "\n".join(line for line in lines if line)
-=======
->>>>>>> 2a1cbe3 (cribb is almost done)
