@@ -20,8 +20,12 @@ import {
 import { buildStaticMapUrl, GUELPH_CENTER, projectLngLatToContainer } from "@/lib/mapbox";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 import { useSavedStore } from "@/lib/saved-store";
 import { BrowseGridSkeleton } from "@/components/ui/Skeletons";
+import type { GenderPreference } from "@/types";
 import {
   type SubletListing, type SubletViewMode, type SubletCellValue,
   MONTHS, subletListings, getScoreLabel, filterOptions,
@@ -114,42 +118,50 @@ function InsightStats() {
   );
 }
 
-function ListSubletForm({ visible }: { visible: boolean }) {
+const INITIAL_SUBLET_FORM = {
+  title: "",
+  address: "",
+  postal_code: "",
+  description: "",
+  rent_per_month: "",
+  estimated_utility_cost: "",
+  sublet_start_date: "",
+  sublet_end_date: "",
+  move_in_date: "",
+  room_type: "private" as "private" | "shared",
+  total_rooms: "1",
+  bathrooms: "1",
+  beds_available: "1",
+  distance_to_campus_km: "",
+  walk_time_minutes: "",
+  drive_time_minutes: "",
+  bus_time_minutes: "",
+  nearest_bus_route: "",
+  is_furnished: false,
+  has_parking: false,
+  has_laundry: false,
+  utilities_included: false,
+  gender_preference: "any" as "any" | "male" | "female" | "other",
+};
+
+function ListSubletForm({
+  visible,
+  selectedRange,
+  onCreated,
+  onClose,
+}: {
+  visible: boolean;
+  selectedRange: [number, number];
+  onCreated: (listing: SubletListing) => void;
+  onClose: () => void;
+}) {
   const isMobile = useIsMobile();
   const [photos, setPhotos] = useState<File[]>([]);
-
-  const [form, setForm] = useState({
-    // Basic info
-    title: "",
-    address: "",
-    postal_code: "",
-    description: "",
-    // Pricing
-    rent_per_month: "",
-    estimated_utility_cost: "",
-    // Dates
-    sublet_start_date: "",
-    sublet_end_date: "",
-    move_in_date: "",
-    // Room details
-    room_type: "private" as "private" | "shared",
-    total_rooms: "1",
-    bathrooms: "1",
-    beds_available: "1",
-    // Commute
-    distance_to_campus_km: "",
-    walk_time_minutes: "",
-    drive_time_minutes: "",
-    bus_time_minutes: "",
-    nearest_bus_route: "",
-    // Amenities (booleans)
-    is_furnished: false,
-    has_parking: false,
-    has_laundry: false,
-    utilities_included: false,
-    // Preferences
-    gender_preference: "any",
-  });
+  const [form, setForm] = useState(INITIAL_SUBLET_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
+  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
 
   const roommatesStaying = Math.max(0, Number(form.total_rooms) - Number(form.beds_available));
 
@@ -177,6 +189,144 @@ function ListSubletForm({ visible }: { visible: boolean }) {
     { key: "has_parking" as const, label: "Parking", emoji: "🅿️" },
     { key: "has_laundry" as const, label: "Laundry", emoji: "🧺" },
   ];
+
+  const handleSubmit = async () => {
+    if (submitting) return;
+
+    if (!token) {
+      toast.info("Please sign in to post a sublet.");
+      router.push("/login?next=/sublets");
+      return;
+    }
+
+    const requiredTextFields = [
+      form.title.trim(),
+      form.address.trim(),
+      form.postal_code.trim(),
+      form.sublet_start_date,
+      form.sublet_end_date,
+      form.move_in_date,
+      form.nearest_bus_route.trim(),
+    ];
+    if (requiredTextFields.some((v) => !v)) {
+      toast.error("Please fill in the required fields.");
+      return;
+    }
+
+    const rent = Number(form.rent_per_month);
+    const distance = Number(form.distance_to_campus_km);
+    const walk = Number(form.walk_time_minutes);
+    const drive = Number(form.drive_time_minutes);
+    const bus = Number(form.bus_time_minutes);
+    const rooms = Number(form.total_rooms);
+    const baths = Number(form.bathrooms);
+    const utilityCost = Number(form.estimated_utility_cost || 0);
+    const bedsAvailable = Number(form.beds_available);
+
+    if ([rent, distance, walk, drive, bus, rooms, baths, bedsAvailable].some((n) => Number.isNaN(n))) {
+      toast.error("Please make sure all required numbers are filled in.");
+      return;
+    }
+
+    setSubmitting(true);
+    const loadingToast = toast.loading("Posting your sublet...");
+
+    try {
+      const response = await api.sublets.create({
+        title: form.title.trim(),
+        address: form.address.trim(),
+        postal_code: form.postal_code.trim(),
+        latitude: null,
+        longitude: null,
+        distance_to_campus_km: distance,
+        walk_time_minutes: walk,
+        drive_time_minutes: drive,
+        bus_time_minutes: bus,
+        nearest_bus_route: form.nearest_bus_route.trim(),
+        room_type: form.room_type,
+        total_rooms: rooms,
+        bathrooms: baths,
+        is_furnished: form.is_furnished,
+        has_parking: form.has_parking,
+        has_laundry: form.has_laundry,
+        utilities_included: form.utilities_included,
+        estimated_utility_cost: utilityCost,
+        rent_per_month: rent,
+        sublet_start_date: form.sublet_start_date,
+        sublet_end_date: form.sublet_end_date,
+        move_in_date: form.move_in_date,
+        gender_preference: form.gender_preference === "any" ? null : (form.gender_preference as GenderPreference),
+        description: form.description.trim() || null,
+      });
+
+      let coverImage = "/demo/listings/house.jpg";
+      if (photos.length > 0) {
+        try {
+          const uploaded = await api.sublets.uploadImages(response.id, photos);
+          if (uploaded.length > 0) {
+            coverImage = uploaded[0].image_url;
+          }
+        } catch {
+          coverImage = URL.createObjectURL(photos[0]);
+        }
+      }
+
+      const availableMonths = MONTHS.map((_, i) => i >= selectedRange[0] && i <= selectedRange[1]);
+      const flexibleDates = (selectedRange[1] - selectedRange[0]) >= 2;
+      const scoreBase = 72
+        + (distance <= 0.7 ? 12 : distance <= 1.5 ? 7 : 2)
+        + (form.is_furnished ? 4 : 0)
+        + (form.utilities_included ? 3 : 0)
+        + (form.has_laundry ? 2 : 0)
+        + (form.has_parking ? 1 : 0);
+      const healthScore = Math.min(96, scoreBase);
+      const roommates = Math.max(0, rooms - bedsAvailable);
+
+      onCreated({
+        id: String(response.id),
+        title: response.title,
+        street: response.address.split(",")[0],
+        coverImage,
+        subletPrice: rent,
+        originalPrice: Math.round(rent * 1.22),
+        healthScore,
+        verified: true,
+        posterType: user?.role === "landlord" ? "Landlord" : "Student poster",
+        posterIsStudent: user?.role !== "landlord",
+        availableMonths,
+        neighborhood: distance <= 0.7 ? "Campus" : distance <= 1.5 ? "Near Campus" : "Guelph",
+        furnished: form.is_furnished,
+        negotiablePrice: form.utilities_included,
+        flexibleDates,
+        roommatesStaying: roommates > 0 ? roommates : null,
+        roommateDesc: roommates > 0 ? `${roommates} roommate${roommates > 1 ? "s" : ""} staying` : null,
+        bedsAvailable,
+        bedsTotal: rooms,
+        distance: `${distance.toFixed(1)} km`,
+        walkTime: `${walk} min`,
+        amenities: [
+          form.is_furnished ? "Furnished" : null,
+          form.utilities_included ? "Utilities Incl." : null,
+          form.has_parking ? "Parking" : null,
+          form.has_laundry ? "Laundry" : null,
+        ].filter(Boolean) as string[],
+        views: 0,
+        saves: 0,
+        rotation: response.id % 2 === 0 ? 1.2 : -1.2,
+      });
+
+      setForm(INITIAL_SUBLET_FORM);
+      setPhotos([]);
+      onClose();
+      toast.success("Your sublet is live.");
+    } catch (error) {
+      console.error("Failed to create sublet", error);
+      toast.error("We couldn’t post your sublet. Please try again.");
+    } finally {
+      toast.dismiss(loadingToast);
+      setSubmitting(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -329,7 +479,7 @@ function ListSubletForm({ visible }: { visible: boolean }) {
               <div className="mt-3">
                 <label className={labelClass} style={labelStyle}>Gender preference</label>
                 <div className="flex gap-2">
-                  {[{ v: "any", l: "Any" }, { v: "male", l: "Male" }, { v: "female", l: "Female" }, { v: "other", l: "Other" }].map((g) => (
+                  {([{ v: "any", l: "Any" }, { v: "male", l: "Male" }, { v: "female", l: "Female" }, { v: "other", l: "Other" }] as const).map((g) => (
                     <button key={g.v} type="button" onClick={() => update("gender_preference", g.v)} className={`px-3.5 py-2 rounded-xl border transition-all ${form.gender_preference === g.v ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/15"}`} style={{ fontSize: "12px", fontWeight: form.gender_preference === g.v ? 600 : 500 }}>
                       {g.l}
                     </button>
@@ -394,10 +544,13 @@ function ListSubletForm({ visible }: { visible: boolean }) {
             {/* ─── Submit ─── */}
             <div className="border-t border-black/[0.04] pt-5 flex items-center gap-3">
               <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
                 className="flex-1 px-6 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors active:scale-[0.98]"
-                style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
+                style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)", opacity: submitting ? 0.7 : 1 }}
               >
-                Post Sublet →
+                {submitting ? "Posting..." : "Post Sublet →"}
               </button>
               <p className="text-[#1B2D45]/20 shrink-0" style={{ fontSize: "10px", maxWidth: "140px", lineHeight: 1.4 }}>
                 * Required fields. You can edit after posting.
@@ -1368,7 +1521,7 @@ function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { lis
 }
 
 /* ════════════════════════════════════════════════════════
-   Sublet Map View (UofG campus)
+   Sublet Map View (Guelph campus)
    ════════════════════════════════════════════════════════ */
 
 function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { listings: SubletListing[]; pinnedIds: string[]; onTogglePin: (id: string) => void; selectedRange: [number, number] }) {
@@ -1448,21 +1601,21 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
               <div className="absolute inset-0 bg-[linear-gradient(180deg,#EEF5F4_0%,#E4EFED_100%)]" />
             )}
 
-            <div className="absolute left-4 top-4 z-[10] rounded-2xl bg-white/92 backdrop-blur-sm px-4 py-3 shadow-md">
-              <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>
+            <div className="absolute left-4 top-4 z-[10] max-w-[calc(100%-5rem)] sm:max-w-none rounded-2xl bg-white/92 backdrop-blur-sm px-3 py-2.5 sm:px-4 sm:py-3 shadow-md">
+              <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 800 }}>
                 Summer sublets
               </div>
-              <div className="mt-1 text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 600 }}>
+              <div className="mt-0.5 sm:mt-1 text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 600 }}>
                 {listings.length} sublets · {MONTHS[selectedRange[0]]} to {MONTHS[selectedRange[1]]}
               </div>
             </div>
 
             <div className="absolute right-4 top-4 z-[10] flex flex-col gap-2">
-              <button onClick={() => setMapZoom((value) => Math.min(16.5, value + 0.8))} className="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
-                <Plus className="w-4 h-4 text-[#1B2D45]" />
+              <button onClick={() => setMapZoom((value) => Math.min(16.5, value + 0.8))} className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1B2D45]" />
               </button>
-              <button onClick={() => setMapZoom((value) => Math.max(11.5, value - 0.8))} className="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
-                <Minus className="w-4 h-4 text-[#1B2D45]" />
+              <button onClick={() => setMapZoom((value) => Math.max(11.5, value - 0.8))} className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
+                <Minus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1B2D45]" />
               </button>
             </div>
 
@@ -1480,7 +1633,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
                   <button
                     key={sublet.id}
                     onClick={() => setSelectedId(sublet.id)}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#2EC4B6] bg-white px-3 py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#2EC4B6] bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
                     style={{
                       left: point.x,
                       top: point.y,
@@ -1491,7 +1644,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
                   >
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block h-2 w-2 rounded-full bg-[#2EC4B6]" />
-                      <span style={{ fontSize: "12px", fontWeight: 800, color: isSelected ? "white" : "#2EC4B6" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 800, color: isSelected ? "white" : "#2EC4B6" }}>
                         ${sublet.subletPrice}
                       </span>
                     </span>
@@ -1586,6 +1739,7 @@ export default function SubletsPage() {
   const isMobile = useIsMobile();
   const [hydrated, setHydrated] = useState(false);
   const [showListForm, setShowListForm] = useState(false);
+  const [listings, setListings] = useState<SubletListing[]>(subletListings);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState<[number, number]>([4, 6]); // May-Jul default (summer feel)
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -1596,6 +1750,10 @@ export default function SubletsPage() {
   const [compareOpen, setCompareOpen] = useState(false);
 
   const handleListClick = () => setShowListForm((prev) => !prev);
+  const handleSubletCreated = (listing: SubletListing) => {
+    setListings((prev) => [listing, ...prev]);
+    setViewMode("board");
+  };
   const proximityFilterKeys = PROXIMITY_FILTER_OPTIONS.map((option) => option.key);
 
   const toggleFilter = (key: string) => {
@@ -1614,14 +1772,14 @@ export default function SubletsPage() {
     setPinnedIds((prev) => prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]);
   };
 
-  const pinnedListings = useMemo(() => subletListings.filter((l) => pinnedIds.includes(l.id)), [pinnedIds]);
+  const pinnedListings = useMemo(() => listings.filter((l) => pinnedIds.includes(l.id)), [listings, pinnedIds]);
 
   const filteredListings = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
     const activeProximityFilter = activeFilters.find((key) => proximityFilterKeys.includes(key as ProximityFilterKey)) as ProximityFilterKey | undefined;
     const maxWalk = getMaxWalkForProximityFilter(activeProximityFilter);
 
-    return subletListings.filter((listing) => {
+    return listings.filter((listing) => {
       const [start, end] = selectedRange;
       let hasOverlap = false;
       for (let i = start; i <= end; i++) {
@@ -1648,7 +1806,7 @@ export default function SubletsPage() {
       }
       return true;
     });
-  }, [selectedRange, activeFilters, searchQuery, proximityFilterKeys]);
+  }, [listings, selectedRange, activeFilters, searchQuery, proximityFilterKeys]);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -1667,7 +1825,12 @@ export default function SubletsPage() {
       <SummerBanner />
       <SubletHero onListClick={handleListClick} />
       <InsightStats />
-      <ListSubletForm visible={showListForm} />
+      <ListSubletForm
+        visible={showListForm}
+        selectedRange={selectedRange}
+        onCreated={handleSubletCreated}
+        onClose={() => setShowListForm(false)}
+      />
       <DateRangeSelector selectedRange={selectedRange} onChange={setSelectedRange} />
       <SearchAndFilters
         onSearchChange={setSearchQuery}
@@ -1677,7 +1840,7 @@ export default function SubletsPage() {
       />
 
       {/* Results meta + view toggle */}
-      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 flex-wrap flex-1">
           <span className="text-[#1B2D45]/35" style={{ fontSize: "12px", fontWeight: 600 }}>
             {filteredListings.length} available
@@ -1689,13 +1852,13 @@ export default function SubletsPage() {
           )}
         </div>
         {/* View toggle */}
-        <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0">
+        <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0 w-full sm:w-auto">
           {(["board", "grid", "map"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className={`px-3 py-1.5 rounded-md transition-all duration-200 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
-              style={{ fontSize: "12px", fontWeight: 600 }}
+              className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all duration-200 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
+              style={{ fontSize: "12px", fontWeight: 600, minWidth: 0 }}
             >
               {mode === "board" ? "📌 Board" : mode === "grid" ? "▦ Grid" : "🗺 Map"}
             </button>

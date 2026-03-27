@@ -99,6 +99,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if ("access_token" in res) {
         localStorage.setItem("cribb_token", res.access_token);
         set({ user: (res as { access_token: string; user: UserResponse }).user, token: res.access_token, isLoading: false });
+        useSavedStore.getState().loadSaved();
       } else {
         set({ isLoading: false });
       }

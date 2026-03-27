@@ -18,6 +18,7 @@ import {
 } from "@/lib/mock-data";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   ArrowLeft, MapPin, Clock, Bus, Heart, Check, X, ChevronLeft, ChevronRight,
   Bed, Bath, Calendar, MessageCircle, Share2, Flag, Zap, Ruler, AlertCircle, Star,
@@ -236,6 +237,10 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
 
   const handleContact = async () => {
     if (contactSending || contactSent) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
+      return;
+    }
     setContactSending(true);
     try {
       await api.messages.startConversation({
@@ -245,8 +250,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       setContactSent(true);
       setTimeout(() => router.push("/messages"), 1500);
     } catch {
-      // Not logged in or error — redirect to login
-      router.push("/login");
+      toast.error("We couldn’t open a conversation right now. Please try again.");
     } finally {
       setContactSending(false);
     }
@@ -311,7 +315,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             {/* Title + address + score */}
             <motion.div variants={fadeUp} className="mt-6 bg-white rounded-xl border border-black/[0.04] p-5 md:p-6"
               style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.03)" }}>
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div className="min-w-0">
                   <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.3px" }}>
                     {listing.title}
@@ -332,7 +336,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               </div>
 
               {/* Quick facts */}
-              <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+              <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
                 {[
                   { label: "Type", value: formatPropertyType(listing.property_type), icon: Ruler },
                   { label: "Rooms", value: `${listing.total_rooms} bed · ${listing.bathrooms} bath`, icon: Bed },
@@ -390,7 +394,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                     <span style={{ fontSize: "16px" }}>📍</span>
                     <div>
                       <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{Number(listing.distance_to_campus_km).toFixed(1)} km</p>
-                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to UofG</p>
+                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to campus</p>
                     </div>
                   </div>
                 )}
@@ -398,7 +402,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
 
               {/* Amenities */}
               <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Amenities</h3>
-              <div className="grid grid-cols-2 gap-2.5 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3">
                 {hasAmenities.map((a) => {
                   const Icon = a.icon;
                   return (
@@ -523,7 +527,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* ─── Sidebar ─── */}
-          <motion.div className="space-y-4 sticky top-[80px] self-start max-h-[calc(100vh-100px)] overflow-y-auto no-scrollbar" variants={fadeUp}>
+          <motion.div className="space-y-4 lg:sticky lg:top-[80px] lg:self-start lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto no-scrollbar" variants={fadeUp}>
             {/* Price card */}
             <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5"
               style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>
@@ -581,11 +585,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               </motion.button>
 
               {/* Share + Report */}
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">
                 <ShareButton path={`/browse/${listingId}`} title={listing.title} variant="inline" />
                 <button
                   onClick={() => setReportOpen(true)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
+                  className="flex-1 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
                   style={{ fontSize: "11px", fontWeight: 500 }}
                 >
                   <Flag className="w-3 h-3" /> Report

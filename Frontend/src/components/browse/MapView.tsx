@@ -223,29 +223,29 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
               <div className="absolute inset-0 bg-[linear-gradient(180deg,#EEF4F0_0%,#E2ECE7_100%)]" />
             )}
 
-            <div className="absolute left-4 top-4 z-[10] rounded-2xl bg-white/92 backdrop-blur-sm px-4 py-3 shadow-md">
-              <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>
+            <div className="absolute left-4 top-4 z-[10] max-w-[calc(100%-5rem)] sm:max-w-none rounded-2xl bg-white/92 backdrop-blur-sm px-3 py-2.5 sm:px-4 sm:py-3 shadow-md">
+              <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 800 }}>
                 Guelph student rentals
               </div>
-              <div className="mt-1 text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 600 }}>
+              <div className="mt-0.5 sm:mt-1 text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 600 }}>
                 {listings.length} listings · Avg {formatPrice(avgRent)}/room
               </div>
-              <div className="flex items-center gap-3 mt-2">
+              <div className="flex items-center gap-2 sm:gap-3 mt-2">
                 {[{ color: "#4ADE80", label: "85+" }, { color: "#FFB627", label: "65-84" }, { color: "#E71D36", label: "<65" }].map((item) => (
                   <div key={item.label} className="flex items-center gap-1.5">
                     <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
-                    <span className="text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 600 }}>{item.label}</span>
+                    <span className="text-[#1B2D45]/45" style={{ fontSize: "9px", fontWeight: 600 }}>{item.label}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="absolute right-4 top-4 z-[10] flex flex-col gap-2">
-              <button onClick={() => setMapZoom((value) => Math.min(16.5, value + 0.8))} className="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
-                <ZoomIn className="w-4 h-4 text-[#1B2D45]" />
+              <button onClick={() => setMapZoom((value) => Math.min(16.5, value + 0.8))} className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
+                <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1B2D45]" />
               </button>
-              <button onClick={() => setMapZoom((value) => Math.max(11.5, value - 0.8))} className="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
-                <ZoomOut className="w-4 h-4 text-[#1B2D45]" />
+              <button onClick={() => setMapZoom((value) => Math.max(11.5, value - 0.8))} className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
+                <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1B2D45]" />
               </button>
             </div>
 
@@ -265,7 +265,7 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
                   <button
                     key={listing.id}
                     onClick={() => focusListing(listing.id)}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white px-3 py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
                     style={{
                       left: point.x,
                       top: point.y,
@@ -277,7 +277,7 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
                   >
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />
-                      <span style={{ fontSize: "12px", fontWeight: 800, color: isSelected ? "white" : "#FF6B35" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 800, color: isSelected ? "white" : "#FF6B35" }}>
                         ${Math.round(Number(listing.rent_per_room))}
                       </span>
                     </span>

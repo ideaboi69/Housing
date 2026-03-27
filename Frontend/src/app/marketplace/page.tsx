@@ -177,19 +177,22 @@ export default function MarketplacePage() {
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6 md:py-8">
-        <div className="flex items-start justify-between gap-4 mb-5">
-          <div><h1 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 900 }}>Marketplace</h1><p className="text-[#1B2D45]/45 mt-0.5" style={{ fontSize: "13px" }}>Buy &amp; sell student essentials at UoG</p></div>
-        <div className="flex items-center gap-2 shrink-0">
-          {user && <Link href="/marketplace/my" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all" style={{ fontSize: "13px", fontWeight: 600 }}>Your Listings</Link>}
-          <Link href={user ? "/marketplace/create" : "/login"} className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}><Plus className="w-4 h-4" /> Sell Something</Link>
-        </div>
+        <div className="flex flex-col gap-3 mb-5 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 900 }}>Marketplace</h1>
+            <p className="text-[#1B2D45]/45 mt-0.5" style={{ fontSize: "13px" }}>Buy &amp; sell student essentials in Guelph</p>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
+            {user && <Link href="/marketplace/my" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Your Listings</Link>}
+            <Link href={user ? "/marketplace/create" : "/login"} className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}><Plus className="w-4 h-4" /> Sell Something</Link>
+          </div>
         </div>
         <AnimatePresence>{showBanner && <SeasonalBanner onDismiss={dismissBanner} />}</AnimatePresence>
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 mb-4">
           <button onClick={() => setActiveCategory("all")} className={`px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === "all" ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === "all" ? 700 : 500 }}>All</button>
           {MARKETPLACE_CATEGORIES.map((cat) => (<button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === cat.key ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === cat.key ? 700 : 500 }}><span style={{ fontSize: "14px" }}>{cat.emoji}</span> {cat.label}</button>))}
         </div>
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#1B2D45]/25" />
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search items..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-black/[0.06] text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/30 focus:outline-none transition-all" style={{ fontSize: "13px" }} />
@@ -207,7 +210,7 @@ export default function MarketplacePage() {
               ))}
             </select>
           </div>
-          <button onClick={() => setShowFilters(true)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl border transition-all shrink-0 ${hasActiveAdvancedFilters ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "13px", fontWeight: 600 }}><SlidersHorizontal className="w-4 h-4" /> Filters{hasActiveAdvancedFilters && <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B35]" />}</button>
+          <button onClick={() => setShowFilters(true)} className={`flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border transition-all shrink-0 w-full sm:w-auto ${hasActiveAdvancedFilters ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "13px", fontWeight: 600 }}><SlidersHorizontal className="w-4 h-4" /> Filters{hasActiveAdvancedFilters && <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B35]" />}</button>
         </div>
         {activeFilterChips.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 mb-5">
@@ -233,11 +236,11 @@ export default function MarketplacePage() {
         )}
         <p className="text-[#1B2D45]/35 mb-4" style={{ fontSize: "12px", fontWeight: 500 }}>{filteredItems.length} item{filteredItems.length !== 1 ? "s" : ""} found</p>
         {isLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{Array.from({ length: 8 }, (_, i) => (<div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse" style={{ border: "1px solid rgba(27,45,69,0.04)" }}><div className="aspect-[4/3] bg-[#1B2D45]/[0.04]" /><div className="p-3.5 space-y-2"><div className="h-4 bg-[#1B2D45]/[0.06] rounded w-3/4" /><div className="h-3 bg-[#1B2D45]/[0.04] rounded w-1/2" /></div></div>))}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{Array.from({ length: 8 }, (_, i) => (<div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse" style={{ border: "1px solid rgba(27,45,69,0.04)" }}><div className="aspect-[4/3] bg-[#1B2D45]/[0.04]" /><div className="p-3.5 space-y-2"><div className="h-4 bg-[#1B2D45]/[0.06] rounded w-3/4" /><div className="h-3 bg-[#1B2D45]/[0.04] rounded w-1/2" /></div></div>))}</div>
         ) : filteredItems.length === 0 ? (
           <div className="text-center py-16"><Package className="w-12 h-12 text-[#1B2D45]/10 mx-auto mb-3" /><h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No items found</h3><p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "13px" }}>{searchQuery ? "Try a different search term" : "Be the first to list something!"}</p><Link href={user ? "/marketplace/create" : "/login"} className="inline-flex items-center gap-1.5 mt-4 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}><Plus className="w-4 h-4" /> Sell Something</Link></div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{filteredItems.map((item, i) => (<motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}><ItemCard item={item} pickupZone={(item as typeof item & { pickup_zone?: string }).pickup_zone} /></motion.div>))}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{filteredItems.map((item, i) => (<motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}><ItemCard item={item} pickupZone={(item as typeof item & { pickup_zone?: string }).pickup_zone} /></motion.div>))}</div>
         )}
       </div>
       <AnimatePresence>{showFilters && <FilterModal isOpen={showFilters} onClose={() => setShowFilters(false)} filters={advancedFilters} onApply={setAdvancedFilters} />}</AnimatePresence>

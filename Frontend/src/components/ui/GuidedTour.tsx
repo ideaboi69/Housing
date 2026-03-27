@@ -44,14 +44,14 @@ const TOUR_STEPS: TourStep[] = [
   {
     selector: "[data-tour='roommates']",
     title: "Find Roommates",
-    description: "Take a 2-minute lifestyle quiz, get matched with compatible UofG students, and browse groups with open spots. Your vibe, your people.",
+    description: "Take a 2-minute lifestyle quiz, get matched with compatible Guelph students, and browse groups with open spots. Your vibe, your people.",
     icon: <Users className="w-5 h-5" />,
     color: "#2EC4B6",
   },
   {
     selector: "[data-tour='the-bubble']",
     title: "The Bubble",
-    description: "Your campus community hub — events, deals, food recs, and discussions from real UofG students.",
+    description: "Your campus community hub — events, deals, food recs, and discussions from real Guelph students.",
     icon: <MessageCircle className="w-5 h-5" />,
     color: "#6C5CE7",
   },

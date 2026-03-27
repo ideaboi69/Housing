@@ -541,7 +541,7 @@ export default function RoommatesPage() {
               pets: "pets", kitchen_use: "cooking",
             };
             for (const [backendField, localKey] of Object.entries(fieldMap)) {
-              const val = (profile as Record<string, unknown>)[backendField];
+              const val = (profile as unknown as Record<string, unknown>)[backendField];
               if (val) {
                 // Find the matching display label from LIFESTYLE_CATEGORIES
                 const cat = LIFESTYLE_CATEGORIES.find((c) => c.key === localKey);
@@ -746,7 +746,7 @@ export default function RoommatesPage() {
           {/* Hero — clean centered */}
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-center mb-14 md:mb-18 pt-4 md:pt-8">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5" style={{ fontSize: "11px", fontWeight: 700, color: "#FF6B35", background: "rgba(255,107,53,0.08)", border: "2px solid rgba(255,107,53,0.12)" }}>
-              <Sparkles className="w-3 h-3" /> Built for UofG students
+              <Sparkles className="w-3 h-3" /> Built for Guelph students
             </div>
             <h1 className="text-[#1B2D45] mx-auto" style={{ fontSize: isMobile ? "34px" : "48px", fontWeight: 900, lineHeight: 1.08, letterSpacing: "-0.025em", maxWidth: "560px" }}>
               Find your perfect roommates
@@ -813,7 +813,7 @@ export default function RoommatesPage() {
             <div className="text-center py-8 bg-white rounded-2xl" style={{ border: "2.5px solid #1B2D45", boxShadow: "6px 6px 0px rgba(27,45,69,0.08)" }}>
               <div className="flex items-center justify-center gap-2 mb-3">
                 <Shield className="w-5 h-5 text-[#2EC4B6]" />
-                <span className="text-[#2EC4B6]" style={{ fontSize: "12px", fontWeight: 700 }}>Verified UofG students only</span>
+                <span className="text-[#2EC4B6]" style={{ fontSize: "12px", fontWeight: 700 }}>Verified Guelph students only</span>
               </div>
               <h3 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Ready to find your people?</h3>
               <p className="text-[#1B2D45]/55 mt-1 mb-4" style={{ fontSize: "12px" }}>Takes 2 minutes. Your info stays private.</p>

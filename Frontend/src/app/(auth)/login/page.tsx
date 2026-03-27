@@ -2,7 +2,7 @@
 import { AuthBackground } from "@/components/ui/AuthBackground";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { Eye, EyeOff, AlertCircle, ArrowRight, ShieldCheck } from "lucide-react";
@@ -12,6 +12,8 @@ const rotatingAuthLines = ["saved picks", "compare flow", "campus-first search"]
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") || "/browse";
   const { login, isLoading, error, clearError } = useAuthStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -59,7 +61,7 @@ export default function LoginPage() {
 
     try {
       await login({ email, password });
-      router.push("/browse");
+      router.push(nextPath);
     } catch {
       // Error is handled by the store
     }
@@ -95,7 +97,7 @@ export default function LoginPage() {
                 style={{ fontSize: "12px", fontWeight: 700 }}
               >
                 <ShieldCheck className="h-4 w-4 text-[#FF6B35]" />
-                For verified UofG students
+                For verified Guelph students
               </motion.div>
               <motion.h1
                 initial={{ opacity: 0, y: 22 }}
@@ -181,7 +183,7 @@ export default function LoginPage() {
                   <span className="h-1 w-1 rounded-full bg-[#1B2D45]/20" />
                   <span>Verified network</span>
                   <span className="h-1 w-1 rounded-full bg-[#1B2D45]/20" />
-                  <span>UofG focused</span>
+                  <span>Guelph focused</span>
                 </motion.div>
               </motion.div>
             </div>
@@ -202,7 +204,7 @@ export default function LoginPage() {
             >
               <div className="border-b border-[#1B2D45]/8 pb-5">
                 <div className="rounded-full bg-[#F3E4DA] px-3 py-1.5 text-[#C86B34] w-fit" style={{ fontSize: "11px", fontWeight: 800 }}>
-                  For verified UofG students
+                  For verified Guelph students
                 </div>
                 <div className="mt-4">
                   <div className="text-[#1B2D45]/35" style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em" }}>
@@ -290,7 +292,7 @@ export default function LoginPage() {
               </form>
 
               <div className="mt-5 text-[#1B2D45]/45" style={{ fontSize: "12px", lineHeight: 1.6 }}>
-                Your UofG email keeps Cribb student-only and helps cut down on fake accounts.
+                Your student email keeps Cribb student-only and helps cut down on fake accounts.
               </div>
 
               <p className="mt-5 text-center text-[#1B2D45]/50" style={{ fontSize: "13px" }}>

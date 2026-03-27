@@ -69,7 +69,7 @@ const slides = [
     iconColor: "#FF6B35",
     title: "Find your perfect roommate",
     description:
-      "Take a 2-minute lifestyle quiz and get matched with UofG students who actually live like you. Anonymous until it's mutual.",
+      "Take a 2-minute lifestyle quiz and get matched with Guelph students who actually live like you. Anonymous until it's mutual.",
     visual: (
       <div className="mt-5 flex items-center justify-center gap-3">
         <div className="bg-white rounded-xl border border-black/[0.04] p-3 w-[110px]" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
@@ -111,7 +111,7 @@ const slides = [
     iconColor: "#6C5CE7",
     title: "Your campus community",
     description:
-      "The Bubble is your campus hub — events, deals, food recs, and discussions from UofG students. Plus buy & sell textbooks, furniture, and more in the Marketplace.",
+      "The Bubble is your campus hub — events, deals, food recs, and discussions from Guelph students. Plus buy & sell textbooks, furniture, and more in the Marketplace.",
     visual: (
       <div className="mt-5 flex items-center justify-center gap-3">
         {/* The Bubble preview */}

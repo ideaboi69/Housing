@@ -106,7 +106,7 @@ const POSTS: Post[] = [
     avatarGradient: "linear-gradient(135deg, #1B2D45, #5C6B7A)",
     verified: true, timestamp: "1d ago", category: "news",
     title: "UC renovations will close the south entrance all March",
-    body: "Just got an email from UofG facilities. The University Centre south entrance is closed for renovations starting March 3rd through April. Use the north entrance near the courtyard. The Bullring cafe will still be open thankfully.",
+    body: "Just got an email from campus facilities. The University Centre south entrance is closed for renovations starting March 3rd through April. Use the north entrance near the courtyard. The Bullring cafe will still be open thankfully.",
     upvotes: 72, postedAt: now - DAY,
   },
   {
@@ -346,7 +346,7 @@ function BecomeWriterCard({ onApply, compact }: { onApply: () => void; compact?:
           <div className="flex-1 min-w-0">
             <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "14px", fontWeight: 700 }}>Become a Writer</h4>
             <p className="text-[#5C6B7A]" style={{ fontSize: compact ? "10px" : "11px", lineHeight: 1.4 }}>
-              Get the verified badge and share with the UofG community
+              Get the verified badge and share with the Guelph community
             </p>
           </div>
           <motion.div animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity }} className="shrink-0">
@@ -431,7 +431,7 @@ function WriterModal({ onClose, onApproved }: { onClose: () => void; onApproved:
                 <div>
                   {labelEl("Email")}
                   <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@uoguelph.ca or business email" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
-                  <p className="text-[#98A3B0] mt-1" style={{ fontSize: "10px" }}>UofG students use your @uoguelph.ca email. Businesses use your business email.</p>
+                  <p className="text-[#98A3B0] mt-1" style={{ fontSize: "10px" }}>Guelph students use your @uoguelph.ca email. Businesses use your business email.</p>
                 </div>
 
                 {/* Password */}
@@ -469,7 +469,7 @@ function WriterModal({ onClose, onApproved }: { onClose: () => void; onApproved:
                 <div>
                   {labelEl(businessType === "business" ? "Business Name" : businessType === "club" ? "Club / Organization Name" : "Organization / Program")}
                   <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)}
-                    placeholder={businessType === "business" ? "e.g. Yuki Ramen" : businessType === "club" ? "e.g. UofG Dance Club" : "e.g. Computer Science, 3rd Year"}
+                    placeholder={businessType === "business" ? "e.g. Yuki Ramen" : businessType === "club" ? "e.g. Guelph Dance Club" : "e.g. Computer Science, 3rd Year"}
                     className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
                 </div>
 
@@ -954,7 +954,7 @@ function Sidebar({ isWriter, onCreatePost, onApply, onTip }: { isWriter: boolean
         <div className="bg-white rounded-2xl border border-black/[0.04] p-4 cursor-pointer hover:shadow-md transition-shadow" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }} onClick={onCreatePost}>
           <div className="flex items-center gap-2.5">
             <Avatar initial="Y" gradient="linear-gradient(135deg, #FF6B35, #FFB627)" size={28} />
-            <div className="flex-1 bg-[#FAF8F4] rounded-xl px-3 py-2 text-[#98A3B0]" style={{ fontSize: "12px" }}>Share something with UofG...</div>
+            <div className="flex-1 bg-[#FAF8F4] rounded-xl px-3 py-2 text-[#98A3B0]" style={{ fontSize: "12px" }}>Share something with Guelph...</div>
           </div>
         </div>
       ) : (
@@ -1017,7 +1017,7 @@ function EmptyState({ onReset }: { onReset: () => void }) {
       <motion.span animate={{ y: [0, -6, 0] }} transition={{ duration: 3, repeat: Infinity }} style={{ fontSize: "48px", display: "inline-block" }}>📭</motion.span>
       <h3 className="text-[#1B2D45] mt-4" style={{ fontSize: "18px", fontWeight: 700 }}>Nothing here yet</h3>
       <p className="text-[#5C6B7A] mt-2 text-center max-w-[300px]" style={{ fontSize: "13px", lineHeight: 1.6 }}>
-        Be the first to share something with the UofG community!
+        Be the first to share something with the Guelph community!
       </p>
       <motion.button whileTap={{ scale: 0.97 }} onClick={onReset}
         className="mt-5 px-5 py-2 rounded-xl bg-[#FF6B35] text-white" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}>
@@ -1049,7 +1049,7 @@ export default function TheBubblePage() {
       return;
     }
     // Check if user has student write access
-    if ((user as Record<string, unknown>).is_writable) {
+    if ((user as unknown as Record<string, unknown>).is_writable) {
       setIsWriter(true);
       return;
     }

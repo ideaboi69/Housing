@@ -44,7 +44,7 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
   const [current, setCurrent] = useState(0);
   if (images.length === 0) {
     return (
-      <div className="w-full min-h-[440px] md:min-h-[620px] rounded-[28px] border border-black/[0.06] bg-[#151A22] flex items-center justify-center">
+      <div className="w-full min-h-[320px] sm:min-h-[380px] md:min-h-[620px] rounded-[28px] border border-black/[0.06] bg-[#151A22] flex items-center justify-center">
         <Package className="w-20 h-20 text-[#1B2D45]/10" />
       </div>
     );
@@ -55,14 +55,14 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
       className="relative rounded-[28px] overflow-hidden border border-black/[0.06] bg-[#151A22] group"
       style={{ boxShadow: "0 22px 60px rgba(27,45,69,0.12)" }}
     >
-      <div className="relative min-h-[440px] md:min-h-[620px]">
+      <div className="relative min-h-[320px] sm:min-h-[380px] md:min-h-[620px]">
         <img
           src={images[current]?.image_url}
           alt=""
           className="absolute inset-0 w-full h-full object-cover scale-105 blur-3xl opacity-30"
         />
         <div className="absolute inset-0 bg-gradient-to-br from-black/18 via-transparent to-black/30" />
-        <div className="relative z-10 flex min-h-[440px] md:min-h-[620px] items-center justify-center px-5 py-6 md:px-8 md:py-10">
+        <div className="relative z-10 flex min-h-[320px] sm:min-h-[380px] md:min-h-[620px] items-center justify-center px-4 py-5 sm:px-5 sm:py-6 md:px-8 md:py-10">
           <img
             src={images[current]?.image_url}
             alt=""
@@ -283,7 +283,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                         {item.seller_name}
                         <ShieldCheck className="w-3.5 h-3.5 text-[#4ADE80]" />
                       </div>
-                      <div className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px" }}>Verified UofG student</div>
+                      <div className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px" }}>Verified Guelph student</div>
                     </div>
                   </div>
                 </div>
@@ -318,7 +318,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 mt-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-5">
                 <button
                   onClick={handleOpenMessage}
                   className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
@@ -392,7 +392,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                 Browse all
               </Link>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
               {similarItems.map((sim) => {
                 const simPrice = getPriceLabel(sim.pricing_type, sim.price);
                 const simCondition = CONDITION_LABELS[sim.condition];

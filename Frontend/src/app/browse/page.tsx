@@ -181,7 +181,7 @@ export default function BrowsePage() {
       {/* Hero + View toggle */}
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 pt-5 md:pt-8 pb-1 md:pb-2">
         <motion.div
-          className="flex items-start justify-between gap-3"
+          className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
@@ -195,19 +195,19 @@ export default function BrowsePage() {
             </h1>
             <p className="mt-1 md:mt-1.5 text-[#1B2D45]/45" style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 400 }}>
               <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{filteredListings.length} listings</span>{" "}
-              available near University of Guelph
+              available in Guelph
               {useMock && <span className="ml-2 text-[#FF6B35]/60" style={{ fontSize: "11px" }}>(demo data)</span>}
             </p>
           </div>
 
           {/* View toggle with indicator */}
-          <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0" data-tour="view-switcher">
+          <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0 w-full sm:w-auto" data-tour="view-switcher">
             {(["board", "grid", "map"] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-3 py-1.5 rounded-md transition-all duration-200 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
-                style={{ fontSize: "12px", fontWeight: 600 }}
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all duration-200 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
+                style={{ fontSize: "12px", fontWeight: 600, minWidth: 0 }}
               >
                 {mode === "board" ? "📌 Board" : mode === "grid" ? "▦ Grid" : "🗺 Map"}
               </button>

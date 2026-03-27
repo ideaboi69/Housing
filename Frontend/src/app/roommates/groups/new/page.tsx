@@ -188,7 +188,7 @@ export default function CreateGroupPage() {
       id: `${user.id}-member-${index + 1}`,
       firstName,
       initial: lastInitial,
-      year: "UofG student",
+      year: "Guelph student",
       program: index === 0 ? "Group organizer" : "Current housemate",
       budget: [rentPerPerson, rentPerPerson],
       moveIn,

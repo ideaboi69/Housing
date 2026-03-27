@@ -330,8 +330,8 @@ export function Navbar() {
 
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
-        <div className="md:hidden absolute top-[56px] left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-black/[0.08] shadow-lg z-40">
-          <div className="px-4 py-3 space-y-1">
+        <div className="md:hidden absolute top-[56px] left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-black/[0.08] shadow-lg z-40 max-h-[calc(100vh-56px)] overflow-y-auto">
+          <div className="px-4 py-3 space-y-1 pb-[calc(env(safe-area-inset-bottom)+12px)]">
             {/* User info on mobile */}
             {user && (
               <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-[#FAF8F4] rounded-xl">

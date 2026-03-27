@@ -58,7 +58,7 @@ export function VerifiedStudentBadge({ size = "sm" }: { size?: "sm" | "md" }) {
         borderRadius: "50%",
         background: "#4ADE80",
       }}
-      title="Verified UofG Student"
+      title="Verified student"
     >
       <svg width={isSm ? "8" : "10"} height={isSm ? "8" : "10"} viewBox="0 0 12 12" fill="none">
         <path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

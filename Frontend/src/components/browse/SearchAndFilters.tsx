@@ -28,7 +28,7 @@ export function SearchAndFilters({
     <div className="sticky top-[56px] md:top-[64px] z-20 bg-white/70 backdrop-blur-xl border-b border-black/[0.04]">
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-3">
         {/* Search bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#1B2D45]/30" />
             <input
@@ -55,7 +55,7 @@ export function SearchAndFilters({
           </div>
           <motion.button
             onClick={onOpenFilters}
-            className="relative flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/80 border border-black/[0.06] text-[#1B2D45]/60 hover:border-[#1B2D45]/20 transition-all shrink-0"
+            className="relative flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/80 border border-black/[0.06] text-[#1B2D45]/60 hover:border-[#1B2D45]/20 transition-all shrink-0 w-full sm:w-auto"
             style={{ fontSize: "13px", fontWeight: 500 }}
             whileTap={{ scale: 0.97 }}
           >

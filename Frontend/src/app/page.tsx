@@ -418,7 +418,7 @@ function ShowcaseVisual({ featureId }: { featureId: (typeof showcaseFeatures)[nu
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FF6B35]/10 text-[#FF6B35]" style={{ fontSize: "16px" }}>✦</div>
                 <div>
                   <div className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Become a Writer</div>
-                  <div className="mt-1 text-[#5C6B7A]" style={{ fontSize: "12px", lineHeight: 1.5 }}>Get the verified badge and share with the UofG community</div>
+                  <div className="mt-1 text-[#5C6B7A]" style={{ fontSize: "12px", lineHeight: 1.5 }}>Get the verified badge and share with the Guelph community</div>
                 </div>
               </div>
             </div>
@@ -668,7 +668,7 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                Find trusted, verified listings near University of Guelph. Real reviews, transparent pricing, and a Cribb Score on every listing so you never rent blind.
+                Find trusted, verified listings in Guelph. Real reviews, transparent pricing, and a Cribb Score on every listing so you never rent blind.
               </motion.p>
               <motion.div
                 className="flex items-center gap-3 mt-8"
@@ -692,7 +692,7 @@ export default function HomePage() {
               >
                 <div className="inline-flex items-center gap-2 bg-[#FAF8F4] border border-black/5 rounded-full px-4 py-1.5">
                   <span style={{ fontSize: "13px" }}>🎓</span>
-                  <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Built by UofG students</span>
+                  <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Built by Guelph students</span>
                 </div>
                 <div className="inline-flex items-center gap-2 bg-[#FAF8F4] border border-black/5 rounded-full px-4 py-1.5">
                   <span style={{ fontSize: "13px" }}>💚</span>
@@ -967,7 +967,7 @@ export default function HomePage() {
             </div>
             <div className="mt-6 inline-flex items-center gap-2 bg-white/60 border border-black/5 rounded-full px-4 py-1.5">
               <span style={{ fontSize: "13px" }}>🎓</span>
-              <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>University of Guelph</span>
+              <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Guelph</span>
             </div>
           </FadeUp>
         </div>
@@ -1015,7 +1015,7 @@ export default function HomePage() {
           </div>
           <div className="border-t border-white/[0.08]" />
           <div className="flex flex-col md:flex-row items-center justify-between mt-4 md:mt-6 gap-3">
-            <span className="text-white/25" style={{ fontSize: "12px", fontWeight: 400 }}>© 2026 cribb · Built for UoG students 🐻‍❄️</span>
+            <span className="text-white/25" style={{ fontSize: "12px", fontWeight: 400 }}>© 2026 cribb · Built for Guelph students 🐻‍❄️</span>
             <div className="flex items-center gap-3 md:gap-5 flex-wrap justify-center">
               <span className="text-white/30 hidden md:inline" style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.03em" }}>HEALTH SCORE</span>
               <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-[#4ADE80]" /><span className="text-white/30" style={{ fontSize: "11px" }}>85+ Great</span></div>

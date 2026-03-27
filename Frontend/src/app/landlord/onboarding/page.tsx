@@ -69,7 +69,7 @@ export default function LandlordOnboardingPage() {
         <div className="grid grid-cols-3 gap-3 mt-6">
           {[
             { emoji: "📋", label: isClaimFlow ? "Claim in progress" : "Easy listing management", desc: isClaimFlow ? "This home stays pending until verification is approved" : "Add properties and listings in minutes" },
-            { emoji: "🎓", label: "Verified students", desc: "UofG students only — no random inquiries" },
+            { emoji: "🎓", label: "Verified students", desc: "Guelph students only — no random inquiries" },
             { emoji: "📊", label: "Cribb Score", desc: "Build your reputation with every interaction" },
           ].map((b) => (
             <div key={b.label} className="text-center bg-[#FAF8F4] rounded-xl p-3">

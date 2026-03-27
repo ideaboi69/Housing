@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useRef, useCallback } from "react";
+import { use, useState, useRef, useCallback, useEffect } from "react";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { ReviewModal } from "@/components/ui/ReviewModal";
@@ -12,6 +12,7 @@ import { getMockSublet } from "@/lib/mock-sublets";
 import { getMockReviews } from "@/lib/mock-data";
 import { useSavedStore } from "@/lib/saved-store";
 import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -22,7 +23,8 @@ import {
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { CribbMap } from "@/components/ui/CribbMap";
 import { getProximityLabel } from "@/lib/proximity";
-import type { ReviewResponse } from "@/types";
+import type { ReviewResponse, SubletResponse } from "@/types";
+import type { SubletDetail } from "@/lib/mock-sublets";
 
 /* ── Helpers ───────────────────────────────────── */
 
@@ -37,6 +39,80 @@ function formatDateRange(start: string, end: string) {
   const s = new Date(start + "T00:00:00");
   const e = new Date(end + "T00:00:00");
   return `${s.toLocaleDateString("en-CA", { month: "short", day: "numeric" })} – ${e.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}`;
+}
+
+function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
+  const startMonth = new Date(`${sublet.sublet_start_date}T00:00:00`).getMonth();
+  const endMonth = new Date(`${sublet.sublet_end_date}T00:00:00`).getMonth();
+  const visibleMonths = [4, 5, 6, 7, 8];
+  const availableMonths = visibleMonths.map((month) => month >= startMonth && month <= endMonth);
+  const distance = Number(sublet.distance_to_campus_km);
+  const walk = Number(sublet.walk_time_minutes);
+  const price = Number(sublet.rent_per_month);
+  const score = Math.min(
+    96,
+    72
+      + (walk <= 5 ? 14 : walk <= 10 ? 10 : walk <= 15 ? 6 : 2)
+      + (sublet.is_furnished ? 3 : 0)
+      + (sublet.utilities_included ? 3 : 0)
+      + (sublet.has_laundry ? 2 : 0)
+      + (sublet.has_parking ? 1 : 0)
+  );
+
+  return {
+    id: String(sublet.id),
+    title: sublet.title,
+    street: sublet.address.split(",")[0] ?? sublet.address,
+    address: sublet.address,
+    postalCode: sublet.postal_code,
+    description: sublet.description || "Posted directly through Cribb.",
+    subletPrice: price,
+    originalPrice: Math.round(price * 1.22),
+    healthScore: score,
+    verified: true,
+    posterName: sublet.posted_by,
+    posterType: "Student poster",
+    posterIsStudent: true,
+    availableMonths,
+    subletStart: sublet.sublet_start_date,
+    subletEnd: sublet.sublet_end_date,
+    neighborhood: distance <= 0.7 ? "Campus" : distance <= 1.5 ? "Near Campus" : "Guelph",
+    negotiablePrice: sublet.utilities_included,
+    flexibleDates: false,
+    roommatesStaying: sublet.total_rooms > 1 ? sublet.total_rooms - 1 : null,
+    roommateDesc: sublet.total_rooms > 1 ? `${sublet.total_rooms - 1} roommate${sublet.total_rooms - 1 > 1 ? "s" : ""} staying` : null,
+    bedsAvailable: 1,
+    bedsTotal: sublet.total_rooms,
+    bathrooms: sublet.bathrooms,
+    propertyType: sublet.room_type,
+    distanceKm: distance,
+    walkTime: walk,
+    busTime: sublet.bus_time_minutes || null,
+    genderPreference: sublet.gender_preference || "any",
+    views: sublet.view_count,
+    saves: 0,
+    images: sublet.images.map((img) => img.image_url),
+    createdAt: sublet.created_at,
+    is_furnished: sublet.is_furnished,
+    has_parking: sublet.has_parking,
+    has_laundry: sublet.has_laundry,
+    utilities_included: sublet.utilities_included,
+    pet_friendly: false,
+    has_air_conditioning: false,
+    has_wifi: false,
+    has_dishwasher: false,
+    has_gym: false,
+    has_elevator: false,
+    has_backyard: false,
+    has_balcony: false,
+    smoking_allowed: false,
+    wheelchair_accessible: false,
+    estimated_utility_cost: Number(sublet.estimated_utility_cost),
+    price_vs_market_score: score,
+    landlord_reputation_score: score,
+    maintenance_score: score,
+    lease_clarity_score: score,
+  };
 }
 
 function AnimatedBar({ score, color }: { score: number; color: string }) {
@@ -105,7 +181,9 @@ function ReviewCard({ review, index }: { review: ReviewResponse; index: number }
 export default function SubletDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const sublet = getMockSublet(id);
+  const mockSublet = getMockSublet(id) ?? null;
+  const [sublet, setSublet] = useState(mockSublet);
+  const [loading, setLoading] = useState(!mockSublet && /^\d+$/.test(id));
 
   const [saved, setSaved] = useState(false);  // fallback for sublets without listing_id
   const [messageSending, setMessageSending] = useState(false);
@@ -114,6 +192,33 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   const [reviewOpen, setReviewOpen] = useState(false);
 
   const user = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (mockSublet || !/^\d+$/.test(id)) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoading(true);
+    api.sublets.getById(Number(id))
+      .then((res) => {
+        if (!cancelled) setSublet(mapApiSubletToDetail(res));
+      })
+      .catch(() => {
+        if (!cancelled) setSublet(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, mockSublet]);
 
   // Use saved store if sublet has a listing_id, otherwise local toggle
   const hasListingId = sublet && typeof sublet.listing_id === "number";
@@ -138,13 +243,28 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   }, [hasListingId, sublet, storeToggle, saved, router]);
 
   // TODO: fetch real reviews for the property once backend links sublets to properties
-  const [reviews, setReviews] = useState<ReviewResponse[]>(sublet ? getMockReviews(1) : []);
+  const [reviews, setReviews] = useState<ReviewResponse[]>(mockSublet ? getMockReviews(1) : []);
+  useEffect(() => {
+    if (sublet && reviews.length === 0) {
+      setReviews(getMockReviews(1));
+    }
+  }, [sublet, reviews.length]);
 
   const handleMessage = async () => {
     if (messageSending || messageSent) return;
     setMessageSending(true);
     setTimeout(() => { setMessageSent(true); setMessageSending(false); setTimeout(() => router.push("/messages"), 1500); }, 800);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
+        <motion.div className="text-center" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <p className="text-[#1B2D45]/50" style={{ fontSize: "15px", fontWeight: 600 }}>Loading sublet...</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (!sublet) {
     return (
@@ -188,7 +308,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               </div>
 
               {/* Title */}
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div className="min-w-0">
                   <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.3px" }}>{sublet.title}</h1>
                   <div className="flex items-center gap-2 mt-1.5 text-[#1B2D45]/50"><MapPin className="w-3.5 h-3.5 shrink-0" /><span style={{ fontSize: "13px" }}>{sublet.address}</span></div>
@@ -225,7 +345,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               </div>
 
               {/* Quick facts */}
-              <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+              <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
                 {[{ label: "Beds", value: `${sublet.bedsAvailable} of ${sublet.bedsTotal}`, icon: Bed }, { label: "Bath", value: `${sublet.bathrooms}`, icon: Bath }, { label: "Type", value: sublet.propertyType.charAt(0).toUpperCase() + sublet.propertyType.slice(1), icon: MapPin }, { label: "Area", value: sublet.neighborhood, icon: MapPin }].map((fact) => {
                   const Icon = fact.icon;
                   return <motion.div key={fact.label} variants={fadeUp} className="bg-[#FAF8F4] rounded-xl p-3"><div className="flex items-center gap-1.5"><Icon className="w-3 h-3 text-[#FF6B35]/50" /><span className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 600 }}>{fact.label}</span></div><div className="text-[#1B2D45] mt-1" style={{ fontSize: "13px", fontWeight: 700 }}>{fact.value}</div></motion.div>;
@@ -263,12 +383,12 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex items-center gap-4 mt-3 flex-wrap">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚶</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.walkTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p></div></div>
                 {sublet.busTime && <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚌</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.busTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p></div></div>}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>📍</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.distanceKm} km</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to UofG</p></div></div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>📍</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.distanceKm} km</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to campus</p></div></div>
               </div>
 
               {/* Amenities — same checklist as listings */}
               <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Amenities</h3>
-              <div className="grid grid-cols-2 gap-2.5 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3">
                 {hasAmenities.map((a) => { const Icon = a.icon; return (
                   <motion.div key={a.key} className="flex items-center gap-2.5 py-2" initial={{ opacity: 0, x: -8 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ type: "spring", stiffness: 200 }}>
                     <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[#4ADE80]/10"><Icon className="w-3.5 h-3.5 text-[#4ADE80]" /></div>
@@ -359,7 +479,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* ─── Sidebar ─── */}
-          <motion.div className="space-y-4 sticky top-[80px] self-start max-h-[calc(100vh-100px)] overflow-y-auto no-scrollbar" variants={fadeUp}>
+          <motion.div className="space-y-4 lg:sticky lg:top-[80px] lg:self-start lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto no-scrollbar" variants={fadeUp}>
             {/* Price card */}
             <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5" style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>
               <div className="flex items-baseline gap-2">
@@ -400,11 +520,11 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               </motion.button>
 
               {/* Share + Report */}
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">
                 <ShareButton path={`/sublets/${id}`} title={sublet.title} variant="inline" />
                 <button
                   onClick={() => setReportOpen(true)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
+                  className="flex-1 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
                   style={{ fontSize: "11px", fontWeight: 500 }}
                 >
                   <Flag className="w-3 h-3" /> Report

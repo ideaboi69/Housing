@@ -314,6 +314,111 @@ export interface SavedListingDetailResponse {
   distance_to_campus_km: number | null;
 }
 
+// ── Sublet ─────────────────────────────────────────────
+
+export enum SubletRoomType {
+  SHARED = "shared",
+  PRIVATE = "private",
+}
+
+export enum SubletStatus {
+  DRAFT = "draft",
+  ACTIVE = "active",
+  RENTED = "rented",
+  EXPIRED = "expired",
+  REMOVED = "removed",
+}
+
+export interface SubletImageResponse {
+  id: number;
+  image_url: string;
+  is_primary: boolean;
+}
+
+export interface SubletCreate {
+  title: string;
+  address: string;
+  postal_code: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  distance_to_campus_km: number;
+  walk_time_minutes: number;
+  drive_time_minutes: number;
+  bus_time_minutes: number;
+  nearest_bus_route: string;
+  room_type: SubletRoomType | "private" | "shared";
+  total_rooms: number;
+  bathrooms: number;
+  is_furnished?: boolean;
+  has_parking?: boolean;
+  has_laundry?: boolean;
+  utilities_included?: boolean;
+  estimated_utility_cost: number;
+  rent_per_month: number;
+  sublet_start_date: string;
+  sublet_end_date: string;
+  move_in_date: string;
+  gender_preference?: GenderPreference | null;
+  description?: string | null;
+}
+
+export interface SubletResponse {
+  id: number;
+  user_id: number;
+  title: string;
+  address: string;
+  postal_code: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  distance_to_campus_km: number;
+  walk_time_minutes: number;
+  drive_time_minutes: number;
+  bus_time_minutes: number;
+  nearest_bus_route: string;
+  room_type: SubletRoomType;
+  total_rooms: number;
+  bathrooms: number;
+  is_furnished: boolean;
+  has_parking: boolean;
+  has_laundry: boolean;
+  utilities_included: boolean;
+  estimated_utility_cost: number;
+  rent_per_month: number;
+  sublet_start_date: string;
+  sublet_end_date: string;
+  move_in_date: string;
+  gender_preference?: GenderPreference | null;
+  status: SubletStatus;
+  view_count: number;
+  description?: string | null;
+  images: SubletImageResponse[];
+  posted_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubletListResponse {
+  id: number;
+  title: string;
+  address: string;
+  rent_per_month: number;
+  sublet_start_date: string;
+  sublet_end_date: string;
+  room_type: SubletRoomType;
+  total_rooms: number;
+  is_furnished: boolean;
+  distance_to_campus_km: number;
+  walk_time_minutes: number;
+  drive_time_minutes: number;
+  bus_time_minutes: number;
+  nearest_bus_route: string;
+  status: SubletStatus;
+  primary_image?: string | null;
+  images: SubletImageResponse[];
+  posted_by: string;
+  created_at: string;
+}
+
 // ── Flag ───────────────────────────────────────────────
 
 export interface FlagCreate {

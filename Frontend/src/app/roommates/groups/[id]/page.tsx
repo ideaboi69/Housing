@@ -539,7 +539,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
         <div className="mt-4 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-[#2EC4B6]/[0.04]">
           <Shield className="w-4 h-4 text-[#2EC4B6] shrink-0 mt-0.5" />
           <p className="text-[#1B2D45]/30" style={{ fontSize: "10px", lineHeight: 1.5 }}>
-            All members are verified UofG students. Your contact info is never shared until you join a group.
+            All members are verified Guelph students. Your contact info is never shared until you join a group.
           </p>
         </div>
       </div>

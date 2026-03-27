@@ -339,7 +339,7 @@ function OverviewTab({
           </div>
           <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No properties yet</h3>
           <p className="text-[#1B2D45]/40 mt-1 max-w-[320px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.5 }}>
-            Add your first property to start creating listings for UofG students.
+            Add your first property to start creating listings for Guelph students.
           </p>
           <Link href="/landlord/properties/new"
             className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-colors"

@@ -137,7 +137,7 @@ export default function SignupPage() {
                 style={{ fontSize: "12px", fontWeight: 700 }}
               >
                 <ShieldCheck className="h-4 w-4 text-[#FF6B35]" />
-                For verified UofG students
+                For verified Guelph students
               </motion.div>
 
               <motion.h1
@@ -203,7 +203,7 @@ export default function SignupPage() {
                   The good part is that once you sign up, Cribb starts behaving like your housing workspace instead of a pile of screenshots.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
-                  {["Save listings", "Compare in one place", "Built around UofG"].map((item, index) => (
+                  {["Save listings", "Compare in one place", "Built around Guelph"].map((item, index) => (
                     <motion.span
                       key={item}
                       initial={{ opacity: 0, y: 18 }}
@@ -344,7 +344,7 @@ export default function SignupPage() {
                   </form>
 
                   <div className="mt-5 text-[#1B2D45]/45" style={{ fontSize: "12px", lineHeight: 1.6 }}>
-                    We use your UofG email to keep the network student-only and more trustworthy.
+                    We use your student email to keep the network student-only and more trustworthy.
                   </div>
 
                   <p className="mt-5 text-center text-[#1B2D45]/50" style={{ fontSize: "13px" }}>

@@ -28,9 +28,9 @@ export const LANDMARK_TYPES: Record<string, { color: string; label: string }> = 
 
 export const GUELPH_LANDMARKS = [
   // Campus
-  { name: "University of Guelph", lat: 43.5305, lng: -80.2262, emoji: "🎓", type: "campus" },
-  { name: "UofG Athletics Centre", lat: 43.5320, lng: -80.2290, emoji: "🏟️", type: "campus" },
-  { name: "UofG Library", lat: 43.5310, lng: -80.2265, emoji: "📚", type: "campus" },
+  { name: "Guelph Campus", lat: 43.5305, lng: -80.2262, emoji: "🎓", type: "campus" },
+  { name: "Athletics Centre", lat: 43.5320, lng: -80.2290, emoji: "🏟️", type: "campus" },
+  { name: "Library", lat: 43.5310, lng: -80.2265, emoji: "📚", type: "campus" },
 
   // Grocery
   { name: "Zehrs (Stone Road)", lat: 43.5185, lng: -80.2523, emoji: "🥬", type: "grocery" },
@@ -69,7 +69,7 @@ export const GUELPH_LANDMARKS = [
 
   // Healthcare
   { name: "Guelph General Hospital", lat: 43.5430, lng: -80.2430, emoji: "🏥", type: "health" },
-  { name: "UofG Health Services", lat: 43.5300, lng: -80.2250, emoji: "🏥", type: "health" },
+  { name: "Health Services", lat: 43.5300, lng: -80.2250, emoji: "🏥", type: "health" },
 
   // Other
   { name: "Guelph Public Library", lat: 43.5470, lng: -80.2520, emoji: "📖", type: "library" },
@@ -228,7 +228,7 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
             markersRef.current = [];
 
             GUELPH_LANDMARKS.forEach((lm) => {
-              const isCampus = lm.type === "campus" && lm.name === "University of Guelph";
+              const isCampus = lm.type === "campus" && lm.name === "Guelph Campus";
               const el = createLandmarkMarker(lm.emoji, isCampus);
 
               const popup = new (mapboxgl as any).Popup({ offset: isCampus ? 20 : 10, closeButton: false })
@@ -371,7 +371,7 @@ function CribbMapExpanded({ lat, lng, showLandmarks = true, zoom = 15 }: { lat?:
           }
           if (showLandmarks) {
             GUELPH_LANDMARKS.forEach((lm) => {
-              const isCampus = lm.type === "campus" && lm.name === "University of Guelph";
+              const isCampus = lm.type === "campus" && lm.name === "Guelph Campus";
               const el = createLandmarkMarker(lm.emoji, isCampus);
               const popup = new (mapboxgl as any).Popup({ offset: isCampus ? 20 : 16, closeButton: false })
                 .setHTML('<div style="font-size:12px;font-weight:600;color:#1B2D45;padding:2px 6px;">' + lm.name + '</div>');

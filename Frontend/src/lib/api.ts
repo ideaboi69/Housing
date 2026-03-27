@@ -16,6 +16,10 @@ import type {
   ReviewCreate,
   HealthScoreResponse,
   SavedListingDetailResponse,
+  SubletCreate,
+  SubletImageResponse,
+  SubletListResponse,
+  SubletResponse,
   FlagCreate,
   FlagResponse,
   LandlordPublicResponse,
@@ -179,7 +183,7 @@ function toQueryString(params: object): string {
 
 export const auth = {
   register: (data: UserCreate) =>
-    request<TokenResponse | { message: string; user_id: number }>("/api/users/register", {
+    request<TokenResponse>("/api/users/register", {
       method: "POST",
       body: JSON.stringify(data),
     }),
@@ -271,6 +275,58 @@ export const listings = {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
+};
+
+// ── Sublets ────────────────────────────────────────────
+
+export const sublets = {
+  browse: (params?: {
+    min_rent?: number;
+    max_rent?: number;
+    room_type?: string;
+    is_furnished?: boolean;
+    utilities_included?: boolean;
+    distance_to_campus_km?: number;
+    gender_preference?: string;
+    available_from?: string;
+    available_until?: string;
+  }) =>
+    request<SubletListResponse[]>(
+      `/api/sublets${toQueryString(params || {})}`
+    ),
+
+  getById: (id: number) =>
+    request<SubletResponse>(`/api/sublets/${id}`),
+
+  create: (data: SubletCreate) =>
+    request<SubletResponse>("/api/sublets", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  uploadImages: async (subletId: number, files: File[]) => {
+    const token = getToken();
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_URL}/api/sublets/${subletId}/images`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Request failed" }));
+      throw new ApiError(res.status, body.detail || "Request failed");
+    }
+
+    return res.json() as Promise<SubletImageResponse[]>;
+  },
 };
 
 // ── Properties ──────────────────────────────────────────
@@ -879,6 +935,7 @@ export const marketplace = {
 export const api = {
   auth,
   listings,
+  sublets,
   properties,
   reviews,
   healthScores,
