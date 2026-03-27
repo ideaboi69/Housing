@@ -2,10 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MapPin, ChevronDown } from "lucide-react";
-
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || "";
-const GUELPH_CENTER = { lat: 43.5305, lng: -80.2262 };
-const MAPBOX_STYLE = "mapbox://styles/mapbox/light-v11";
+import { GUELPH_CENTER, MAPBOX_STYLE, MAPBOX_TOKEN, loadMapboxGl } from "@/lib/mapbox";
 
 /* ════════════════════════════════════════════════════════
    Landmark type config — colors & labels
@@ -165,6 +162,7 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [ready, setReady] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(
     () => new Set(Object.keys(LANDMARK_TYPES))
@@ -193,21 +191,12 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
     if (typeof window === "undefined" || !mapRef.current || !MAPBOX_TOKEN) return;
 
     let cancelled = false;
+    setReady(false);
 
     async function initMap() {
-      if (!document.querySelector('link[href*="mapbox-gl"]')) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css";
-        document.head.appendChild(link);
-      }
-
       try {
-        const mapboxModule = await import("mapbox-gl");
-        const mapboxgl = (mapboxModule as any).default || mapboxModule;
+        const mapboxgl = await loadMapboxGl();
         if (cancelled) return;
-
-        (mapboxgl as any).accessToken = MAPBOX_TOKEN;
 
         const map = new (mapboxgl as any).Map({
           container: mapRef.current!,
@@ -254,10 +243,19 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
             });
           }
 
-          setReady(true);
+          requestAnimationFrame(() => {
+            map.resize();
+            setReady(true);
+          });
         });
 
         mapInstance.current = map;
+        resizeObserverRef.current = new ResizeObserver(() => {
+          if (mapInstance.current) {
+            mapInstance.current.resize();
+          }
+        });
+        resizeObserverRef.current.observe(mapRef.current!);
       } catch (err) {
         console.error("Map init failed:", err);
       }
@@ -267,6 +265,8 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
 
     return () => {
       cancelled = true;
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       if (mapInstance.current) {
         try { mapInstance.current.remove(); } catch {}
         mapInstance.current = null;
@@ -339,6 +339,7 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
 function CribbMapExpanded({ lat, lng, showLandmarks = true, zoom = 15 }: { lat?: number; lng?: number; showLandmarks?: boolean; zoom?: number }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [ready, setReady] = useState(false);
   const center = lat && lng ? { lat, lng } : GUELPH_CENTER;
 
@@ -348,10 +349,8 @@ function CribbMapExpanded({ lat, lng, showLandmarks = true, zoom = 15 }: { lat?:
 
     async function initMap() {
       try {
-        const mapboxModule = await import("mapbox-gl");
-        const mapboxgl = (mapboxModule as any).default || mapboxModule;
+        const mapboxgl = await loadMapboxGl();
         if (cancelled) return;
-        (mapboxgl as any).accessToken = MAPBOX_TOKEN;
 
         const map = new (mapboxgl as any).Map({
           container: mapRef.current!,
@@ -379,13 +378,27 @@ function CribbMapExpanded({ lat, lng, showLandmarks = true, zoom = 15 }: { lat?:
               new (mapboxgl as any).Marker({ element: el }).setLngLat([lm.lng, lm.lat]).setPopup(popup).addTo(map);
             });
           }
-          setReady(true);
+          requestAnimationFrame(() => {
+            map.resize();
+            setReady(true);
+          });
         });
         mapInstance.current = map;
+        resizeObserverRef.current = new ResizeObserver(() => {
+          if (mapInstance.current) {
+            mapInstance.current.resize();
+          }
+        });
+        resizeObserverRef.current.observe(mapRef.current!);
       } catch {}
     }
     initMap();
-    return () => { cancelled = true; if (mapInstance.current) { try { mapInstance.current.remove(); } catch {} } };
+    return () => {
+      cancelled = true;
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+      if (mapInstance.current) { try { mapInstance.current.remove(); } catch {} }
+    };
   }, [lat, lng, zoom, showLandmarks]);
 
   return (

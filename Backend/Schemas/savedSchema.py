@@ -16,6 +16,7 @@ class SavedListingDetailResponse(BaseModel):
     """Saved listing with full listing + property info baked in."""
     id: int
     listing_id: int
+    sublet_id: Optional[int] = None
     saved_at: datetime
     # listing info
     rent_per_room: Decimal

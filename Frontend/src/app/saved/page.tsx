@@ -17,10 +17,9 @@ type SavedPageItem = SavedListingDetailResponse & {
 };
 
 function toSavedPageItem(item: SavedListingDetailResponse): SavedPageItem {
-  const matchedSublet = mockSubletDetails.find((sublet) => sublet.listing_id === item.listing_id);
   return {
     ...item,
-    href: item.is_sublet && matchedSublet ? `/sublets/${matchedSublet.id}` : `/browse/${item.listing_id}`,
+    href: item.is_sublet && item.sublet_id ? `/sublets/${item.sublet_id}` : `/browse/${item.listing_id}`,
   };
 }
 
@@ -96,6 +95,9 @@ export default function SavedListingsPage() {
         setLoading(false);
         return;
       }
+      setListings([]);
+      setLoading(false);
+      return;
     } catch {
       // Backend unavailable — fall through to store
     }

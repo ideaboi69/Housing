@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { AnimatePresence, motion, useInView, useAnimation } from "framer-motion";
 import Link from "next/link";
 import { Heart, User } from "lucide-react";
 
@@ -52,13 +52,13 @@ const showcaseFeatures = [
     bullets: ["Saved picks tray", "Quick price checks", "Side-by-side decisions"],
   },
   {
-    id: "bubble",
-    title: "The Bubble",
-    eyebrow: "Campus Pulse",
-    desc: "A student-first feed for housing tips, local deals, and what's happening around Guelph so the app feels useful even before you sign a lease.",
-    accent: "#2EC4B6",
-    bg: "rgba(46,196,182,0.10)",
-    bullets: ["Housing tips", "Campus news", "Student deals"],
+    id: "roommates",
+    title: "Roommate Matching",
+    eyebrow: "Build Your Group",
+    desc: "Help students go from solo searchers to complete groups with compatibility cues, shareable invites, and a clearer path to filling a place.",
+    accent: "#4ADE80",
+    bg: "rgba(74,222,128,0.10)",
+    bullets: ["Compatibility cues", "Invite links", "Group discovery"],
   },
   {
     id: "marketplace",
@@ -70,13 +70,13 @@ const showcaseFeatures = [
     bullets: ["Buy & sell fast", "Move-in essentials", "No random middlemen"],
   },
   {
-    id: "roommates",
-    title: "Roommate Matching",
-    eyebrow: "Build Your Group",
-    desc: "Help students go from solo searchers to complete groups with compatibility cues, shareable invites, and a clearer path to filling a place.",
-    accent: "#4ADE80",
-    bg: "rgba(74,222,128,0.10)",
-    bullets: ["Compatibility cues", "Invite links", "Group discovery"],
+    id: "bubble",
+    title: "The Bubble",
+    eyebrow: "Campus Pulse",
+    desc: "A student-first feed for housing tips, local deals, and what's happening around Guelph so the app feels useful even before you sign a lease.",
+    accent: "#2EC4B6",
+    bg: "rgba(46,196,182,0.10)",
+    bullets: ["Housing tips", "Campus news", "Student deals"],
   },
 ] as const;
 
@@ -84,22 +84,132 @@ const showcaseFeatures = [
    Helper Components
    ════════════════════════════════════════════════════════ */
 
-function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
+const heroRotatingLines = ["Student housing,", "Your next cribb,", "Off-campus living,"];
+
+function RotatingHeadline() {
+  const [index, setIndex] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setIndex((i) => (i + 1) % heroRotatingLines.length), 3000);
+    return () => clearInterval(interval);
+  }, []);
+  return (
+    <span className="inline-block relative" style={{ height: "1.1em", verticalAlign: "top" }}>
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={heroRotatingLines[index]}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="inline-block"
+        >
+          {heroRotatingLines[index]}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+function useCountUp(target: number, duration: number, start: boolean) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!start) return;
+    let startTime: number | null = null;
+    let raf: number;
+    const step = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(eased * target));
+      if (progress < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration, start]);
+  return value;
+}
+
+function AnimatedScoreRing({ score, size = 120 }: { score: number; size?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-80px" });
+  const count = useCountUp(score, 1200, isInView);
   const sw = 8;
   const r = (size - sw) / 2;
   const c = 2 * Math.PI * r;
-  const progress = (score / 100) * c;
   return (
-    <div className="relative" style={{ width: size, height: size }}>
+    <div className="relative" style={{ width: size, height: size }} ref={ref}>
       <svg width={size} height={size} className="transform -rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(46,196,182,0.12)" strokeWidth={sw} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#2EC4B6" strokeWidth={sw} strokeDasharray={c} strokeDashoffset={c - progress} strokeLinecap="round" />
+        <motion.circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#2EC4B6" strokeWidth={sw}
+          strokeDasharray={c}
+          strokeLinecap="round"
+          initial={{ strokeDashoffset: c }}
+          animate={isInView ? { strokeDashoffset: c - (score / 100) * c } : { strokeDashoffset: c }}
+          transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
+        />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[#1B2D45]" style={{ fontSize: "36px", fontWeight: 900 }}>87</span>
-        <span className="text-[#2EC4B6]" style={{ fontSize: "11px", fontWeight: 600, marginTop: "-4px" }}>Great Match</span>
+        <span className="text-[#1B2D45]" style={{ fontSize: "36px", fontWeight: 900 }}>{count}</span>
+        <motion.span
+          className="text-[#2EC4B6]"
+          style={{ fontSize: "11px", fontWeight: 600, marginTop: "-4px" }}
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+          transition={{ delay: 1.0, duration: 0.4 }}
+        >
+          Great Match
+        </motion.span>
       </div>
     </div>
+  );
+}
+
+function AnimatedBar({ score, color, delay }: { score: number; color: string; delay: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-60px" });
+  return (
+    <div ref={ref} className="w-full h-2 rounded-full bg-[#1B2D45]/5 overflow-hidden">
+      <motion.div
+        className="h-full rounded-full"
+        style={{ backgroundColor: color }}
+        initial={{ width: "0%" }}
+        animate={isInView ? { width: `${score}%` } : { width: "0%" }}
+        transition={{ duration: 0.8, ease: "easeOut", delay }}
+      />
+    </div>
+  );
+}
+
+function AnimatedScoreNumber({ score, delay }: { score: number; delay: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-60px" });
+  const count = useCountUp(score, 800, isInView);
+  return (
+    <motion.span
+      ref={ref}
+      className="text-[#1B2D45]"
+      style={{ fontSize: "13px", fontWeight: 700 }}
+      initial={{ opacity: 0 }}
+      animate={isInView ? { opacity: 1 } : { opacity: 0 }}
+      transition={{ delay, duration: 0.3 }}
+    >
+      {count}
+    </motion.span>
+  );
+}
+
+function FadeUp({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.5, ease: "easeOut", delay }}
+      className={className}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -410,19 +520,6 @@ function ShowcaseVisual({ featureId }: { featureId: (typeof showcaseFeatures)[nu
               </div>
             ))}
           </div>
-          <div className="mt-4 rounded-[22px] bg-[#1B2D45] px-4 py-4 text-white">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div style={{ fontSize: "15px", fontWeight: 700 }}>Moving out? Sell your stuff before you leave.</div>
-                <div className="mt-1 text-white/55" style={{ fontSize: "12px", lineHeight: 1.6 }}>
-                  Makes Cribb useful beyond discovery and helps students finish the move, not just find the place.
-                </div>
-              </div>
-              <div className="rounded-xl bg-white/10 px-3 py-2 text-center" style={{ fontSize: "11px", fontWeight: 700 }}>
-                List in 60s
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -562,21 +659,37 @@ export default function HomePage() {
             {/* Left — copy */}
             <div className="max-w-[520px] shrink-0">
               <h1 className="text-[#1B2D45]" style={{ fontSize: "48px", fontWeight: 900, lineHeight: 1.1, letterSpacing: "-0.02em" }}>
-                Student housing,<br />finally done right.
+                <RotatingHeadline /><br />finally done right.
               </h1>
-              <p className="mt-5 text-[#1B2D45]/55 max-w-[480px]" style={{ fontSize: "16px", fontWeight: 400, lineHeight: 1.7 }}>
+              <motion.p
+                className="mt-5 text-[#1B2D45]/55 max-w-[480px]"
+                style={{ fontSize: "16px", fontWeight: 400, lineHeight: 1.7 }}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+              >
                 Find trusted, verified listings near University of Guelph. Real reviews, transparent pricing, and a Cribb Score on every listing so you never rent blind.
-              </p>
-              <div className="flex items-center gap-3 mt-8">
+              </motion.p>
+              <motion.div
+                className="flex items-center gap-3 mt-8"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+              >
                 <Link href="/browse" className="px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.35)" }}>
                   Browse Listings →
                 </Link>
                 <Link href="/landlord/login" className="px-7 py-3.5 rounded-xl border-2 border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 600 }}>
                   I&apos;m a Landlord →
                 </Link>
-              </div>
+              </motion.div>
               {/* Honest tagline */}
-              <div className="flex items-center gap-3 mt-8 flex-wrap">
+              <motion.div
+                className="flex items-center gap-3 mt-8 flex-wrap"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.7 }}
+              >
                 <div className="inline-flex items-center gap-2 bg-[#FAF8F4] border border-black/5 rounded-full px-4 py-1.5">
                   <span style={{ fontSize: "13px" }}>🎓</span>
                   <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Built by UofG students</span>
@@ -589,7 +702,7 @@ export default function HomePage() {
                   <span style={{ fontSize: "13px" }}>🔒</span>
                   <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Sign in with your @uoguelph.ca email</span>
                 </div>
-              </div>
+              </motion.div>
             </div>
 
             {/* Right — scrolling photo mosaic */}
@@ -653,14 +766,14 @@ export default function HomePage() {
       {/* ═══ 2. FEATURE SHOWCASE ══════════════════════════ */}
       <section className="bg-[#FAF8F4] py-24">
         <div className="max-w-[1200px] mx-auto px-6">
-          <div className="text-center">
+          <FadeUp className="text-center">
             <h2 className="text-[#1B2D45]" style={{ fontSize: "36px", fontWeight: 800, letterSpacing: "-0.02em" }}>
-              More than just listings.
+              More than just listings
             </h2>
             <p className="text-[#1B2D45]/60 mt-4 max-w-2xl mx-auto" style={{ fontSize: "16px", lineHeight: 1.7 }}>
               Cribb works best when it feels like your housing control center: compare options, stay plugged into student life, and handle everything around the move.
             </p>
-          </div>
+          </FadeUp>
 
           <div className="mt-14 grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -764,7 +877,7 @@ export default function HomePage() {
       <section className="bg-white">
         <div className="max-w-[1200px] mx-auto px-6 py-20">
           <div className="bg-white rounded-3xl border border-black/5 p-10 flex flex-col md:flex-row gap-10 md:gap-16 items-center shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <div className="flex-1 min-w-0">
+            <FadeUp className="flex-1 min-w-0">
               <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.2 }}>Every listing gets<br />a Cribb Score</h2>
               <p className="mt-4 text-[#1B2D45]/50 max-w-[440px]" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.7 }}>No more guessing. Every listing is scored 0-100 based on price, location, amenities, and real tenant reviews — so you can compare with confidence.</p>
               <div className="flex items-center gap-5 mt-7 flex-wrap">
@@ -773,12 +886,12 @@ export default function HomePage() {
                 <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#E71D36]" /><span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>&lt;65 Review Carefully</span></div>
               </div>
               <p className="mt-5 text-[#1B2D45]/35" style={{ fontSize: "12px", fontWeight: 400, fontStyle: "italic" }}>Scores update as tenant reviews come in. New listings are scored on property data alone.</p>
-            </div>
-            <div className="w-full md:w-[380px] shrink-0">
+            </FadeUp>
+            <FadeUp delay={0.2} className="w-full md:w-[380px] shrink-0">
               <div className="bg-white rounded-2xl border border-black/[0.06] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
-                <div className="flex justify-center mb-6"><ScoreRing score={87} size={120} /></div>
+                <div className="flex justify-center mb-6"><AnimatedScoreRing score={87} size={120} /></div>
                 <div className="space-y-3">
-                  {healthBreakdowns.map((b) => (
+                  {healthBreakdowns.map((b, i) => (
                     <div key={b.label}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
@@ -786,69 +899,45 @@ export default function HomePage() {
                           <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>{b.label}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{b.score}</span>
+                          <AnimatedScoreNumber score={b.score} delay={0.3 + i * 0.15} />
                         </div>
                       </div>
-                      <div className="w-full h-2 rounded-full bg-[#1B2D45]/5 overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${b.score}%`, backgroundColor: b.color }} />
-                      </div>
+                      <AnimatedBar score={b.score} color={b.color} delay={0.3 + i * 0.15} />
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
+            </FadeUp>
           </div>
         </div>
       </section>
 
-      {/* ═══ 4. BUILT BY STUDENTS ═════════════════════════ */}
-      <section style={{ backgroundColor: "#F5F0E8" }}>
-        <div className="max-w-[1200px] mx-auto px-6 py-20 text-center">
-          <h2 className="text-[#1B2D45] max-w-[600px] mx-auto" style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.25 }}>Built by students who got tired of the housing search.</h2>
-          <p className="mt-4 text-[#1B2D45]/50 max-w-[560px] mx-auto" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.7 }}>
-            We spent too long on sketchy sites, ghosted by landlords, and signing leases we didn&apos;t understand. So we built cribb — the platform we wish existed in first year.
-          </p>
-          <div className="flex items-center justify-center gap-12 mt-10">
-            {founders.map((f) => (
-              <div key={f.name} className="flex flex-col items-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={f.image} alt={f.name} className="w-20 h-20 rounded-full object-cover border-[3px] border-white shadow-sm" />
-                <span className="mt-3 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>{f.name}</span>
-                <span className="text-[#1B2D45]/45" style={{ fontSize: "12px", fontWeight: 400 }}>{f.program}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 inline-flex items-center gap-2 bg-white/60 border border-black/5 rounded-full px-4 py-1.5">
-            <span style={{ fontSize: "13px" }}>🎓</span>
-            <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>University of Guelph</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ 6. DEMAND BOARD PREVIEW ══════════════════════ */}
+      {/* ═══ 5. DEMAND BOARD PREVIEW ══════════════════════ */}
       <section className="max-w-[1200px] mx-auto px-6 py-20">
-        <div className="text-center mb-10">
+        <FadeUp className="text-center mb-10">
           <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800 }}>Students are looking for housing right now</h2>
           <p className="text-[#1B2D45]/50 mt-2" style={{ fontSize: "15px", fontWeight: 400 }}>Post what you need on the Demand Board — let landlords come to you.</p>
-        </div>
+        </FadeUp>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {demands.map((d) => (
-            <div key={d.id} className="bg-white rounded-2xl border border-black/[0.06] p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[#FF6B35]" style={{ fontSize: "17px", fontWeight: 700 }}>{d.budget}</span>
-                <span className="bg-[#1B2D45]/[0.06] text-[#1B2D45]/60 px-2.5 py-1 rounded-lg" style={{ fontSize: "11px", fontWeight: 600 }}>{d.moveIn}</span>
+          {demands.map((d, i) => (
+            <FadeUp key={d.id} delay={i * 0.1}>
+              <div className="bg-white rounded-2xl border border-black/[0.06] p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-shadow">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[#FF6B35]" style={{ fontSize: "17px", fontWeight: 700 }}>{d.budget}</span>
+                  <span className="bg-[#1B2D45]/[0.06] text-[#1B2D45]/60 px-2.5 py-1 rounded-lg" style={{ fontSize: "11px", fontWeight: 600 }}>{d.moveIn}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {d.tags.map((tag) => (
+                    <span key={tag} className="bg-[#FF6B35]/[0.08] text-[#FF6B35] px-2.5 py-0.5 rounded-full border border-[#FF6B35]/[0.12]" style={{ fontSize: "11px", fontWeight: 500 }}>{tag}</span>
+                  ))}
+                </div>
+                <p className="text-[#1B2D45]/50 mb-4" style={{ fontSize: "13px", fontWeight: 400, lineHeight: 1.6 }}>{d.desc}</p>
+                <div className="flex items-center gap-2 pt-3 border-t border-black/5">
+                  <div className="w-6 h-6 rounded-full bg-[#1B2D45]/[0.08] flex items-center justify-center"><User className="w-3 h-3 text-[#1B2D45]/40" /></div>
+                  <span className="text-[#1B2D45]/40" style={{ fontSize: "11px", fontWeight: 500 }}>{d.student}</span>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {d.tags.map((tag) => (
-                  <span key={tag} className="bg-[#FF6B35]/[0.08] text-[#FF6B35] px-2.5 py-0.5 rounded-full border border-[#FF6B35]/[0.12]" style={{ fontSize: "11px", fontWeight: 500 }}>{tag}</span>
-                ))}
-              </div>
-              <p className="text-[#1B2D45]/50 mb-4" style={{ fontSize: "13px", fontWeight: 400, lineHeight: 1.6 }}>{d.desc}</p>
-              <div className="flex items-center gap-2 pt-3 border-t border-black/5">
-                <div className="w-6 h-6 rounded-full bg-[#1B2D45]/[0.08] flex items-center justify-center"><User className="w-3 h-3 text-[#1B2D45]/40" /></div>
-                <span className="text-[#1B2D45]/40" style={{ fontSize: "11px", fontWeight: 500 }}>{d.student}</span>
-              </div>
-            </div>
+            </FadeUp>
           ))}
         </div>
         <div className="text-center mt-8">
@@ -856,15 +945,49 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ═══ 6. BUILT BY STUDENTS ═════════════════════════ */}
+      <section style={{ backgroundColor: "#F5F0E8" }}>
+        <div className="max-w-[1200px] mx-auto px-6 py-20 text-center">
+          <FadeUp>
+            <h2 className="text-[#1B2D45] max-w-[600px] mx-auto" style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.25 }}>Built by students who got tired of the housing search.</h2>
+            <p className="mt-4 text-[#1B2D45]/50 max-w-[560px] mx-auto" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.7 }}>
+              We spent too long on sketchy sites, ghosted by landlords, and signing leases we didn&apos;t understand. So we built cribb — the platform we wish existed in first year.
+            </p>
+          </FadeUp>
+          <FadeUp delay={0.2}>
+            <div className="flex items-center justify-center gap-12 mt-10">
+              {founders.map((f) => (
+                <div key={f.name} className="flex flex-col items-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.image} alt={f.name} className="w-20 h-20 rounded-full object-cover border-[3px] border-white shadow-sm" />
+                  <span className="mt-3 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>{f.name}</span>
+                  <span className="text-[#1B2D45]/45" style={{ fontSize: "12px", fontWeight: 400 }}>{f.program}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 inline-flex items-center gap-2 bg-white/60 border border-black/5 rounded-full px-4 py-1.5">
+              <span style={{ fontSize: "13px" }}>🎓</span>
+              <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>University of Guelph</span>
+            </div>
+          </FadeUp>
+        </div>
+      </section>
+
       {/* ═══ 7. POPULAR LISTINGS ══════════════════════════ */}
       <section className="bg-[#FAF8F4]">
         <div className="max-w-[1200px] mx-auto px-6 py-20">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800 }}>Popular near campus 🔥</h2>
-            <Link href="/browse" className="text-[#FF6B35] hover:underline" style={{ fontSize: "14px", fontWeight: 600 }}>See all →</Link>
-          </div>
+          <FadeUp>
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800 }}>Popular near campus 🔥</h2>
+              <Link href="/browse" className="text-[#FF6B35] hover:underline" style={{ fontSize: "14px", fontWeight: 600 }}>See all →</Link>
+            </div>
+          </FadeUp>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {popularListings.map((listing) => <ListingPreviewCard key={listing.id} listing={listing} />)}
+            {popularListings.map((listing, i) => (
+              <FadeUp key={listing.id} delay={i * 0.1}>
+                <ListingPreviewCard listing={listing} />
+              </FadeUp>
+            ))}
           </div>
         </div>
       </section>

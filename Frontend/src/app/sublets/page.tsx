@@ -2,14 +2,22 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import {
-  Heart, Check, ChevronRight, SlidersHorizontal, X, ArrowRight, ChevronDown,
+  Heart, Check, ChevronRight, X, ArrowRight, ChevronDown, Plus,
   Sparkles, ExternalLink, Minus, MapPin, DollarSign, Clock, ShieldCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
+import { SearchAndFilters } from "@/components/browse/SearchAndFilters";
 import { getScoreColor, formatPrice } from "@/lib/utils";
+import {
+  PROXIMITY_FILTER_OPTIONS,
+  type ProximityFilterKey,
+  getMaxWalkForProximityFilter,
+  getProximityLabel,
+} from "@/lib/proximity";
+import { buildStaticMapUrl, GUELPH_CENTER, projectLngLatToContainer } from "@/lib/mapbox";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSavedStore } from "@/lib/saved-store";
@@ -479,6 +487,7 @@ function SubletFiltersModal({
   const isMobile = useIsMobile();
   const [start, end] = selectedRange;
   const monthLabel = `${MONTHS[start]}-${MONTHS[end]}`;
+  const proximityFilterKeys = PROXIMITY_FILTER_OPTIONS.map((option) => option.key);
 
   return (
     <AnimatePresence>
@@ -534,11 +543,41 @@ function SubletFiltersModal({
               </div>
 
               <div>
+                <div className="text-[#1B2D45] mb-2" style={{ fontSize: "13px", fontWeight: 700 }}>
+                  Campus Proximity
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {PROXIMITY_FILTER_OPTIONS.map((option) => {
+                    const active = option.key === "any_distance"
+                      ? !activeFilters.some((filter) => proximityFilterKeys.includes(filter as ProximityFilterKey))
+                      : activeFilters.includes(option.key);
+                    return (
+                      <button
+                        key={option.key}
+                        onClick={() => onToggleFilter(option.key)}
+                        className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
+                          active
+                            ? "border-[#2EC4B6]/30 bg-[#2EC4B6]/[0.08] text-[#2EC4B6]"
+                            : "border-black/[0.06] text-[#1B2D45]/55 hover:border-[#2EC4B6]/20 hover:text-[#2EC4B6]"
+                        }`}
+                        style={{ fontSize: "12px", fontWeight: active ? 700 : 500 }}
+                      >
+                        <div>{option.label}</div>
+                        <div className="mt-0.5 text-current/70" style={{ fontSize: "10px", fontWeight: 500 }}>
+                          {option.description}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
                     Amenities & Match Filters
                   </div>
-                  {activeFilters.length > 0 && (
+                  {activeFilters.filter((filter) => !proximityFilterKeys.includes(filter as ProximityFilterKey)).length > 0 && (
                     <button
                       onClick={onClear}
                       className="text-[#FF6B35] hover:text-[#e55e2e]"
@@ -643,6 +682,8 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
   const scoreColor = getScoreColor(listing.healthScore);
   const scoreLabel = getScoreLabel(listing.healthScore);
   const isSaved = hasListingId ? saved : savedFallback;
+  const walkMinutes = parseSubletWalkTime(listing.walkTime);
+  const proximity = getProximityLabel(walkMinutes);
 
   const handleSaveClick = useCallback(async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -677,12 +718,16 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
       <TapeStrip side="left" rotation={-8} />
       <TapeStrip side="right" rotation={6} />
 
-      <Link href={`/sublets/${listing.id}`} className="bg-white rounded-sm overflow-hidden cursor-pointer hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-shadow block" style={{ padding: "8px 8px 14px 8px", boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)" }}>
+      <Link href={`/sublets/${listing.id}`} className="bg-white rounded-sm overflow-hidden cursor-pointer hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] transition-shadow block" style={{ padding: "10px 10px 18px 10px", boxShadow: "0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)" }}>
         {/* Image area */}
-        <div className="relative rounded-sm overflow-hidden" style={{ height: isMobile ? "130px" : "150px" }}>
-          <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.15) 0%, rgba(46,196,182,0.15) 100%)" }}>
-            <span style={{ fontSize: "36px", opacity: 0.3 }}>☀️</span>
-          </div>
+        <div className="relative rounded-sm overflow-hidden" style={{ height: isMobile ? "138px" : "176px" }}>
+          {listing.coverImage ? (
+            <img src={listing.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.15) 0%, rgba(46,196,182,0.15) 100%)" }}>
+              <span style={{ fontSize: "36px", opacity: 0.3 }}>☀️</span>
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
 
           {/* Score + discount */}
@@ -713,14 +758,14 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
         </div>
 
         {/* Content */}
-        <div className="pt-3 px-1">
-          <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.title}</h3>
-          <p className="text-[#1B2D45]/40 truncate mt-0.5" style={{ fontSize: "11px", fontWeight: 400 }}>{listing.street}</p>
+        <div className="px-3 pt-4 pb-3">
+          <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "15px", fontWeight: 700 }}>{listing.title}</h3>
+          <p className="text-[#1B2D45]/40 truncate mt-1" style={{ fontSize: "11px", fontWeight: 400 }}>{listing.street}</p>
 
           <AvailabilityTimeline months={listing.availableMonths} selectedRange={selectedRange} />
 
           {/* Price */}
-          <div className="flex items-baseline gap-2 mt-2.5">
+          <div className="flex items-baseline gap-2 mt-3">
             <span className="text-[#FF6B35]" style={{ fontSize: "22px", fontWeight: 800 }}>
               ${listing.subletPrice}<span style={{ fontSize: "12px", fontWeight: 500 }}>/mo</span>
             </span>
@@ -728,21 +773,24 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
           </div>
 
           {/* Flexibility badges */}
-          <div className="flex flex-wrap gap-1.5 mt-2">
+          <div className="flex flex-wrap gap-2 mt-2.5">
+            <span className="px-2.5 py-1 rounded-full" style={{ fontSize: "10px", fontWeight: 600, color: proximity.color, background: proximity.bg }}>
+              {proximity.emoji} {proximity.label}
+            </span>
             {listing.negotiablePrice && (
-              <span className="px-2 py-0.5 rounded-full border" style={{ fontSize: "9px", fontWeight: 600, background: "rgba(46,196,182,0.08)", borderColor: "rgba(46,196,182,0.2)", color: "#2EC4B6" }}>💬 Price Negotiable</span>
+              <span className="px-2.5 py-1 rounded-full border" style={{ fontSize: "10px", fontWeight: 600, background: "rgba(46,196,182,0.08)", borderColor: "rgba(46,196,182,0.2)", color: "#2EC4B6" }}>💬 Price Negotiable</span>
             )}
             {listing.flexibleDates && (
-              <span className="px-2 py-0.5 rounded-full border" style={{ fontSize: "9px", fontWeight: 600, background: "rgba(255,182,39,0.08)", borderColor: "rgba(255,182,39,0.2)", color: "#D4990F" }}>📅 Flexible Dates</span>
+              <span className="px-2.5 py-1 rounded-full border" style={{ fontSize: "10px", fontWeight: 600, background: "rgba(255,182,39,0.08)", borderColor: "rgba(255,182,39,0.2)", color: "#D4990F" }}>📅 Flexible Dates</span>
             )}
             {listing.furnished && (
-              <span className="px-2 py-0.5 rounded-full border" style={{ fontSize: "9px", fontWeight: 600, background: "rgba(27,45,69,0.06)", borderColor: "rgba(27,45,69,0.12)", color: "#1B2D45" }}>🛋️ Furnished</span>
+              <span className="px-2.5 py-1 rounded-full border" style={{ fontSize: "10px", fontWeight: 600, background: "rgba(27,45,69,0.06)", borderColor: "rgba(27,45,69,0.12)", color: "#1B2D45" }}>🛋️ Furnished</span>
             )}
           </div>
 
           {/* Roommate info */}
           {listing.roommatesStaying !== null && listing.roommatesStaying > 0 && (
-            <div className="mt-2.5 rounded-lg px-3 py-2" style={{ background: "rgba(27,45,69,0.04)" }}>
+            <div className="mt-3 rounded-lg px-3 py-2.5" style={{ background: "rgba(27,45,69,0.04)" }}>
               <div className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>
                 🏠 {listing.roommatesStaying} roommate{listing.roommatesStaying > 1 ? "s" : ""} staying
               </div>
@@ -751,16 +799,16 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
           )}
 
           {/* Meta */}
-          <div className="flex flex-wrap gap-1.5 mt-2.5">
-            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>📍 {listing.distance}</span>
-            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>🚶 {listing.walkTime}</span>
-            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>{listing.bedsAvailable}/{listing.bedsTotal} beds</span>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>📍 {listing.distance}</span>
+            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>🚶 {listing.walkTime}</span>
+            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>{listing.bedsAvailable}/{listing.bedsTotal} beds</span>
           </div>
 
           {/* Amenities */}
-          <div className="flex flex-wrap gap-1 mt-2">
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
             {listing.amenities.map((a) => (
-              <span key={a} className="px-2 py-0.5 rounded border border-black/[0.04] text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 500 }}>{a}</span>
+              <span key={a} className="px-2.5 py-1 rounded border border-black/[0.04] text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 500 }}>{a}</span>
             ))}
           </div>
 
@@ -768,19 +816,19 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
           {onTogglePin && (
             <button
               onClick={(e) => { e.preventDefault(); onTogglePin(listing.id); }}
-              className={`mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-all active:scale-[0.97] ${
+              className={`mt-4 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-all active:scale-[0.97] ${
                 isPinned
                   ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
                   : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]/60"
               }`}
-              style={{ fontSize: "10px", fontWeight: 600 }}
+              style={{ fontSize: "11px", fontWeight: 600 }}
             >
               📌 {isPinned ? "Pinned" : "Pin to board"}
             </button>
           )}
 
           {/* Bottom bar */}
-          <div className="mt-3 pt-2.5 border-t border-black/[0.04] flex items-center justify-between">
+          <div className="mt-4 pt-3 border-t border-black/[0.04] flex items-center justify-between">
             <span className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 500 }}>👁 {listing.views} viewed · ❤️ {listing.saves} saved</span>
             <span style={{ fontSize: "10px", fontWeight: 700, color: scoreColor }}>{scoreLabel}</span>
           </div>
@@ -1087,8 +1135,12 @@ function SubletPickCard({ listing, onRemove }: { listing: SubletListing; onRemov
       exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
       className="flex items-center gap-3 bg-[#FAF8F4] rounded-xl px-3 py-2 shrink-0 border border-black/[0.04]"
     >
-      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center shrink-0">
-        <span style={{ fontSize: "14px" }}>🏠</span>
+      <div className="w-10 h-10 rounded-lg overflow-hidden bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center shrink-0">
+        {listing.coverImage ? (
+          <img src={listing.coverImage} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span style={{ fontSize: "14px" }}>🏠</span>
+        )}
       </div>
       <div className="min-w-0">
         <Link
@@ -1229,43 +1281,84 @@ function SubletPicksTray({ picks, onRemove, onCompare, showSheet, onCloseSheet }
 
 function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { listing: SubletListing; selectedRange: [number, number]; isPinned?: boolean; onTogglePin?: (id: string) => void }) {
   const discount = Math.round(((listing.originalPrice - listing.subletPrice) / listing.originalPrice) * 100);
-  const scoreColor = getScoreColor(listing.healthScore);
+  const walkMinutes = parseSubletWalkTime(listing.walkTime);
+  const proximity = getProximityLabel(walkMinutes);
 
   return (
-    <Link href={`/sublets/${listing.id}`} className="bg-white rounded-xl border border-black/[0.04] overflow-hidden hover:shadow-md hover:border-[#FF6B35]/15 transition-all group block">
-      {/* Image placeholder */}
-      <div className="h-[130px] bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center relative">
-        <span style={{ fontSize: "28px" }}>🏠</span>
-        <div className="absolute top-2 left-2">
-          <ScoreRing score={listing.healthScore} size={30} />
+    <Link href={`/sublets/${listing.id}`} className="bg-white rounded-2xl border border-black/[0.06] overflow-hidden hover:shadow-[0_12px_28px_rgba(27,45,69,0.08)] hover:border-[#FF6B35]/15 transition-all group block">
+      {/* Image */}
+      <div className="h-[152px] bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center relative overflow-hidden">
+        {listing.coverImage ? (
+          <img src={listing.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <span style={{ fontSize: "30px" }}>🏠</span>
+        )}
+        <div className="absolute top-2.5 left-2.5">
+          <ScoreRing score={listing.healthScore} size={32} />
         </div>
         {discount > 0 && (
-          <div className="absolute top-2 right-2 bg-[#2EC4B6] text-white px-1.5 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 700 }}>
+          <div className="absolute top-2.5 right-2.5 bg-[#2EC4B6] text-white px-2 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 700 }}>
             ↓ {discount}%
           </div>
         )}
       </div>
-      <div className="p-3">
-        <h4 className="text-[#1B2D45] truncate" style={{ fontSize: "12px", fontWeight: 700 }}>{listing.title}</h4>
-        <p className="text-[#1B2D45]/30 truncate" style={{ fontSize: "10px" }}>{listing.street} · {listing.neighborhood}</p>
-        <div className="flex items-baseline gap-1.5 mt-1">
-          <span className="text-[#FF6B35]" style={{ fontSize: "16px", fontWeight: 800 }}>${listing.subletPrice}</span>
-          <span className="text-[#1B2D45]/20 line-through" style={{ fontSize: "10px" }}>${listing.originalPrice}</span>
-          <span className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>/mo</span>
+      <div className="p-4">
+        <h4 className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.title}</h4>
+        <p className="text-[#1B2D45]/30 truncate mt-0.5" style={{ fontSize: "11px" }}>{listing.street} · {listing.neighborhood}</p>
+        <div className="flex items-baseline gap-1.5 mt-2">
+          <span className="text-[#FF6B35]" style={{ fontSize: "19px", fontWeight: 800 }}>${listing.subletPrice}</span>
+          <span className="text-[#1B2D45]/20 line-through" style={{ fontSize: "11px" }}>${listing.originalPrice}</span>
+          <span className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>/mo</span>
         </div>
-        <div className="flex flex-wrap gap-1 mt-2">
-          {listing.furnished && <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>Furnished</span>}
-          <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>{listing.bedsAvailable} bed</span>
-          <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-1.5 py-0.5 rounded" style={{ fontSize: "8px", fontWeight: 500 }}>{listing.walkTime}</span>
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          <span className="px-2 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 600, color: proximity.color, background: proximity.bg }}>
+            {proximity.emoji} {proximity.label}
+          </span>
+          {listing.verified && <span className="bg-[#2EC4B6]/[0.10] text-[#2EC4B6] px-2 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 600 }}>Verified</span>}
+          {listing.furnished && <span className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>Furnished</span>}
+          {listing.flexibleDates && <span className="bg-[#FFB627]/[0.10] text-[#D4990F] px-2 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 600 }}>Flexible dates</span>}
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
+            📍 {listing.distance}
+          </div>
+          <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
+            🚶 {listing.walkTime}
+          </div>
+          <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
+            🛏 {listing.bedsAvailable}/{listing.bedsTotal} beds
+          </div>
+          <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
+            {listing.posterIsStudent ? "🎓 Student post" : "🏢 Managed post"}
+          </div>
+        </div>
+        {listing.roommatesStaying !== null && (
+          <div className="mt-3 rounded-xl border border-black/[0.05] bg-white px-3 py-2.5 text-[#1B2D45]/60" style={{ fontSize: "10px", fontWeight: 600 }}>
+            {listing.roommatesStaying > 0
+              ? `🏠 ${listing.roommatesStaying} roommate${listing.roommatesStaying > 1 ? "s" : ""} staying`
+              : "🏠 Entire place available"}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {listing.amenities.slice(0, 2).map((amenity) => (
+            <span key={amenity} className="bg-[#1B2D45]/5 text-[#1B2D45]/40 px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 500 }}>
+              {amenity}
+            </span>
+          ))}
+          {listing.negotiablePrice && (
+            <span className="bg-[#2EC4B6]/[0.08] text-[#2EC4B6] px-2 py-0.5 rounded" style={{ fontSize: "9px", fontWeight: 600 }}>
+              Negotiable
+            </span>
+          )}
         </div>
         {/* Availability mini-bar */}
-        <div className="flex gap-0.5 mt-2">
+        <div className="flex gap-0.5 mt-3">
           {MONTHS.map((m, idx) => (
             <div key={m} className="flex-1 h-1.5 rounded-full" style={{ background: listing.availableMonths[idx] ? (idx >= selectedRange[0] && idx <= selectedRange[1] ? "#FF6B35" : "#FF6B35" + "40") : "#e5e5e5" }} />
           ))}
         </div>
         {onTogglePin && (
-          <button onClick={(e) => { e.preventDefault(); onTogglePin(listing.id); }} className={`mt-2 w-full py-1.5 rounded-lg border text-center transition-all active:scale-[0.97] ${isPinned ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/30 hover:border-[#FF6B35]/20"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
+          <button onClick={(e) => { e.preventDefault(); onTogglePin(listing.id); }} className={`mt-3 w-full py-2 rounded-lg border text-center transition-all active:scale-[0.97] ${isPinned ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/30 hover:border-[#FF6B35]/20"}`} style={{ fontSize: "11px", fontWeight: 600 }}>
             📌 {isPinned ? "Pinned" : "Pin"}
           </button>
         )}
@@ -1280,9 +1373,9 @@ function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { lis
 
 function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { listings: SubletListing[]; pinnedIds: string[]; onTogglePin: (id: string) => void; selectedRange: [number, number] }) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstance = useRef<any>(null);
-  const [mapReady, setMapReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mapZoom, setMapZoom] = useState(13.8);
+  const [mapSize, setMapSize] = useState({ width: 960, height: 720 });
   const selectedSublet = listings.find((l) => l.id === selectedId);
 
   // Mock coords for sublets based on neighborhood
@@ -1298,105 +1391,188 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
   };
 
   useEffect(() => {
-    if (typeof window === "undefined" || !mapRef.current) return;
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    if (!token) return;
+    if (!mapRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setMapSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+    observer.observe(mapRef.current);
+    return () => observer.disconnect();
+  }, []);
 
-    let cancelled = false;
-
-    async function initMap() {
-      if (!document.querySelector('link[href*="mapbox-gl"]')) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css";
-        document.head.appendChild(link);
-      }
-
-      try {
-        const mapboxModule = await import("mapbox-gl");
-        const mapboxgl = (mapboxModule as any).default || mapboxModule;
-        if (cancelled) return;
-
-        (mapboxgl as any).accessToken = token;
-        const map = new (mapboxgl as any).Map({
-          container: mapRef.current!,
-          style: "mapbox://styles/mapbox/light-v11",
-          center: [-80.2262, 43.5305],
-          zoom: 14,
-          attributionControl: false,
-        });
-        map.addControl(new (mapboxgl as any).AttributionControl({ compact: true }), "bottom-left");
-
-        map.on("load", () => {
-          if (cancelled) return;
-
-          // Campus marker
-          const campusEl = document.createElement("div");
-          campusEl.innerHTML = '<div style="width:32px;height:32px;background:#1B2D45;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.2);">🎓</div>';
-          new (mapboxgl as any).Marker({ element: campusEl }).setLngLat([-80.2262, 43.5305])
-            .setPopup(new (mapboxgl as any).Popup({ offset: 20, closeButton: false }).setHTML('<div style="font-size:12px;font-weight:600;padding:2px 4px;">University of Guelph</div>'))
-            .addTo(map);
-
-          // Sublet pins
-          listings.forEach((sublet) => {
-            const coords = subletCoords[sublet.id];
-            if (!coords) return;
-            const el = document.createElement("div");
-            el.innerHTML = '<div style="background:white;border-radius:20px;padding:4px 10px;font-size:13px;font-weight:800;color:#2EC4B6;box-shadow:0 2px 12px rgba(0,0,0,0.15);border:2px solid #2EC4B6;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#2EC4B6;display:inline-block;"></span>$' + sublet.subletPrice + '</div>';
-            el.addEventListener("click", () => setSelectedId(sublet.id));
-            new (mapboxgl as any).Marker({ element: el }).setLngLat([coords.lng, coords.lat]).addTo(map);
-          });
-
-          setMapReady(true);
-        });
-
-        mapInstance.current = map;
-      } catch (err) {
-        console.error("Sublet map failed:", err);
-      }
+  useEffect(() => {
+    if (!selectedId && listings.length > 0) {
+      setSelectedId(listings[0].id);
     }
+  }, [listings, selectedId]);
 
-    initMap();
-    return () => { cancelled = true; if (mapInstance.current) { try { mapInstance.current.remove(); } catch {} mapInstance.current = null; } };
-  }, [listings]);
+  const staticMapUrl = useMemo(() => buildStaticMapUrl({
+    center: GUELPH_CENTER,
+    zoom: mapZoom,
+    width: mapSize.width,
+    height: mapSize.height,
+  }), [mapSize.height, mapSize.width, mapZoom]);
+
+  const markerPoints = useMemo(() => {
+    return listings.map((sublet) => {
+      const coords = subletCoords[sublet.id];
+      if (!coords) return null;
+      const point = projectLngLatToContainer({
+        lat: coords.lat,
+        lng: coords.lng,
+        center: GUELPH_CENTER,
+        zoom: mapZoom,
+        width: mapSize.width,
+        height: mapSize.height,
+      });
+      return { sublet, point };
+    }).filter(Boolean) as { sublet: SubletListing; point: { x: number; y: number } }[];
+  }, [listings, mapSize.height, mapSize.width, mapZoom]);
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4">
-      <div className="relative w-full rounded-2xl overflow-hidden border border-black/[0.04]" style={{ height: "500px" }}>
-        <div ref={mapRef} className="w-full h-full" />
+    <div className="max-w-[1440px] mx-auto px-4 md:px-6 py-4 md:py-5">
+      <div
+        className="overflow-hidden rounded-[28px] border border-black/[0.06] bg-white xl:h-[calc(100vh-190px)]"
+        style={{ boxShadow: "0 22px 55px rgba(27,45,69,0.08)" }}
+      >
+        <div className="grid xl:h-full xl:grid-cols-[minmax(0,1.18fr)_430px]">
+          <div className="relative min-h-[54vh] bg-[#EEF5F4] xl:h-full">
+            <div ref={mapRef} className="absolute inset-0" />
+            {staticMapUrl ? (
+              <img src={staticMapUrl} alt="Guelph sublet map" className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,#EEF5F4_0%,#E4EFED_100%)]" />
+            )}
 
-        {/* Selected sublet card */}
-        {selectedSublet && (
-          <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[300px] z-[10] bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.15)] p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <Link href={`/sublets/${selectedSublet.id}`} className="hover:underline">
-                  <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{selectedSublet.title}</h3>
-                </Link>
-                <p className="text-[#1B2D45]/40 truncate" style={{ fontSize: "11px" }}>{selectedSublet.street}</p>
+            <div className="absolute left-4 top-4 z-[10] rounded-2xl bg-white/92 backdrop-blur-sm px-4 py-3 shadow-md">
+              <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>
+                Summer sublets
               </div>
-              <button onClick={() => setSelectedId(null)} className="ml-2 w-6 h-6 rounded-full bg-[#1B2D45]/5 flex items-center justify-center shrink-0">
-                <X className="w-3 h-3 text-[#1B2D45]/40" />
-              </button>
+              <div className="mt-1 text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 600 }}>
+                {listings.length} sublets · {MONTHS[selectedRange[0]]} to {MONTHS[selectedRange[1]]}
+              </div>
             </div>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-[#2EC4B6]" style={{ fontSize: "20px", fontWeight: 800 }}>${selectedSublet.subletPrice}<span className="text-[#1B2D45]/30" style={{ fontSize: "11px", fontWeight: 500 }}>/mo</span></span>
-              <span className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{selectedSublet.neighborhood}</span>
-            </div>
-            <div className="flex items-center gap-2 mt-3">
-              <Link href={`/sublets/${selectedSublet.id}`} className="flex-1 py-2 rounded-lg bg-[#2EC4B6] text-white text-center hover:bg-[#28b0a3]" style={{ fontSize: "12px", fontWeight: 600 }}>View Sublet</Link>
-              <button onClick={() => onTogglePin(selectedSublet.id)} className={`px-3 py-2 rounded-lg border flex items-center gap-1 ${pinnedIds.includes(selectedSublet.id) ? "border-[#2EC4B6]/30 bg-[#2EC4B6]/[0.08] text-[#2EC4B6]" : "border-black/[0.06] text-[#1B2D45]/40"}`} style={{ fontSize: "12px", fontWeight: 600 }}>
-                📌 {pinnedIds.includes(selectedSublet.id) ? "Pinned" : "Pin"}
-              </button>
-            </div>
-          </div>
-        )}
 
-        {!mapReady && (
-          <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center z-[5]">
-            <div className="animate-pulse w-10 h-10 rounded-full bg-[#2EC4B6]/20 mx-auto mb-3" />
+            <div className="absolute right-4 top-4 z-[10] flex flex-col gap-2">
+              <button onClick={() => setMapZoom((value) => Math.min(16.5, value + 0.8))} className="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
+                <Plus className="w-4 h-4 text-[#1B2D45]" />
+              </button>
+              <button onClick={() => setMapZoom((value) => Math.max(11.5, value - 0.8))} className="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
+                <Minus className="w-4 h-4 text-[#1B2D45]" />
+              </button>
+            </div>
+
+            <div className="absolute inset-0 z-[5]">
+              <div
+                className="absolute flex items-center justify-center rounded-full border-[3px] border-white bg-[#1B2D45] shadow-[0_3px_12px_rgba(0,0,0,0.2)]"
+                style={{ width: 36, height: 36, left: "50%", top: "50%", transform: "translate(-50%, -50%)" }}
+              >
+                <span style={{ fontSize: "16px" }}>🎓</span>
+              </div>
+
+              {markerPoints.map(({ sublet, point }) => {
+                const isSelected = selectedSublet?.id === sublet.id;
+                return (
+                  <button
+                    key={sublet.id}
+                    onClick={() => setSelectedId(sublet.id)}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#2EC4B6] bg-white px-3 py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
+                    style={{
+                      left: point.x,
+                      top: point.y,
+                      transform: `translate(-50%, -50%) scale(${isSelected ? 1.08 : 1})`,
+                      background: isSelected ? "#1B2D45" : "white",
+                      zIndex: isSelected ? 8 : 6,
+                    }}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block h-2 w-2 rounded-full bg-[#2EC4B6]" />
+                      <span style={{ fontSize: "12px", fontWeight: 800, color: isSelected ? "white" : "#2EC4B6" }}>
+                        ${sublet.subletPrice}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
           </div>
-        )}
+
+          <div className="min-h-[46vh] border-t xl:h-full xl:border-t-0 xl:border-l border-black/[0.06] bg-[#FCFBF8] flex flex-col overflow-hidden">
+            <div className="px-5 py-4 border-b border-black/[0.06] bg-white/92 backdrop-blur-sm">
+              <div className="text-[#1B2D45]/45" style={{ fontSize: "12px", fontWeight: 700 }}>
+                Home • ON • Guelph
+              </div>
+              <h2 className="mt-1 text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.02em" }}>
+                {listings.length} sublets found
+              </h2>
+              <p className="mt-1 text-[#1B2D45]/42" style={{ fontSize: "12px" }}>
+                Compare summer options by price, walk time, and setup.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              {listings.map((listing) => {
+                const proximity = getProximityLabel(parseSubletWalkTime(listing.walkTime));
+                const isSelected = selectedSublet?.id === listing.id;
+                return (
+                  <div
+                    key={listing.id}
+                    onClick={() => setSelectedId(listing.id)}
+                    className={`rounded-2xl border bg-white overflow-hidden cursor-pointer transition-all ${
+                      isSelected
+                        ? "border-[#2EC4B6]/35 shadow-[0_12px_28px_rgba(46,196,182,0.12)]"
+                        : "border-black/[0.06] hover:border-[#1B2D45]/12 hover:shadow-[0_10px_24px_rgba(27,45,69,0.08)]"
+                    }`}
+                  >
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "15px", fontWeight: 800 }}>{listing.title}</h3>
+                          <div className="flex items-center gap-1.5 mt-1 text-[#1B2D45]/40 min-w-0">
+                            <MapPin className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate" style={{ fontSize: "11px", fontWeight: 500 }}>{listing.street}</span>
+                          </div>
+                        </div>
+                        <ScoreRing score={listing.healthScore} size={40} />
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-3 flex-wrap">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full border"
+                          style={{ fontSize: "10px", fontWeight: 700, color: proximity.color, background: proximity.bg, borderColor: `${proximity.color}22` }}
+                        >
+                          <span>{proximity.emoji}</span>
+                          <span>{proximity.label}</span>
+                        </span>
+                        <span className="text-[#1B2D45]/42" style={{ fontSize: "11px", fontWeight: 600 }}>{listing.walkTime} walk</span>
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-3 text-[#1B2D45]/52 flex-wrap" style={{ fontSize: "11px", fontWeight: 600 }}>
+                        <span>{listing.bedsAvailable}/{listing.bedsTotal} beds</span>
+                        <span>{listing.neighborhood}</span>
+                        <span>{listing.posterType}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-4">
+                        <Link href={`/sublets/${listing.id}`} className="flex-1 py-2 rounded-xl bg-[#2EC4B6] text-white text-center hover:bg-[#28b0a3]" style={{ fontSize: "12px", fontWeight: 700 }}>
+                          View sublet
+                        </Link>
+                        <button onClick={(e) => { e.stopPropagation(); onTogglePin(listing.id); }} className={`px-3 py-2 rounded-xl border flex items-center gap-1 ${pinnedIds.includes(listing.id) ? "border-[#2EC4B6]/30 bg-[#2EC4B6]/[0.08] text-[#2EC4B6]" : "border-black/[0.06] text-[#1B2D45]/40"}`} style={{ fontSize: "12px", fontWeight: 700 }}>
+                          📌 {pinnedIds.includes(listing.id) ? "Pinned" : "Pin"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1413,15 +1589,24 @@ export default function SubletsPage() {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState<[number, number]>([4, 6]); // May-Jul default (summer feel)
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<SubletViewMode>("board");
   const [showPicksSheet, setShowPicksSheet] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
 
   const handleListClick = () => setShowListForm((prev) => !prev);
+  const proximityFilterKeys = PROXIMITY_FILTER_OPTIONS.map((option) => option.key);
 
   const toggleFilter = (key: string) => {
-    setActiveFilters((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]);
+    setActiveFilters((prev) => {
+      if (proximityFilterKeys.includes(key as ProximityFilterKey)) {
+        const withoutProximity = prev.filter((k) => !proximityFilterKeys.includes(k as ProximityFilterKey));
+        if (key === "any_distance") return withoutProximity;
+        return prev.includes(key) ? withoutProximity : [...withoutProximity, key];
+      }
+      return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
+    });
   };
   const clearFilters = () => setActiveFilters([]);
 
@@ -1432,6 +1617,10 @@ export default function SubletsPage() {
   const pinnedListings = useMemo(() => subletListings.filter((l) => pinnedIds.includes(l.id)), [pinnedIds]);
 
   const filteredListings = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const activeProximityFilter = activeFilters.find((key) => proximityFilterKeys.includes(key as ProximityFilterKey)) as ProximityFilterKey | undefined;
+    const maxWalk = getMaxWalkForProximityFilter(activeProximityFilter);
+
     return subletListings.filter((listing) => {
       const [start, end] = selectedRange;
       let hasOverlap = false;
@@ -1445,9 +1634,21 @@ export default function SubletsPage() {
       if (activeFilters.includes("private") && listing.roommatesStaying === null) return false;
       if (activeFilters.includes("entire") && listing.roommatesStaying !== null) return false;
       if (activeFilters.includes("parking") && !listing.amenities.includes("Parking")) return false;
+      if (maxWalk !== undefined) {
+        const walkMinutes = parseSubletWalkTime(listing.walkTime);
+        if (walkMinutes == null || walkMinutes > maxWalk) return false;
+      }
+      if (normalizedQuery) {
+        const haystack = [
+          listing.title,
+          listing.street,
+          listing.neighborhood,
+        ].join(" ").toLowerCase();
+        if (!haystack.includes(normalizedQuery)) return false;
+      }
       return true;
     });
-  }, [selectedRange, activeFilters]);
+  }, [selectedRange, activeFilters, searchQuery, proximityFilterKeys]);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -1468,46 +1669,24 @@ export default function SubletsPage() {
       <InsightStats />
       <ListSubletForm visible={showListForm} />
       <DateRangeSelector selectedRange={selectedRange} onChange={setSelectedRange} />
+      <SearchAndFilters
+        onSearchChange={setSearchQuery}
+        onOpenFilters={() => setShowFiltersModal(true)}
+        activeFilterCount={activeFilters.length}
+        placeholder="Search by street, neighborhood..."
+      />
 
-      {/* View toggle + filter bar */}
-      <div className="max-w-[1200px] mx-auto px-4 md:px-6 pb-3 flex items-center justify-between gap-3">
+      {/* Results meta + view toggle */}
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 flex-wrap flex-1">
-          <motion.button
-            onClick={() => setShowFiltersModal(true)}
-            className="relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border bg-white text-[#1B2D45]/60 hover:border-[#FF6B35]/20 hover:text-[#FF6B35] transition-all"
-            style={{ fontSize: "12px", fontWeight: 600 }}
-            whileTap={{ scale: 0.97 }}
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            Filters
-            {activeFilters.length > 0 && (
-              <span
-                className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#FF6B35] text-white flex items-center justify-center"
-                style={{ fontSize: "10px", fontWeight: 700 }}
-              >
-                {activeFilters.length}
-              </span>
-            )}
-          </motion.button>
-
-          {filterOptions.map((f) => {
-            const active = activeFilters.includes(f.key);
-            return (
-              <button key={f.key} onClick={() => toggleFilter(f.key)} className={`px-3 py-1.5 rounded-full border transition-all ${active ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]"} ${isMobile ? "hidden sm:inline-flex" : ""}`} style={{ fontSize: "12px", fontWeight: active ? 600 : 500 }}>
-                {f.label}
-              </button>
-            );
-          })}
-          {isMobile && activeFilters.length > 0 && (
-            <button
-              onClick={clearFilters}
-              className="px-3 py-1.5 rounded-full border border-black/[0.06] text-[#1B2D45]/40 hover:text-[#E71D36] hover:border-[#E71D36]/15 transition-all"
-              style={{ fontSize: "12px", fontWeight: 500 }}
-            >
-              Clear
-            </button>
+          <span className="text-[#1B2D45]/35" style={{ fontSize: "12px", fontWeight: 600 }}>
+            {filteredListings.length} available
+          </span>
+          {activeFilters.length > 0 && (
+            <span className="rounded-full bg-white px-3 py-1.5 text-[#1B2D45]/45 border border-black/[0.06]" style={{ fontSize: "11px", fontWeight: 600 }}>
+              {activeFilters.length} filter{activeFilters.length !== 1 ? "s" : ""} active
+            </span>
           )}
-          <span className="text-[#1B2D45]/30 ml-1" style={{ fontSize: "12px", fontWeight: 500 }}>{filteredListings.length} available</span>
         </div>
         {/* View toggle */}
         <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0">
@@ -1567,7 +1746,7 @@ export default function SubletsPage() {
         </div>
       ) : viewMode === "grid" ? (
         <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
             {filteredListings.map((listing) => (
               <SubletGridCard key={listing.id} listing={listing} selectedRange={selectedRange} isPinned={pinnedIds.includes(listing.id)} onTogglePin={togglePin} />
             ))}

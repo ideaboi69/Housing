@@ -26,15 +26,15 @@ import type { ListingDetailResponse, ListingFilters } from "@/types";
 type ViewMode = "board" | "grid" | "map";
 
 const rotations = [
-  [-1.8, 1.2, -0.6],
-  [0.9, -1.5, 0.4],
-  [1.3, -0.8, 0.5],
+  [-1.2, 0.8, -0.4],
+  [0.7, -1.0, 0.3],
+  [0.9, -0.6, 0.35],
 ];
 
 const staggers = [
-  [0, 16, 6],
-  [10, 0, 8],
-  [4, 18, 0],
+  [0, 10, 4],
+  [6, 0, 8],
+  [3, 8, 0],
 ];
 
 /* ── Animated number ticker ─────────────────────── */
@@ -68,23 +68,6 @@ const viewVariants = {
   exit: { opacity: 0 },
 };
 
-const sectionVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.06 },
-  },
-};
-
-const sectionHeaderVariants = {
-  hidden: { opacity: 0, x: -12 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { type: "spring", stiffness: 260, damping: 22 },
-  },
-};
-
 export default function BrowsePage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -104,29 +87,31 @@ export default function BrowsePage() {
     setIsLoading(true);
     try {
       const data = await api.listings.browse(filterParams);
-      if (data && data.length > 0) {
-        setListings(data);
-        setUseMock(false);
-        // Fetch Cribb Scores — allSettled already handles rejections, no inner try-catch needed
-        const scoreResults = await Promise.allSettled(
-          data.map((l) => api.healthScores.get(l.id))
-        );
-        const scores: Record<number, number> = {};
-        scoreResults.forEach((result, i) => {
-          if (result.status === "fulfilled" && result.value?.overall_score) {
-            scores[data[i].id] = result.value.overall_score;
-          }
-        });
-        setHealthScores(scores);
-      } else {
+      if (!data || data.length === 0) {
         setListings(mockListings);
         setHealthScores(mockHealthScores);
         setUseMock(true);
+        return;
       }
+
+      setListings(data ?? []);
+      setUseMock(false);
+      const scoreResults = await Promise.allSettled(
+        data.map((l) => api.healthScores.get(l.id))
+      );
+      const scores: Record<number, number> = {};
+      scoreResults.forEach((result, i) => {
+        if (result.status === "fulfilled" && result.value?.overall_score != null) {
+          scores[data[i].id] = result.value.overall_score;
+        }
+      });
+      setHealthScores(Object.keys(scores).length > 0 ? scores : mockHealthScores);
     } catch {
       setListings(mockListings);
       setHealthScores(mockHealthScores);
       setUseMock(true);
+      setIsLoading(false);
+      return;
     } finally {
       setIsLoading(false);
     }
@@ -154,11 +139,6 @@ export default function BrowsePage() {
 
   const handleApplyFilters = useCallback((newFilters: ListingFilters) => {
     setFilters(newFilters);
-  }, []);
-
-  const handleQuickFilter = useCallback((quickFilters: Partial<ListingFilters>) => {
-    // Quick filters reset to base + the quick filter
-    setFilters({ status: "active", limit: 20, ...quickFilters });
   }, []);
 
   // Client-side search filtering (address/title)
@@ -191,21 +171,6 @@ export default function BrowsePage() {
     () => listings.filter((l) => pinnedIds.includes(l.id)),
     [listings, pinnedIds]
   );
-
-  const sections = useMemo(() => {
-    const nearCampus = filteredListings.filter((l) => (l.walk_time_minutes ?? 99) <= 10);
-    const midDistance = filteredListings.filter((l) => {
-      const wt = l.walk_time_minutes ?? 99;
-      return wt > 10 && wt <= 20;
-    });
-    const farther = filteredListings.filter((l) => (l.walk_time_minutes ?? 0) > 20);
-
-    return [
-      { key: "near", title: "Near Campus", emoji: "🎓", subtitle: "Walking distance to classes", items: nearCampus },
-      { key: "mid", title: "Stone Road Area", emoji: "🛍️", subtitle: "Close to shopping and transit", items: midDistance },
-      { key: "far", title: "South End & Beyond", emoji: "🏘️", subtitle: "More space, great value", items: farther },
-    ].filter((s) => s.items.length > 0);
-  }, [filteredListings]);
 
   const avgRent = filteredListings.length > 0
     ? Math.round(filteredListings.reduce((acc, l) => acc + Number(l.rent_per_room), 0) / filteredListings.length)
@@ -276,7 +241,6 @@ export default function BrowsePage() {
       {/* Search & Filters (now sticky/glass in component) */}
       <SearchAndFilters
         onSearchChange={setSearchQuery}
-        onQuickFilter={handleQuickFilter}
         onOpenFilters={() => setFilterOpen(true)}
         activeFilterCount={activeFilterCount}
       />
@@ -293,6 +257,7 @@ export default function BrowsePage() {
       {/* My Picks Tray */}
       <MyPicksTray
         picks={pinnedListings}
+        healthScores={healthScores}
         onRemove={removePin}
         onCompare={() => setCompareOpen(true)}
         showBottomSheet={showPicksSheet}
@@ -321,65 +286,37 @@ export default function BrowsePage() {
             transition={{ duration: 0.15 }}
             className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6 cork-bg"
           >
-            {sections.map((section, si) => (
-              <motion.div
-                key={section.key}
-                className="mb-8 md:mb-14"
-                variants={sectionVariants}
-                initial="hidden"
-                animate="visible"
-              >
-                <motion.div className="mb-4 md:mb-6" variants={sectionHeaderVariants}>
-                  <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: isMobile ? "18px" : "22px", fontWeight: 800 }}>
-                    {section.title} <span style={{ fontSize: isMobile ? "16px" : "20px" }}>{section.emoji}</span>
-                  </h2>
-                  <p className="text-[#1B2D45]/40 mt-0.5" style={{ fontSize: "12px", fontWeight: 400 }}>{section.subtitle}</p>
-                </motion.div>
-
-                <div
-                  className={isMobile ? "flex flex-col gap-5" : "grid gap-6"}
-                  style={isMobile ? undefined : {
-                    gridTemplateColumns: section.items.length <= 2 ? `repeat(${section.items.length}, minmax(0, 1fr))` : "repeat(3, minmax(0, 1fr))",
-                    maxWidth: section.items.length <= 2 ? "680px" : undefined,
-                  }}
-                >
-                  {section.items.map((listing, i) => (
-                    <div key={listing.id} style={isMobile ? undefined : { marginTop: `${(staggers[si % 3] ?? staggers[0])[i % 3] ?? 0}px` }}>
+            <motion.div
+              className="board-surface overflow-hidden px-4 pb-6 pt-5 md:px-5 md:pb-8 md:pt-6"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <div className={isMobile ? "relative z-[1] flex flex-col gap-5" : "relative z-[1] grid grid-cols-3 gap-5"}>
+                {filteredListings.map((listing, i) => {
+                  const row = Math.floor(i / 3);
+                  const col = i % 3;
+                  return (
+                    <div
+                      key={listing.id}
+                      className="min-w-0"
+                      style={isMobile ? undefined : { marginTop: `${(staggers[row % 3] ?? staggers[0])[col] ?? 0}px` }}
+                    >
                       <PolaroidCard
                         listing={listing}
                         healthScore={healthScores[listing.id] ?? null}
-                        rotation={isMobile ? (rotations[si % 3] ?? rotations[0])[i % 3] * 0.7 : (rotations[si % 3] ?? rotations[0])[i % 3] ?? 0}
+                        rotation={isMobile ? (rotations[row % 3] ?? rotations[0])[col] * 0.55 : (rotations[row % 3] ?? rotations[0])[col] ?? 0}
                         isPinned={pinnedIds.includes(listing.id)}
                         onTogglePin={togglePin}
                         isMobile={isMobile}
+                        variant="board"
                       />
                     </div>
-                  ))}
-                </div>
-              </motion.div>
-            ))}
-
-            {/* CTA */}
-            <motion.div
-              className="text-center py-8 md:py-10 px-4 md:px-6 rounded-2xl border-2 border-dashed border-[#FF6B35]/20 bg-[#FF6B35]/[0.03] mb-4"
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-            >
-              <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Can&apos;t find the right fit?</h3>
-              <p className="text-[#1B2D45]/45 mt-2 max-w-[400px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.6 }}>
-                Tell us what you&apos;re looking for and let landlords come to you.
-              </p>
-              <motion.button
-                className="mt-5 px-7 py-3 rounded-xl bg-[#FF6B35] text-white transition-colors"
-                style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
-                whileHover={{ scale: 1.03, boxShadow: "0 8px 30px rgba(255,107,53,0.4)" }}
-                whileTap={{ scale: 0.97 }}
-              >
-                Post a Request →
-              </motion.button>
+                  );
+                })}
+              </div>
             </motion.div>
+
           </motion.div>
         ) : viewMode === "grid" ? (
           <motion.div
@@ -391,7 +328,7 @@ export default function BrowsePage() {
             transition={{ duration: 0.15 }}
             className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
               {filteredListings.map((listing) => (
                 <PolaroidCard
                   key={listing.id}
@@ -401,6 +338,7 @@ export default function BrowsePage() {
                   isPinned={pinnedIds.includes(listing.id)}
                   onTogglePin={togglePin}
                   isMobile={isMobile}
+                  variant="grid"
                 />
               ))}
             </div>
@@ -414,7 +352,7 @@ export default function BrowsePage() {
             exit="exit"
             transition={{ duration: 0.15 }}
           >
-            <MapView listings={filteredListings} pinnedIds={pinnedIds} onTogglePin={togglePin} />
+            <MapView listings={filteredListings} healthScores={healthScores} pinnedIds={pinnedIds} onTogglePin={togglePin} />
           </motion.div>
         )}
       </AnimatePresence>

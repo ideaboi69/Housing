@@ -266,6 +266,8 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         property_id=prop.id,
         title=prop.title,
         address=prop.address,
+        latitude=prop.latitude,
+        longitude=prop.longitude,
         property_type=prop.property_type if isinstance(prop.property_type, str) else prop.property_type.value,
         total_rooms=prop.total_rooms,
         bathrooms=prop.bathrooms,
@@ -587,6 +589,7 @@ def get_host_info(booking: ViewingBooking, db: Session):
     else:
         owner = db.query(User).filter(User.id == booking.owner_id).first()
         return owner.email, owner.first_name, f"{owner.first_name} {owner.last_name}"
+<<<<<<< HEAD
 
 # AI Compare helper (Prompt builder)
 def build_listing_prompt_data(listing: Listing, prop: Property, landlord: Landlord, score: Optional[int]) -> str:
@@ -634,3 +637,5 @@ def build_listing_prompt_data(listing: Listing, prop: Property, landlord: Landlo
     ]
 
     return "\n".join(line for line in lines if line)
+=======
+>>>>>>> 2a1cbe3 (cribb is almost done)

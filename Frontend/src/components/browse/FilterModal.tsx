@@ -9,6 +9,12 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ListingFilters } from "@/types";
+import {
+  PROXIMITY_FILTER_OPTIONS,
+  type ProximityFilterKey,
+  getDistanceMaxForProximityFilter,
+  getProximityFilterFromDistanceMax,
+} from "@/lib/proximity";
 
 /* ── Types ────────────────────────────────────── */
 
@@ -262,7 +268,9 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
     has_laundry: currentFilters.has_laundry ?? false,
     utilities_included: currentFilters.utilities_included ?? false,
   });
-  const [distanceMax, setDistanceMax] = useState(currentFilters.distance_max ?? DIST_MAX);
+  const [proximityFilter, setProximityFilter] = useState<ProximityFilterKey | null>(
+    getProximityFilterFromDistanceMax(currentFilters.distance_max)
+  );
   const [sortIndex, setSortIndex] = useState(() => {
     const idx = SORT_OPTIONS.findIndex(
       (o) => o.value === currentFilters.sort_by && o.order === currentFilters.sort_order
@@ -282,7 +290,7 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
         has_laundry: currentFilters.has_laundry ?? false,
         utilities_included: currentFilters.utilities_included ?? false,
       });
-      setDistanceMax(currentFilters.distance_max ?? DIST_MAX);
+      setProximityFilter(getProximityFilterFromDistanceMax(currentFilters.distance_max));
       const idx = SORT_OPTIONS.findIndex(
         (o) => o.value === currentFilters.sort_by && o.order === currentFilters.sort_order
       );
@@ -302,7 +310,7 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
     amenities.has_parking,
     amenities.has_laundry,
     amenities.utilities_included,
-    distanceMax < DIST_MAX,
+    proximityFilter !== null,
     sortIndex !== 0,
   ].filter(Boolean).length;
 
@@ -311,7 +319,7 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
     setPropertyType(undefined);
     setLeaseType(undefined);
     setAmenities({ is_furnished: false, has_parking: false, has_laundry: false, utilities_included: false });
-    setDistanceMax(DIST_MAX);
+    setProximityFilter(null);
     setSortIndex(0);
   };
 
@@ -330,7 +338,8 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
     if (amenities.has_parking) filters.has_parking = true;
     if (amenities.has_laundry) filters.has_laundry = true;
     if (amenities.utilities_included) filters.utilities_included = true;
-    if (distanceMax < DIST_MAX) filters.distance_max = distanceMax;
+    const distanceMax = getDistanceMaxForProximityFilter(proximityFilter);
+    if (distanceMax !== undefined) filters.distance_max = distanceMax;
 
     const sort = SORT_OPTIONS[sortIndex];
     if (sort) {
@@ -457,17 +466,39 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
                 </div>
               </div>
 
-              {/* Distance */}
+              {/* Proximity */}
               <div>
-                <SectionLabel>Max Distance to Campus</SectionLabel>
-                <SingleSlider
-                  min={0.5}
-                  max={DIST_MAX}
-                  step={0.5}
-                  value={distanceMax}
-                  onChange={setDistanceMax}
-                  formatLabel={(v) => v >= DIST_MAX ? "Any distance" : `${v} km`}
-                />
+                <SectionLabel>Campus Proximity</SectionLabel>
+                <div className="grid grid-cols-2 gap-2">
+                  {PROXIMITY_FILTER_OPTIONS.map((option) => {
+                    const isActive = option.key === "any_distance"
+                      ? proximityFilter === null
+                      : proximityFilter === option.key;
+                    return (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() => {
+                        if (option.key === "any_distance") {
+                          setProximityFilter(null);
+                          return;
+                        }
+                        setProximityFilter(proximityFilter === option.key ? null : option.key);
+                      }}
+                      className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
+                        isActive
+                          ? "border-[#2EC4B6]/30 bg-[#2EC4B6]/[0.08] text-[#2EC4B6]"
+                          : "border-[#1B2D45]/[0.06] text-[#1B2D45]/55 hover:border-[#2EC4B6]/20 hover:bg-[#2EC4B6]/[0.03]"
+                      }`}
+                    >
+                      <div style={{ fontSize: "12px", fontWeight: 700 }}>{option.label}</div>
+                      <div className="mt-0.5 text-current/70" style={{ fontSize: "10px", fontWeight: 500 }}>
+                        {option.description}
+                      </div>
+                    </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Sort */}

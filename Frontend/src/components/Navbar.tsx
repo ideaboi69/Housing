@@ -96,22 +96,29 @@ export function Navbar() {
   if (pathname === "/") {
     return (
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[56px] md:h-[64px]">
-          <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.04em" }}>
+        <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[64px] md:h-[72px]">
+          <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.04em" }}>
             cribb
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/landlord/login"
+              className="hidden sm:inline-block px-4 py-2 rounded-xl text-[#1B2D45]/50 hover:text-[#1B2D45] hover:bg-[#1B2D45]/5 transition-all"
+              style={{ fontSize: "15px", fontWeight: 500 }}
+            >
+              For Landlords
+            </Link>
             <Link
               href="/login"
-              className="px-4 py-2 rounded-lg text-[#1B2D45]/70 hover:text-[#1B2D45] hover:bg-[#1B2D45]/5 transition-all"
-              style={{ fontSize: "14px", fontWeight: 600 }}
+              className="px-5 py-2.5 rounded-xl text-[#1B2D45]/70 hover:text-[#1B2D45] hover:bg-[#1B2D45]/5 transition-all"
+              style={{ fontSize: "15px", fontWeight: 600 }}
             >
               Log in
             </Link>
             <Link
               href="/signup"
-              className="px-4 py-2 rounded-lg bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
-              style={{ fontSize: "14px", fontWeight: 700 }}
+              className="px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
+              style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}
             >
               Sign up
             </Link>

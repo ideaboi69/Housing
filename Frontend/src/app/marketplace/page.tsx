@@ -69,8 +69,7 @@ function FilterModal({ isOpen, onClose, filters, onApply }: { isOpen: boolean; o
   const [local, setLocal] = useState<FilterState>(filters);
   useEffect(() => { if (isOpen) setLocal(filters); }, [isOpen, filters]);
   const toggleCondition = (c: ItemCondition) => setLocal((prev) => ({ ...prev, conditions: prev.conditions.includes(c) ? prev.conditions.filter((x) => x !== c) : [...prev.conditions, c] }));
-  const sortOptions: { key: SortOption; label: string }[] = [{ key: "newest", label: "Newest First" }, { key: "price_low", label: "Price: Low to High" }, { key: "price_high", label: "Price: High to Low" }, { key: "most_viewed", label: "Most Viewed" }];
-  const handleReset = () => setLocal({ priceMin: "", priceMax: "", conditions: [], sort: "newest" });
+  const handleReset = () => setLocal({ ...local, priceMin: "", priceMax: "", conditions: [] });
   if (!isOpen) return null;
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/40 flex items-end md:items-center justify-center" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -99,12 +98,6 @@ function FilterModal({ isOpen, onClose, filters, onApply }: { isOpen: boolean; o
               ))}
             </div>
           </div>
-          <div>
-            <label className="text-[#1B2D45]/50 block mb-2" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Sort By</label>
-            <div className="grid grid-cols-2 gap-2">
-              {sortOptions.map((s) => (<button key={s.key} onClick={() => setLocal({ ...local, sort: s.key })} className={`px-3.5 py-2.5 rounded-xl border transition-all text-left ${local.sort === s.key ? "border-[#FF6B35] bg-[#FF6B35]/[0.06] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/45 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: local.sort === s.key ? 700 : 500 }}>{s.label}</button>))}
-            </div>
-          </div>
         </div>
         <div className="px-5 py-4 border-t border-black/[0.06]">
           <button onClick={() => { onApply(local); onClose(); }} className="w-full py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}>Apply Filters</button>
@@ -114,8 +107,6 @@ function FilterModal({ isOpen, onClose, filters, onApply }: { isOpen: boolean; o
   );
 }
 
-type QuickFilter = "all" | "free" | "under25" | "under50" | "new_likenew" | "negotiable";
-
 export default function MarketplacePage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -124,7 +115,6 @@ export default function MarketplacePage() {
   const [useMock, setUseMock] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<MarketplaceCategory | "all">("all");
-  const [activeQuickFilter, setActiveQuickFilter] = useState<QuickFilter>("all");
   const [showBanner, setShowBanner] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<FilterState>({ priceMin: "", priceMax: "", conditions: [], sort: "newest" });
@@ -151,11 +141,6 @@ export default function MarketplacePage() {
     let result = items;
     if (useMock && activeCategory !== "all") result = result.filter((item) => item.category === activeCategory);
     if (useMock && searchQuery.trim()) { const q = searchQuery.toLowerCase(); result = result.filter((item) => item.title.toLowerCase().includes(q)); }
-    if (activeQuickFilter === "free") result = result.filter((i) => i.pricing_type === "free");
-    else if (activeQuickFilter === "under25") result = result.filter((i) => i.pricing_type === "free" || (i.price != null && i.price <= 25));
-    else if (activeQuickFilter === "under50") result = result.filter((i) => i.pricing_type === "free" || (i.price != null && i.price <= 50));
-    else if (activeQuickFilter === "new_likenew") result = result.filter((i) => i.condition === "new" || i.condition === "like_new");
-    else if (activeQuickFilter === "negotiable") result = result.filter((i) => i.pricing_type === "negotiable");
     if (advancedFilters.priceMin) result = result.filter((i) => i.pricing_type === "free" || (i.price != null && i.price >= parseFloat(advancedFilters.priceMin)));
     if (advancedFilters.priceMax) result = result.filter((i) => i.pricing_type === "free" || (i.price != null && i.price <= parseFloat(advancedFilters.priceMax)));
     if (advancedFilters.conditions.length > 0) result = result.filter((i) => advancedFilters.conditions.includes(i.condition));
@@ -163,10 +148,31 @@ export default function MarketplacePage() {
     else if (advancedFilters.sort === "price_high") result = [...result].sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
     else if (advancedFilters.sort === "most_viewed") result = [...result].sort((a, b) => b.view_count - a.view_count);
     return result;
-  }, [items, useMock, activeCategory, activeQuickFilter, searchQuery, advancedFilters]);
-
-  const quickFilters: { key: QuickFilter; label: string }[] = [{ key: "all", label: "All" }, { key: "free", label: "Free" }, { key: "under25", label: "Under $25" }, { key: "under50", label: "Under $50" }, { key: "new_likenew", label: "New / Like New" }, { key: "negotiable", label: "Negotiable" }];
+  }, [items, useMock, activeCategory, searchQuery, advancedFilters]);
   const hasActiveAdvancedFilters = advancedFilters.priceMin || advancedFilters.priceMax || advancedFilters.conditions.length > 0 || advancedFilters.sort !== "newest";
+  const sortOptions: { key: SortOption; label: string }[] = [
+    { key: "newest", label: "Newest" },
+    { key: "price_low", label: "Price: Low to High" },
+    { key: "price_high", label: "Price: High to Low" },
+    { key: "most_viewed", label: "Most Viewed" },
+  ];
+  const activeFilterChips = [
+    advancedFilters.priceMin ? {
+      key: "priceMin",
+      label: `Min $${advancedFilters.priceMin}`,
+      onClear: () => setAdvancedFilters((prev) => ({ ...prev, priceMin: "" })),
+    } : null,
+    advancedFilters.priceMax ? {
+      key: "priceMax",
+      label: `Max $${advancedFilters.priceMax}`,
+      onClear: () => setAdvancedFilters((prev) => ({ ...prev, priceMax: "" })),
+    } : null,
+    ...advancedFilters.conditions.map((condition) => ({
+      key: `condition-${condition}`,
+      label: CONDITION_LABELS[condition].label,
+      onClear: () => setAdvancedFilters((prev) => ({ ...prev, conditions: prev.conditions.filter((c) => c !== condition) })),
+    })),
+  ].filter(Boolean) as { key: string; label: string; onClear: () => void }[];
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
@@ -189,11 +195,42 @@ export default function MarketplacePage() {
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search items..." className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-black/[0.06] text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/30 focus:outline-none transition-all" style={{ fontSize: "13px" }} />
             {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B2D45]/20 hover:text-[#1B2D45]/50"><X className="w-4 h-4" /></button>}
           </div>
+          <div className="hidden md:block shrink-0">
+            <select
+              value={advancedFilters.sort}
+              onChange={(e) => setAdvancedFilters((prev) => ({ ...prev, sort: e.target.value as SortOption }))}
+              className="px-4 py-2.5 rounded-xl bg-white border border-black/[0.06] text-[#1B2D45]/70 focus:border-[#FF6B35]/30 focus:outline-none transition-all"
+              style={{ fontSize: "13px", fontWeight: 600 }}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.key} value={option.key}>{option.label}</option>
+              ))}
+            </select>
+          </div>
           <button onClick={() => setShowFilters(true)} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl border transition-all shrink-0 ${hasActiveAdvancedFilters ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "13px", fontWeight: 600 }}><SlidersHorizontal className="w-4 h-4" /> Filters{hasActiveAdvancedFilters && <span className="w-1.5 h-1.5 rounded-full bg-[#FF6B35]" />}</button>
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 mb-5">
-          {quickFilters.map((f) => (<button key={f.key} onClick={() => setActiveQuickFilter(activeQuickFilter === f.key ? "all" : f.key)} className={`px-3 py-1.5 rounded-full border transition-all shrink-0 ${(f.key === "all" && activeQuickFilter === "all") || (activeQuickFilter === f.key && f.key !== "all") ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/45 hover:border-[#1B2D45]/15 hover:text-[#1B2D45]/65"}`} style={{ fontSize: "11px", fontWeight: 600 }}>{f.label}</button>))}
-        </div>
+        {activeFilterChips.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 mb-5">
+            {activeFilterChips.map((chip) => (
+              <button
+                key={chip.key}
+                onClick={chip.onClear}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#FF6B35]/20 bg-[#FF6B35]/[0.08] text-[#FF6B35] shrink-0"
+                style={{ fontSize: "11px", fontWeight: 700 }}
+              >
+                <span>{chip.label}</span>
+                <X className="w-3 h-3" />
+              </button>
+            ))}
+            <button
+              onClick={() => setAdvancedFilters((prev) => ({ ...prev, priceMin: "", priceMax: "", conditions: [] }))}
+              className="px-3 py-1.5 rounded-full text-[#1B2D45]/40 hover:text-[#1B2D45]/65 shrink-0"
+              style={{ fontSize: "11px", fontWeight: 600 }}
+            >
+              Clear all
+            </button>
+          </div>
+        )}
         <p className="text-[#1B2D45]/35 mb-4" style={{ fontSize: "12px", fontWeight: 500 }}>{filteredItems.length} item{filteredItems.length !== 1 ? "s" : ""} found</p>
         {isLoading ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{Array.from({ length: 8 }, (_, i) => (<div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse" style={{ border: "1px solid rgba(27,45,69,0.04)" }}><div className="aspect-[4/3] bg-[#1B2D45]/[0.04]" /><div className="p-3.5 space-y-2"><div className="h-4 bg-[#1B2D45]/[0.06] rounded w-3/4" /><div className="h-3 bg-[#1B2D45]/[0.04] rounded w-1/2" /></div></div>))}</div>

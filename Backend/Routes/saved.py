@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from tables import get_db, User, Listing, Property, SavedListing
+from tables import get_db, User, Listing, Property, SavedListing, Sublet
 from Schemas.savedSchema import SavedListingResponse, SavedListingDetailResponse
 from Utils.security import get_current_user
 
@@ -58,10 +58,17 @@ def list_saved_listings(db: Session = Depends(get_db), current_user: User = Depe
         SavedListing.student_id == current_user.id
     ).order_by(SavedListing.created_at.desc()).all()
 
+    listing_ids = [listing.id for _, listing, _ in results]
+    sublet_map = {
+        sublet.listing_id: sublet.id
+        for sublet in db.query(Sublet).filter(Sublet.listing_id.in_(listing_ids)).all()
+    } if listing_ids else {}
+
     return [
         SavedListingDetailResponse(
             id=saved.id,
             listing_id=listing.id,
+            sublet_id=sublet_map.get(listing.id),
             saved_at=saved.created_at,
             rent_per_room=listing.rent_per_room,
             rent_total=listing.rent_total,

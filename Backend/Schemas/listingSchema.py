@@ -99,6 +99,8 @@ class ListingDetailResponse(BaseModel):
     property_id: int
     title: str
     address: str
+    latitude: Optional[Decimal] = None
+    longitude: Optional[Decimal] = None
     property_type: str
     total_rooms: int
     bathrooms: int
@@ -114,4 +116,3 @@ class ListingDetailResponse(BaseModel):
     landlord_id: int
     landlord_name: str
     landlord_verified: bool
-

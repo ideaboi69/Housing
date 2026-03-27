@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, MapPin, Eye, Clock, MessageCircle, Share2, ChevronLeft, ChevronRight,
-  ShieldCheck, Package, User, X,
+  ShieldCheck, Package, X,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
@@ -14,7 +14,7 @@ import {
   MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo,
   MOCK_MARKETPLACE_ITEMS,
 } from "@/components/marketplace/marketplace-data";
-import type { MarketplaceItemResponse } from "@/types";
+import type { MarketplaceItemListResponse, MarketplaceItemResponse } from "@/types";
 import { toast } from "sonner";
 
 /* ════════════════════════════════════════════════════════
@@ -44,47 +44,56 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
   const [current, setCurrent] = useState(0);
   if (images.length === 0) {
     return (
-      <div className="w-full aspect-[16/10] bg-[#1B2D45]/[0.03] rounded-2xl flex items-center justify-center">
+      <div className="w-full min-h-[440px] md:min-h-[620px] rounded-[28px] border border-black/[0.06] bg-[#151A22] flex items-center justify-center">
         <Package className="w-20 h-20 text-[#1B2D45]/10" />
       </div>
     );
   }
 
   return (
-    <div className="relative rounded-2xl overflow-hidden bg-[#1B2D45]/[0.03] group">
-      <img
-        src={images[current]?.image_url}
-        alt=""
-        className="w-full aspect-[16/10] object-cover"
-      />
-      {/* Dark gradient at bottom for dots visibility */}
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+    <div
+      className="relative rounded-[28px] overflow-hidden border border-black/[0.06] bg-[#151A22] group"
+      style={{ boxShadow: "0 22px 60px rgba(27,45,69,0.12)" }}
+    >
+      <div className="relative min-h-[440px] md:min-h-[620px]">
+        <img
+          src={images[current]?.image_url}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover scale-105 blur-3xl opacity-30"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-black/18 via-transparent to-black/30" />
+        <div className="relative z-10 flex min-h-[440px] md:min-h-[620px] items-center justify-center px-5 py-6 md:px-8 md:py-10">
+          <img
+            src={images[current]?.image_url}
+            alt=""
+            className="max-h-[720px] w-auto max-w-full rounded-[22px] object-contain"
+            style={{ boxShadow: "0 20px 70px rgba(0,0,0,0.35)" }}
+          />
+        </div>
+      </div>
 
       {images.length > 1 && (
         <>
-          {/* Large prev/next buttons — always visible */}
           <button
             onClick={() => setCurrent((p) => (p - 1 + images.length) % images.length)}
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-[#1B2D45]/70 hover:text-[#1B2D45] transition-all"
+            className="absolute left-4 top-1/2 z-20 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-[#1B2D45]/70 hover:text-[#1B2D45] transition-all"
             style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <button
             onClick={() => setCurrent((p) => (p + 1) % images.length)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-[#1B2D45]/70 hover:text-[#1B2D45] transition-all"
+            className="absolute right-4 top-1/2 z-20 -translate-y-1/2 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center text-[#1B2D45]/70 hover:text-[#1B2D45] transition-all"
             style={{ boxShadow: "0 4px 16px rgba(0,0,0,0.15)" }}
           >
             <ChevronRight className="w-6 h-6" />
           </button>
 
-          {/* Photo counter badge */}
-          <div className="absolute top-4 right-4 px-3 py-1.5 rounded-full bg-black/50 text-white backdrop-blur-sm" style={{ fontSize: "12px", fontWeight: 600 }}>
+          <div className="absolute top-4 right-4 z-20 px-3 py-1.5 rounded-full bg-black/50 text-white backdrop-blur-sm" style={{ fontSize: "12px", fontWeight: 600 }}>
             {current + 1} / {images.length}
           </div>
 
-          {/* Dot indicators */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+          <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 flex items-center gap-2 md:hidden">
             {images.map((_, i) => (
               <button
                 key={i}
@@ -102,15 +111,14 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
         </>
       )}
 
-      {/* Thumbnail strip below main image */}
       {images.length > 1 && (
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-8 bg-gradient-to-t from-black/40 to-transparent hidden md:flex items-center justify-center gap-2">
+        <div className="absolute bottom-0 left-0 right-0 px-5 pb-5 pt-12 bg-gradient-to-t from-black/45 to-transparent hidden md:flex items-center justify-center gap-2 z-20">
           {images.map((img, i) => (
             <button
               key={i}
               onClick={() => setCurrent(i)}
-              className={`w-16 h-12 rounded-lg overflow-hidden border-2 transition-all ${
-                i === current ? "border-white opacity-100" : "border-transparent opacity-60 hover:opacity-90"
+              className={`h-14 w-20 rounded-xl overflow-hidden border-2 transition-all ${
+                i === current ? "border-white opacity-100 translate-y-0" : "border-transparent opacity-60 hover:opacity-90 hover:-translate-y-0.5"
               }`}
             >
               <img src={img.image_url} alt="" className="w-full h-full object-cover" />
@@ -131,6 +139,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
   const router = useRouter();
   const { user } = useAuthStore();
   const [item, setItem] = useState<MarketplaceItemResponse | null>(null);
+  const [similarItems, setSimilarItems] = useState<MarketplaceItemListResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [messaging, setMessaging] = useState(false);
   const [showMessageModal, setShowMessageModal] = useState(false);
@@ -151,6 +160,32 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
     }
     fetchItem();
   }, [id]);
+
+  useEffect(() => {
+    async function fetchSimilar() {
+      if (!item) return;
+
+      try {
+        const liveItems = await api.marketplace.getItems({ category: item.category });
+        const filtered = liveItems
+          .filter((candidate) => candidate.id !== item.id)
+          .slice(0, 6);
+
+        if (filtered.length > 0) {
+          setSimilarItems(filtered);
+          return;
+        }
+      } catch {
+        // Fall through to mock recommendations
+      }
+
+      const categoryMatches = MOCK_MARKETPLACE_ITEMS.filter((m) => m.id !== item.id && m.category === item.category);
+      const fallbackMatches = MOCK_MARKETPLACE_ITEMS.filter((m) => m.id !== item.id && m.category !== item.category);
+      setSimilarItems([...categoryMatches, ...fallbackMatches].slice(0, 6));
+    }
+
+    fetchSimilar();
+  }, [item]);
 
   const handleOpenMessage = () => {
     if (!user) { router.push("/login"); return; }
@@ -214,56 +249,50 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
   const price = getPriceLabel(item.pricing_type, item.price);
   const condition = CONDITION_LABELS[item.condition];
   const category = MARKETPLACE_CATEGORIES.find((c) => c.key === item.category);
-  const similarItems = MOCK_MARKETPLACE_ITEMS.filter((m) => m.id !== item.id && m.category === item.category).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
-      <div className="max-w-[1100px] mx-auto px-4 md:px-6 py-6 md:py-8">
-        {/* Back */}
-        <Link href="/marketplace" className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-5" style={{ fontSize: "12px", fontWeight: 600 }}>
+      <div className="max-w-[1460px] mx-auto px-4 md:px-6 py-5 md:py-6">
+        <Link href="/marketplace" className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-4" style={{ fontSize: "12px", fontWeight: 600 }}>
           <ArrowLeft className="w-4 h-4" /> Back to Marketplace
         </Link>
 
-        {/* Main layout — image takes more space */}
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-6">
-          {/* Left — Images + Description */}
-          <div>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_400px] gap-5 items-start">
+          <div className="min-w-0">
             <ImageGallery images={item.images} />
 
-            {/* Description */}
-            {item.description && (
-              <div className="mt-6">
-                <h3 className="text-[#1B2D45]/50 mb-2" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Description</h3>
-                <p className="text-[#1B2D45]/70" style={{ fontSize: "14px", lineHeight: 1.7 }}>{item.description}</p>
-              </div>
-            )}
+            <div className="mt-5 bg-white rounded-[28px] border border-black/[0.06] p-5 md:p-6" style={{ boxShadow: "0 14px 44px rgba(27,45,69,0.06)" }}>
+              <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_220px] md:gap-6">
+                <div>
+                  <h2 className="text-[#1B2D45] mb-3" style={{ fontSize: "16px", fontWeight: 800 }}>Seller&apos;s description</h2>
+                  <p className="text-[#1B2D45]/68" style={{ fontSize: "14px", lineHeight: 1.7 }}>
+                    {item.description || "Message the seller for more details about condition, pickup timing, and whether it is still available."}
+                  </p>
+                </div>
 
-            {/* Similar Items */}
-            {similarItems.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-[#1B2D45] mb-3" style={{ fontSize: "16px", fontWeight: 800 }}>Similar Items</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {similarItems.map((sim) => {
-                    const simPrice = getPriceLabel(sim.pricing_type, sim.price);
-                    return (
-                      <Link key={sim.id} href={`/marketplace/${sim.id}`} className="bg-white rounded-xl overflow-hidden hover:shadow-md transition-shadow" style={{ border: "1px solid rgba(27,45,69,0.06)" }}>
-                        {sim.primary_image && <img src={sim.primary_image} alt={sim.title} className="w-full aspect-[4/3] object-cover" />}
-                        <div className="p-2.5">
-                          <p className="text-[#1B2D45] truncate" style={{ fontSize: "12px", fontWeight: 600 }}>{sim.title}</p>
-                          <p style={{ fontSize: "12px", fontWeight: 800, color: simPrice.color }}>{simPrice.text}</p>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                <div className="rounded-2xl bg-[#FAF8F4] p-4">
+                  <div className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Seller
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center">
+                      <span style={{ fontSize: "15px", fontWeight: 800, color: "#FF6B35" }}>{item.seller_name[0]}</span>
+                    </div>
+                    <div>
+                      <div className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "14px", fontWeight: 700 }}>
+                        {item.seller_name}
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#4ADE80]" />
+                      </div>
+                      <div className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px" }}>Verified UofG student</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Right — Details + CTA */}
-          <div>
-            <div className="bg-white rounded-2xl border border-black/[0.06] p-5 sticky top-[80px]" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-              {/* Price */}
+          <div className="xl:sticky xl:top-[88px] space-y-4">
+            <div className="bg-white rounded-[28px] border border-black/[0.06] p-5 md:p-6" style={{ boxShadow: "0 14px 44px rgba(27,45,69,0.08)" }}>
               <div className="flex items-center gap-2 mb-1">
                 <span style={{ fontSize: "32px", fontWeight: 900, color: price.color }}>{price.text}</span>
                 {price.badge && (
@@ -273,11 +302,12 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                 )}
               </div>
 
-              {/* Title */}
               <h1 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 800, lineHeight: 1.3 }}>{item.title}</h1>
+              <p className="mt-2 text-[#1B2D45]/40" style={{ fontSize: "13px" }}>
+                Listed {timeAgo(item.created_at)} in Guelph, ON
+              </p>
 
-              {/* Badges */}
-              <div className="flex items-center gap-1.5 mt-3">
+              <div className="flex items-center gap-1.5 mt-3 flex-wrap">
                 <span className="px-2.5 py-1 rounded-full" style={{ fontSize: "11px", fontWeight: 700, color: condition.color, background: `${condition.color}15`, border: `1px solid ${condition.color}25` }}>
                   {condition.label}
                 </span>
@@ -288,59 +318,132 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                 )}
               </div>
 
-              {/* Pickup */}
-              <div className="flex items-start gap-2.5 mt-4 px-3.5 py-3 rounded-xl bg-[#FAF8F4]">
-                <MapPin className="w-4 h-4 text-[#FF6B35] shrink-0 mt-0.5" />
-                <div>
-                  <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Pickup: {item.pickup_location}</div>
-                  <div className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>Guelph, ON</div>
-                  {item.pickup_notes && <div className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "11px" }}>{item.pickup_notes}</div>}
-                </div>
+              <div className="grid grid-cols-2 gap-2.5 mt-5">
+                <button
+                  onClick={handleOpenMessage}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
+                  style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}
+                >
+                  <MessageCircle className="w-4.5 h-4.5" />
+                  Message
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl border border-black/[0.06] text-[#1B2D45]/60 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all"
+                  style={{ fontSize: "14px", fontWeight: 700 }}
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </button>
               </div>
 
-              {/* Stats */}
-              <div className="flex items-center gap-4 mt-3 text-[#1B2D45]/35" style={{ fontSize: "11px", fontWeight: 500 }}>
-                <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {item.view_count} views</span>
-                <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Posted {timeAgo(item.created_at)}</span>
-              </div>
-
-              {/* CTA */}
-              <button
-                onClick={handleOpenMessage}
-                className="w-full flex items-center justify-center gap-2 mt-5 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
-                style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}
-              >
-                <MessageCircle className="w-4.5 h-4.5" />
-                Message Seller
-              </button>
-
-              <button
-                onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 mt-2 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all"
-                style={{ fontSize: "13px", fontWeight: 600 }}
-              >
-                <Share2 className="w-4 h-4" /> Share
-              </button>
-            </div>
-
-            {/* Seller card */}
-            <div className="bg-white rounded-2xl border border-black/[0.06] p-5 mt-4" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-              <div className="text-[#1B2D45]/50 mb-3" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Seller</div>
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center">
-                  <span style={{ fontSize: "15px", fontWeight: 800, color: "#FF6B35" }}>{item.seller_name[0]}</span>
-                </div>
-                <div>
-                  <div className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "14px", fontWeight: 700 }}>
-                    {item.seller_name}
-                    <ShieldCheck className="w-3.5 h-3.5 text-[#4ADE80]" />
+              <div className="mt-5 pt-5 border-t border-black/[0.06]">
+                <h2 className="text-[#1B2D45] mb-3" style={{ fontSize: "16px", fontWeight: 800 }}>About this item</h2>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-4 h-4 text-[#1B2D45]/45 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>Pickup in {item.pickup_location}</div>
+                      <div className="text-[#1B2D45]/45 mt-0.5" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                        Guelph, ON
+                        {item.pickup_notes ? ` · ${item.pickup_notes}` : ""}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[#1B2D45]/35" style={{ fontSize: "11px" }}>Verified UofG student</div>
+                  <div className="flex items-start gap-3">
+                    <Package className="w-4 h-4 text-[#1B2D45]/45 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{condition.label} condition</div>
+                      <div className="text-[#1B2D45]/45 mt-0.5" style={{ fontSize: "12px" }}>
+                        {category?.label ?? "Marketplace item"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Eye className="w-4 h-4 text-[#1B2D45]/45 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{item.view_count} views</div>
+                      <div className="text-[#1B2D45]/45 mt-0.5" style={{ fontSize: "12px" }}>
+                        Posted {timeAgo(item.created_at)}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
+
+        {similarItems.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>More like this</h3>
+                <p className="text-[#1B2D45]/40 mt-0.5" style={{ fontSize: "12px" }}>
+                  More marketplace finds students might message next.
+                </p>
+              </div>
+              <Link
+                href="/marketplace"
+                className="hidden md:inline-flex text-[#FF6B35] hover:text-[#e55e2e] transition-colors"
+                style={{ fontSize: "12px", fontWeight: 700 }}
+              >
+                Browse all
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+              {similarItems.map((sim) => {
+                const simPrice = getPriceLabel(sim.pricing_type, sim.price);
+                const simCondition = CONDITION_LABELS[sim.condition];
+                const simCategory = MARKETPLACE_CATEGORIES.find((c) => c.key === sim.category);
+                return (
+                  <Link
+                    key={sim.id}
+                    href={`/marketplace/${sim.id}`}
+                    className="bg-white rounded-2xl overflow-hidden hover:shadow-md transition-all"
+                    style={{ border: "1px solid rgba(27,45,69,0.06)" }}
+                  >
+                    <div className="relative aspect-[4/3] bg-[#FAF8F4] overflow-hidden">
+                      {sim.primary_image ? (
+                        <img src={sim.primary_image} alt={sim.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-8 h-8 text-[#1B2D45]/10" />
+                        </div>
+                      )}
+                      <div
+                        className="absolute left-2.5 top-2.5 px-2 py-1 rounded-lg bg-white/95 backdrop-blur-sm"
+                        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
+                      >
+                        <span style={{ fontSize: "12px", fontWeight: 800, color: simPrice.color }}>{simPrice.text}</span>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <p className="text-[#1B2D45] line-clamp-2" style={{ fontSize: "13px", fontWeight: 700, lineHeight: 1.35 }}>{sim.title}</p>
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <span
+                          className="px-2 py-0.5 rounded-full"
+                          style={{ fontSize: "10px", fontWeight: 700, color: simCondition.color, background: `${simCondition.color}15`, border: `1px solid ${simCondition.color}25` }}
+                        >
+                          {simCondition.label}
+                        </span>
+                        {simCategory && (
+                          <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>
+                            {simCategory.emoji} {simCategory.label}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-[#1B2D45]/35" style={{ fontSize: "11px", fontWeight: 500 }}>
+                        Posted {timeAgo(sim.created_at)}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Message Seller Modal */}

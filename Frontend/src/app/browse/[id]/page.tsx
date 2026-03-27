@@ -26,6 +26,7 @@ import { motion, useInView, AnimatePresence } from "framer-motion";
 import { getAmenityChecklist } from "@/lib/amenities";
 import { CribbMap } from "@/components/ui/CribbMap";
 import { mockCoordinates } from "@/lib/mock-data";
+import { getProximityFromKm, getProximityLabel } from "@/lib/proximity";
 import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
 
 /* ── Animation helpers ─────────────────────────── */
@@ -275,6 +276,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const overallScore = healthScore?.overall_score ?? 0;
+  const campusAccess = listing.walk_time_minutes != null
+    ? getProximityLabel(listing.walk_time_minutes)
+    : getProximityFromKm(listing.distance_to_campus_km != null ? Number(listing.distance_to_campus_km) : null);
 
   const amenities = getAmenityChecklist(listing as unknown as Record<string, unknown>);
   const hasAmenities = amenities.filter((a) => a.has);
@@ -348,6 +352,50 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 })}
               </motion.div>
 
+              {/* Getting to campus */}
+              <div className="mt-6 flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Getting to Campus</h3>
+                <div
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border"
+                  style={{ fontSize: "11px", fontWeight: 700, color: campusAccess.color, background: campusAccess.bg, borderColor: `${campusAccess.color}25` }}
+                >
+                  <span>{campusAccess.emoji}</span>
+                  <span>{campusAccess.label}</span>
+                </div>
+              </div>
+              <p className="mt-2 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>
+                Campus access uses the same proximity labels shown across Cribb.
+              </p>
+              <div className="flex items-center gap-4 mt-3 flex-wrap">
+                {listing.walk_time_minutes && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]">
+                    <span style={{ fontSize: "16px" }}>🚶</span>
+                    <div>
+                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.walk_time_minutes} min</p>
+                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p>
+                    </div>
+                  </div>
+                )}
+                {listing.bus_time_minutes && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]">
+                    <span style={{ fontSize: "16px" }}>🚌</span>
+                    <div>
+                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.bus_time_minutes} min</p>
+                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p>
+                    </div>
+                  </div>
+                )}
+                {listing.distance_to_campus_km && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]">
+                    <span style={{ fontSize: "16px" }}>📍</span>
+                    <div>
+                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{Number(listing.distance_to_campus_km).toFixed(1)} km</p>
+                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to UofG</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Amenities */}
               <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Amenities</h3>
               <div className="grid grid-cols-2 gap-2.5 mt-3">
@@ -386,38 +434,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   </span>
                 </div>
               )}
-
-              {/* Getting to campus */}
-              <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Getting to Campus</h3>
-              <div className="flex items-center gap-4 mt-3 flex-wrap">
-                {listing.walk_time_minutes && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]">
-                    <span style={{ fontSize: "16px" }}>🚶</span>
-                    <div>
-                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.walk_time_minutes} min</p>
-                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p>
-                    </div>
-                  </div>
-                )}
-                {listing.bus_time_minutes && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]">
-                    <span style={{ fontSize: "16px" }}>🚌</span>
-                    <div>
-                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.bus_time_minutes} min</p>
-                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p>
-                    </div>
-                  </div>
-                )}
-                {listing.distance_to_campus_km && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]">
-                    <span style={{ fontSize: "16px" }}>📍</span>
-                    <div>
-                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{Number(listing.distance_to_campus_km).toFixed(1)} km</p>
-                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to UofG</p>
-                    </div>
-                  </div>
-                )}
-              </div>
 
               {/* Cribb Score Breakdown */}
               {healthScore && (
@@ -592,8 +608,8 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             <div className="rounded-xl border border-black/[0.04] overflow-hidden bg-white/90 backdrop-blur-xl"
               style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
               <CribbMap
-                lat={mockCoordinates[listing.id]?.lat}
-                lng={mockCoordinates[listing.id]?.lng}
+                lat={listing.latitude != null ? Number(listing.latitude) : mockCoordinates[listing.id]?.lat}
+                lng={listing.longitude != null ? Number(listing.longitude) : mockCoordinates[listing.id]?.lng}
                 address={listing.address}
                 height="200px"
                 zoom={15}

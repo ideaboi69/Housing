@@ -8,6 +8,7 @@ export interface SubletListing {
   listing_id?: number;
   title: string;
   street: string;
+  coverImage?: string;
   subletPrice: number;
   originalPrice: number;
   healthScore: number;
@@ -36,6 +37,7 @@ export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "
 export const subletListings: SubletListing[] = [
   {
     id: "s1", listing_id: 1001, title: "Furnished Room in 4BR House", street: "78 College Ave W",
+    coverImage: "/demo/listings/townhouse.jpg",
     subletPrice: 550, originalPrice: 720, healthScore: 91, verified: true,
     posterType: "4th year, Engineering", posterIsStudent: true,
     availableMonths: [false, false, false, false, true, true, true, false, false, false, false, false], neighborhood: "Campus",
@@ -46,6 +48,7 @@ export const subletListings: SubletListing[] = [
   },
   {
     id: "s2", listing_id: 1002, title: "Entire 2BR Apartment", street: "155 Gordon St",
+    coverImage: "/demo/listings/apartment.jpg",
     subletPrice: 1100, originalPrice: 1400, healthScore: 86, verified: true,
     posterType: "Property Manager", posterIsStudent: false,
     availableMonths: [false, false, false, false, true, true, true, true, false, false, false, false], neighborhood: "Stone Road",
@@ -56,6 +59,7 @@ export const subletListings: SubletListing[] = [
   },
   {
     id: "s3", listing_id: 1003, title: "Private Room near Campus", street: "42 Suffolk St W",
+    coverImage: "/demo/listings/studio.jpg",
     subletPrice: 480, originalPrice: 680, healthScore: 68, verified: false,
     posterType: "3rd year, Arts", posterIsStudent: true,
     availableMonths: [false, false, false, false, true, true, true, false, false, false, false, false], neighborhood: "Campus",
@@ -66,6 +70,7 @@ export const subletListings: SubletListing[] = [
   },
   {
     id: "s4", listing_id: 1004, title: "Studio Apartment Downtown", street: "88 Macdonell St",
+    coverImage: "/demo/listings/house.jpg",
     subletPrice: 700, originalPrice: 950, healthScore: 82, verified: true,
     posterType: "Landlord", posterIsStudent: false,
     availableMonths: [false, false, false, false, false, true, true, true, false, false, false, false], neighborhood: "Downtown",
@@ -76,6 +81,7 @@ export const subletListings: SubletListing[] = [
   },
   {
     id: "s5", listing_id: 1005, title: "Room in Townhouse", street: "31 Grange St",
+    coverImage: "/demo/listings/townhouse.jpg",
     subletPrice: 450, originalPrice: 640, healthScore: 64, verified: false,
     posterType: "2nd year, Business", posterIsStudent: true,
     availableMonths: [false, false, false, false, true, true, false, false, false, false, false, false], neighborhood: "South End",
@@ -86,6 +92,7 @@ export const subletListings: SubletListing[] = [
   },
   {
     id: "s6", listing_id: 1006, title: "Master Bedroom in 5BR House", street: "62 Dean Ave",
+    coverImage: "/demo/listings/house.jpg",
     subletPrice: 500, originalPrice: 600, healthScore: 88, verified: true,
     posterType: "4th year, CompSci", posterIsStudent: true,
     availableMonths: [false, false, false, false, true, true, true, true, false, false, false, false], neighborhood: "Campus",

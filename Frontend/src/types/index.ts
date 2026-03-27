@@ -179,6 +179,8 @@ export interface ListingDetailResponse {
   property_id: number;
   title: string;
   address: string;
+  latitude?: number | null;
+  longitude?: number | null;
   property_type: string;
   total_rooms: number;
   bathrooms: number;
@@ -296,6 +298,7 @@ export interface SavedListingResponse {
 export interface SavedListingDetailResponse {
   id: number;
   listing_id: number;
+  sublet_id?: number | null;
   saved_at: string;
   rent_per_room: number;
   rent_total: number;

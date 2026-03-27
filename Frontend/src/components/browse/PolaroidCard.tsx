@@ -9,7 +9,9 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
 import { formatPrice, formatPropertyType, formatLeaseType } from "@/lib/utils";
 import { useSavedStore } from "@/lib/saved-store";
+import { getListingImages } from "@/lib/mock-data";
 import type { ListingDetailResponse } from "@/types";
+import { getProximityLabel } from "@/lib/proximity";
 
 interface PolaroidCardProps {
   listing: ListingDetailResponse;
@@ -18,6 +20,7 @@ interface PolaroidCardProps {
   isPinned?: boolean;
   onTogglePin?: (id: number) => void;
   isMobile?: boolean;
+  variant?: "board" | "grid";
 }
 
 export function PolaroidCard({
@@ -27,6 +30,7 @@ export function PolaroidCard({
   isPinned = false,
   onTogglePin,
   isMobile = false,
+  variant = "board",
 }: PolaroidCardProps) {
   const router = useRouter();
   const saved = useSavedStore((s) => s.savedIds.has(listing.id));
@@ -46,20 +50,23 @@ export function PolaroidCard({
     }
   }, [listing.id, toggleSave, router]);
   const score = healthScore ?? 0;
+  const isBoard = variant === "board";
 
   /* ── Spring-driven hover state ────────────────── */
   const hoverProgress = useMotionValue(0);
   const springProgress = useSpring(hoverProgress, { stiffness: 300, damping: 24 });
 
-  const y = useTransform(springProgress, [0, 1], [0, -12]);
+  const y = useTransform(springProgress, [0, 1], [0, isBoard ? -12 : -6]);
   const rotate = useTransform(springProgress, [0, 1], [rotation, 0]);
-  const scale = useTransform(springProgress, [0, 1], [1, 1.02]);
+  const scale = useTransform(springProgress, [0, 1], [1, isBoard ? 1.02 : 1.01]);
   const shadow = useTransform(
     springProgress,
     [0, 1],
     [
       "0 2px 8px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06)",
-      "0 20px 40px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)",
+      isBoard
+        ? "0 20px 40px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08)"
+        : "0 16px 28px rgba(27,45,69,0.10), 0 6px 14px rgba(27,45,69,0.06)",
     ]
   );
 
@@ -78,14 +85,27 @@ export function PolaroidCard({
   /* ── Lease type short label ─────────────────────── */
   const leaseLabel = listing.lease_type ? formatLeaseType(listing.lease_type) : null;
 
+  /* ── Proximity label ────────────────────────────── */
+  const proximity = getProximityLabel(listing.walk_time_minutes);
+  const campusFacts = [
+    `${proximity.emoji} ${proximity.label}`,
+    listing.walk_time_minutes != null
+      ? `🚶 ${listing.walk_time_minutes} min walk`
+      : listing.bus_time_minutes != null
+        ? `🚌 ${listing.bus_time_minutes} min bus`
+        : null,
+    listing.distance_to_campus_km != null ? `📍 ${listing.distance_to_campus_km.toFixed(1)} km` : null,
+  ].filter(Boolean) as string[];
+
   /* ── Social proof counts ────────────────────────── */
   const viewCount = listing.view_count ?? 0;
   const saveCount = listing.save_count ?? 0;
+  const coverImage = getListingImages(listing.id)[0];
 
   return (
     <motion.div
       className="relative group"
-      style={{ y, rotate, scale }}
+      style={{ y, rotate: isBoard ? rotate : 0, scale }}
       onHoverStart={() => {
         hoverProgress.set(1);
         setIsHovered(true);
@@ -98,40 +118,44 @@ export function PolaroidCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 260, damping: 22 }}
     >
-      {/* Pushpin */}
-      <div
-        className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10"
-        style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.15))" }}
-      >
-        <Pushpin />
-      </div>
-
-      {/* Tape strips */}
-      <TapeStrip side="left" rotation={-8} />
-      <TapeStrip side="right" rotation={6} />
+      {isBoard && (
+        <>
+          <div
+            className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-10"
+            style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.15))" }}
+          >
+            <Pushpin />
+          </div>
+          <TapeStrip side="left" rotation={-8} />
+          <TapeStrip side="right" rotation={6} />
+        </>
+      )}
 
       {/* Card body */}
       <Link
         href={`/browse/${listing.id}`}
-        className="bg-white rounded-sm cursor-pointer block"
-        style={{ padding: "8px 8px 14px 8px" }}
+        className={`bg-white cursor-pointer block ${isBoard ? "rounded-sm" : "rounded-2xl border border-black/[0.06] overflow-hidden"}`}
+        style={isBoard ? { padding: "8px 8px 18px 8px" } : undefined}
       >
-        <motion.div style={{ boxShadow: shadow }} className="rounded-sm">
+        <motion.div style={{ boxShadow: shadow }} className={isBoard ? "rounded-sm" : "rounded-2xl"}>
           {/* Image area */}
           <div
-            className="relative rounded-sm overflow-hidden bg-[#f0ece6]"
-            style={{ height: isMobile ? "140px" : "180px" }}
+            className={`relative overflow-hidden bg-[#f0ece6] ${isBoard ? "rounded-sm" : "rounded-t-2xl"}`}
+            style={{ height: isBoard ? (isMobile ? "148px" : "192px") : (isMobile ? "150px" : "170px") }}
           >
-            {/* Placeholder image */}
-            <div className="w-full h-full bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center text-[#1B2D45]/20">
-              <motion.span
-                style={{ fontSize: "32px" }}
-                animate={isHovered ? { scale: 1.15 } : { scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 18 }}
-              >
-                🏠
-              </motion.span>
-            </div>
+            {coverImage ? (
+              <img src={coverImage} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center text-[#1B2D45]/20">
+                <motion.span
+                  style={{ fontSize: "32px" }}
+                  animate={isHovered ? { scale: 1.15 } : { scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 18 }}
+                >
+                  🏠
+                </motion.span>
+              </div>
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
 
             {/* Hover shimmer overlay */}
@@ -197,123 +221,253 @@ export function PolaroidCard({
               </div>
             )}
           </div>
-        </motion.div>
 
-        {/* Card info */}
-        <div className="pt-3 px-0.5">
-          <h3
-            className="text-[#1B2D45] truncate"
-            style={{ fontSize: "13px", fontWeight: 700 }}
-          >
-            {listing.title}
-          </h3>
-          <p
-            className="text-[#1B2D45]/40 truncate mt-0.5"
-            style={{ fontSize: "10px", fontWeight: 400 }}
-          >
-            {listing.address}
-          </p>
-
-          <div className="flex items-baseline gap-1 mt-1.5">
-            <span
-              className="text-[#FF6B35]"
-              style={{ fontSize: "18px", fontWeight: 800 }}
-            >
-              {formatPrice(Number(listing.rent_per_room))}
-            </span>
-            <span
-              className="text-[#1B2D45]/30"
-              style={{ fontSize: "10px", fontWeight: 400 }}
-            >
-              /room/mo
-            </span>
-          </div>
-
-          {/* Tags row 1 — property info + lease + move-in */}
-          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-            <span
-              className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded"
-              style={{ fontSize: "9px", fontWeight: 500 }}
-            >
-              {formatPropertyType(listing.property_type)}
-            </span>
-            <span
-              className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded"
-              style={{ fontSize: "9px", fontWeight: 500 }}
-            >
-              {listing.total_rooms} bed
-            </span>
-            {leaseLabel && (
-              <span
-                className="bg-[#2EC4B6]/[0.08] text-[#2EC4B6] px-2 py-0.5 rounded"
-                style={{ fontSize: "9px", fontWeight: 600 }}
-              >
-                {leaseLabel}
-              </span>
-            )}
-            {moveInLabel && (
-              <span
-                className="bg-[#1B2D45]/[0.04] text-[#1B2D45]/40 px-2 py-0.5 rounded"
-                style={{ fontSize: "9px", fontWeight: 500 }}
-              >
-                📅 {moveInLabel}
-              </span>
-            )}
-          </div>
-
-          {/* Tags row 2 — amenities */}
-          {tags.length > 0 && (
-            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-              {tags.slice(0, 3).map((tag) => (
-                <span
-                  key={tag}
-                  className="bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 px-2 py-0.5 rounded border border-[#FF6B35]/10"
-                  style={{ fontSize: "9px", fontWeight: 500 }}
+          {/* Card info */}
+          <div className={isBoard ? "px-3 pt-4 pb-4" : "px-4 pb-4 pt-3"}>
+            {isBoard ? (
+              <>
+                <h3
+                  className="text-[#1B2D45] truncate"
+                  style={{ fontSize: "15px", fontWeight: 700 }}
                 >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+                  {listing.title}
+                </h3>
+                <p
+                  className="text-[#1B2D45]/40 truncate mt-1"
+                  style={{ fontSize: "11px", fontWeight: 400 }}
+                >
+                  {listing.address}
+                </p>
 
-          {/* Social proof — viewed / saved */}
-          {(viewCount > 0 || saveCount > 0) && (
-            <div className="flex items-center gap-2.5 mt-2 text-[#1B2D45]/25" style={{ fontSize: "9px", fontWeight: 500 }}>
-              {viewCount > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <Eye className="w-3 h-3" /> {viewCount} viewed
-                </span>
-              )}
-              {saveCount > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <Heart className="w-3 h-3" /> {saveCount} saved
-                </span>
-              )}
-            </div>
-          )}
+                <div className="flex items-baseline gap-1 mt-2.5">
+                  <span
+                    className="text-[#FF6B35]"
+                    style={{ fontSize: "21px", fontWeight: 800 }}
+                  >
+                    {formatPrice(Number(listing.rent_per_room))}
+                  </span>
+                  <span
+                    className="text-[#1B2D45]/30"
+                    style={{ fontSize: "11px", fontWeight: 500 }}
+                  >
+                    /room/mo
+                  </span>
+                </div>
 
-          {/* Pin to compare board */}
-          {onTogglePin && (
-            <motion.button
-              data-tour="pin-to-board"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onTogglePin(listing.id);
-              }}
-              className={`mt-2.5 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg border transition-colors ${
-                isPinned
-                  ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
-                  : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]/60"
-              }`}
-              style={{ fontSize: "10px", fontWeight: 600 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              <Pin className="w-3 h-3" />
-              {isPinned ? "Pinned" : "Pin to board"}
-            </motion.button>
-          )}
-        </div>
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  {campusFacts.map((fact, index) => (
+                    <span
+                      key={fact}
+                      className={index === 0 ? "px-2.5 py-1 rounded-full" : "bg-[#1B2D45]/[0.04] text-[#1B2D45]/50 px-2.5 py-1 rounded"}
+                      style={index === 0
+                        ? { fontSize: "10px", fontWeight: 600, color: proximity.color, background: proximity.bg }
+                        : { fontSize: "10px", fontWeight: 500 }}
+                    >
+                      {fact}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                  <span
+                    className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2.5 py-1 rounded"
+                    style={{ fontSize: "10px", fontWeight: 500 }}
+                  >
+                    {formatPropertyType(listing.property_type)}
+                  </span>
+                  <span
+                    className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2.5 py-1 rounded"
+                    style={{ fontSize: "10px", fontWeight: 500 }}
+                  >
+                    {listing.total_rooms} bed
+                  </span>
+                  {leaseLabel && (
+                    <span
+                      className="bg-[#2EC4B6]/[0.08] text-[#2EC4B6] px-2.5 py-1 rounded"
+                      style={{ fontSize: "10px", fontWeight: 600 }}
+                    >
+                      {leaseLabel}
+                    </span>
+                  )}
+                  {moveInLabel && (
+                    <span
+                      className="bg-[#1B2D45]/[0.04] text-[#1B2D45]/40 px-2.5 py-1 rounded"
+                      style={{ fontSize: "10px", fontWeight: 500 }}
+                    >
+                      📅 {moveInLabel}
+                    </span>
+                  )}
+                </div>
+
+                {tags.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {tags.slice(0, 3).map((tag) => (
+                      <span
+                        key={tag}
+                        className="bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 px-2.5 py-1 rounded border border-[#FF6B35]/10"
+                        style={{ fontSize: "10px", fontWeight: 500 }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {(viewCount > 0 || saveCount > 0) && (
+                  <div className="flex items-center gap-3 mt-3 text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 500 }}>
+                    {viewCount > 0 && (
+                      <span className="flex items-center gap-0.5">
+                        <Eye className="w-3 h-3" /> {viewCount} viewed
+                      </span>
+                    )}
+                    {saveCount > 0 && (
+                      <span className="flex items-center gap-0.5">
+                        <Heart className="w-3 h-3" /> {saveCount} saved
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {onTogglePin && (
+                  <motion.button
+                    data-tour="pin-to-board"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onTogglePin(listing.id);
+                    }}
+                    className={`mt-4.5 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-colors ${
+                      isPinned
+                        ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
+                        : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]/60"
+                    }`}
+                    style={{ fontSize: "11px", fontWeight: 600 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    <Pin className="w-3 h-3" />
+                    {isPinned ? "Pinned" : "Pin to board"}
+                  </motion.button>
+                )}
+              </>
+            ) : (
+              <>
+                <h3
+                  className="text-[#1B2D45] truncate"
+                  style={{ fontSize: "15px", fontWeight: 700 }}
+                >
+                  {listing.title}
+                </h3>
+                <p
+                  className="text-[#1B2D45]/40 truncate mt-0.5"
+                  style={{ fontSize: "11px", fontWeight: 400 }}
+                >
+                  {listing.address}
+                </p>
+
+                <div className="flex items-baseline gap-1 mt-1.5">
+                  <span
+                    className="text-[#FF6B35]"
+                    style={{ fontSize: "22px", fontWeight: 800 }}
+                  >
+                    {formatPrice(Number(listing.rent_per_room))}
+                  </span>
+                  <span
+                    className="text-[#1B2D45]/30"
+                    style={{ fontSize: "11px", fontWeight: 500 }}
+                  >
+                    /room/mo
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  {campusFacts.map((fact, index) => (
+                    <span
+                      key={fact}
+                      className={index === 0 ? "px-2 py-0.5 rounded-full" : "bg-[#1B2D45]/[0.04] text-[#1B2D45]/40 px-2 py-0.5 rounded"}
+                      style={index === 0
+                        ? { fontSize: "10px", fontWeight: 600, color: proximity.color, background: proximity.bg }
+                        : { fontSize: "10px", fontWeight: 500 }}
+                    >
+                      {fact}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span
+                    className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded"
+                    style={{ fontSize: "10px", fontWeight: 500 }}
+                  >
+                    {formatPropertyType(listing.property_type)}
+                  </span>
+                  <span
+                    className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded"
+                    style={{ fontSize: "10px", fontWeight: 500 }}
+                  >
+                    {listing.total_rooms} bed
+                  </span>
+                  <span
+                    className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded"
+                    style={{ fontSize: "10px", fontWeight: 500 }}
+                  >
+                    {listing.bathrooms} bath
+                  </span>
+                  {leaseLabel && (
+                    <span
+                      className="bg-[#2EC4B6]/[0.08] text-[#2EC4B6] px-2 py-0.5 rounded"
+                      style={{ fontSize: "10px", fontWeight: 600 }}
+                    >
+                      {leaseLabel}
+                    </span>
+                  )}
+                  {moveInLabel && (
+                    <span
+                      className="bg-[#1B2D45]/[0.04] text-[#1B2D45]/40 px-2 py-0.5 rounded"
+                      style={{ fontSize: "10px", fontWeight: 500 }}
+                    >
+                      📅 {moveInLabel}
+                    </span>
+                  )}
+                  {listing.landlord_verified && (
+                    <span
+                      className="bg-[#2EC4B6]/[0.08] text-[#2EC4B6] px-2 py-0.5 rounded"
+                      style={{ fontSize: "10px", fontWeight: 600 }}
+                    >
+                      Verified landlord
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {tags.slice(0, 2).map((tag) => (
+                    <span
+                      key={tag}
+                      className="bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 px-2 py-0.5 rounded border border-[#FF6B35]/10"
+                      style={{ fontSize: "10px", fontWeight: 500 }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                {(viewCount > 0 || saveCount > 0) && (
+                  <div className="flex items-center gap-2.5 mt-2 text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 500 }}>
+                    {viewCount > 0 && (
+                      <span className="flex items-center gap-0.5">
+                        <Eye className="w-3 h-3" /> {viewCount} viewed
+                      </span>
+                    )}
+                    {saveCount > 0 && (
+                      <span className="flex items-center gap-0.5">
+                        <Heart className="w-3 h-3" /> {saveCount} saved
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </motion.div>
       </Link>
     </motion.div>
   );

@@ -4,12 +4,13 @@ import { X, ArrowRight, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { getScoreColor, formatPrice } from "@/lib/utils";
-import { mockHealthScores } from "@/lib/mock-data";
+import { getListingImages } from "@/lib/mock-data";
 import type { ListingDetailResponse } from "@/types";
 import Link from "next/link";
 
 interface MyPicksTrayProps {
   picks: ListingDetailResponse[];
+  healthScores: Record<number, number>;
   onRemove: (id: number) => void;
   onCompare: () => void;
   showBottomSheet?: boolean;
@@ -18,13 +19,14 @@ interface MyPicksTrayProps {
 
 function PickCard({
   listing,
+  healthScore,
   onRemove,
 }: {
   listing: ListingDetailResponse;
+  healthScore: number | null;
   onRemove: () => void;
 }) {
-  const score = mockHealthScores[listing.id] ?? 0;
-
+  const thumbnail = getListingImages(listing.id)[0];
   return (
     <motion.div
       layout
@@ -33,9 +35,12 @@ function PickCard({
       exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
       className="flex items-center gap-3 bg-[#FAF8F4] rounded-xl px-3 py-2 shrink-0 border border-black/[0.04]"
     >
-      {/* Thumbnail placeholder */}
-      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center shrink-0">
-        <span style={{ fontSize: "14px" }}>🏠</span>
+      <div className="w-10 h-10 rounded-lg overflow-hidden bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center shrink-0">
+        {thumbnail ? (
+          <img src={thumbnail} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span style={{ fontSize: "14px" }}>🏠</span>
+        )}
       </div>
       <div className="min-w-0">
         <Link
@@ -52,17 +57,17 @@ function PickCard({
           >
             {formatPrice(Number(listing.rent_per_room))}
           </span>
-          {score > 0 && (
+          {(healthScore ?? 0) > 0 && (
             <>
               <div
                 className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: getScoreColor(score) }}
+                style={{ backgroundColor: getScoreColor(healthScore ?? 0) }}
               />
               <span
                 className="text-[#1B2D45]/40"
                 style={{ fontSize: "10px", fontWeight: 600 }}
               >
-                {score}
+                {healthScore}
               </span>
             </>
           )}
@@ -80,6 +85,7 @@ function PickCard({
 
 export function MyPicksTray({
   picks,
+  healthScores,
   onRemove,
   onCompare,
   showBottomSheet = false,
@@ -180,6 +186,7 @@ export function MyPicksTray({
                         <PickCard
                           key={p.id}
                           listing={p}
+                          healthScore={healthScores[p.id] ?? null}
                           onRemove={() => onRemove(p.id)}
                         />
                       ))}
@@ -242,6 +249,7 @@ export function MyPicksTray({
                   <PickCard
                     key={p.id}
                     listing={p}
+                    healthScore={healthScores[p.id] ?? null}
                     onRemove={() => onRemove(p.id)}
                   />
                 ))}

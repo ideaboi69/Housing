@@ -65,34 +65,34 @@ export interface SubletDetail {
 
 const SUBLET_IMAGES: Record<string, string[]> = {
   s1: [
-    "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=500&fit=crop",
+    "/demo/listings/townhouse.jpg",
+    "/demo/listings/apartment.jpg",
+    "/demo/listings/house.jpg",
   ],
   s2: [
-    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=500&fit=crop",
+    "/demo/listings/apartment.jpg",
+    "/demo/listings/house.jpg",
+    "/demo/listings/studio.jpg",
+    "/demo/listings/townhouse.jpg",
   ],
   s3: [
-    "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=500&fit=crop",
+    "/demo/listings/studio.jpg",
+    "/demo/listings/apartment.jpg",
   ],
   s4: [
-    "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=500&fit=crop",
+    "/demo/listings/house.jpg",
+    "/demo/listings/apartment.jpg",
+    "/demo/listings/studio.jpg",
   ],
   s5: [
-    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&h=500&fit=crop",
+    "/demo/listings/townhouse.jpg",
+    "/demo/listings/house.jpg",
   ],
   s6: [
-    "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=500&fit=crop",
-    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=500&fit=crop",
+    "/demo/listings/house.jpg",
+    "/demo/listings/townhouse.jpg",
+    "/demo/listings/apartment.jpg",
+    "/demo/listings/studio.jpg",
   ],
 };
 

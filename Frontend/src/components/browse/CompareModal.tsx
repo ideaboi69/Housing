@@ -9,7 +9,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { formatPrice, getScoreColor } from "@/lib/utils";
-import { mockHealthScores } from "@/lib/mock-data";
+import { getListingImages } from "@/lib/mock-data";
 import type { ListingDetailResponse } from "@/types";
 
 /* ── Types ────────────────────────────────── */
@@ -277,9 +277,13 @@ export function CompareModal({ isOpen, onClose, listings, healthScores }: Compar
                             <Link href={`/browse/${l.id}`} className="group block">
                               {/* Thumbnail */}
                               <div className="w-full h-[100px] rounded-lg bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] mb-2.5 overflow-hidden relative">
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <span style={{ fontSize: "24px" }}>🏠</span>
-                                </div>
+                                {getListingImages(l.id)[0] ? (
+                                  <img src={getListingImages(l.id)[0]} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <span style={{ fontSize: "24px" }}>🏠</span>
+                                  </div>
+                                )}
                                 {/* Health score badge */}
                                 {healthScores[l.id] && (
                                   <div

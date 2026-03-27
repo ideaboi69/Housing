@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { CribbMap } from "@/components/ui/CribbMap";
+import { getProximityLabel } from "@/lib/proximity";
 import type { ReviewResponse } from "@/types";
 
 /* ── Helpers ───────────────────────────────────── */
@@ -159,6 +160,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   const discount = Math.round(((sublet.originalPrice - sublet.subletPrice) / sublet.originalPrice) * 100);
   const score = sublet.healthScore;
   const scoreColor = getScoreColor(score);
+  const campusAccess = getProximityLabel(sublet.walkTime);
 
   const amenities = getAmenityChecklist(sublet as unknown as Record<string, unknown>);
   const hasAmenities = amenities.filter((a) => a.has);
@@ -244,6 +246,26 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               {/* Description */}
               {sublet.description && (<div className="mt-5"><h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>About this sublet</h3><p className="text-[#1B2D45]/60 mt-2" style={{ fontSize: "13px", lineHeight: 1.7 }}>{sublet.description}</p></div>)}
 
+              {/* Getting to campus */}
+              <div className="mt-6 flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Getting to Campus</h3>
+                <div
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border"
+                  style={{ fontSize: "11px", fontWeight: 700, color: campusAccess.color, background: campusAccess.bg, borderColor: `${campusAccess.color}25` }}
+                >
+                  <span>{campusAccess.emoji}</span>
+                  <span>{campusAccess.label}</span>
+                </div>
+              </div>
+              <p className="mt-2 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>
+                Campus access uses the same proximity labels shown across Cribb.
+              </p>
+              <div className="flex items-center gap-4 mt-3 flex-wrap">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚶</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.walkTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p></div></div>
+                {sublet.busTime && <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚌</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.busTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p></div></div>}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>📍</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.distanceKm} km</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to UofG</p></div></div>
+              </div>
+
               {/* Amenities — same checklist as listings */}
               <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Amenities</h3>
               <div className="grid grid-cols-2 gap-2.5 mt-3">
@@ -268,14 +290,6 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                   <span className="text-[#1B2D45]/60" style={{ fontSize: "11px" }}>Estimated utilities: <strong className="text-[#1B2D45]">${sublet.estimated_utility_cost}/mo</strong> per person</span>
                 </div>
               )}
-
-              {/* Getting to campus */}
-              <h3 className="mt-6 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Getting to Campus</h3>
-              <div className="flex items-center gap-4 mt-3 flex-wrap">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚶</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.walkTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p></div></div>
-                {sublet.busTime && <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚌</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.busTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p></div></div>}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>📍</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.distanceKm} km</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to UofG</p></div></div>
-              </div>
 
               {/* Cribb Score Breakdown */}
               <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.4 }}>
