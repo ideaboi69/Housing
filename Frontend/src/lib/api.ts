@@ -4,6 +4,7 @@ import type {
   UserLogin,
   UserResponse,
   UserUpdate,
+  UserDashboardResponse,
   PasswordChange,
   RoleSwitch,
   ListingDetailResponse,
@@ -22,6 +23,7 @@ import type {
   SubletResponse,
   FlagCreate,
   FlagResponse,
+  LandlordFlagResponse,
   LandlordPublicResponse,
   WriterRegister,
   WriterResponse,
@@ -195,6 +197,8 @@ export const auth = {
     }),
 
   getMe: () => request<UserResponse>("/api/users/me"),
+
+  getDashboard: () => request<UserDashboardResponse>("/api/users/me/dashboard"),
 
   updateMe: (data: UserUpdate) =>
     request<UserResponse>("/api/users/me", {
@@ -447,6 +451,9 @@ export const landlords = {
       method: "PATCH",
       body: JSON.stringify(data),
     }),
+
+  getMyFlags: () =>
+    request<LandlordFlagResponse[]>("/api/landlords/me/flags"),
 
   requestVerification: () =>
     request<{ message: string }>("/api/landlords/me/verify", {

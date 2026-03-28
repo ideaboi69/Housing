@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, LandlordDocuments
-from Schemas.landlordSchema import LandlordLogin, LandlordUpdate, LandlordResponse, LandlordPublicResponse, LandlordPropertyResponse, LandlordReviewResponse, PropertyRange, IDType, DocumentType, LandlordVerification, LandlordTokenResponse
+from Schemas.landlordSchema import LandlordLogin, LandlordUpdate, LandlordResponse, LandlordPublicResponse, LandlordPropertyResponse, LandlordReviewResponse, LandlordFlagResponse, PropertyRange, IDType, DocumentType, LandlordVerification, LandlordTokenResponse
 from Schemas.userSchema import UserRole, TokenResponse
 from Utils.security import get_current_user, hash_password, verify_password, create_access_token, validate_password
 from Utils.textract import extract_document_data
@@ -236,3 +236,28 @@ def get_landlord_reviews(landlord_id: int, db: Session = Depends(get_db)):
 
     reviews = db.query(Review).filter(Review.landlord_id == landlord_id).all()
     return [LandlordReviewResponse.model_validate(r) for r in reviews]
+
+@landlord_router.get("/me/flags", response_model=list[LandlordFlagResponse])
+def get_my_listing_flags(current_landlord: Landlord = Depends(require_landlord), db: Session = Depends(get_db)):
+    rows = (
+        db.query(Flag, Listing, Property)
+        .join(Listing, Flag.listing_id == Listing.id)
+        .join(Property, Listing.property_id == Property.id)
+        .filter(Property.landlord_id == current_landlord.id)
+        .order_by(Flag.created_at.desc())
+        .all()
+    )
+
+    return [
+        LandlordFlagResponse(
+            id=flag.id,
+            listing_id=listing.id,
+            property_id=property.id,
+            property_title=property.title,
+            property_address=property.address,
+            reason=flag.reason,
+            status=flag.status.value if hasattr(flag.status, "value") else str(flag.status),
+            created_at=flag.created_at,
+        )
+        for flag, listing, property in rows
+    ]

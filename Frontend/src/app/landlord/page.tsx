@@ -2,17 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { clearLandlordClaim, getLandlordClaimCode, getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
-import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse } from "@/types";
+import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse } from "@/types";
 import {
   Plus, Building2, Eye, TrendingUp, Shield, ShieldCheck,
   ChevronRight, Home, Phone, Mail, Pencil, Check, X,
   MessageCircle, Settings, LayoutDashboard, Send,
   ToggleLeft, ToggleRight, Calendar, Loader2,
-  ArrowRight, Inbox, Clock, AlertCircle, Image, CalendarDays,
+  ArrowRight, Inbox, Clock, AlertCircle, Image, CalendarDays, Star, Flag,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getScoreColor } from "@/lib/utils";
@@ -32,7 +32,20 @@ interface PropertyWithListings extends PropertyResponse {
   totalViews: number;
 }
 
-type Tab = "overview" | "properties" | "messages" | "settings";
+type Tab = "overview" | "properties" | "listings" | "reviews" | "messages" | "settings";
+
+const LANDLORD_TABS: Tab[] = ["overview", "properties", "listings", "reviews", "messages", "settings"];
+
+function getTabFromQuery(value: string | null): Tab {
+  return LANDLORD_TABS.includes(value as Tab) ? (value as Tab) : "overview";
+}
+
+function getListingStatusBucket(status: string): "active" | "draft" | "archived" {
+  const normalized = status.toLowerCase();
+  if (normalized === "active") return "active";
+  if (normalized === "draft" || normalized === "pending") return "draft";
+  return "archived";
+}
 
 /* ════════════════════════════════════════════════════════
    Sidebar
@@ -42,6 +55,8 @@ function Sidebar({ active, onChange, unreadCount }: { active: Tab; onChange: (t:
   const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
     { key: "overview", label: "Overview", icon: <LayoutDashboard className="w-4 h-4" /> },
     { key: "properties", label: "Properties", icon: <Building2 className="w-4 h-4" /> },
+    { key: "listings", label: "Listings", icon: <Home className="w-4 h-4" /> },
+    { key: "reviews", label: "Feedback", icon: <Star className="w-4 h-4" /> },
     { key: "messages", label: "Messages", icon: <MessageCircle className="w-4 h-4" />, badge: unreadCount },
     { key: "settings", label: "Settings", icon: <Settings className="w-4 h-4" /> },
   ];
@@ -84,6 +99,8 @@ function MobileTabBar({ active, onChange, unreadCount }: { active: Tab; onChange
   const tabs: { key: Tab; icon: React.ReactNode; label: string; badge?: number }[] = [
     { key: "overview", icon: <LayoutDashboard className="w-5 h-5" />, label: "Overview" },
     { key: "properties", icon: <Building2 className="w-5 h-5" />, label: "Properties" },
+    { key: "listings", icon: <Home className="w-5 h-5" />, label: "Listings" },
+    { key: "reviews", icon: <Star className="w-5 h-5" />, label: "Feedback" },
     { key: "messages", icon: <MessageCircle className="w-5 h-5" />, label: "Messages", badge: unreadCount },
     { key: "settings", icon: <Settings className="w-5 h-5" />, label: "Settings" },
   ];
@@ -153,6 +170,7 @@ function OverviewTab({
 }) {
   const totalListings = properties.reduce((sum, p) => sum + p.listings.length, 0);
   const activeListings = properties.reduce((sum, p) => sum + p.listings.filter(l => l.status === "active").length, 0);
+  const draftListings = properties.reduce((sum, p) => sum + p.listings.filter((l) => getListingStatusBucket(l.status) === "draft").length, 0);
   const totalViews = properties.reduce((sum, p) => sum + p.totalViews, 0);
   const scores = properties.filter(p => p.healthScore).map(p => p.healthScore!);
   const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
@@ -256,15 +274,16 @@ function OverviewTab({
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
         <StatCard icon={<Building2 className="w-4 h-4 text-[#1B2D45]" />} label="Properties" value={properties.length} />
         <StatCard icon={<Home className="w-4 h-4 text-[#2EC4B6]" />} label="Active Listings" value={activeListings} sub={totalListings > activeListings ? `${totalListings} total` : undefined} />
+        <StatCard icon={<Clock className="w-4 h-4 text-[#FFB627]" />} label="Draft Listings" value={draftListings} />
         <StatCard icon={<MessageCircle className="w-4 h-4 text-[#FF6B35]" />} label="Unread Messages" value={unreadCount} />
         <StatCard icon={<TrendingUp className="w-4 h-4 text-[#4ADE80]" />} label="Avg Cribb Score" value={avgScore ?? "—"} sub={avgScore ? (avgScore >= 85 ? "Great" : avgScore >= 65 ? "Good" : "Needs work") : "No scores yet"} />
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
         <Link href="/landlord/properties/new" className="flex items-center gap-3 bg-white rounded-xl border border-black/[0.04] p-4 hover:border-[#1B2D45]/15 transition-all group">
           <div className="w-10 h-10 rounded-xl bg-[#1B2D45]/[0.06] flex items-center justify-center shrink-0">
             <Plus className="w-5 h-5 text-[#1B2D45]/60" />
@@ -281,6 +300,26 @@ function OverviewTab({
           <div>
             <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>View Messages</div>
             <div className="text-[#1B2D45]/30" style={{ fontSize: "11px" }}>{unreadCount > 0 ? `${unreadCount} unread` : "No new messages"}</div>
+          </div>
+        </button>
+        <button onClick={() => onSwitchTab("listings")} className="flex items-center gap-3 bg-white rounded-xl border border-black/[0.04] p-4 hover:border-[#1B2D45]/15 transition-all group text-left">
+          <div className="w-10 h-10 rounded-xl bg-[#FFB627]/[0.08] flex items-center justify-center shrink-0">
+            <Home className="w-5 h-5 text-[#FFB627]" />
+          </div>
+          <div>
+            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Manage Listings</div>
+            <div className="text-[#1B2D45]/30" style={{ fontSize: "11px" }}>
+              {draftListings > 0 ? `${draftListings} draft${draftListings > 1 ? "s" : ""} need attention` : "View active, draft, and archived"}
+            </div>
+          </div>
+        </button>
+        <button onClick={() => onSwitchTab("reviews")} className="flex items-center gap-3 bg-white rounded-xl border border-black/[0.04] p-4 hover:border-[#1B2D45]/15 transition-all group text-left">
+          <div className="w-10 h-10 rounded-xl bg-[#4ADE80]/[0.08] flex items-center justify-center shrink-0">
+            <Star className="w-5 h-5 text-[#4ADE80]" />
+          </div>
+          <div>
+            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Reviews & Reports</div>
+            <div className="text-[#1B2D45]/30" style={{ fontSize: "11px" }}>See student feedback and moderation status</div>
           </div>
         </button>
         <Link href="/browse" className="flex items-center gap-3 bg-white rounded-xl border border-black/[0.04] p-4 hover:border-[#1B2D45]/15 transition-all group">
@@ -360,17 +399,20 @@ function PropertiesTab({ properties, onListingUpdated }: { properties: PropertyW
   const [editListing, setEditListing] = useState<ListingResponse | null>(null);
   const [photosListing, setPhotosListing] = useState<{ id: number; title: string } | null>(null);
   const [showingsListing, setShowingsListing] = useState<{ id: number; title: string } | null>(null);
+  const hasProperties = properties.length > 0;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Your Properties</h2>
-        <Link href="/landlord/properties/new" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-all" style={{ fontSize: "12px", fontWeight: 700 }}>
-          <Plus className="w-3.5 h-3.5" /> Add Property
-        </Link>
+        {hasProperties && (
+          <Link href="/landlord/properties/new" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-all" style={{ fontSize: "12px", fontWeight: 700 }}>
+            <Plus className="w-3.5 h-3.5" /> Add Property
+          </Link>
+        )}
       </div>
 
-      {properties.length === 0 ? (
+      {!hasProperties ? (
         <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-10 text-center">
           <div className="w-14 h-14 rounded-2xl bg-[#1B2D45]/[0.06] flex items-center justify-center mx-auto mb-3">
             <Home className="w-7 h-7 text-[#1B2D45]/40" />
@@ -535,6 +577,417 @@ function PropertiesTab({ properties, onListingUpdated }: { properties: PropertyW
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Listings Tab
+   ════════════════════════════════════════════════════════ */
+
+function ListingsTab({
+  properties,
+  onListingUpdated,
+}: {
+  properties: PropertyWithListings[];
+  onListingUpdated?: (listingId: number, updated: ListingResponse) => void;
+}) {
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
+  const [editListing, setEditListing] = useState<ListingResponse | null>(null);
+  const [photosListing, setPhotosListing] = useState<{ id: number; title: string } | null>(null);
+  const [showingsListing, setShowingsListing] = useState<{ id: number; title: string } | null>(null);
+
+  const allListings = properties.flatMap((property) =>
+    property.listings.map((listing) => ({
+      listing,
+      property,
+    }))
+  );
+
+  const filteredListings = allListings.filter(({ listing }) =>
+    statusFilter === "all" ? true : getListingStatusBucket(listing.status) === statusFilter
+  );
+
+  const counts = {
+    all: allListings.length,
+    active: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "active").length,
+    draft: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "draft").length,
+    archived: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "archived").length,
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Your Listings</h2>
+          <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "12px" }}>
+            Active, draft, and archived listings in one place. Tenant reviews live in the reviews tab.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "all", label: "All" },
+            { key: "active", label: "Active" },
+            { key: "draft", label: "Draft" },
+            { key: "archived", label: "Archived" },
+          ].map((filter) => (
+            <button
+              key={filter.key}
+              onClick={() => setStatusFilter(filter.key as typeof statusFilter)}
+              className={`rounded-full border px-3 py-1.5 transition-all ${
+                statusFilter === filter.key
+                  ? "border-[#1B2D45]/20 bg-[#1B2D45]/[0.06] text-[#1B2D45]"
+                  : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#1B2D45]/15 hover:text-[#1B2D45]"
+              }`}
+              style={{ fontSize: "11px", fontWeight: 700 }}
+            >
+              {filter.label} ({counts[filter.key as keyof typeof counts]})
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-black/[0.04] bg-white px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFB627]/10 text-[#FFB627]">
+            <Flag className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Listing reports</div>
+            <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px", lineHeight: 1.55 }}>
+              Student flags are still handled through Cribb&apos;s moderation flow. Tenant reviews and public sentiment are visible in the reviews tab.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {filteredListings.length === 0 ? (
+        <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-10 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-[#1B2D45]/[0.06] flex items-center justify-center mx-auto mb-3">
+            <Home className="w-7 h-7 text-[#1B2D45]/40" />
+          </div>
+          <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>
+            {statusFilter === "all" ? "No listings yet" : `No ${statusFilter} listings`}
+          </h3>
+          <p className="text-[#1B2D45]/40 mt-1 max-w-[340px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.5 }}>
+            {properties.length === 0
+              ? "Add a property first, then create your first listing."
+              : "Use the properties tab to add a new listing to one of your homes."}
+          </p>
+          <Link
+            href={properties[0] ? `/landlord/properties/${properties[0].id}/listings/new` : "/landlord/properties/new"}
+            className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-colors"
+            style={{ fontSize: "14px", fontWeight: 600 }}
+          >
+            <Plus className="w-4 h-4" /> {properties.length === 0 ? "Add Property" : "Create Listing"}
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredListings.map(({ listing, property }) => (
+            <div key={listing.id} className="bg-white rounded-xl border border-black/[0.04] p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>
+                      {property.title}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-md ${
+                        listing.status === "active"
+                          ? "bg-[#4ADE80]/10 text-[#4ADE80]"
+                          : getListingStatusBucket(listing.status) === "draft"
+                            ? "bg-[#FFB627]/10 text-[#FFB627]"
+                            : "bg-[#1B2D45]/[0.05] text-[#1B2D45]/45"
+                      }`}
+                      style={{ fontSize: "10px", fontWeight: 700 }}
+                    >
+                      {listing.status}
+                    </span>
+                    {listing.is_sublet && (
+                      <span className="px-2 py-0.5 rounded-md bg-[#2EC4B6]/10 text-[#2EC4B6]" style={{ fontSize: "10px", fontWeight: 700 }}>
+                        Sublet
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-[#1B2D45]/35" style={{ fontSize: "12px" }}>
+                    {property.address}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="rounded-md bg-[#FAF8F4] px-2 py-1 text-[#1B2D45]/55" style={{ fontSize: "11px", fontWeight: 600 }}>
+                      ${listing.rent_per_room}/room
+                    </span>
+                    <span className="rounded-md bg-[#FAF8F4] px-2 py-1 text-[#1B2D45]/55" style={{ fontSize: "11px", fontWeight: 600 }}>
+                      {listing.lease_type}
+                    </span>
+                    <span className="rounded-md bg-[#FAF8F4] px-2 py-1 text-[#1B2D45]/55" style={{ fontSize: "11px", fontWeight: 600 }}>
+                      <Eye className="w-3 h-3 inline mr-1" /> {listing.view_count} views
+                    </span>
+                    {listing.move_in_date && (
+                      <span className="rounded-md bg-[#FAF8F4] px-2 py-1 text-[#1B2D45]/55" style={{ fontSize: "11px", fontWeight: 600 }}>
+                        Move-in {new Date(listing.move_in_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setEditListing(listing)}
+                    className="rounded-lg border border-black/[0.06] px-3 py-2 text-[#1B2D45]/55 hover:border-[#1B2D45]/15 hover:text-[#1B2D45] transition-all"
+                    style={{ fontSize: "11px", fontWeight: 700 }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setPhotosListing({ id: listing.id, title: `${property.title} — $${listing.rent_per_room}/rm` })}
+                    className="rounded-lg border border-black/[0.06] px-3 py-2 text-[#1B2D45]/55 hover:border-[#1B2D45]/15 hover:text-[#1B2D45] transition-all"
+                    style={{ fontSize: "11px", fontWeight: 700 }}
+                  >
+                    Photos
+                  </button>
+                  <button
+                    onClick={() => setShowingsListing({ id: listing.id, title: `${property.title} — $${listing.rent_per_room}/rm` })}
+                    className="rounded-lg border border-black/[0.06] px-3 py-2 text-[#1B2D45]/55 hover:border-[#1B2D45]/15 hover:text-[#1B2D45] transition-all"
+                    style={{ fontSize: "11px", fontWeight: 700 }}
+                  >
+                    Showings
+                  </button>
+                  <Link
+                    href={`/landlord/properties/${property.id}`}
+                    className="rounded-lg bg-[#1B2D45] px-3 py-2 text-white hover:bg-[#152438] transition-all"
+                    style={{ fontSize: "11px", fontWeight: 700 }}
+                  >
+                    View Property
+                  </Link>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {editListing && (
+          <EditListingModal
+            listing={editListing}
+            onClose={() => setEditListing(null)}
+            onSaved={(updated) => {
+              onListingUpdated?.(updated.id, updated);
+              setEditListing(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {photosListing && (
+          <ListingImageUpload
+            listingId={photosListing.id}
+            onClose={() => setPhotosListing(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showingsListing && (
+          <ShowingsManager
+            listingId={showingsListing.id}
+            listingTitle={showingsListing.title}
+            onClose={() => setShowingsListing(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Reviews Tab
+   ════════════════════════════════════════════════════════ */
+
+function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: LandlordFlagResponse[] }) {
+  const avg =
+    reviews.length > 0
+      ? (
+          reviews.reduce((sum, review) => {
+            const reviewAvg =
+              (review.responsiveness +
+                review.maintenance_speed +
+                review.respect_privacy +
+                review.fairness_of_charges) /
+              4;
+            return sum + reviewAvg;
+          }, 0) / reviews.length
+        ).toFixed(1)
+      : null;
+
+  const wouldRentAgain =
+    reviews.length > 0
+      ? Math.round((reviews.filter((review) => review.would_rent_again).length / reviews.length) * 100)
+      : null;
+  const pendingFlags = flags.filter((flag) => flag.status === "pending").length;
+  const resolvedFlags = flags.filter((flag) => flag.status === "resolved").length;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Reviews & Reports</h2>
+        <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "12px" }}>
+          Anonymous student feedback across your properties plus reports submitted on your listings.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <StatCard icon={<Star className="w-4 h-4 text-[#FFB627]" />} label="Average Rating" value={avg ?? "—"} sub={avg ? "Across all categories" : "No reviews yet"} />
+        <StatCard icon={<ShieldCheck className="w-4 h-4 text-[#4ADE80]" />} label="Would Rent Again" value={wouldRentAgain != null ? `${wouldRentAgain}%` : "—"} />
+        <StatCard icon={<MessageCircle className="w-4 h-4 text-[#1B2D45]" />} label="Total Reviews" value={reviews.length} />
+        <StatCard icon={<Flag className="w-4 h-4 text-[#E71D36]" />} label="Open Reports" value={pendingFlags} sub={flags.length > 0 ? `${resolvedFlags} resolved` : "No reports yet"} />
+      </div>
+
+      <div className="bg-white rounded-xl border border-black/[0.04] p-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E71D36]/[0.07] text-[#E71D36]">
+            <Flag className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Listing reports</div>
+            <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px", lineHeight: 1.55 }}>
+              Students can report inaccurate or suspicious listings. Cribb moderation still handles the final review, but you can now see which of your listings were flagged and why.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {flags.length === 0 ? (
+        <div className="bg-white rounded-xl border border-black/[0.04] p-8 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-[#E71D36]/[0.05] flex items-center justify-center mx-auto mb-3">
+            <Flag className="w-6 h-6 text-[#E71D36]/50" />
+          </div>
+          <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>No listing reports</h3>
+          <p className="text-[#1B2D45]/40 mt-1 max-w-[360px] mx-auto" style={{ fontSize: "12px", lineHeight: 1.55 }}>
+            If students flag one of your listings, it will appear here with the reported reason and moderation status.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {flags.map((flag) => (
+            <div key={flag.id} className="bg-white rounded-xl border border-black/[0.04] p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>
+                      {flag.property_title}
+                    </span>
+                    <span
+                      className={`rounded-full px-2.5 py-1 ${
+                        flag.status === "pending"
+                          ? "bg-[#E71D36]/8 text-[#E71D36]"
+                          : flag.status === "resolved"
+                            ? "bg-[#4ADE80]/10 text-[#4ADE80]"
+                            : "bg-[#FFB627]/10 text-[#B8860B]"
+                      }`}
+                      style={{ fontSize: "10px", fontWeight: 700 }}
+                    >
+                      {flag.status}
+                    </span>
+                  </div>
+                  <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px" }}>
+                    {flag.property_address}
+                  </p>
+                </div>
+                <span className="text-[#1B2D45]/25 shrink-0" style={{ fontSize: "11px" }}>
+                  {new Date(flag.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+              </div>
+              <div className="mt-3 rounded-lg bg-[#FAF8F4] px-3 py-2.5">
+                <div className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em" }}>
+                  REPORTED ISSUE
+                </div>
+                <p className="text-[#1B2D45] mt-1" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+                  {flag.reason}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {reviews.length === 0 ? (
+        <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-10 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-[#FFB627]/10 flex items-center justify-center mx-auto mb-3">
+            <Star className="w-7 h-7 text-[#FFB627]" />
+          </div>
+          <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No reviews yet</h3>
+          <p className="text-[#1B2D45]/40 mt-1 max-w-[340px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.5 }}>
+            Reviews from students will appear here once they have completed a stay and left feedback.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {reviews.map((review) => {
+            const reviewAvg = (
+              (review.responsiveness +
+                review.maintenance_speed +
+                review.respect_privacy +
+                review.fairness_of_charges) /
+              4
+            ).toFixed(1);
+
+            return (
+              <div key={review.id} className="bg-white rounded-xl border border-black/[0.04] p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>
+                        Anonymous tenant review
+                      </span>
+                      <span className="rounded-md bg-[#FFB627]/10 px-2 py-0.5 text-[#B8860B]" style={{ fontSize: "10px", fontWeight: 700 }}>
+                        Avg {reviewAvg}
+                      </span>
+                    </div>
+                    <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px" }}>
+                      Property #{review.property_id} · {new Date(review.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1.5 ${
+                      review.would_rent_again ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#E71D36]/8 text-[#E71D36]"
+                    }`}
+                    style={{ fontSize: "11px", fontWeight: 700 }}
+                  >
+                    {review.would_rent_again ? "Would rent again" : "Would not rent again"}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {[
+                    ["Responsiveness", review.responsiveness],
+                    ["Maintenance", review.maintenance_speed],
+                    ["Privacy", review.respect_privacy],
+                    ["Charges", review.fairness_of_charges],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg bg-[#FAF8F4] px-3 py-2">
+                      <div className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 700 }}>
+                        {label}
+                      </div>
+                      <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 800 }}>
+                        {value}/5
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {review.comment && (
+                  <p className="mt-4 text-[#1B2D45]/55" style={{ fontSize: "13px", lineHeight: 1.65 }}>
+                    “{review.comment}”
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1062,10 +1515,13 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
 
 export default function LandlordDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuthStore();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>(() => getTabFromQuery(searchParams.get("tab")));
   const [properties, setProperties] = useState<PropertyWithListings[]>([]);
   const [conversations, setConversations] = useState<ConversationResponse[]>([]);
+  const [reviews, setReviews] = useState<ReviewResponse[]>([]);
+  const [flags, setFlags] = useState<LandlordFlagResponse[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [claimCode, setClaimCode] = useState("");
@@ -1083,9 +1539,21 @@ export default function LandlordDashboard() {
   }, []);
 
   useEffect(() => {
+    const nextTab = getTabFromQuery(searchParams.get("tab"));
+    setTab((current) => (current === nextTab ? current : nextTab));
+  }, [searchParams]);
+
+  const handleTabChange = useCallback((nextTab: Tab) => {
+    setTab(nextTab);
+    const target = nextTab === "overview" ? "/landlord" : `/landlord?tab=${nextTab}`;
+    router.replace(target, { scroll: false });
+  }, [router]);
+
+  useEffect(() => {
     if (authLoading) return;
     if (!user) { router.replace("/landlord/login"); return; }
     if (user.role !== "landlord") { router.replace("/"); return; }
+    const landlordUser = user;
 
     async function load() {
       const token = localStorage.getItem("cribb_token");
@@ -1134,6 +1602,16 @@ export default function LandlordDashboard() {
         try {
           const convos = await api.messages.getLandlordConversations();
           setConversations(convos);
+        } catch { /* */ }
+
+        try {
+          const reviewData = await api.reviews.browse({ landlord_id: landlordUser.id, limit: 100 });
+          setReviews(reviewData);
+        } catch { /* */ }
+
+        try {
+          const flagData = await api.landlords.getMyFlags();
+          setFlags(flagData);
         } catch { /* */ }
 
         // Fetch unread count
@@ -1186,16 +1664,18 @@ export default function LandlordDashboard() {
               Landlord Dashboard
             </p>
           </div>
-          <Link href="/landlord/properties/new"
-            className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-all"
-            style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 4px 16px rgba(27,45,69,0.15)" }}>
-            <Plus className="w-3.5 h-3.5" /> Add Property
-          </Link>
+          {tab !== "properties" && (
+            <Link href="/landlord/properties/new"
+              className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-all"
+              style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 4px 16px rgba(27,45,69,0.15)" }}>
+              <Plus className="w-3.5 h-3.5" /> Add Property
+            </Link>
+          )}
         </div>
 
         {/* Layout: Sidebar + Content */}
         <div className="flex gap-6">
-          <Sidebar active={tab} onChange={setTab} unreadCount={unreadCount} />
+          <Sidebar active={tab} onChange={handleTabChange} unreadCount={unreadCount} />
 
           <div className="flex-1 min-w-0 pb-20 md:pb-0">
             <AnimatePresence mode="wait">
@@ -1215,7 +1695,7 @@ export default function LandlordDashboard() {
                     claimCode={claimCode}
                     claimState={claimState}
                     onClearClaim={handleClearClaim}
-                    onSwitchTab={setTab}
+                    onSwitchTab={handleTabChange}
                   />
                 )}
                 {tab === "properties" && <PropertiesTab properties={properties} onListingUpdated={(lid, updated) => {
@@ -1224,6 +1704,13 @@ export default function LandlordDashboard() {
                     listings: p.listings.map(l => l.id === lid ? updated : l),
                   })));
                 }} />}
+                {tab === "listings" && <ListingsTab properties={properties} onListingUpdated={(lid, updated) => {
+                  setProperties(prev => prev.map(p => ({
+                    ...p,
+                    listings: p.listings.map(l => l.id === lid ? updated : l),
+                  })));
+                }} />}
+                {tab === "reviews" && <ReviewsTab reviews={reviews} flags={flags} />}
                 {tab === "messages" && <MessagesTab conversations={conversations} />}
                 {tab === "settings" && <SettingsTab user={user} />}
               </motion.div>
@@ -1232,7 +1719,7 @@ export default function LandlordDashboard() {
         </div>
       </div>
 
-      <MobileTabBar active={tab} onChange={setTab} unreadCount={unreadCount} />
+      <MobileTabBar active={tab} onChange={handleTabChange} unreadCount={unreadCount} />
     </div>
   );
 }

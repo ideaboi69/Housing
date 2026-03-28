@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion, useInView, useAnimation } from "framer-motion";
 import Link from "next/link";
-import { Heart, User } from "lucide-react";
+import { Heart } from "lucide-react";
 
 /* ════════════════════════════════════════════════════════
    Images / Data
@@ -21,10 +21,37 @@ const founders = [
   { name: "OJ", program: "Computer Science", image: "/oj.jpg" },
 ];
 
-const demands = [
-  { id: 1, budget: "$500–$700/room", moveIn: "Sep 2026", tags: ["Furnished", "Near campus", "2+ bedrooms"], desc: "Looking for a 2BR apartment within walking distance of campus for Sep. Prefer furnished with utilities included.", student: "3rd year student" },
-  { id: 2, budget: "$400–$550/room", moveIn: "Sep 2026", tags: ["Parking", "Laundry", "Pet-friendly"], desc: "Need a room in a shared house, ideally with parking and in-unit laundry. Flexible on distance if on a bus route.", student: "2nd year student" },
-  { id: 3, budget: "$600–$800/room", moveIn: "Jan 2027", tags: ["Studio", "Downtown", "Utilities incl."], desc: "Looking for a studio or bachelor downtown for a winter sublet. Budget flexible for the right place.", student: "4th year student" },
+const featuredSublets = [
+  {
+    id: "sublet-1",
+    title: "Fall term room near campus",
+    street: "87 Edinburgh Rd S",
+    price: 690,
+    term: "Sep-Dec 2026",
+    tags: ["Furnished", "Near campus", "Utilities incl."],
+    note: "4-month sublet in a shared house with quick walk access to campus and an easy move-in.",
+    image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdHVkZW50JTIwYmVkcm9vbSUyMGJyaWdodHxlbnwxfHx8fDE3OTU2NDY4NTV8MA&ixlib=rb-4.1.0&q=80&w=1080",
+  },
+  {
+    id: "sublet-2",
+    title: "Winter sublet downtown",
+    street: "32 Macdonell St, Unit 5",
+    price: 780,
+    term: "Jan-Apr 2027",
+    tags: ["Studio", "Downtown", "Flexible dates"],
+    note: "Private studio for the winter semester with downtown access and a simple takeover timeline.",
+    image: "https://images.unsplash.com/photo-1494526585095-c41746248156?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzdHVkaW8lMjBhcGFydG1lbnQlMjBjb3p5fGVufDF8fHx8MTc5NTY0Njg2OXww&ixlib=rb-4.1.0&q=80&w=1080",
+  },
+  {
+    id: "sublet-3",
+    title: "Summer room on Gordon",
+    street: "415 Gordon St, Unit B",
+    price: 620,
+    term: "May-Aug 2026",
+    tags: ["Summer", "4-month", "Laundry"],
+    note: "Budget-friendly summer setup with a furnished room, shared kitchen, and easy bus route back to campus.",
+    image: "https://images.unsplash.com/photo-1484154218962-a197022b5858?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhcGFydG1lbnQlMjBraXRjaGVuJTIwY29venl8ZW58MXx8fHwxNzk1NjQ2ODgxfDA&ixlib=rb-4.1.0&q=80&w=1080",
+  },
 ];
 
 const popularListings = [
@@ -253,6 +280,50 @@ function ListingPreviewCard({ listing }: { listing: typeof popularListings[0] })
           <span className="bg-[#1B2D45]/5 text-[#1B2D45]/60 px-2 py-0.5 rounded-md" style={{ fontSize: "10px", fontWeight: 500 }}>{listing.beds} bed</span>
           <span className="bg-[#1B2D45]/5 text-[#1B2D45]/60 px-2 py-0.5 rounded-md" style={{ fontSize: "10px", fontWeight: 500 }}>🚶 {listing.walkTime} min</span>
         </div>
+      </div>
+    </Link>
+  );
+}
+
+function SubletPreviewCard({ sublet }: { sublet: typeof featuredSublets[0] }) {
+  return (
+    <Link
+      href="/sublets"
+      className="group block overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_10px_30px_rgba(27,45,69,0.10)]"
+    >
+      <div className="relative h-[180px] overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={sublet.image} alt={sublet.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+        <div className="absolute left-3 top-3 rounded-full bg-white/92 px-3 py-1.5 text-[#FF6B35] shadow-sm" style={{ fontSize: "16px", fontWeight: 800 }}>
+          ${sublet.price}
+        </div>
+        <div className="absolute right-3 top-3 rounded-full bg-[#1B2D45]/80 px-3 py-1.5 text-white backdrop-blur-sm" style={{ fontSize: "11px", fontWeight: 700 }}>
+          {sublet.term}
+        </div>
+      </div>
+
+      <div className="p-5">
+        <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800, lineHeight: 1.2 }}>
+          {sublet.title}
+        </h3>
+        <p className="mt-1 text-[#1B2D45]/40" style={{ fontSize: "12px", fontWeight: 500 }}>
+          {sublet.street}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {sublet.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full border border-[#FF6B35]/[0.12] bg-[#FF6B35]/[0.08] px-2.5 py-1 text-[#FF6B35]"
+              style={{ fontSize: "11px", fontWeight: 600 }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+        <p className="mt-4 text-[#1B2D45]/55" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+          {sublet.note}
+        </p>
       </div>
     </Link>
   );
@@ -912,36 +983,29 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ 5. DEMAND BOARD PREVIEW ══════════════════════ */}
+      {/* ═══ 5. SUBLETS PREVIEW ═══════════════════════════ */}
       <section className="max-w-[1200px] mx-auto px-6 py-20">
         <FadeUp className="text-center mb-10">
-          <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800 }}>Students are looking for housing right now</h2>
-          <p className="text-[#1B2D45]/50 mt-2" style={{ fontSize: "15px", fontWeight: 400 }}>Post what you need on the Demand Board — let landlords come to you.</p>
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800 }}>Sublets for the timelines students actually need</h2>
+          <p className="text-[#1B2D45]/50 mt-2 max-w-[720px] mx-auto" style={{ fontSize: "15px", fontWeight: 400, lineHeight: 1.7 }}>
+            Semester takeovers, summer rooms, and short-term options should be easy to scan. Cribb keeps sublets visible instead of burying them inside generic listings.
+          </p>
         </FadeUp>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {demands.map((d, i) => (
-            <FadeUp key={d.id} delay={i * 0.1}>
-              <div className="bg-white rounded-2xl border border-black/[0.06] p-5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-shadow">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[#FF6B35]" style={{ fontSize: "17px", fontWeight: 700 }}>{d.budget}</span>
-                  <span className="bg-[#1B2D45]/[0.06] text-[#1B2D45]/60 px-2.5 py-1 rounded-lg" style={{ fontSize: "11px", fontWeight: 600 }}>{d.moveIn}</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {d.tags.map((tag) => (
-                    <span key={tag} className="bg-[#FF6B35]/[0.08] text-[#FF6B35] px-2.5 py-0.5 rounded-full border border-[#FF6B35]/[0.12]" style={{ fontSize: "11px", fontWeight: 500 }}>{tag}</span>
-                  ))}
-                </div>
-                <p className="text-[#1B2D45]/50 mb-4" style={{ fontSize: "13px", fontWeight: 400, lineHeight: 1.6 }}>{d.desc}</p>
-                <div className="flex items-center gap-2 pt-3 border-t border-black/5">
-                  <div className="w-6 h-6 rounded-full bg-[#1B2D45]/[0.08] flex items-center justify-center"><User className="w-3 h-3 text-[#1B2D45]/40" /></div>
-                  <span className="text-[#1B2D45]/40" style={{ fontSize: "11px", fontWeight: 500 }}>{d.student}</span>
-                </div>
-              </div>
+          {featuredSublets.map((sublet, i) => (
+            <FadeUp key={sublet.id} delay={i * 0.1}>
+              <SubletPreviewCard sublet={sublet} />
             </FadeUp>
           ))}
         </div>
         <div className="text-center mt-8">
-          <button className="px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>Post Your Request →</button>
+          <Link
+            href="/sublets"
+            className="inline-flex px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
+            style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
+          >
+            Browse Sublets →
+          </Link>
         </div>
       </section>
 

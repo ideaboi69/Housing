@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Menu, X, Settings, Bookmark, Heart, LogOut, ChevronDown,
   User, Shield, LayoutDashboard, MessageCircle, ShoppingBag,
@@ -40,6 +40,7 @@ function UserAvatar({ firstName, lastName, size = 34 }: { firstName: string; las
 
 export function Navbar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -47,6 +48,7 @@ export function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const isLandlord = user?.role === "landlord";
+  const landlordTab = searchParams.get("tab");
 
   const allNavItems = isLandlord
     ? [{ label: "Dashboard", path: "/landlord" }, ...navItems]
@@ -56,12 +58,14 @@ export function Navbar() {
   const fetchUnread = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await api.messages.getUnreadCount();
+      const data = isLandlord
+        ? await api.messages.getLandlordUnreadCount()
+        : await api.messages.getUnreadCount();
       setUnreadCount(data.unread_count);
     } catch {
       // silently fail
     }
-  }, [user]);
+  }, [user, isLandlord]);
 
   useEffect(() => {
     fetchUnread();
@@ -131,16 +135,24 @@ export function Navbar() {
   const dropdownLinks = isLandlord
     ? [
         { label: "Dashboard", href: "/landlord", icon: LayoutDashboard },
-        { label: "Messages", href: "/messages", icon: MessageCircle },
-        { label: "Settings", href: "/settings", icon: Settings },
+        { label: "Messages", href: "/landlord?tab=messages", icon: MessageCircle },
+        { label: "Settings", href: "/landlord?tab=settings", icon: Settings },
       ]
     : [
+        { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { label: "Messages", href: "/messages", icon: MessageCircle },
         { label: "Saved Listings", href: "/saved", icon: Bookmark },
         { label: "Your Listings", href: "/marketplace/my", icon: ShoppingBag },
         { label: "My Group", href: "/roommates", icon: Heart },
         { label: "Settings", href: "/settings", icon: Settings },
       ];
+
+  const isDropdownLinkActive = (href: string) => {
+    if (href.startsWith("/landlord?tab=")) {
+      return pathname === "/landlord" && landlordTab === href.split("tab=")[1];
+    }
+    return pathname === href;
+  };
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
@@ -185,9 +197,9 @@ export function Navbar() {
             <>
               {/* Message icon */}
               <Link
-                href="/messages"
+                href={isLandlord ? "/landlord?tab=messages" : "/messages"}
                 className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                  pathname === "/messages"
+                  (!isLandlord && pathname === "/messages") || (isLandlord && pathname === "/landlord" && landlordTab === "messages")
                     ? "bg-[#FF6B35]/10 text-[#FF6B35]"
                     : "text-[#1B2D45]/40 hover:bg-[#1B2D45]/5 hover:text-[#1B2D45]/60"
                 }`}
@@ -261,7 +273,7 @@ export function Navbar() {
                   <div className="py-1.5">
                     {dropdownLinks.map((item) => {
                       const Icon = item.icon;
-                      const isActive = pathname === item.href;
+                      const isActive = isDropdownLinkActive(item.href);
                       return (
                         <Link
                           key={item.href}
@@ -372,13 +384,18 @@ export function Navbar() {
               <div className="border-t border-black/5 mt-2 pt-2 space-y-1">
                 {dropdownLinks.map((item) => {
                   const Icon = item.icon;
+                  const isActive = isDropdownLinkActive(item.href);
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-[#1B2D45]/60 hover:bg-[#1B2D45]/5 rounded-xl transition-colors"
-                      style={{ fontSize: "14px", fontWeight: 500 }}
+                      className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
+                        isActive
+                          ? "bg-[#FF6B35]/8 text-[#FF6B35]"
+                          : "text-[#1B2D45]/60 hover:bg-[#1B2D45]/5"
+                      }`}
+                      style={{ fontSize: "14px", fontWeight: isActive ? 700 : 500 }}
                     >
                       <Icon className="w-4 h-4" />
                       {item.label}

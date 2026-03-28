@@ -52,12 +52,42 @@ export interface UserResponse {
   last_name: string;
   role: string;
   email_verified: boolean;
+  is_early_adopter?: boolean;
+  profile_photo_url?: string | null;
+  program?: string | null;
+  year?: string | null;
+  bio?: string | null;
   created_at: string;
   updated_at: string;
   // Landlord-specific (populated when role === "landlord")
   identity_verified?: boolean;
   company_name?: string | null;
   phone?: string | null;
+}
+
+export interface UserDashboardResponse {
+  sublets_active: number;
+  sublets_drafts: number;
+  sublets_total: number;
+  posts: number;
+  saved_listings: number;
+  marketplace_active: number;
+  marketplace_sold: number;
+  marketplace_drafts: number;
+  marketplace_unread_messages: number;
+  marketplace_total_views: number;
+  upcoming_viewings: number;
+  unread_messages: number;
+  reviews_written: number;
+  has_roommate_profile: boolean;
+  roommate_quiz_completed: boolean;
+  is_in_group: boolean;
+  is_group_owner: boolean;
+  group_id: number | null;
+  group_name: string | null;
+  pending_invites_received: number;
+  pending_requests_sent: number;
+  profile_completeness: number;
 }
 
 export interface UserCreate {
@@ -432,6 +462,17 @@ export interface FlagResponse {
   reporter_id: number;
   listing_id: number | null;
   review_id: number | null;
+  reason: string;
+  status: string;
+  created_at: string;
+}
+
+export interface LandlordFlagResponse {
+  id: number;
+  listing_id: number | null;
+  property_id: number;
+  property_title: string;
+  property_address: string;
   reason: string;
   status: string;
   created_at: string;

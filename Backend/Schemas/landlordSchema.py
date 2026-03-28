@@ -99,3 +99,16 @@ class LandlordReviewResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class LandlordFlagResponse(BaseModel):
+    id: int
+    listing_id: Optional[int] = None
+    property_id: int
+    property_title: str
+    property_address: str
+    reason: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
