@@ -68,6 +68,33 @@ const viewVariants = {
   exit: { opacity: 0 },
 };
 
+function toNullableNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeBrowseListing(listing: ListingDetailResponse): ListingDetailResponse {
+  return {
+    ...listing,
+    id: Number(listing.id),
+    property_id: Number(listing.property_id),
+    landlord_id: Number(listing.landlord_id),
+    rent_per_room: Number(listing.rent_per_room),
+    rent_total: Number(listing.rent_total),
+    total_rooms: Number(listing.total_rooms),
+    bathrooms: Number(listing.bathrooms),
+    view_count: Number(listing.view_count ?? 0),
+    save_count: listing.save_count == null ? undefined : Number(listing.save_count),
+    latitude: toNullableNumber(listing.latitude),
+    longitude: toNullableNumber(listing.longitude),
+    estimated_utility_cost: toNullableNumber(listing.estimated_utility_cost),
+    distance_to_campus_km: toNullableNumber(listing.distance_to_campus_km),
+    walk_time_minutes: toNullableNumber(listing.walk_time_minutes),
+    bus_time_minutes: toNullableNumber(listing.bus_time_minutes),
+  };
+}
+
 export default function BrowsePage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -94,15 +121,16 @@ export default function BrowsePage() {
         return;
       }
 
-      setListings(data ?? []);
+      const normalizedData = (data ?? []).map(normalizeBrowseListing);
+      setListings(normalizedData);
       setUseMock(false);
       const scoreResults = await Promise.allSettled(
-        data.map((l) => api.healthScores.get(l.id))
+        normalizedData.map((l) => api.healthScores.get(l.id))
       );
       const scores: Record<number, number> = {};
       scoreResults.forEach((result, i) => {
         if (result.status === "fulfilled" && result.value?.overall_score != null) {
-          scores[data[i].id] = result.value.overall_score;
+          scores[normalizedData[i].id] = result.value.overall_score;
         }
       });
       setHealthScores(Object.keys(scores).length > 0 ? scores : mockHealthScores);

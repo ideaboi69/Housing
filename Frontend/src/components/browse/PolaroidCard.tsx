@@ -51,6 +51,9 @@ export function PolaroidCard({
   }, [listing.id, toggleSave, router]);
   const score = healthScore ?? 0;
   const isBoard = variant === "board";
+  const walkMinutes = listing.walk_time_minutes == null ? null : Number(listing.walk_time_minutes);
+  const busMinutes = listing.bus_time_minutes == null ? null : Number(listing.bus_time_minutes);
+  const distanceKm = listing.distance_to_campus_km == null ? null : Number(listing.distance_to_campus_km);
 
   /* ── Spring-driven hover state ────────────────── */
   const hoverProgress = useMotionValue(0);
@@ -86,15 +89,15 @@ export function PolaroidCard({
   const leaseLabel = listing.lease_type ? formatLeaseType(listing.lease_type) : null;
 
   /* ── Proximity label ────────────────────────────── */
-  const proximity = getProximityLabel(listing.walk_time_minutes);
+  const proximity = getProximityLabel(walkMinutes);
   const campusFacts = [
     `${proximity.emoji} ${proximity.label}`,
-    listing.walk_time_minutes != null
-      ? `🚶 ${listing.walk_time_minutes} min walk`
-      : listing.bus_time_minutes != null
-        ? `🚌 ${listing.bus_time_minutes} min bus`
+    walkMinutes != null
+      ? `🚶 ${walkMinutes} min walk`
+      : busMinutes != null
+        ? `🚌 ${busMinutes} min bus`
         : null,
-    listing.distance_to_campus_km != null ? `📍 ${listing.distance_to_campus_km.toFixed(1)} km` : null,
+    distanceKm != null ? `📍 ${distanceKm.toFixed(1)} km` : null,
   ].filter(Boolean) as string[];
 
   /* ── Social proof counts ────────────────────────── */
@@ -212,12 +215,12 @@ export function PolaroidCard({
             </div>
 
             {/* Walk time pill */}
-            {listing.walk_time_minutes && (
+            {walkMinutes != null && (
               <div
                 className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full"
                 style={{ fontSize: "10px", fontWeight: 600, color: "#1B2D45" }}
               >
-                🚶 {listing.walk_time_minutes} min
+                🚶 {walkMinutes} min
               </div>
             )}
           </div>
