@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Mail, ArrowLeft, CheckCircle, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
+import { AuthBackLink } from "@/components/ui/AuthBackLink";
 
 const rotatingResetLines = ["reset access", "get back to your picks", "stay in the flow"];
 
@@ -53,15 +54,11 @@ export default function ForgotPasswordPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: "easeOut" }}
-            className="min-w-0 lg:-mt-10 lg:pr-6"
+            className="min-w-0 lg:pr-6 lg:self-center"
           >
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }}>
-              <Link href="/" className="inline-block text-[#FF6B35] lg:-ml-6 xl:-ml-8" style={{ fontSize: "38px", fontWeight: 900, letterSpacing: "-0.05em" }}>
-                cribb
-              </Link>
-            </motion.div>
+            <AuthBackLink />
 
-            <div className="mt-10 max-w-[620px]">
+            <div className="mt-6 max-w-[620px]">
               <motion.div
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -146,9 +143,6 @@ export default function ForgotPasswordPage() {
                   style={{ boxShadow: "0 24px 80px rgba(27,45,69,0.10)" }}
                 >
                   <div className="border-b border-[#1B2D45]/8 pb-5">
-                    <div className="w-fit rounded-full bg-[#F3E4DA] px-3 py-1.5 text-[#C86B34]" style={{ fontSize: "11px", fontWeight: 800 }}>
-                      Reset password
-                    </div>
                     <div className="mt-4">
                       <div className="text-[#1B2D45]/35" style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                         Account recovery
@@ -156,6 +150,9 @@ export default function ForgotPasswordPage() {
                       <h2 className="mt-2 text-[#1B2D45]" style={{ fontSize: "30px", fontWeight: 900, letterSpacing: "-0.05em", lineHeight: 1.05 }}>
                         Reset your password.
                       </h2>
+                      <p className="mt-2 text-[#1B2D45]/42" style={{ fontSize: "12px", fontWeight: 600, lineHeight: 1.5 }}>
+                        We&apos;ll send the link to your student email.
+                      </p>
                     </div>
                   </div>
 

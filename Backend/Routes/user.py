@@ -22,7 +22,7 @@ from config import settings
 user_router = APIRouter()
 
 # Create User Account
-@user_router.post("/register", status_code=status.HTTP_201_CREATED)
+@user_router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register_users(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
     if not check_uoguelph_email(payload.email):
@@ -55,10 +55,12 @@ def register_users(request: Request, payload: UserCreate, db: Session = Depends(
     email_token = create_email_verification_token(user.email)
     send_verification_email(user.email, user.first_name, email_token)
 
-    return {
-        "message": "Account created. Please check your email to verify your account.",
-        "user_id": user.id,
-    }
+    access_token = create_access_token({"user_id": user.id, "role": user.role.value})
+
+    return TokenResponse(
+        access_token=access_token,
+        user=UserResponse.model_validate(user),
+    )
 
 # User Login
 # JSON login for frontend

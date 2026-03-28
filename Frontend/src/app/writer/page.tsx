@@ -7,6 +7,7 @@ import {
   Send, Shield, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { useWriterStore } from "@/lib/store";
 import { api, ApiError } from "@/lib/api";
 import type { PostListResponse, PostResponse, PostCategory } from "@/types";
@@ -59,14 +60,14 @@ function WriterLogin() {
     }
   };
 
-  const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
+  const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#1B2D45]/25 focus:ring-2 focus:ring-[#1B2D45]/10 transition-all";
 
   return (
     <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-[400px]">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-[#FF6B35]/10 flex items-center justify-center mx-auto mb-4">
-            <PenLine className="w-6 h-6 text-[#FF6B35]" />
+          <div className="w-14 h-14 rounded-2xl bg-[#1B2D45]/10 flex items-center justify-center mx-auto mb-4">
+            <PenLine className="w-6 h-6 text-[#2D5B88]" />
           </div>
           <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.5px" }}>Writer Dashboard</h1>
           <p className="text-[#98A3B0] mt-1" style={{ fontSize: "13px" }}>Log in with your writer account</p>
@@ -89,8 +90,8 @@ function WriterLogin() {
           )}
 
           <button type="submit" disabled={isLoading}
-            className="w-full py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-            style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}>
+            className="w-full py-2.5 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 2px 12px rgba(27,45,69,0.24)" }}>
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             {isLoading ? "Signing in..." : "Sign in"}
           </button>
@@ -98,7 +99,7 @@ function WriterLogin() {
 
         <p className="text-center mt-4 text-[#98A3B0]" style={{ fontSize: "12px" }}>
           Not a writer yet? Apply from{" "}
-          <a href="/the-bubble" className="text-[#FF6B35]" style={{ fontWeight: 600 }}>The Bubble</a>
+          <a href="/writers/signup" className="text-[#1B2D45]" style={{ fontWeight: 600 }}>The Bubble</a>
         </p>
       </motion.div>
     </div>
@@ -516,11 +517,23 @@ function Dashboard() {
    ═══════════════════════════════════════════════════════ */
 
 export default function WriterPage() {
+  const router = useRouter();
   const { writer, writerToken, loadWriter } = useWriterStore();
+  const [hydrated, setHydrated] = useState(false);
 
-  useEffect(() => { loadWriter(); }, [loadWriter]);
+  useEffect(() => {
+    loadWriter();
+    setHydrated(true);
+  }, [loadWriter]);
 
-  if (!writerToken || !writer) return <WriterLogin />;
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!writerToken || !writer) {
+      router.replace("/writers/login?next=/writer");
+    }
+  }, [hydrated, writerToken, writer, router]);
+
+  if (!hydrated || (!writerToken || !writer)) return null;
 
   if (writer.status !== "approved") {
     return (

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
+import { AuthBackLink } from "@/components/ui/AuthBackLink";
 import { motion } from "framer-motion";
 import {
   Building2, Phone, Shield, Upload, FileText, X, Check,
@@ -226,13 +227,11 @@ export default function LandlordSignupPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: "easeOut" }}
-            className="min-w-0 lg:-mt-10 lg:pr-6"
+            className="min-w-0 lg:pr-6 lg:self-center"
           >
-            <Link href="/" className="inline-block text-[#FF6B35] lg:-ml-6 xl:-ml-8" style={{ fontSize: "38px", fontWeight: 900, letterSpacing: "-0.05em" }}>
-              cribb
-            </Link>
+              <AuthBackLink />
 
-            <div className="mt-10 max-w-[620px]">
+            <div className="mt-6 max-w-[620px]">
               <motion.div
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -278,7 +277,7 @@ export default function LandlordSignupPage() {
                 initial={{ opacity: 0, y: 22 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.5, ease: "easeOut" }}
-                className="relative mt-8 max-w-[560px]"
+                className="relative mt-6 max-w-[560px]"
               >
                 <div className="pointer-events-none absolute -left-3 -top-3 h-16 w-16 rounded-full border border-[#1B2D45]/7" />
                 <p className="text-[#1B2D45]" style={{ fontSize: "17px", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.5 }}>
@@ -298,7 +297,7 @@ export default function LandlordSignupPage() {
                   initial={{ opacity: 0, y: 22 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.38, duration: 0.45, ease: "easeOut" }}
-                  className="mt-8 max-w-[620px] rounded-[24px] border border-[#2EC4B6]/15 bg-white/70 p-4 backdrop-blur-sm"
+                  className="mt-6 max-w-[620px] rounded-[24px] border border-[#2EC4B6]/15 bg-white/70 p-4 backdrop-blur-sm"
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-xl bg-[#2EC4B6]/10 flex items-center justify-center shrink-0">

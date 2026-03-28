@@ -87,7 +87,7 @@ export function Navbar() {
   }, [pathname]);
 
   // Hide navbar on auth pages and admin — must be after all hooks
-  const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding", "/admin"];
+  const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding", "/writers/login", "/writers/signup", "/admin"];
   if (hideNavPaths.some((p) => pathname.startsWith(p))) {
     return null;
   }
@@ -102,11 +102,11 @@ export function Navbar() {
           </Link>
           <div className="flex items-center gap-3">
             <Link
-              href="/landlord/login"
+              href="/writers/login"
               className="hidden sm:inline-block px-4 py-2 rounded-xl text-[#1B2D45]/50 hover:text-[#1B2D45] hover:bg-[#1B2D45]/5 transition-all"
               style={{ fontSize: "15px", fontWeight: 500 }}
             >
-              For Landlords
+              For Writers
             </Link>
             <Link
               href="/login"
@@ -247,12 +247,12 @@ export function Navbar() {
                     </div>
                     {!isLandlord && (
                       <Link
-                        href="/landlord/login"
+                        href="/writers/login"
                         className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[#FAF8F4] border border-[#E8E4DC] text-[#1B2D45]/60 hover:border-[#FF6B35]/30 hover:text-[#FF6B35] transition-all"
                         style={{ fontSize: "11px", fontWeight: 600 }}
                       >
                         <User className="w-3 h-3" />
-                        Are you a landlord?
+                        Are you a writer?
                       </Link>
                     )}
                   </div>

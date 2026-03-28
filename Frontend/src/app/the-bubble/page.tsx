@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   ChevronUp, Bookmark, Share2, MoreHorizontal, X, ImagePlus,
   Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag,
@@ -361,211 +362,6 @@ function BecomeWriterCard({ onApply, compact }: { onApply: () => void; compact?:
 /* ═══════════════════════════════════════════════════════
    WRITER APPLICATION MODAL
    ═══════════════════════════════════════════════════════ */
-
-function WriterModal({ onClose, onApproved }: { onClose: () => void; onApproved: () => void }) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
-  const [businessName, setBusinessName] = useState("");
-  const [businessType, setBusinessType] = useState("");
-  const [website, setWebsite] = useState("");
-  const [phone, setPhone] = useState("");
-  const [reason, setReason] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const isMobile = useIsMobile();
-
-  const canSubmit = firstName.trim() && lastName.trim() && email.trim() && password.length >= 6 && businessType && reason.trim().length > 10;
-
-  const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
-  const labelEl = (text: string, required = true) => (
-    <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{text}{required && " *"}</label>
-  );
-
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="bg-white rounded-2xl w-full overflow-hidden" style={{ maxWidth: isMobile ? "100%" : "520px", maxHeight: "90vh", boxShadow: "0 24px 80px rgba(0,0,0,0.15)" }}>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#FF6B35]/10 flex items-center justify-center">
-              <VerifiedBadge />
-            </div>
-            <div>
-              <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>Become a Writer</h3>
-              <p className="text-[#98A3B0]" style={{ fontSize: "10px" }}>Verified writers get the orange badge</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-[#98A3B0] hover:bg-[#1B2D45]/5 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <AnimatePresence mode="wait">
-          {!submitted ? (
-            <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, x: -20 }}>
-              <div className="px-5 py-4 space-y-3.5 overflow-y-auto" style={{ maxHeight: "calc(90vh - 180px)" }}>
-
-                {/* Name row */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    {labelEl("First Name")}
-                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
-                  </div>
-                  <div>
-                    {labelEl("Last Name")}
-                    <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div>
-                  {labelEl("Email")}
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@uoguelph.ca or business email" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
-                  <p className="text-[#98A3B0] mt-1" style={{ fontSize: "10px" }}>Guelph students use your @uoguelph.ca email. Businesses use your business email.</p>
-                </div>
-
-                {/* Password */}
-                <div>
-                  {labelEl("Password")}
-                  <div className="relative">
-                    <input type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Min. 6 characters" className={`${inputClass} pr-10`} style={{ fontSize: "13px", fontWeight: 500 }} />
-                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#98A3B0] hover:text-[#5C6B7A] transition-colors">
-                      {showPw ? <span style={{ fontSize: "11px" }}>Hide</span> : <span style={{ fontSize: "11px" }}>Show</span>}
-                    </button>
-                  </div>
-                  <p className="text-[#98A3B0] mt-1" style={{ fontSize: "10px" }}>You&apos;ll use this to log in and manage your posts.</p>
-                </div>
-
-                {/* Business type */}
-                <div>
-                  {labelEl("I'm writing as a...")}
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { key: "student", label: "🎓 Student", color: "#1B2D45" },
-                      { key: "club", label: "🏛️ Club / Org", color: "#6C5CE7" },
-                      { key: "business", label: "🏪 Local Business", color: "#2EC4B6" },
-                      { key: "other", label: "✨ Other", color: "#FFB627" },
-                    ].map((opt) => (
-                      <button key={opt.key} onClick={() => setBusinessType(opt.key)}
-                        className={`px-3 py-1.5 rounded-full border transition-all ${businessType === opt.key ? "border-transparent text-white" : "border-black/[0.06] text-[#5C6B7A] hover:border-black/15 bg-white"}`}
-                        style={{ fontSize: "11px", fontWeight: 600, backgroundColor: businessType === opt.key ? opt.color : undefined }}>
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Business name — always shown, label adapts */}
-                <div>
-                  {labelEl(businessType === "business" ? "Business Name" : businessType === "club" ? "Club / Organization Name" : "Organization / Program")}
-                  <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)}
-                    placeholder={businessType === "business" ? "e.g. Yuki Ramen" : businessType === "club" ? "e.g. Guelph Dance Club" : "e.g. Computer Science, 3rd Year"}
-                    className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
-                </div>
-
-                {/* Conditional: website + phone for businesses */}
-                <AnimatePresence>
-                  {(businessType === "business" || businessType === "club") && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          {labelEl("Website", false)}
-                          <input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className={inputClass} style={{ fontSize: "12px", fontWeight: 500 }} />
-                        </div>
-                        <div>
-                          {labelEl("Phone", false)}
-                          <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(519) 555-0123" className={inputClass} style={{ fontSize: "12px", fontWeight: 500 }} />
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Reason */}
-                <div>
-                  {labelEl("What will you post about?")}
-                  <textarea value={reason} onChange={(e) => setReason(e.target.value)}
-                    placeholder="Events, campus news, local deals, tips for students..." rows={3}
-                    className={`${inputClass} resize-none`} style={{ fontSize: "13px", lineHeight: 1.6 }} />
-                </div>
-
-                {/* Agreement */}
-                <div className="bg-[#FAF8F4] rounded-xl p-3 flex items-start gap-2.5">
-                  <Shield className="w-3.5 h-3.5 text-[#98A3B0] mt-0.5 shrink-0" />
-                  <p className="text-[#98A3B0]" style={{ fontSize: "10px", lineHeight: 1.5 }}>
-                    By applying, you agree to follow our community guidelines. No spam, no landlord listings, no harmful content. Posts auto-expire after 30 days.
-                  </p>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-5 py-4 border-t border-black/5 flex items-center justify-between gap-3">
-                <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-[#E8E4DC] text-[#5C6B7A] hover:bg-[#1B2D45]/[0.03] transition-all" style={{ fontSize: "13px", fontWeight: 600 }}>Cancel</button>
-                <motion.button whileTap={{ scale: 0.97 }} onClick={async () => {
-                  if (!canSubmit || submitting) return;
-                  setSubmitting(true);
-                  setError("");
-                  try {
-                    await api.writers.register({
-                      email,
-                      password,
-                      first_name: firstName,
-                      last_name: lastName,
-                      business_name: businessName,
-                      business_type: businessType || undefined,
-                      website: website || undefined,
-                      phone: phone || undefined,
-                      reason,
-                    });
-                    setSubmitted(true);
-                  } catch (err) {
-                    setError(err instanceof ApiError ? err.detail : "Something went wrong. Please try again.");
-                  } finally {
-                    setSubmitting(false);
-                  }
-                }}
-                  className="px-5 py-2.5 rounded-xl text-white transition-all"
-                  style={{ fontSize: "13px", fontWeight: 700, backgroundColor: canSubmit ? "#FF6B35" : "#98A3B0", boxShadow: canSubmit ? "0 2px 12px rgba(255,107,53,0.35)" : "none", cursor: canSubmit ? "pointer" : "not-allowed" }}>
-                  {submitting ? "Submitting..." : "Submit Application"}
-                </motion.button>
-              </div>
-              {error && (
-                <div className="px-5 pb-3">
-                  <p className="text-[#E71D36] bg-[#E71D36]/5 rounded-xl px-3 py-2" style={{ fontSize: "12px", fontWeight: 500 }}>{error}</p>
-                </div>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="px-5 py-10 text-center">
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                className="w-16 h-16 rounded-full bg-[#FF6B35]/10 flex items-center justify-center mx-auto mb-4">
-                <VerifiedBadge />
-              </motion.div>
-              <h3 className="text-[#1B2D45] mb-2" style={{ fontSize: "18px", fontWeight: 800 }}>Application Submitted!</h3>
-              <p className="text-[#5C6B7A] mb-6 max-w-[280px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.5 }}>
-                We&apos;ll review your application and get back to you within 24 hours. Once approved, you&apos;ll get the verified writer badge.
-              </p>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={onApproved}
-                className="px-6 py-2.5 rounded-xl bg-[#FF6B35] text-white" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.35)" }}>
-                Got it!
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </motion.div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════
    POST CREATION MODAL
@@ -1032,13 +828,12 @@ function EmptyState({ onReset }: { onReset: () => void }) {
    ═══════════════════════════════════════════════════════ */
 
 export default function TheBubblePage() {
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<Category | "all">("all");
   const [sortMode, setSortMode] = useState<SortMode>("trending");
   const [showPostModal, setShowPostModal] = useState(false);
-  const [showWriterModal, setShowWriterModal] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
   const [isWriter, setIsWriter] = useState(false);
-  const [writerPending, setWriterPending] = useState(false);
   const { user } = useAuthStore();
   const isMobile = useIsMobile();
 
@@ -1081,16 +876,11 @@ export default function TheBubblePage() {
 
   const handlePostClick = () => {
     if (!user) {
-      // Could redirect to login, but for now just show writer modal
-      setShowWriterModal(true);
+      router.push("/writers/signup");
       return;
     }
     if (isWriter) setShowPostModal(true);
-    else if (writerPending) {
-      // Show a toast or message that their application is pending
-      import("sonner").then(({ toast }) => toast.info("Your writer application is being reviewed. We'll notify you once approved!"));
-    }
-    else setShowWriterModal(true);
+    else router.push("/writers/signup");
   };
 
   return (
@@ -1136,7 +926,7 @@ export default function TheBubblePage() {
 
       {/* Page content */}
       <div className="relative z-10">
-      <HeroSection isWriter={isWriter} onCreatePost={() => setShowPostModal(true)} onApply={() => setShowWriterModal(true)} isMobile={isMobile} />
+      <HeroSection isWriter={isWriter} onCreatePost={() => setShowPostModal(true)} onApply={() => router.push("/writers/signup")} isMobile={isMobile} />
 
       <FilterBar activeCategory={activeCategory} onSelectCategory={setActiveCategory} sortMode={sortMode} onSelectSort={setSortMode} isMobile={isMobile} />
 
@@ -1145,7 +935,7 @@ export default function TheBubblePage() {
           {/* Feed */}
           <div className="flex-1 min-w-0 space-y-4">
             {activeCategory === "all" && <WeeklyHighlightsCard />}
-            {isMobile && !isWriter && activeCategory === "all" && <BecomeWriterCard onApply={() => setShowWriterModal(true)} />}
+            {isMobile && !isWriter && activeCategory === "all" && <BecomeWriterCard onApply={() => router.push("/writers/signup")} />}
 
             {/* Mobile sort toggle */}
             {isMobile && (
@@ -1167,7 +957,7 @@ export default function TheBubblePage() {
             )}
           </div>
 
-          {!isMobile && <Sidebar isWriter={isWriter} onCreatePost={() => setShowPostModal(true)} onApply={() => setShowWriterModal(true)} onTip={() => setShowTipModal(true)} />}
+          {!isMobile && <Sidebar isWriter={isWriter} onCreatePost={() => setShowPostModal(true)} onApply={() => router.push("/writers/signup")} onTip={() => setShowTipModal(true)} />}
         </div>
       </div>
 
@@ -1184,11 +974,6 @@ export default function TheBubblePage() {
       {/* Modals */}
       <AnimatePresence>
         {showPostModal && isWriter && <PostModal onClose={() => setShowPostModal(false)} />}
-      </AnimatePresence>
-      <AnimatePresence>
-        {showWriterModal && (
-          <WriterModal onClose={() => setShowWriterModal(false)} onApproved={() => { setWriterPending(true); setShowWriterModal(false); }} />
-        )}
       </AnimatePresence>
       <AnimatePresence>
         {showTipModal && (
