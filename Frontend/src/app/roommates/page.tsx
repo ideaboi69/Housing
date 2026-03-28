@@ -368,7 +368,7 @@ function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>
 
 type LookingMode = null | "solo" | "with-friends";
 
-function GettingStarted({ onSelect }: { onSelect: (mode: Exclude<LookingMode, null>, count: number, need: number) => void }) {
+function GettingStarted({ onSelect, allowGroupCreation }: { onSelect: (mode: Exclude<LookingMode, null>, count: number, need: number) => void; allowGroupCreation: boolean }) {
   const [mode, setMode] = useState<LookingMode>(null);
   const [haveCount, setHaveCount] = useState(2);
   const [needCount, setNeedCount] = useState(1);
@@ -390,13 +390,22 @@ function GettingStarted({ onSelect }: { onSelect: (mode: Exclude<LookingMode, nu
               <ChevronRight className="w-4 h-4 text-[#1B2D45]/15 ml-auto shrink-0" />
             </div>
           </motion.button>
-          <motion.button onClick={() => setMode("with-friends")} className="w-full bg-white rounded-2xl p-5 text-left transition-all group" style={{ border: "2.5px solid rgba(27,45,69,0.06)", boxShadow: "4px 4px 0px rgba(27,45,69,0.06)" }} whileHover={{ y: -2, boxShadow: "6px 6px 0px rgba(27,45,69,0.1)" }} whileTap={{ y: 1, boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(46,196,182,0.08)", border: "2px solid rgba(46,196,182,0.12)" }}><Users className="w-6 h-6 text-[#2EC4B6]" /></div>
-              <div><h3 className="text-[#1B2D45] group-hover:text-[#2EC4B6] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I have friends already</h3><p className="text-[#1B2D45]/55" style={{ fontSize: "12px" }}>We already have a place and need to fill a room</p></div>
-              <ChevronRight className="w-4 h-4 text-[#1B2D45]/15 ml-auto shrink-0" />
+          {allowGroupCreation ? (
+            <motion.button onClick={() => setMode("with-friends")} className="w-full bg-white rounded-2xl p-5 text-left transition-all group" style={{ border: "2.5px solid rgba(27,45,69,0.06)", boxShadow: "4px 4px 0px rgba(27,45,69,0.06)" }} whileHover={{ y: -2, boxShadow: "6px 6px 0px rgba(27,45,69,0.1)" }} whileTap={{ y: 1, boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(46,196,182,0.08)", border: "2px solid rgba(46,196,182,0.12)" }}><Users className="w-6 h-6 text-[#2EC4B6]" /></div>
+                <div><h3 className="text-[#1B2D45] group-hover:text-[#2EC4B6] transition-colors" style={{ fontSize: "15px", fontWeight: 700 }}>I have friends already</h3><p className="text-[#1B2D45]/55" style={{ fontSize: "12px" }}>We already have a place and need to fill a room</p></div>
+                <ChevronRight className="w-4 h-4 text-[#1B2D45]/15 ml-auto shrink-0" />
+              </div>
+            </motion.button>
+          ) : (
+            <div className="w-full bg-white rounded-2xl p-5 text-left" style={{ border: "2.5px solid rgba(27,45,69,0.06)", boxShadow: "4px 4px 0px rgba(27,45,69,0.06)" }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(27,45,69,0.05)", border: "2px solid rgba(27,45,69,0.08)" }}><Users className="w-6 h-6 text-[#1B2D45]/45" /></div>
+                <div><h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Group creation is student-only</h3><p className="text-[#1B2D45]/55" style={{ fontSize: "12px" }}>Landlord accounts can browse roommate availability, but can&apos;t create groups.</p></div>
+              </div>
             </div>
-          </motion.button>
+          )}
         </motion.div>
       )}
 
@@ -512,6 +521,7 @@ function clearRoommateProfile() {
 export default function RoommatesPage() {
   const isMobile = useIsMobile();
   const { user } = useAuthStore();
+  const isLandlord = user?.role === "landlord";
   const [hydrated, setHydrated] = useState(false);
   const [started, setStarted] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
@@ -834,7 +844,7 @@ export default function RoommatesPage() {
   }
 
   if (!hasProfile) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><ProfileQuiz onComplete={handleQuizComplete} /></div></div>;
-  if (!setupDone) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><GettingStarted onSelect={handleSetupSelect} /></div></div>;
+  if (!setupDone) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><GettingStarted onSelect={handleSetupSelect} allowGroupCreation={!isLandlord} /></div></div>;
 
   /* ── Browse page ── */
   return (
@@ -845,9 +855,15 @@ export default function RoommatesPage() {
             <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>Roommates</h1>
             <p className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px" }}>{myMode === "solo" ? "Browse houses with availability" : "Find someone for your current place"}</p>
           </div>
-          <Link href="/roommates/groups/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "12px", fontWeight: 700, border: "2px solid #e55e2e", boxShadow: "3px 3px 0px rgba(255,107,53,0.15)" }}>
-            <Plus className="w-3.5 h-3.5" /> Create Group
-          </Link>
+          {!isLandlord ? (
+            <Link href="/roommates/groups/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "12px", fontWeight: 700, border: "2px solid #e55e2e", boxShadow: "3px 3px 0px rgba(255,107,53,0.15)" }}>
+              <Plus className="w-3.5 h-3.5" /> Create Group
+            </Link>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[#1B2D45]/10 bg-white text-[#1B2D45]/55" style={{ fontSize: "12px", fontWeight: 700 }}>
+              <Users className="w-3.5 h-3.5" /> Browse only
+            </div>
+          )}
         </div>
 
         {/* Edit profile bar */}

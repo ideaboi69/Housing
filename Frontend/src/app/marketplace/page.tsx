@@ -42,7 +42,7 @@ function ItemCard({ item, pickupZone }: { item: MarketplaceItemListResponse; pic
   );
 }
 
-function SeasonalBanner({ onDismiss }: { onDismiss: () => void }) {
+function SeasonalBanner({ onDismiss, canSell }: { onDismiss: () => void; canSell: boolean }) {
   return (
     <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0, marginBottom: 0 }} className="relative rounded-2xl overflow-hidden mb-6" style={{ background: "linear-gradient(135deg, #FF6B35 0%, #FFB627 100%)", border: "2.5px solid #1B2D45", boxShadow: "5px 5px 0px #1B2D45" }}>
       <div className="flex items-center justify-between px-5 py-4 md:px-6 md:py-5">
@@ -54,7 +54,9 @@ function SeasonalBanner({ onDismiss }: { onDismiss: () => void }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Link href="/marketplace/create" className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-[#FF6B35] hover:bg-white/90 transition-all" style={{ fontSize: "13px", fontWeight: 700 }}><Plus className="w-4 h-4" /> Sell Something</Link>
+          {canSell && (
+            <Link href="/marketplace/create" className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-[#FF6B35] hover:bg-white/90 transition-all" style={{ fontSize: "13px", fontWeight: 700 }}><Plus className="w-4 h-4" /> Sell Something</Link>
+          )}
           <button onClick={onDismiss} className="text-white/50 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
         </div>
       </div>
@@ -110,6 +112,7 @@ function FilterModal({ isOpen, onClose, filters, onApply }: { isOpen: boolean; o
 export default function MarketplacePage() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const isLandlord = user?.role === "landlord";
   const [items, setItems] = useState<(MarketplaceItemListResponse & { pickup_zone?: string })[]>(MOCK_ITEMS_WITH_ZONES);
   const [isLoading, setIsLoading] = useState(true);
   const [useMock, setUseMock] = useState(false);
@@ -183,11 +186,20 @@ export default function MarketplacePage() {
             <p className="text-[#1B2D45]/45 mt-0.5" style={{ fontSize: "13px" }}>Buy &amp; sell student essentials in Guelph</p>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
-            {user && <Link href="/marketplace/my" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Your Listings</Link>}
-            <Link href={user ? "/marketplace/create" : "/login"} className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}><Plus className="w-4 h-4" /> Sell Something</Link>
+            {!isLandlord && user && <Link href="/marketplace/my" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Your Listings</Link>}
+            {!isLandlord ? (
+              <Link href={user ? "/marketplace/create" : "/login"} className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}><Plus className="w-4 h-4" /> Sell Something</Link>
+            ) : (
+              <Link href="/landlord" className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl border border-[#1B2D45]/10 text-[#1B2D45]/60 hover:border-[#1B2D45]/20 hover:text-[#1B2D45] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>Landlord Dashboard</Link>
+            )}
           </div>
         </div>
-        <AnimatePresence>{showBanner && <SeasonalBanner onDismiss={dismissBanner} />}</AnimatePresence>
+        {isLandlord && (
+          <div className="mb-5 rounded-2xl border border-[#1B2D45]/10 bg-white px-4 py-3 text-[#1B2D45]/58" style={{ fontSize: "13px", fontWeight: 600 }}>
+            Marketplace selling is only available for student accounts. Landlords can browse items, but cannot create or manage marketplace listings.
+          </div>
+        )}
+        <AnimatePresence>{showBanner && <SeasonalBanner onDismiss={dismissBanner} canSell={!isLandlord} />}</AnimatePresence>
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 mb-4">
           <button onClick={() => setActiveCategory("all")} className={`px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === "all" ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === "all" ? 700 : 500 }}>All</button>
           {MARKETPLACE_CATEGORIES.map((cat) => (<button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === cat.key ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === cat.key ? 700 : 500 }}><span style={{ fontSize: "14px" }}>{cat.emoji}</span> {cat.label}</button>))}
@@ -238,7 +250,7 @@ export default function MarketplacePage() {
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{Array.from({ length: 8 }, (_, i) => (<div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse" style={{ border: "1px solid rgba(27,45,69,0.04)" }}><div className="aspect-[4/3] bg-[#1B2D45]/[0.04]" /><div className="p-3.5 space-y-2"><div className="h-4 bg-[#1B2D45]/[0.06] rounded w-3/4" /><div className="h-3 bg-[#1B2D45]/[0.04] rounded w-1/2" /></div></div>))}</div>
         ) : filteredItems.length === 0 ? (
-          <div className="text-center py-16"><Package className="w-12 h-12 text-[#1B2D45]/10 mx-auto mb-3" /><h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No items found</h3><p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "13px" }}>{searchQuery ? "Try a different search term" : "Be the first to list something!"}</p><Link href={user ? "/marketplace/create" : "/login"} className="inline-flex items-center gap-1.5 mt-4 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}><Plus className="w-4 h-4" /> Sell Something</Link></div>
+          <div className="text-center py-16"><Package className="w-12 h-12 text-[#1B2D45]/10 mx-auto mb-3" /><h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No items found</h3><p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "13px" }}>{searchQuery ? "Try a different search term" : isLandlord ? "Student accounts can create marketplace listings." : "Be the first to list something!"}</p>{!isLandlord && <Link href={user ? "/marketplace/create" : "/login"} className="inline-flex items-center gap-1.5 mt-4 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}><Plus className="w-4 h-4" /> Sell Something</Link>}</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{filteredItems.map((item, i) => (<motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}><ItemCard item={item} pickupZone={(item as typeof item & { pickup_zone?: string }).pickup_zone} /></motion.div>))}</div>
         )}

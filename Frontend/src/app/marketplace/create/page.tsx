@@ -158,6 +158,28 @@ export default function CreateListingPage() {
     );
   }
 
+  if (user.role === "landlord") {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
+        <div className="max-w-[420px] text-center">
+          <Package className="w-10 h-10 text-[#1B2D45]/10 mx-auto mb-3" />
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 700 }}>Marketplace selling is student-only</h2>
+          <p className="text-[#1B2D45]/40 mt-1 mb-5" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+            Landlord accounts can browse the marketplace, but only student accounts can create items and manage listings.
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <Link href="/marketplace" className="px-5 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/60 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>
+              Browse Marketplace
+            </Link>
+            <Link href="/landlord" className="px-5 py-2.5 rounded-xl bg-[#1B2D45] text-white hover:bg-[#142235] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>
+              Landlord Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const stepLabels = ["Photos", "Details", "Pricing & Pickup", "Review"];
 
   return (

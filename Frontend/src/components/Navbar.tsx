@@ -97,7 +97,7 @@ export function Navbar() {
   }
 
   // Minimal navbar on landing page — just logo + auth buttons
-  if (pathname === "/") {
+  if (pathname === "/" && !user) {
     return (
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
         <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[64px] md:h-[72px]">

@@ -56,7 +56,7 @@ function SummerBanner() {
   );
 }
 
-function SubletHero({ onListClick }: { onListClick: () => void }) {
+function SubletHero({ onListClick, canList }: { onListClick: () => void; canList: boolean }) {
   const isMobile = useIsMobile();
   return (
     <motion.div
@@ -74,14 +74,23 @@ function SubletHero({ onListClick }: { onListClick: () => void }) {
             Find short-term housing from students leaving for co-op, or list your place while you&apos;re away.
           </p>
         </div>
-        <motion.button
-          onClick={onListClick}
-          className="border-2 border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35]/5 transition-colors px-5 py-2.5 rounded-xl shrink-0"
-          style={{ fontSize: "14px", fontWeight: 700 }}
-          whileTap={{ scale: 0.97 }}
-        >
-          ☀️ List Your Sublet
-        </motion.button>
+        {canList ? (
+          <motion.button
+            onClick={onListClick}
+            className="border-2 border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35]/5 transition-colors px-5 py-2.5 rounded-xl shrink-0"
+            style={{ fontSize: "14px", fontWeight: 700 }}
+            whileTap={{ scale: 0.97 }}
+          >
+            ☀️ List Your Sublet
+          </motion.button>
+        ) : (
+          <div
+            className="rounded-xl border border-[#1B2D45]/10 bg-white px-4 py-2.5 text-[#1B2D45]/55 shrink-0"
+            style={{ fontSize: "12px", fontWeight: 600 }}
+          >
+            Student sublets only
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -192,6 +201,11 @@ function ListSubletForm({
 
   const handleSubmit = async () => {
     if (submitting) return;
+
+    if (user?.role === "landlord") {
+      toast.error("Landlord accounts can't post student sublets.");
+      return;
+    }
 
     if (!token) {
       toast.info("Please sign in to post a sublet.");
@@ -991,7 +1005,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
   );
 }
 
-function BottomCTA({ onListClick }: { onListClick: () => void }) {
+function BottomCTA({ onListClick, canList }: { onListClick: () => void; canList: boolean }) {
   const isMobile = useIsMobile();
   return (
     <motion.div
@@ -1008,14 +1022,24 @@ function BottomCTA({ onListClick }: { onListClick: () => void }) {
             Don&apos;t pay rent on an empty room. List your sublet in 2 minutes — it&apos;s free, and we&apos;ll help you find someone.
           </p>
         </div>
-        <motion.button
-          onClick={onListClick}
-          className="px-6 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors shrink-0"
-          style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
-          whileTap={{ scale: 0.97 }}
-        >
-          List Your Sublet →
-        </motion.button>
+        {canList ? (
+          <motion.button
+            onClick={onListClick}
+            className="px-6 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors shrink-0"
+            style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
+            whileTap={{ scale: 0.97 }}
+          >
+            List Your Sublet →
+          </motion.button>
+        ) : (
+          <Link
+            href="/landlord"
+            className="inline-flex items-center justify-center px-6 py-3 rounded-xl border border-[#1B2D45]/10 text-[#1B2D45]/60 hover:border-[#1B2D45]/20 hover:text-[#1B2D45] transition-colors shrink-0"
+            style={{ fontSize: "13px", fontWeight: 700 }}
+          >
+            Go to Landlord Dashboard
+          </Link>
+        )}
       </div>
     </motion.div>
   );
@@ -1737,6 +1761,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
 
 export default function SubletsPage() {
   const isMobile = useIsMobile();
+  const user = useAuthStore((s) => s.user);
   const [hydrated, setHydrated] = useState(false);
   const [showListForm, setShowListForm] = useState(false);
   const [listings, setListings] = useState<SubletListing[]>(subletListings);
@@ -1748,8 +1773,15 @@ export default function SubletsPage() {
   const [viewMode, setViewMode] = useState<SubletViewMode>("board");
   const [showPicksSheet, setShowPicksSheet] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const isLandlord = user?.role === "landlord";
 
-  const handleListClick = () => setShowListForm((prev) => !prev);
+  const handleListClick = () => {
+    if (isLandlord) {
+      toast.info("Sublet posting is only available for student accounts.");
+      return;
+    }
+    setShowListForm((prev) => !prev);
+  };
   const handleSubletCreated = (listing: SubletListing) => {
     setListings((prev) => [listing, ...prev]);
     setViewMode("board");
@@ -1823,7 +1855,7 @@ export default function SubletsPage() {
   return (
       <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
       <SummerBanner />
-      <SubletHero onListClick={handleListClick} />
+      <SubletHero onListClick={handleListClick} canList={!isLandlord} />
       <InsightStats />
       <ListSubletForm
         visible={showListForm}
@@ -1940,7 +1972,7 @@ export default function SubletsPage() {
         )}
       </AnimatePresence>
 
-      <BottomCTA onListClick={handleListClick} />
+      <BottomCTA onListClick={handleListClick} canList={!isLandlord} />
 
       <SubletCompareModal
         isOpen={compareOpen}

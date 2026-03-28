@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/lib/auth-store";
 import { AlertCircle, ArrowRight, CheckCircle2, PenLine, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WriterRegister } from "@/types";
@@ -23,6 +24,7 @@ const BUSINESS_TYPES = [
 
 export default function WriterSignupPage() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
   const [form, setForm] = useState<WriterRegister>({
     first_name: "",
     last_name: "",
@@ -101,6 +103,35 @@ export default function WriterSignupPage() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (user?.role === "landlord") {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-[#F6F1E8]">
+        <WriterAuthBackground />
+        <div className="relative z-10 min-h-screen px-4 py-8 md:px-6 md:py-10 flex items-center">
+          <div className="mx-auto w-full max-w-[520px]">
+            <AuthBackLink />
+            <div className="mt-8 rounded-[28px] border border-black/[0.06] bg-white/92 p-8 text-center shadow-[0_24px_60px_rgba(27,45,69,0.10)] backdrop-blur-xl">
+              <h1 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.05em" }}>
+                Writer applications are student-only.
+              </h1>
+              <p className="mt-3 text-[#1B2D45]/52" style={{ fontSize: "14px", lineHeight: 1.7 }}>
+                Landlord accounts can browse The Bubble, but only student and approved writer accounts can apply to contribute.
+              </p>
+              <div className="mt-6 flex items-center justify-center gap-2">
+                <Link href="/the-bubble" className="px-5 py-3 rounded-xl border border-black/[0.06] text-[#1B2D45]/65 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>
+                  Browse The Bubble
+                </Link>
+                <Link href="/landlord" className="px-5 py-3 rounded-xl bg-[#1B2D45] text-white hover:bg-[#142235] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>
+                  Landlord Dashboard
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

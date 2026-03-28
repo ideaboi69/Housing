@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Eye, FileText, PenLine, Trash2, MoreHorizontal, Plus,
   Clock, CheckCircle2, Archive, LogOut, AlertCircle, X,
-  Send, Shield, Loader2,
+  Send, Shield, Loader2, ImagePlus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -120,6 +120,8 @@ function PostEditor({ post, onClose, onSaved }: {
   const [category, setCategory] = useState<string>(post?.category || "");
   const [eventDate, setEventDate] = useState(post?.event_date || "");
   const [eventLocation, setEventLocation] = useState(post?.event_location || "");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState(post?.cover_image_url || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -128,13 +130,31 @@ function PostEditor({ post, onClose, onSaved }: {
 
   const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
 
+  useEffect(() => {
+    return () => {
+      if (coverPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
+  const handleCoverSelect = (file: File | null) => {
+    if (!file) return;
+    if (coverPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
   const handleSave = async (publish = false) => {
     if (!canSave || saving) return;
     setSaving(true);
     setError("");
     try {
+      let savedPost: PostResponse;
       if (isEdit) {
-        await api.posts.update(post.id, {
+        savedPost = await api.posts.update(post.id, {
           title,
           content,
           preview: content.slice(0, 160),
@@ -144,7 +164,7 @@ function PostEditor({ post, onClose, onSaved }: {
           ...(publish ? { status: "published" as any } : {}),
         });
       } else {
-        const created = await api.posts.create({
+        savedPost = await api.posts.create({
           title,
           content,
           preview: content.slice(0, 160),
@@ -153,8 +173,11 @@ function PostEditor({ post, onClose, onSaved }: {
           event_location: eventLocation || undefined,
         });
         if (publish) {
-          await api.posts.update(created.id, { status: "published" as any });
+          savedPost = await api.posts.update(savedPost.id, { status: "published" as any });
         }
+      }
+      if (coverFile) {
+        savedPost = await api.posts.uploadCoverImage(savedPost.id, coverFile);
       }
       onSaved();
       onClose();
@@ -224,6 +247,52 @@ function PostEditor({ post, onClose, onSaved }: {
             </div>
           )}
 
+          <div>
+            <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cover Image</label>
+            <div className="space-y-3">
+              <label className="block cursor-pointer rounded-xl border-2 border-dashed border-[#E8E4DC] p-5 text-center transition-colors hover:border-[#FF6B35]/30">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => handleCoverSelect(e.target.files?.[0] ?? null)}
+                />
+                <ImagePlus className="w-6 h-6 text-[#98A3B0] mx-auto mb-2" />
+                <p className="text-[#98A3B0]" style={{ fontSize: "12px", fontWeight: 500 }}>
+                  Upload a cover image to make the post stand out in The Bubble
+                </p>
+                <p className="text-[#98A3B0]/80 mt-1" style={{ fontSize: "10px" }}>
+                  PNG, JPG, or WebP
+                </p>
+              </label>
+
+              {coverPreview && (
+                <div className="overflow-hidden rounded-xl border border-black/[0.05] bg-[#FAF8F4]">
+                  <img src={coverPreview} alt="Cover preview" className="h-[180px] w-full object-cover" />
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <span className="text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>
+                      {coverFile ? "New image ready to upload" : "Current cover image"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (coverPreview.startsWith("blob:")) {
+                          URL.revokeObjectURL(coverPreview);
+                        }
+                        setCoverFile(null);
+                        setCoverPreview("");
+                      }}
+                      className="text-[#E71D36]/70 hover:text-[#E71D36]"
+                      style={{ fontSize: "11px", fontWeight: 700 }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {error && (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#E71D36]/5 text-[#E71D36]" style={{ fontSize: "12px" }}>
               <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {error}
@@ -268,6 +337,12 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
     <div className="flex items-center gap-4 px-4 md:px-5 py-4 bg-white rounded-xl border border-black/[0.04] hover:border-black/[0.08] transition-all"
       style={{ boxShadow: "0 1px 3px rgba(27,45,69,0.03)" }}>
 
+      {post.cover_image_url && (
+        <div className="hidden md:block w-[120px] h-[88px] shrink-0 overflow-hidden rounded-xl border border-black/[0.04] bg-[#FAF8F4]">
+          <img src={post.cover_image_url} alt={post.title} className="w-full h-full object-cover" />
+        </div>
+      )}
+
       {/* Category + title */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
@@ -280,6 +355,11 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
         </div>
         <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{post.title}</p>
         <p className="text-[#98A3B0] truncate mt-0.5" style={{ fontSize: "11px" }}>{post.preview || "No preview"}</p>
+        {post.cover_image_url && (
+          <div className="md:hidden mt-3 overflow-hidden rounded-xl border border-black/[0.04] bg-[#FAF8F4]">
+            <img src={post.cover_image_url} alt={post.title} className="w-full h-[168px] object-cover" />
+          </div>
+        )}
       </div>
 
       {/* Stats */}

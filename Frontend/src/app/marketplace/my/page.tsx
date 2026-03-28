@@ -211,6 +211,28 @@ export default function MyListingsPage() {
     );
   }
 
+  if (user.role === "landlord") {
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
+        <div className="max-w-[420px] text-center">
+          <ShoppingBag className="w-10 h-10 text-[#1B2D45]/10 mx-auto mb-3" />
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 700 }}>Marketplace listings are for student sellers</h2>
+          <p className="text-[#1B2D45]/40 mt-1 mb-5" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+            Landlord accounts can browse marketplace items, but they don&apos;t get seller tools or personal listings here.
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <Link href="/marketplace" className="px-5 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/60 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>
+              Browse Marketplace
+            </Link>
+            <Link href="/landlord" className="px-5 py-2.5 rounded-xl bg-[#1B2D45] text-white hover:bg-[#142235] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}>
+              Landlord Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const activeItems = items.filter((i) => i.status === "available");
   const draftItems = items.filter((i) => i.status === "draft");
   const soldItems = items.filter((i) => i.status === "sold");

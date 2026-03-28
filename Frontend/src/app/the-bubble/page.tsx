@@ -39,6 +39,41 @@ interface Post {
   viewCount?: number;
 }
 
+function formatRelativeTimestamp(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.max(1, Math.floor(diff / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
+}
+
+function buildLivePost(post: PostListResponse): Post {
+  const category = (post.category || "other") as Category;
+  const meta = getCategoryMeta(category);
+  const authorName = post.author_name || "Writer";
+
+  return {
+    id: `live-${post.id}`,
+    author: authorName,
+    initial: authorName[0]?.toUpperCase() || "W",
+    avatarGradient: `linear-gradient(135deg, ${meta.color}, #1B2D45)`,
+    verified: true,
+    timestamp: formatRelativeTimestamp(post.created_at),
+    category,
+    title: post.title,
+    body: post.preview || "Tap through to read the full post.",
+    image: post.cover_image_url || undefined,
+    eventDate: post.event_date,
+    upvotes: post.view_count || 0,
+    postedAt: new Date(post.created_at).getTime(),
+    slug: post.slug,
+    viewCount: post.view_count,
+  };
+}
+
 /* ═══════════════════════════════════════════════════════
    CATEGORY DEFINITIONS — matches backend PostCategory
    ═══════════════════════════════════════════════════════ */
@@ -603,7 +638,7 @@ function TipModal({ onClose }: { onClose: () => void }) {
    HERO
    ═══════════════════════════════════════════════════════ */
 
-function HeroSection({ isWriter, onCreatePost, onApply, isMobile }: { isWriter: boolean; onCreatePost: () => void; onApply: () => void; isMobile: boolean }) {
+function HeroSection({ isWriter, canContribute, onCreatePost, onApply, isMobile }: { isWriter: boolean; canContribute: boolean; onCreatePost: () => void; onApply: () => void; isMobile: boolean }) {
   return (
     <div className="relative overflow-hidden" style={{ background: "radial-gradient(ellipse at 50% 80%, rgba(255,107,53,0.06) 0%, transparent 60%), #FAF8F4" }}>
 
@@ -670,7 +705,7 @@ function HeroSection({ isWriter, onCreatePost, onApply, isMobile }: { isWriter: 
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-5">
-            {isWriter ? (
+            {canContribute ? isWriter ? (
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onCreatePost}
                 className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-[#FF6B35] text-white"
                 style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.3)" }}>
@@ -682,6 +717,10 @@ function HeroSection({ isWriter, onCreatePost, onApply, isMobile }: { isWriter: 
                 style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.3)" }}>
                 <BadgeCheck className="w-4 h-4" /> Become a Writer
               </motion.button>
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#1B2D45]/10 bg-white/80 px-4 py-2.5 text-[#1B2D45]/55" style={{ fontSize: "12px", fontWeight: 600 }}>
+                Bubble posting is student-only
+              </div>
             )}
           </motion.div>
         </div>
@@ -738,15 +777,15 @@ function FilterBar({ activeCategory, onSelectCategory, sortMode, onSelectSort, i
    SIDEBAR
    ═══════════════════════════════════════════════════════ */
 
-function Sidebar({ isWriter, onCreatePost, onApply, onTip }: { isWriter: boolean; onCreatePost: () => void; onApply: () => void; onTip: () => void }) {
-  const trendingPosts = useMemo(() => [...POSTS].sort((a, b) => b.upvotes - a.upvotes).slice(0, 5), []);
+function Sidebar({ isWriter, canContribute, onCreatePost, onApply, onTip, posts }: { isWriter: boolean; canContribute: boolean; onCreatePost: () => void; onApply: () => void; onTip: () => void; posts: Post[] }) {
+  const trendingPosts = useMemo(() => [...posts].sort((a, b) => b.upvotes - a.upvotes).slice(0, 5), [posts]);
 
   return (
     <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
-      className="w-[280px] shrink-0 space-y-4 sticky top-[120px]">
+      className="w-[280px] shrink-0 space-y-4 pb-4">
 
       {/* Create or Apply */}
-      {isWriter ? (
+      {canContribute ? isWriter ? (
         <div className="bg-white rounded-2xl border border-black/[0.04] p-4 cursor-pointer hover:shadow-md transition-shadow" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }} onClick={onCreatePost}>
           <div className="flex items-center gap-2.5">
             <Avatar initial="Y" gradient="linear-gradient(135deg, #FF6B35, #FFB627)" size={28} />
@@ -755,6 +794,13 @@ function Sidebar({ isWriter, onCreatePost, onApply, onTip }: { isWriter: boolean
         </div>
       ) : (
         <BecomeWriterCard onApply={onApply} />
+      ) : (
+        <div className="bg-white rounded-2xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+          <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Read-only for landlords</h4>
+          <p className="mt-2 text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.6 }}>
+            Landlord accounts can browse Bubble posts, but student and writer accounts handle tips and publishing.
+          </p>
+        </div>
       )}
 
       {/* Trending */}
@@ -777,16 +823,18 @@ function Sidebar({ isWriter, onCreatePost, onApply, onTip }: { isWriter: boolean
       </div>
 
       {/* Submit a Tip */}
-      <div className="bg-white rounded-2xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
-        <div className="flex items-center gap-1.5 mb-2">
-          <Sparkles className="w-3.5 h-3.5 text-[#FFB627]" />
-          <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Submit a Tip</h4>
+      {canContribute && (
+        <div className="bg-white rounded-2xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+          <div className="flex items-center gap-1.5 mb-2">
+            <Sparkles className="w-3.5 h-3.5 text-[#FFB627]" />
+            <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Submit a Tip</h4>
+          </div>
+          <p className="text-[#98A3B0] mb-3" style={{ fontSize: "11px", lineHeight: 1.5 }}>Know something the community should hear? Send us a tip and a writer may feature it.</p>
+          <button onClick={onTip} className="w-full py-2 rounded-xl border border-[#FFB627]/20 text-[#B8860B] hover:bg-[#FFB627]/5 transition-colors" style={{ fontSize: "12px", fontWeight: 600 }}>
+            💡 Send a Tip
+          </button>
         </div>
-        <p className="text-[#98A3B0] mb-3" style={{ fontSize: "11px", lineHeight: 1.5 }}>Know something the community should hear? Send us a tip and a writer may feature it.</p>
-        <button onClick={onTip} className="w-full py-2 rounded-xl border border-[#FFB627]/20 text-[#B8860B] hover:bg-[#FFB627]/5 transition-colors" style={{ fontSize: "12px", fontWeight: 600 }}>
-          💡 Send a Tip
-        </button>
-      </div>
+      )}
 
       {/* Guidelines */}
       <div className="bg-[#FAF8F4] rounded-2xl border border-[#E8E4DC] p-4">
@@ -834,12 +882,19 @@ export default function TheBubblePage() {
   const [showPostModal, setShowPostModal] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
   const [isWriter, setIsWriter] = useState(false);
+  const [livePosts, setLivePosts] = useState<Post[]>([]);
   const { user } = useAuthStore();
   const isMobile = useIsMobile();
+  const isLandlord = user?.role === "landlord";
+  const canUseBubbleActions = !isLandlord;
 
   // Check if user has write access (student with is_writable, or a writer token)
   useEffect(() => {
     if (!user) {
+      setIsWriter(false);
+      return;
+    }
+    if (user.role === "landlord") {
       setIsWriter(false);
       return;
     }
@@ -855,8 +910,35 @@ export default function TheBubblePage() {
     } catch {}
   }, [user]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPublishedPosts() {
+      try {
+        const data = await api.posts.getAll();
+        if (!cancelled) {
+          setLivePosts(data.filter((post) => post.status === "published").map(buildLivePost));
+        }
+      } catch {
+        if (!cancelled) setLivePosts([]);
+      }
+    }
+
+    loadPublishedPosts();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const feedPosts = useMemo(() => {
+    if (livePosts.length === 0) return POSTS;
+    const liveSlugs = new Set(livePosts.map((post) => post.slug).filter(Boolean));
+    const mockPosts = POSTS.filter((post) => !post.slug || !liveSlugs.has(post.slug));
+    return [...livePosts, ...mockPosts];
+  }, [livePosts]);
+
   const filteredAndSorted = useMemo(() => {
-    let posts = activeCategory === "all" ? [...POSTS] : POSTS.filter((p) => p.category === activeCategory);
+    let posts = activeCategory === "all" ? [...feedPosts] : feedPosts.filter((p) => p.category === activeCategory);
     if (sortMode === "trending") {
       // hot score: upvotes weighted by recency
       posts.sort((a, b) => {
@@ -872,9 +954,10 @@ export default function TheBubblePage() {
       posts.sort((a, b) => b.upvotes - a.upvotes);
     }
     return posts;
-  }, [activeCategory, sortMode]);
+  }, [activeCategory, sortMode, feedPosts]);
 
   const handlePostClick = () => {
+    if (isLandlord) return;
     if (!user) {
       router.push("/writers/signup");
       return;
@@ -926,7 +1009,7 @@ export default function TheBubblePage() {
 
       {/* Page content */}
       <div className="relative z-10">
-      <HeroSection isWriter={isWriter} onCreatePost={() => setShowPostModal(true)} onApply={() => router.push("/writers/signup")} isMobile={isMobile} />
+      <HeroSection isWriter={isWriter} canContribute={canUseBubbleActions} onCreatePost={() => setShowPostModal(true)} onApply={() => router.push("/writers/signup")} isMobile={isMobile} />
 
       <FilterBar activeCategory={activeCategory} onSelectCategory={setActiveCategory} sortMode={sortMode} onSelectSort={setSortMode} isMobile={isMobile} />
 
@@ -935,7 +1018,7 @@ export default function TheBubblePage() {
           {/* Feed */}
           <div className="flex-1 min-w-0 space-y-4">
             {activeCategory === "all" && <WeeklyHighlightsCard />}
-            {isMobile && !isWriter && activeCategory === "all" && <BecomeWriterCard onApply={() => router.push("/writers/signup")} />}
+            {isMobile && canUseBubbleActions && !isWriter && activeCategory === "all" && <BecomeWriterCard onApply={() => router.push("/writers/signup")} />}
 
             {/* Mobile sort toggle */}
             {isMobile && (
@@ -957,12 +1040,16 @@ export default function TheBubblePage() {
             )}
           </div>
 
-          {!isMobile && <Sidebar isWriter={isWriter} onCreatePost={() => setShowPostModal(true)} onApply={() => router.push("/writers/signup")} onTip={() => setShowTipModal(true)} />}
+          {!isMobile && (
+            <div className="shrink-0 pl-1 pr-1">
+              <Sidebar isWriter={isWriter} canContribute={canUseBubbleActions} onCreatePost={() => setShowPostModal(true)} onApply={() => router.push("/writers/signup")} onTip={() => setShowTipModal(true)} posts={feedPosts} />
+            </div>
+          )}
         </div>
       </div>
 
       {/* Mobile FAB */}
-      {isMobile && (
+      {isMobile && canUseBubbleActions && (
         <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 350, damping: 20, delay: 0.5 }}
           whileTap={{ scale: 0.9 }} onClick={handlePostClick}
           className="fixed bottom-6 right-4 z-50 w-14 h-14 rounded-full bg-[#FF6B35] text-white flex items-center justify-center"
@@ -973,10 +1060,10 @@ export default function TheBubblePage() {
 
       {/* Modals */}
       <AnimatePresence>
-        {showPostModal && isWriter && <PostModal onClose={() => setShowPostModal(false)} />}
+        {showPostModal && canUseBubbleActions && isWriter && <PostModal onClose={() => setShowPostModal(false)} />}
       </AnimatePresence>
       <AnimatePresence>
-        {showTipModal && (
+        {showTipModal && canUseBubbleActions && (
           <TipModal onClose={() => setShowTipModal(false)} />
         )}
       </AnimatePresence>
