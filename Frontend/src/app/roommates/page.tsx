@@ -893,7 +893,7 @@ export default function RoommatesPage() {
                   <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>Try another filter or create your own group.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {groupsWithCompat.map((g, i) => <DossierGroupCard key={g.id} group={g} compatibility={hasProfile ? g._compat : undefined} index={i} claimState={claimState} />)}
                 </div>
               )}
