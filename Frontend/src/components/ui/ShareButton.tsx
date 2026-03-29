@@ -61,7 +61,7 @@ export function ShareButton({ path, title, description, variant = "sidebar" }: S
 
   const handleClick = useCallback(() => {
     // If native share is available (mobile), use it directly
-    if (typeof navigator !== "undefined" && navigator.share) {
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       handleNativeShare();
     } else {
       // Desktop: show small menu or just copy

@@ -79,159 +79,153 @@ function DossierGroupCard({
     : matchingClaim?.status === "property_created"
       ? "🏠 Property added"
       : "⏳ Has a place";
+  const heroImage = (group as any).groupImage || group.housing?.linkedListingImage || group.housing?.selfReportedPhotos?.[0] || null;
+  const compactMeta = [
+    group.spotsNeeded === 1 ? "Need 1 more" : `Need ${group.spotsNeeded} more`,
+    group.preferredArea,
+    group.genderPreference && group.genderPreference !== "No preference" ? group.genderPreference : null,
+  ].filter(Boolean).slice(0, 2);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, rotate: -1 }}
-      animate={{ opacity: 1, y: 0, rotate: 0 }}
-      transition={{ delay: index * 0.08, type: "spring", stiffness: 260, damping: 22 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, type: "spring", stiffness: 260, damping: 24 }}
     >
       <Link href={`/roommates/groups/${group.id}`} className="block group">
         <motion.div
-          className="bg-white rounded-2xl overflow-hidden cursor-pointer"
-          style={{ border: "2.5px solid #1B2D45", boxShadow: "5px 5px 0px rgba(27,45,69,0.08)" }}
-          whileHover={{ y: -4, boxShadow: "7px 7px 0px rgba(27,45,69,0.12)" }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          className="h-full rounded-[24px] border border-black/[0.08] bg-white p-3.5 cursor-pointer transition-all"
+          style={{ boxShadow: "0 16px 34px rgba(27,45,69,0.06)" }}
+          whileHover={{ y: -4, boxShadow: "0 18px 40px rgba(27,45,69,0.1)" }}
+          transition={{ type: "spring", stiffness: 320, damping: 24 }}
         >
-          {/* Banner */}
-          <div className="relative h-[70px] overflow-hidden" style={{ background: (group as any).groupImage ? undefined : (group.bannerGradient || defaultGradient) }}>
-            {(group as any).groupImage ? (
-              <img src={(group as any).groupImage} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)", backgroundSize: "12px 12px" }} />
-            )}
-            {/* Dark overlay for text readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-            {/* Group name on banner */}
-            <div className="absolute bottom-2.5 left-3.5">
-              <h3 className="text-white" style={{ fontSize: "15px", fontWeight: 800, textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>{group.name}</h3>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {compactMeta.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full bg-[#FF6B35]/[0.08] px-2 py-1 text-[#FF6B35]"
+                        style={{ fontSize: "9px", fontWeight: 700 }}
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                  <h3 className="mt-2 text-[#1B2D45] truncate" style={{ fontSize: "18px", fontWeight: 800, letterSpacing: "-0.02em" }}>
+                    {group.name}
+                  </h3>
+                </div>
+                {compatibility != null && compatibility > 0 && <CompatRing score={compatibility} size={36} />}
+              </div>
+
+              <div className="mt-2.5 flex items-center">
+                <div className="flex items-center -space-x-2.5">
+                  {group.members.slice(0, 3).map((m) => (
+                    <div
+                      key={m.id}
+                      className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/18 to-[#FFB627]/18 flex items-center justify-center border-2 border-white overflow-hidden"
+                      style={{ boxShadow: "0 2px 8px rgba(27,45,69,0.08)" }}
+                    >
+                      {(m as typeof m & { avatar?: string }).avatar ? (
+                        <img src={(m as typeof m & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span style={{ fontSize: "12px", fontWeight: 800, color: "#FF6B35" }}>{m.firstName[0]}</span>
+                      )}
+                    </div>
+                  ))}
+                  {Array.from({ length: Math.min(group.spotsNeeded, 2) }, (_, i) => (
+                    <div
+                      key={`empty-${i}`}
+                      className="w-9 h-9 rounded-full border-2 border-dashed border-[#1B2D45]/12 flex items-center justify-center bg-[#FAF8F4]"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-[#FF6B35]/45" />
+                    </div>
+                  ))}
+                </div>
+                <span className="ml-2.5 text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 700 }}>
+                  {filled}/{group.groupSize}
+                </span>
+              </div>
             </div>
-            {/* Compat ring on banner */}
-            {compatibility != null && compatibility > 0 && (
-              <div className="absolute top-2 right-2.5 bg-white rounded-full p-0.5" style={{ boxShadow: "2px 2px 0px rgba(0,0,0,0.08)" }}>
-                <CompatRing score={compatibility} size={34} />
+
+            <div
+              className="shrink-0 h-[68px] w-[72px] rounded-2xl overflow-hidden border border-black/[0.05]"
+              style={{ background: heroImage ? undefined : (group.bannerGradient || defaultGradient) }}
+            >
+              {heroImage ? (
+                <img src={heroImage} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.16) 1px, transparent 1px)", backgroundSize: "10px 10px" }} />
+              )}
+            </div>
+          </div>
+
+          <div className="mt-2.5">
+            <p
+              className="text-[#1B2D45]/58"
+              style={{
+                fontSize: "12px",
+                lineHeight: 1.55,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical" as const,
+                overflow: "hidden",
+              }}
+            >
+              {group.description}
+            </p>
+          </div>
+
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border border-black/[0.05] bg-[#FCFAF7] px-3 py-2.5">
+              <div className="text-[#1B2D45]/42" style={{ fontSize: "9px", fontWeight: 700 }}>Rent</div>
+              <div className="mt-0.5 text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 800 }}>
+                {displayRent ? `$${displayRent}/mo` : `$${group.budgetMin}–$${group.budgetMax}`}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-black/[0.05] bg-[#FCFAF7] px-3 py-2.5">
+              <div className="text-[#1B2D45]/42" style={{ fontSize: "9px", fontWeight: 700 }}>Move-in</div>
+              <div className="mt-0.5 text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 800 }}>{group.moveIn}</div>
+            </div>
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {displayAddress ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1"
+                style={{ background: addressBg, border: `1px solid ${addressAccent}20`, color: addressAccent, fontSize: "10px", fontWeight: 700 }}
+              >
+                <MapPin className="w-3 h-3" />
+                Has a place
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#FFB627]/[0.09] px-2.5 py-1 text-[#D4990F]" style={{ fontSize: "10px", fontWeight: 700 }}>
+                {pendingBadge}
+              </span>
+            )}
+            {displayAddress && (
+              <div
+                className="flex items-center gap-1.5 min-w-0 rounded-full bg-[#1B2D45]/[0.05] px-2.5 py-1"
+                style={{ fontSize: "10px", fontWeight: 700, color: "#1B2D45" }}
+              >
+                <MapPin className="w-3 h-3 shrink-0" />
+                <span className="truncate">
+                  {displayAddress}
+                </span>
               </div>
             )}
           </div>
 
-          {/* Body */}
-          <div className="px-4 pt-3 pb-3.5">
-            {/* Avatars row — polaroid stack + empty seats */}
-            <div className="flex items-center mb-3">
-              <div className="flex items-center -space-x-3">
-                {group.members.map((m) => (
-                  <div
-                    key={m.id}
-                    className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/25 to-[#FFB627]/25 flex items-center justify-center border-[3px] border-white relative overflow-hidden"
-                    style={{ boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}
-                  >
-                    {(m as typeof m & { avatar?: string }).avatar ? (
-                      <img src={(m as typeof m & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{m.firstName[0]}</span>
-                    )}
-                  </div>
-                ))}
-                {/* Empty seat(s) */}
-                {Array.from({ length: group.spotsNeeded }, (_, i) => (
-                  <motion.div
-                    key={`empty-${i}`}
-                    className="w-10 h-10 rounded-full border-[3px] border-dashed border-[#1B2D45]/15 flex items-center justify-center bg-[#FAF8F4] relative"
-                    animate={{ borderColor: ["rgba(27,45,69,0.1)", "rgba(255,107,53,0.3)", "rgba(27,45,69,0.1)"] }}
-                    transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.3 }}
-                  >
-                    <Plus className="w-3.5 h-3.5 text-[#FF6B35]/40" />
-                  </motion.div>
-                ))}
-              </div>
-              <span className="text-[#1B2D45]/50 ml-2" style={{ fontSize: "10px", fontWeight: 600 }}>{filled}/{group.groupSize}</span>
-            </div>
-
-            {/* Description */}
-            <p className="text-[#1B2D45]/60 mb-2.5" style={{ fontSize: "11px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
-              {group.description}
-            </p>
-
-            {/* Snapshot list */}
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
-                <div className="text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 700 }}>Rent</div>
-                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>
-                  {displayRent ? `$${displayRent}/mo` : `$${group.budgetMin}–$${group.budgetMax}`}
-                </div>
-              </div>
-              <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
-                <div className="text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 700 }}>Utilities</div>
-                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>
-                  {utilitiesIncluded == null ? "Not listed" : utilitiesIncluded ? "Included" : "Extra"}
-                </div>
-              </div>
-              <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
-                <div className="text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 700 }}>Move-in</div>
-                <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{group.moveIn}</div>
-              </div>
-              <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 border border-black/[0.04]">
-                <div className="text-[#1B2D45]/50" style={{ fontSize: "9px", fontWeight: 700 }}>Availability</div>
-                <div
-                  className="mt-0.5"
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: group.housing?.status === "linked" ? "#4ADE80" : "#FFB627",
-                  }}
-                >
-                  {group.housing?.status === "linked" ? "Verified place" : pendingBadge}
-                </div>
-              </div>
-            </div>
-
-            {group.genderPreference && group.genderPreference !== "No preference" && (
-              <div className="mt-2">
-                <span className="px-2 py-0.5 rounded-lg bg-[#FFB627]/[0.08] text-[#FFB627] border border-[#FFB627]/15" style={{ fontSize: "9px", fontWeight: 700 }}>
-                  {group.genderPreference}
-                </span>
-              </div>
-            )}
-
-            {/* Address line for groups with confirmed availability */}
-            {displayAddress && (
-              <div
-                className="flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg min-w-0"
-                style={{ background: addressBg, border: `1.5px solid ${addressAccent}20` }}
-              >
-                <MapPin className="w-3 h-3 shrink-0" style={{ color: addressAccent }} />
-                <span className="truncate" style={{ fontSize: "10px", fontWeight: 700, color: addressAccent }}>
-                  Availability at {displayAddress}
-                </span>
-              </div>
-            )}
-
-            {matchingClaim && group.housing?.status === "pending" && (
-              <div
-                className="mt-2 px-2.5 py-1.5 rounded-lg"
-                style={{
-                  background: matchingClaim.status === "listing_created" ? "rgba(74,222,128,0.06)" : "rgba(46,196,182,0.06)",
-                  border: `1.5px solid ${matchingClaim.status === "listing_created" ? "rgba(74,222,128,0.18)" : "rgba(46,196,182,0.18)"}`,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "9px",
-                    fontWeight: 700,
-                    color: matchingClaim.status === "listing_created" ? "#4ADE80" : "#2EC4B6",
-                  }}
-                >
-                  {matchingClaim.status === "listing_created" ? "Frontend progress: landlord finished the listing" : "Frontend progress: landlord added the property"}
-                </span>
-              </div>
-            )}
-
-            {/* CTA */}
-            <div className="flex items-center justify-end mt-2.5">
-              <span className="text-[#FF6B35] group-hover:translate-x-1 transition-transform flex items-center gap-1" style={{ fontSize: "11px", fontWeight: 700 }}>
-                View group <ChevronRight className="w-3 h-3" />
-              </span>
-            </div>
+          <div className="mt-3.5 flex items-center justify-between">
+            <span className="text-[#1B2D45]/42" style={{ fontSize: "10px", fontWeight: 700 }}>
+              {utilitiesIncluded == null ? "Utilities not listed" : utilitiesIncluded ? "Utilities included" : "Utilities extra"}
+            </span>
+            <span className="text-[#FF6B35] group-hover:translate-x-1 transition-transform flex items-center gap-1" style={{ fontSize: "11px", fontWeight: 700 }}>
+              View group <ChevronRight className="w-3 h-3" />
+            </span>
           </div>
         </motion.div>
       </Link>
@@ -242,16 +236,16 @@ function DossierGroupCard({
 /* ── Individual Card ── */
 
 function IndividualCard({ profile }: { profile: LifestyleProfile }) {
-  const topTags = Object.entries(profile.tags).slice(0, 4).map(([_, v]) => TAG_SHORT_LABELS[v] || v);
+  const topTags = Object.entries(profile.tags).slice(0, 3).map(([_, v]) => TAG_SHORT_LABELS[v] || v);
   const budgetLabel = profile.budget[1] >= 2000 ? `$${profile.budget[0]}+` : `$${profile.budget[0]}–$${profile.budget[1]}`;
   return (
     <motion.div
-      className="bg-white rounded-2xl p-4 hover:translate-y-[-3px] transition-all"
-      style={{ border: "2.5px solid #1B2D45", boxShadow: "5px 5px 0px rgba(27,45,69,0.08)" }}
-      whileHover={{ boxShadow: "7px 7px 0px rgba(27,45,69,0.12)" }}
+      className="rounded-[24px] border border-black/[0.08] bg-white p-3.5 transition-all hover:translate-y-[-3px]"
+      style={{ boxShadow: "0 16px 34px rgba(27,45,69,0.06)" }}
+      whileHover={{ boxShadow: "0 18px 40px rgba(27,45,69,0.1)" }}
     >
       <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 border-[2.5px] border-[#1B2D45]/10 overflow-hidden" style={{ boxShadow: "2px 2px 0px rgba(27,45,69,0.06)" }}>
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 border border-[#1B2D45]/10 overflow-hidden" style={{ boxShadow: "0 8px 18px rgba(27,45,69,0.08)" }}>
           {(profile as typeof profile & { avatar?: string }).avatar ? (
             <img src={(profile as typeof profile & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
           ) : (
@@ -270,16 +264,16 @@ function IndividualCard({ profile }: { profile: LifestyleProfile }) {
         </div>
       </div>
       <p className="text-[#1B2D45]/60 mt-2" style={{ fontSize: "11px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{profile.bio}</p>
-      <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
         <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/60 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 600 }}>{budgetLabel}/mo</span>
         <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/60 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 600 }}>{profile.moveIn}</span>
         {topTags.map((t) => <span key={t} className="px-2 py-0.5 rounded-lg bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 border border-[#FF6B35]/10" style={{ fontSize: "9px", fontWeight: 500 }}>{t}</span>)}
       </div>
       <div className="flex items-center gap-2 mt-3">
-        <button className="flex-1 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all flex items-center justify-center gap-1.5" style={{ fontSize: "11px", fontWeight: 700, border: "2px solid #e55e2e" }}>
+        <button className="flex-1 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all flex items-center justify-center gap-1.5" style={{ fontSize: "11px", fontWeight: 700 }}>
           <MessageCircle className="w-3 h-3" /> Invite to Group
         </button>
-        <button className="py-2 px-3 rounded-xl text-[#1B2D45]/55 hover:text-[#1B2D45] transition-all" style={{ fontSize: "11px", fontWeight: 600, border: "2px solid rgba(27,45,69,0.08)" }}>View</button>
+        <button className="py-2 px-3 rounded-xl text-[#1B2D45]/55 hover:text-[#1B2D45] transition-all border border-black/[0.08] bg-[#FCFAF7]" style={{ fontSize: "11px", fontWeight: 600 }}>View</button>
       </div>
     </motion.div>
   );
@@ -451,17 +445,17 @@ function GettingStarted({ onSelect, allowGroupCreation }: { onSelect: (mode: Exc
 
 const FILTER_OPTIONS = [
   { key: "all", label: "All Groups" },
-  { key: "1more", label: "Need 1 More" },
-  { key: "girls", label: "All Girls" },
+  { key: "1more", label: "Open Room" },
+  { key: "girls", label: "Women Only" },
   { key: "coed", label: "Co-ed" },
   { key: "campus", label: "Near Campus" },
   { key: "downtown", label: "Downtown" },
-  { key: "under700", label: "Under $700" },
+  { key: "under700", label: "< $700" },
 ];
 
 function FilterBar({ active, onFilter }: { active: string; onFilter: (key: string) => void }) {
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-5 -mx-1 px-1 scrollbar-hide">
+    <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
       {FILTER_OPTIONS.map((f) => (
         <motion.button
           key={f.key}
@@ -472,8 +466,8 @@ function FilterBar({ active, onFilter }: { active: string; onFilter: (key: strin
             fontWeight: 700,
             color: active === f.key ? "white" : "#1B2D45",
             background: active === f.key ? "#FF6B35" : "white",
-            border: active === f.key ? "2.5px solid #e55e2e" : "2.5px solid #1B2D45",
-            boxShadow: active === f.key ? "3px 3px 0px rgba(255,107,53,0.15)" : "2px 2px 0px rgba(27,45,69,0.06)",
+            border: active === f.key ? "1px solid #e55e2e" : "1px solid rgba(27,45,69,0.12)",
+            boxShadow: active === f.key ? "0 10px 20px rgba(255,107,53,0.12)" : "0 8px 18px rgba(27,45,69,0.04)",
           }}
           whileHover={{ y: -1 }}
           whileTap={{ y: 1, scale: 0.97 }}
@@ -756,7 +750,7 @@ export default function RoommatesPage() {
           {/* Hero — clean centered */}
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="text-center mb-14 md:mb-18 pt-4 md:pt-8">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-5" style={{ fontSize: "11px", fontWeight: 700, color: "#FF6B35", background: "rgba(255,107,53,0.08)", border: "2px solid rgba(255,107,53,0.12)" }}>
-              <Sparkles className="w-3 h-3" /> Built for Guelph students
+              <Sparkles className="w-3 h-3" /> Built for student roommates
             </div>
             <h1 className="text-[#1B2D45] mx-auto" style={{ fontSize: isMobile ? "34px" : "48px", fontWeight: 900, lineHeight: 1.08, letterSpacing: "-0.025em", maxWidth: "560px" }}>
               Find your perfect roommates
@@ -811,7 +805,7 @@ export default function RoommatesPage() {
               <h2 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Availability right now</h2>
               <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>Take the quiz to see your compatibility score</p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-10">
               {visibleGroups.slice(0, 4).map((g, i) => (
                 <DossierGroupCard key={g.id} group={g} index={i} claimState={claimState} />
               ))}
@@ -823,7 +817,7 @@ export default function RoommatesPage() {
             <div className="text-center py-8 bg-white rounded-2xl" style={{ border: "2.5px solid #1B2D45", boxShadow: "6px 6px 0px rgba(27,45,69,0.08)" }}>
               <div className="flex items-center justify-center gap-2 mb-3">
                 <Shield className="w-5 h-5 text-[#2EC4B6]" />
-                <span className="text-[#2EC4B6]" style={{ fontSize: "12px", fontWeight: 700 }}>Verified Guelph students only</span>
+                <span className="text-[#2EC4B6]" style={{ fontSize: "12px", fontWeight: 700 }}>Verified student email only</span>
               </div>
               <h3 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Ready to find your people?</h3>
               <p className="text-[#1B2D45]/55 mt-1 mb-4" style={{ fontSize: "12px" }}>Takes 2 minutes. Your info stays private.</p>
@@ -849,14 +843,14 @@ export default function RoommatesPage() {
   /* ── Browse page ── */
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
-      <div className="max-w-[900px] mx-auto px-4 py-6 md:py-8">
+      <div className="max-w-[1320px] mx-auto px-4 py-6 md:py-8">
         <div className="flex items-start justify-between flex-wrap gap-4 mb-5">
           <div>
             <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>Roommates</h1>
             <p className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px" }}>{myMode === "solo" ? "Browse houses with availability" : "Find someone for your current place"}</p>
           </div>
           {!isLandlord ? (
-            <Link href="/roommates/groups/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "12px", fontWeight: 700, border: "2px solid #e55e2e", boxShadow: "3px 3px 0px rgba(255,107,53,0.15)" }}>
+            <Link href="/roommates/groups/new" className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 12px 24px rgba(255,107,53,0.18)" }}>
               <Plus className="w-3.5 h-3.5" /> Create Group
             </Link>
           ) : (
@@ -867,20 +861,27 @@ export default function RoommatesPage() {
         </div>
 
         {/* Edit profile bar */}
-        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-white" style={{ border: "2px solid rgba(27,45,69,0.06)", boxShadow: "2px 2px 0px rgba(27,45,69,0.04)" }}>
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-white border border-black/[0.06]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
           <Shield className="w-3.5 h-3.5 text-[#2EC4B6] shrink-0" />
           <span className="text-[#1B2D45]/55 flex-1" style={{ fontSize: "11px" }}>Your roommate profile is active</span>
           <button onClick={handleResetProfile} className="text-[#FF6B35] hover:underline shrink-0" style={{ fontSize: "11px", fontWeight: 600 }}>✏️ Redo Quiz</button>
         </div>
 
-        {/* Tab toggle */}
-        <div className="flex items-center gap-1 bg-white rounded-xl p-1 mb-4 w-fit" style={{ border: "2.5px solid #1B2D45", boxShadow: "3px 3px 0px rgba(27,45,69,0.06)" }}>
-          <button onClick={() => setTab("groups")} className={`px-4 py-2 rounded-lg transition-all ${tab === "groups" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><Users className="w-3.5 h-3.5 inline mr-1.5" />Groups</button>
-          <button onClick={() => setTab("individuals")} className={`px-4 py-2 rounded-lg transition-all ${tab === "individuals" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><User className="w-3.5 h-3.5 inline mr-1.5" />Individuals</button>
-        </div>
+        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-black/[0.08]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
+              <button onClick={() => setTab("groups")} className={`px-4 py-2 rounded-lg transition-all ${tab === "groups" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><Users className="w-3.5 h-3.5 inline mr-1.5" />Groups</button>
+              <button onClick={() => setTab("individuals")} className={`px-4 py-2 rounded-lg transition-all ${tab === "individuals" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><User className="w-3.5 h-3.5 inline mr-1.5" />Individuals</button>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 border border-black/[0.06]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
+              <span className="text-[#1B2D45]/42" style={{ fontSize: "11px", fontWeight: 700 }}>
+                {tab === "groups" ? `${groupsWithCompat.length} groups` : `${individualsWithCompat.length} people`}
+              </span>
+            </div>
+          </div>
 
-        {/* Filter bar (groups tab only) */}
-        {tab === "groups" && <FilterBar active={activeFilter} onFilter={setActiveFilter} />}
+          {tab === "groups" && <FilterBar active={activeFilter} onFilter={setActiveFilter} />}
+        </div>
 
         <AnimatePresence mode="wait">
           {tab === "groups" && (
@@ -892,7 +893,7 @@ export default function RoommatesPage() {
                   <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>Try another filter or create your own group.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
                   {groupsWithCompat.map((g, i) => <DossierGroupCard key={g.id} group={g} compatibility={hasProfile ? g._compat : undefined} index={i} claimState={claimState} />)}
                 </div>
               )}
@@ -900,7 +901,7 @@ export default function RoommatesPage() {
           )}
           {tab === "individuals" && (
             <motion.div key="individuals" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {individualsWithCompat.map((p) => <IndividualCard key={p.id} profile={p} />)}
               </div>
             </motion.div>

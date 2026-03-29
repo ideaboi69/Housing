@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, Calendar, DollarSign, Loader2, Check, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
+import { GenderPreference, LeaseType } from "@/types";
 import type { ListingResponse } from "@/types";
 
 interface EditListingModalProps {
@@ -16,9 +17,17 @@ export function EditListingModal({ listing, onClose, onSaved }: EditListingModal
   const [rent, setRent] = useState(listing.rent_per_room.toString());
   const [rentTotal, setRentTotal] = useState(listing.rent_total.toString());
   const [moveInDate, setMoveInDate] = useState(listing.move_in_date?.split("T")[0] ?? "");
-  const [leaseType, setLeaseType] = useState(listing.lease_type);
+  const [leaseType, setLeaseType] = useState<LeaseType | undefined>(
+    Object.values(LeaseType).includes(listing.lease_type as LeaseType)
+      ? (listing.lease_type as LeaseType)
+      : undefined
+  );
   const [status, setStatus] = useState(listing.status);
-  const [genderPref, setGenderPref] = useState(listing.gender_preference ?? "any");
+  const [genderPref, setGenderPref] = useState<GenderPreference | "any">(
+    listing.gender_preference && Object.values(GenderPreference).includes(listing.gender_preference as GenderPreference)
+      ? (listing.gender_preference as GenderPreference)
+      : "any"
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -33,7 +42,7 @@ export function EditListingModal({ listing, onClose, onSaved }: EditListingModal
         move_in_date: moveInDate || undefined,
         lease_type: leaseType,
         status: status as "active" | "inactive",
-        gender_preference: genderPref === "any" ? null : genderPref,
+        gender_preference: genderPref === "any" ? undefined : genderPref,
       });
       setSuccess(true);
       setTimeout(() => {
@@ -49,7 +58,15 @@ export function EditListingModal({ listing, onClose, onSaved }: EditListingModal
 
   const inputCls = "w-full px-3 py-2 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#1B2D45]/20 focus:bg-white focus:outline-none transition-all";
 
-  function PillGroup({ options, value, onChange }: { options: { key: string; label: string }[]; value: string; onChange: (v: string) => void }) {
+  function PillGroup<T extends string>({
+    options,
+    value,
+    onChange,
+  }: {
+    options: { key: T; label: string }[];
+    value: T | undefined;
+    onChange: (v: T) => void;
+  }) {
     return (
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
@@ -119,10 +136,10 @@ export function EditListingModal({ listing, onClose, onSaved }: EditListingModal
               value={leaseType}
               onChange={setLeaseType}
               options={[
-                { key: "12_months", label: "12 months" },
-                { key: "8_months", label: "8 months" },
-                { key: "4_months", label: "4 months" },
-                { key: "month_to_month", label: "Month-to-month" },
+                { key: LeaseType.TWELVE_MONTH, label: "12 months" },
+                { key: LeaseType.EIGHT_MONTH, label: "8 months" },
+                { key: LeaseType.TEN_MONTH, label: "10 months" },
+                { key: LeaseType.FLEXIBLE, label: "Flexible" },
               ]}
             />
           </div>
@@ -149,8 +166,8 @@ export function EditListingModal({ listing, onClose, onSaved }: EditListingModal
               onChange={setGenderPref}
               options={[
                 { key: "any", label: "Any" },
-                { key: "female", label: "Female only" },
-                { key: "male", label: "Male only" },
+                { key: GenderPreference.FEMALE, label: "Female only" },
+                { key: GenderPreference.MALE, label: "Male only" },
               ]}
             />
           </div>

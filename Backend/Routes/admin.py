@@ -313,18 +313,6 @@ def resolve_flag(flag_id: int, db: Session = Depends(get_db), admin: User = Depe
     return {"message": f"Flag {flag_id} resolved"}
 
 
-@admin_router.patch("/flags/{flag_id}/resolve", status_code=status.HTTP_200_OK)
-def resolve_flag(flag_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    flag = db.query(Flag).filter(Flag.id == flag_id).first()
-    if not flag:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
-
-    flag.status = FlagStatus.RESOLVED  
-    db.commit()
-
-    return {"message": f"Flag {flag_id} resolved"}
-
-
 @admin_router.patch("/flags/{flag_id}/dismiss", status_code=status.HTTP_200_OK)
 def dismiss_flag(flag_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     flag = db.query(Flag).filter(Flag.id == flag_id).first()

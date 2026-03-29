@@ -10,6 +10,7 @@ import type {
   ListingDetailResponse,
   ListingResponse,
   ListingCreate,
+  ListingUpdate,
   ListingFilters,
   PropertyResponse,
   PropertyCreate,
@@ -259,7 +260,7 @@ export const listings = {
       body: JSON.stringify(data),
     }),
 
-  update: (id: number, data: Partial<ListingCreate>) =>
+  update: (id: number, data: ListingUpdate) =>
     request<ListingResponse>(`/api/listings/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),

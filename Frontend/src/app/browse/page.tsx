@@ -95,6 +95,27 @@ function normalizeBrowseListing(listing: ListingDetailResponse): ListingDetailRe
   };
 }
 
+function mergeBrowseListings(liveListings: ListingDetailResponse[]): ListingDetailResponse[] {
+  const seen = new Set<string>();
+  const merged: ListingDetailResponse[] = [];
+
+  const addListing = (listing: ListingDetailResponse) => {
+    const key = [
+      listing.id,
+      listing.address?.trim().toLowerCase(),
+      listing.title?.trim().toLowerCase(),
+    ].join("::");
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(listing);
+  };
+
+  liveListings.forEach(addListing);
+  mockListings.forEach(addListing);
+
+  return merged;
+}
+
 export default function BrowsePage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -122,8 +143,8 @@ export default function BrowsePage() {
       }
 
       const normalizedData = (data ?? []).map(normalizeBrowseListing);
-      setListings(normalizedData);
-      setUseMock(false);
+      setListings(mergeBrowseListings(normalizedData));
+      setUseMock(normalizedData.length < mockListings.length);
       const scoreResults = await Promise.allSettled(
         normalizedData.map((l) => api.healthScores.get(l.id))
       );
@@ -133,7 +154,7 @@ export default function BrowsePage() {
           scores[normalizedData[i].id] = result.value.overall_score;
         }
       });
-      setHealthScores(Object.keys(scores).length > 0 ? scores : mockHealthScores);
+      setHealthScores(Object.keys(scores).length > 0 ? { ...mockHealthScores, ...scores } : mockHealthScores);
     } catch {
       setListings(mockListings);
       setHealthScores(mockHealthScores);

@@ -44,10 +44,14 @@ function MemberCard({ member }: { member: LifestyleProfile }) {
   const budgetLabel = member.budget[1] >= 2000 ? `$${member.budget[0]}+` : `$${member.budget[0]}–$${member.budget[1]}`;
 
   return (
-    <div className="bg-white rounded-xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
+    <div className="bg-white rounded-2xl border border-black/[0.06] p-4" style={{ boxShadow: "0 12px 28px rgba(27,45,69,0.04)" }}>
       <div className="flex items-center gap-3 mb-2.5">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0">
-          <span style={{ fontSize: "14px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden border border-[#1B2D45]/10">
+          {(member as typeof member & { avatar?: string }).avatar ? (
+            <img src={(member as typeof member & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span style={{ fontSize: "14px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+          )}
         </div>
         <div>
           <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{member.firstName} {member.initial}</h4>
@@ -196,6 +200,16 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     : matchingClaim?.status === "property_created"
       ? "Landlord added the property details"
       : "Current availability awaiting landlord verification";
+  const heroImage =
+    (group as RoommateGroup & { groupImage?: string }).groupImage ||
+    group.housing?.linkedListingImage ||
+    group.housing?.selfReportedPhotos?.[0] ||
+    null;
+  const compactMeta = [
+    group.spotsNeeded === 1 ? "Need 1 more" : `Need ${group.spotsNeeded} more`,
+    group.preferredArea,
+    group.genderPreference && group.genderPreference !== "No preference" ? group.genderPreference : null,
+  ].filter(Boolean).slice(0, 2);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -226,22 +240,43 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
         </Link>
 
         {/* Header card */}
-        <div className="bg-white rounded-2xl border border-black/[0.04] p-6 mb-4" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-          <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 900 }}>{group.name}</h1>
+        <div className="bg-white rounded-[24px] border border-black/[0.06] p-5 mb-4" style={{ boxShadow: "0 16px 34px rgba(27,45,69,0.05)" }}>
+          <div className="flex items-start gap-4 mb-4">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                {compactMeta.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full bg-[#FF6B35]/[0.08] px-2.5 py-1 text-[#FF6B35]"
+                    style={{ fontSize: "10px", fontWeight: 700 }}
+                  >
+                    {item}
+                  </span>
+                ))}
               </div>
-              <p className="text-[#1B2D45]/35" style={{ fontSize: "12px" }}>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.02em" }}>{group.name}</h1>
+              </div>
+              <p className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>
                 Looking for {group.spotsNeeded} more roommate{group.spotsNeeded > 1 ? "s" : ""} · {group.moveIn}
               </p>
             </div>
-            {/* Spots visual */}
-            <div className="flex items-center gap-1.5 bg-[#FAF8F4] px-3 py-2 rounded-xl">
-              {Array.from({ length: group.groupSize }, (_, i) => (
-                <div key={i} className={`w-3.5 h-3.5 rounded-full ${i < filled ? "bg-[#4ADE80]" : "bg-[#1B2D45]/[0.08] border-2 border-dashed border-[#1B2D45]/10"}`} />
-              ))}
-              <span className="text-[#1B2D45]/40 ml-1" style={{ fontSize: "11px", fontWeight: 600 }}>{filled}/{group.groupSize}</span>
+            <div className="flex items-start gap-3 shrink-0">
+              <div
+                className="hidden sm:block w-[92px] h-[82px] rounded-2xl overflow-hidden border border-black/[0.05] bg-[#FAF8F4]"
+              >
+                {heroImage ? (
+                  <img src={heroImage} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.18) 0%, rgba(255,182,39,0.18) 100%)" }} />
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 bg-[#FAF8F4] px-3 py-2 rounded-xl border border-black/[0.04]">
+                {Array.from({ length: group.groupSize }, (_, i) => (
+                  <div key={i} className={`w-3.5 h-3.5 rounded-full ${i < filled ? "bg-[#4ADE80]" : "bg-[#1B2D45]/[0.08] border-2 border-dashed border-[#1B2D45]/10"}`} />
+                ))}
+                <span className="text-[#1B2D45]/40 ml-1" style={{ fontSize: "11px", fontWeight: 600 }}>{filled}/{group.groupSize}</span>
+              </div>
             </div>
           </div>
 
@@ -249,29 +284,29 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
 
           {/* Snapshot */}
           <div className="grid grid-cols-2 gap-2 mb-4">
-            <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
-              <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Rent</div>
-              <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>
+            <div className="rounded-2xl bg-[#FCFAF7] px-3 py-2.5 border border-black/[0.05]">
+              <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700 }}>Rent</div>
+              <div className="text-[#1B2D45] mt-0.5" style={{ fontSize: "12px", fontWeight: 800 }}>
                 {displayRent ? `$${displayRent}/mo` : `$${group.budgetMin}–$${group.budgetMax}/mo`}
               </div>
             </div>
-            <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
-              <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Utilities</div>
-              <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>
+            <div className="rounded-2xl bg-[#FCFAF7] px-3 py-2.5 border border-black/[0.05]">
+              <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700 }}>Utilities</div>
+              <div className="text-[#1B2D45] mt-0.5" style={{ fontSize: "12px", fontWeight: 800 }}>
                 {utilitiesIncluded == null ? "Not listed" : utilitiesIncluded ? "Included" : "Extra"}
               </div>
             </div>
-            <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
-              <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Move-in</div>
-              <div className="text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "12px", fontWeight: 700 }}>{group.moveIn}</div>
+            <div className="rounded-2xl bg-[#FCFAF7] px-3 py-2.5 border border-black/[0.05]">
+              <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700 }}>Move-in</div>
+              <div className="text-[#1B2D45] mt-0.5" style={{ fontSize: "12px", fontWeight: 800 }}>{group.moveIn}</div>
             </div>
-            <div className="rounded-xl bg-[#FAF8F4] px-3 py-2.5 border border-black/[0.04]">
-              <div className="text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 700 }}>Availability</div>
+            <div className="rounded-2xl bg-[#FCFAF7] px-3 py-2.5 border border-black/[0.05]">
+              <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700 }}>Availability</div>
               <div
                 className="mt-0.5"
                 style={{
                   fontSize: "12px",
-                  fontWeight: 700,
+                  fontWeight: 800,
                   color: group.housing?.status === "linked" ? "#4ADE80" : "#FFB627",
                 }}
               >
@@ -539,7 +574,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
         <div className="mt-4 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-[#2EC4B6]/[0.04]">
           <Shield className="w-4 h-4 text-[#2EC4B6] shrink-0 mt-0.5" />
           <p className="text-[#1B2D45]/30" style={{ fontSize: "10px", lineHeight: 1.5 }}>
-            All members are verified Guelph students. Your contact info is never shared until you join a group.
+            All members use verified student email. Your contact info is never shared until you join a group.
           </p>
         </div>
       </div>

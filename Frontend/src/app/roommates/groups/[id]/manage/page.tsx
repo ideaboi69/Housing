@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Users, Copy, Check, Link2, Pencil, Trash2,
   X, UserPlus, UserMinus, Shield, MessageCircle, Clock,
-  AlertCircle, Settings, Eye,
+  AlertCircle, Settings, Eye, Camera,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
@@ -126,6 +126,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editVisible, setEditVisible] = useState(true);
+  const [editGroupImage, setEditGroupImage] = useState<string | null>(null);
 
   useEffect(() => {
     // TODO: GET /api/groups/{id} — for now use mock + stored local groups
@@ -137,6 +138,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     setEditName(group.name);
     setEditDesc(group.description);
     setEditVisible(group.isVisible);
+    setEditGroupImage(group.groupImage || null);
   }, [group]);
 
   if (group === undefined) {
@@ -218,12 +220,13 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     } catch { /* API failed */ }
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveSettings = () => {
     const nextGroup: RoommateGroup = {
       ...group,
       name: editName.trim() || group.name,
       description: editDesc.trim() || group.description,
       isVisible: editVisible,
+      groupImage: editGroupImage || undefined,
     };
 
     upsertStoredRoommateGroup(nextGroup);
@@ -242,66 +245,211 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
 
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const resolvedRequests = requests.filter((r) => r.status !== "pending");
+  const heroImage = editGroupImage || group.groupImage || group.housing?.linkedListingImage || group.housing?.selfReportedPhotos?.[0] || null;
+  const saveDisabled =
+    editName.trim().length < 2 ||
+    editDesc.trim().length < 10 ||
+    (
+      editName.trim() === group.name &&
+      editDesc.trim() === group.description &&
+      editVisible === group.isVisible &&
+      (editGroupImage || "") === (group.groupImage || "")
+    );
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
-      <div className="max-w-[640px] mx-auto px-4 py-6 md:py-8">
+      <div className="max-w-[1120px] mx-auto px-4 py-6 md:py-8">
         {/* Back */}
         <Link href={`/roommates/groups/${id}`} className="inline-flex items-center gap-1 text-[#1B2D45]/35 hover:text-[#1B2D45] transition-colors mb-5" style={{ fontSize: "12px", fontWeight: 600 }}>
           <ChevronLeft className="w-4 h-4" /> Back to group
         </Link>
 
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
+        <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
+          <div className="relative space-y-4 lg:sticky lg:top-24">
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute -left-6 top-14 h-32 w-32 rounded-full bg-[#FF6B35]/[0.08] blur-3xl"
+              animate={{ opacity: [0.35, 0.62, 0.35], scale: [1, 1.08, 1] }}
+              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute right-4 top-[17rem] h-24 w-24 rounded-full bg-[#FFB627]/[0.08] blur-3xl"
+              animate={{ opacity: [0.24, 0.5, 0.24], y: [0, -8, 0] }}
+              transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
+              className="overflow-hidden rounded-[30px] border border-black/[0.05] bg-white"
+              style={{ boxShadow: "0 22px 60px rgba(15, 23, 42, 0.07)" }}
+            >
+              <div className="px-5 py-5 border-b border-black/[0.05] bg-[linear-gradient(135deg,#FFF4EE_0%,#FFFFFF_100%)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-[#1B2D45]/35" style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Group management
+                    </div>
+                    <h1 className="mt-2 text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 900 }}>{group.name}</h1>
+                    <p className="text-[#1B2D45]/42 mt-1" style={{ fontSize: "13px" }}>
+                      {filled}/{group.groupSize} members filled · {group.spotsNeeded} spots open
+                    </p>
+                  </div>
+                  <Link href={`/roommates/groups/${id}`} className="shrink-0 px-3.5 py-2 rounded-full border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] transition-all flex items-center gap-1.5" style={{ fontSize: "11px", fontWeight: 700 }}>
+                    <Eye className="w-3 h-3" /> View public page
+                  </Link>
+                </div>
+              </div>
+
+              <div className="p-5">
+                <div className="flex items-start gap-4">
+                  <div className="relative h-[88px] w-[104px] shrink-0 overflow-hidden rounded-[22px] border border-black/[0.05] bg-[#FAF8F4]">
+                    {heroImage ? (
+                      <img src={heroImage} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[#FF6B35]/55" style={{ background: group.bannerGradient || "linear-gradient(135deg, #FFE6DA 0%, #FFF8F2 100%)" }}>
+                        <Users className="h-5 w-5" />
+                      </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap gap-2">
+                      <span className="rounded-full bg-[#1B2D45]/[0.05] px-3 py-1.5 text-[#1B2D45]/58" style={{ fontSize: "11px", fontWeight: 700 }}>
+                        {group.moveIn}
+                      </span>
+                      <span className="rounded-full bg-[#FF6B35]/[0.08] px-3 py-1.5 text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 700 }}>
+                        Need {group.spotsNeeded}
+                      </span>
+                        <span className="rounded-full bg-[#1B2D45]/[0.05] px-3 py-1.5 text-[#1B2D45]/58" style={{ fontSize: "11px", fontWeight: 700 }}>
+                          {group.isVisible ? "Public" : "Invite only"}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-[#1B2D45]/52" style={{ fontSize: "13px", lineHeight: 1.7 }}>
+                        {group.description}
+                      </p>
+                      <div className="mt-4 flex items-center">
+                        {group.members.slice(0, 4).map((member, index) => (
+                          <motion.div
+                            key={member.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.08 + index * 0.04, duration: 0.25 }}
+                            className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[linear-gradient(135deg,#FFE3D3_0%,#FFF7F0_100%)] text-[#FF6B35]"
+                            style={{ fontSize: "13px", fontWeight: 800, marginLeft: index === 0 ? 0 : -10 }}
+                          >
+                            {member.firstName[0]}
+                          </motion.div>
+                        ))}
+                        {group.spotsNeeded > 0 && (
+                          <motion.div
+                            className="ml-2 rounded-full border border-[#FF6B35]/15 bg-[#FF6B35]/[0.08] px-3 py-1.5 text-[#FF6B35]"
+                            style={{ fontSize: "11px", fontWeight: 700 }}
+                            animate={{ y: [0, -2, 0] }}
+                            transition={{ duration: 3.1, repeat: Infinity, ease: "easeInOut" }}
+                          >
+                            Need {group.spotsNeeded}
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[18px] border border-black/[0.05] bg-[#FCFBF8] px-4 py-3">
+                    <div className="text-[#1B2D45]/32" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Student invite
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="min-w-0 flex-1 truncate text-[#1B2D45]/50" style={{ fontSize: "12px", fontWeight: 600 }}>
+                        {shareUrl || `cribb.ca/join/${group.inviteCode}`}
+                      </div>
+                      <button onClick={handleCopy} className="shrink-0 rounded-full bg-[#1B2D45] px-3 py-1.5 text-white transition-all hover:bg-[#152438]" style={{ fontSize: "10px", fontWeight: 700 }}>
+                        {copied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[18px] border border-[#2EC4B6]/12 bg-[#F5FCFB] px-4 py-3">
+                    <div className="text-[#2EC4B6]" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Landlord verification
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="min-w-0 flex-1 truncate text-[#2EC4B6]/72" style={{ fontSize: "12px", fontWeight: 600 }}>
+                        {group.housing?.landlordInviteUrl || "Generated when landlord verification is needed."}
+                      </div>
+                      {group.housing?.landlordInviteUrl && (
+                        <button onClick={handleLandlordCopy} className="shrink-0 rounded-full bg-[#2EC4B6] px-3 py-1.5 text-white transition-all hover:bg-[#28b0a3]" style={{ fontSize: "10px", fontWeight: 700 }}>
+                          {landlordCopied ? "Copied" : "Copy"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 rounded-[22px] border border-black/[0.05] bg-[linear-gradient(180deg,#FFF8F3_0%,#FFFFFF_100%)] px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                        Group pulse
+                      </div>
+                      <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 800 }}>
+                        Quick snapshot of what needs attention.
+                      </div>
+                    </div>
+                    <motion.div
+                      className="h-3 w-3 rounded-full bg-[#FF6B35]"
+                      animate={{ scale: [1, 1.3, 1], opacity: [0.7, 1, 0.7] }}
+                      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-[18px] bg-white px-3 py-3">
+                      <div className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Requests</div>
+                      <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>{pendingCount}</div>
+                      <div className="text-[#1B2D45]/42 mt-1" style={{ fontSize: "11px", lineHeight: 1.55 }}>Waiting to be reviewed.</div>
+                    </div>
+                    <div className="rounded-[18px] bg-white px-3 py-3">
+                      <div className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Members</div>
+                      <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>{filled}</div>
+                      <div className="text-[#1B2D45]/42 mt-1" style={{ fontSize: "11px", lineHeight: 1.55 }}>Already in the house.</div>
+                    </div>
+                    <div className="rounded-[18px] bg-white px-3 py-3">
+                      <div className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Status</div>
+                      <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>{group.housing?.status === "linked" ? "Verified" : "Pending"}</div>
+                      <div className="text-[#1B2D45]/42 mt-1" style={{ fontSize: "11px", lineHeight: 1.55 }}>Home verification state.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
           <div>
-            <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 900 }}>{group.name}</h1>
-            <p className="text-[#1B2D45]/35 mt-0.5" style={{ fontSize: "12px" }}>{filled}/{group.groupSize} members · {group.spotsNeeded} spots open</p>
-          </div>
-          <Link href={`/roommates/groups/${id}`} className="px-3 py-1.5 rounded-lg border border-black/[0.06] text-[#1B2D45]/40 hover:text-[#1B2D45] transition-all flex items-center gap-1" style={{ fontSize: "11px", fontWeight: 600 }}>
-            <Eye className="w-3 h-3" /> View public page
-          </Link>
-        </div>
+            {/* Tabs */}
+            <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-black/[0.05] bg-white p-2 mb-5" style={{ boxShadow: "0 12px 30px rgba(15, 23, 42, 0.04)" }}>
+              <button onClick={() => setTab("requests")} className={`px-4 py-2 rounded-full transition-all flex items-center gap-1.5 ${tab === "requests" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/48 hover:text-[#1B2D45] hover:bg-[#1B2D45]/[0.04]"}`} style={{ fontSize: "12px", fontWeight: 700 }}>
+                <UserPlus className="w-3.5 h-3.5" /> Requests
+                {pendingCount > 0 && <span className={`min-w-[18px] h-[18px] rounded-full flex items-center justify-center ${tab === "requests" ? "bg-white/18 text-white" : "bg-[#E71D36] text-white"}`} style={{ fontSize: "9px", fontWeight: 800 }}>{pendingCount}</span>}
+              </button>
+              <button onClick={() => setTab("members")} className={`px-4 py-2 rounded-full transition-all flex items-center gap-1.5 ${tab === "members" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/48 hover:text-[#1B2D45] hover:bg-[#1B2D45]/[0.04]"}`} style={{ fontSize: "12px", fontWeight: 700 }}>
+                <Users className="w-3.5 h-3.5" /> Members
+              </button>
+              <button onClick={() => setTab("settings")} className={`px-4 py-2 rounded-full transition-all flex items-center gap-1.5 ${tab === "settings" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/48 hover:text-[#1B2D45] hover:bg-[#1B2D45]/[0.04]"}`} style={{ fontSize: "12px", fontWeight: 700 }}>
+                <Settings className="w-3.5 h-3.5" /> Settings
+              </button>
+            </div>
 
-        {/* Invite link bar */}
-        <div className="flex items-center gap-2 bg-white rounded-xl border border-black/[0.04] px-3 py-2.5 mb-5" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
-          <Link2 className="w-3.5 h-3.5 text-[#1B2D45]/20 shrink-0" />
-          <span className="text-[#1B2D45]/40 truncate flex-1" style={{ fontSize: "11px" }}>Student invite: {shareUrl || `cribb.ca/join/${group.inviteCode}`}</span>
-          <button onClick={handleCopy} className="px-3 py-1.5 rounded-lg bg-[#1B2D45] text-white hover:bg-[#152438] transition-all flex items-center gap-1 shrink-0" style={{ fontSize: "10px", fontWeight: 600 }}>
-            {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
-          </button>
-        </div>
-
-        {group.housing?.status === "pending" && group.housing.landlordInviteUrl && (
-          <div className="flex items-center gap-2 bg-white rounded-xl border border-[#2EC4B6]/10 px-3 py-2.5 mb-5" style={{ boxShadow: "0 1px 4px rgba(46,196,182,0.03)" }}>
-            <Link2 className="w-3.5 h-3.5 text-[#2EC4B6]/40 shrink-0" />
-            <span className="text-[#2EC4B6]/70 truncate flex-1" style={{ fontSize: "11px" }}>Landlord verify: {group.housing.landlordInviteUrl}</span>
-            <button onClick={handleLandlordCopy} className="px-3 py-1.5 rounded-lg bg-[#2EC4B6] text-white hover:bg-[#28b0a3] transition-all flex items-center gap-1 shrink-0" style={{ fontSize: "10px", fontWeight: 600 }}>
-              {landlordCopied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
-            </button>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="flex items-center gap-1 bg-white rounded-xl border border-black/[0.04] p-1 mb-5 w-fit">
-          <button onClick={() => setTab("requests")} className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${tab === "requests" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]"}`} style={{ fontSize: "11px", fontWeight: 600 }}>
-            <UserPlus className="w-3 h-3" /> Requests
-            {pendingCount > 0 && <span className={`w-4 h-4 rounded-full flex items-center justify-center ${tab === "requests" ? "bg-white/20 text-white" : "bg-[#E71D36] text-white"}`} style={{ fontSize: "9px", fontWeight: 700 }}>{pendingCount}</span>}
-          </button>
-          <button onClick={() => setTab("members")} className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${tab === "members" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]"}`} style={{ fontSize: "11px", fontWeight: 600 }}>
-            <Users className="w-3 h-3" /> Members
-          </button>
-          <button onClick={() => setTab("settings")} className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${tab === "settings" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]"}`} style={{ fontSize: "11px", fontWeight: 600 }}>
-            <Settings className="w-3 h-3" /> Settings
-          </button>
-        </div>
-
-        {/* Content */}
-        <AnimatePresence mode="wait">
+            {/* Content */}
+            <AnimatePresence mode="wait">
           {/* ── Requests Tab ── */}
           {tab === "requests" && (
             <motion.div key="requests" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
               {pendingRequests.length === 0 ? (
-                <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-8 text-center">
+                <div className="bg-white rounded-[28px] border border-dashed border-black/[0.08] p-10 text-center" style={{ boxShadow: "0 14px 36px rgba(15, 23, 42, 0.04)" }}>
                   <UserPlus className="w-8 h-8 text-[#1B2D45]/10 mx-auto mb-2" />
                   <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>No pending requests</h3>
                   <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "12px" }}>Share your group link to get people requesting to join.</p>
@@ -337,7 +485,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
           {/* ── Members Tab ── */}
           {tab === "members" && (
             <motion.div key="members" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-[28px] border border-black/[0.05] bg-white p-4 sm:p-5" style={{ boxShadow: "0 14px 36px rgba(15, 23, 42, 0.04)" }}>
                 {group.members.map((m, i) => (
                   <MemberRow key={m.id} member={m} isOwner={i === 0} onRemove={() => handleRemoveMember(m.id)} />
                 ))}
@@ -353,52 +501,118 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
           {/* ── Settings Tab ── */}
           {tab === "settings" && (
             <motion.div key="settings" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
-              {/* Edit group info */}
-              <div className="bg-white rounded-xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
-                <h3 className="text-[#1B2D45] mb-3" style={{ fontSize: "14px", fontWeight: 700 }}>Group Info</h3>
-                {editing ? (
-                  <div className="space-y-3">
+              <div className="bg-white rounded-[28px] border border-black/[0.05] p-5 sm:p-6" style={{ boxShadow: "0 14px 36px rgba(15, 23, 42, 0.04)" }}>
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Group settings</h3>
+                  <button onClick={() => setEditing((prev) => !prev)} className="flex items-center gap-1.5 rounded-full border border-black/[0.06] px-3 py-1.5 text-[#1B2D45]/50 transition-all hover:text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>
+                    <Pencil className="w-3 h-3" /> {editing ? "Lock fields" : "Edit fields"}
+                  </button>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-[0.72fr_1.28fr]">
+                  <div className="rounded-[22px] border border-black/[0.05] bg-[#FCFBF8] p-4">
+                    <div className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      Group photo
+                    </div>
+                    <div className="mt-3 relative h-[164px] overflow-hidden rounded-[22px] border border-black/[0.05] bg-white">
+                      {editGroupImage ? (
+                        <>
+                          <img src={editGroupImage} alt="" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setEditGroupImage(null)}
+                            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 transition-colors hover:bg-black/65"
+                          >
+                            <X className="h-4 w-4 text-white" />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[#FF6B35]/55" style={{ background: group.bannerGradient || "linear-gradient(135deg, #FFE6DA 0%, #FFF8F2 100%)" }}>
+                          <Camera className="h-5 w-5" />
+                        </div>
+                      )}
+                    </div>
+                    <label className={`mt-4 inline-flex items-center gap-2 rounded-full border px-4 py-2 transition-all ${editing ? "cursor-pointer border-[#FF6B35]/15 bg-[#FF6B35]/[0.06] text-[#FF6B35] hover:bg-[#FF6B35]/[0.09]" : "border-black/[0.05] text-[#1B2D45]/28"}`} style={{ fontSize: "12px", fontWeight: 700 }}>
+                      <Camera className="h-3.5 w-3.5" />
+                      {editGroupImage ? "Replace photo" : "Upload photo"}
+                      {editing && (
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => setEditGroupImage(ev.target?.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      )}
+                    </label>
+                    <p className="mt-2 text-[#1B2D45]/38" style={{ fontSize: "11px", lineHeight: 1.55 }}>
+                      Only the group creator manages the group image. Keep it simple so it supports the card instead of overwhelming it.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
                     <div>
-                      <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "10px", fontWeight: 600 }}>Name</label>
-                      <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#FAF8F4] border border-black/[0.04] focus:border-[#FF6B35]/20 focus:outline-none" style={{ fontSize: "13px" }} />
+                      <label className="text-[#1B2D45]/38 block mb-1.5" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Group name</label>
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        disabled={!editing}
+                        className="w-full rounded-[18px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3 text-[#1B2D45] outline-none transition-all focus:border-[#FF6B35]/24 focus:bg-white disabled:cursor-not-allowed disabled:text-[#1B2D45]/55"
+                        style={{ fontSize: "14px", fontWeight: 600 }}
+                      />
                     </div>
                     <div>
-                      <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "10px", fontWeight: 600 }}>Description</label>
-                      <textarea value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="w-full px-3 py-2 rounded-lg bg-[#FAF8F4] border border-black/[0.04] focus:border-[#FF6B35]/20 focus:outline-none resize-none" style={{ fontSize: "13px", minHeight: 80 }} />
-                    </div>
-                    <div className="flex items-center gap-2 pt-1">
-                      <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg text-[#1B2D45]/40 hover:bg-[#1B2D45]/[0.04]" style={{ fontSize: "11px", fontWeight: 600 }}>Cancel</button>
-                      <button onClick={handleSaveEdit} className="px-4 py-1.5 rounded-lg bg-[#1B2D45] text-white hover:bg-[#152438] transition-all" style={{ fontSize: "11px", fontWeight: 700 }}>Save</button>
+                      <label className="text-[#1B2D45]/38 block mb-1.5" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>Description</label>
+                      <textarea
+                        value={editDesc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                        disabled={!editing}
+                        className="w-full min-h-[128px] resize-none rounded-[18px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3 text-[#1B2D45] outline-none transition-all focus:border-[#FF6B35]/24 focus:bg-white disabled:cursor-not-allowed disabled:text-[#1B2D45]/55"
+                        style={{ fontSize: "13px", lineHeight: 1.65 }}
+                      />
                     </div>
                   </div>
-                ) : (
-                  <div>
-                    <p className="text-[#1B2D45]/50 mb-2" style={{ fontSize: "12px", lineHeight: 1.5 }}>{group.description}</p>
-                    <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-[#FF6B35] hover:underline" style={{ fontSize: "11px", fontWeight: 600 }}>
-                      <Pencil className="w-3 h-3" /> Edit
-                    </button>
-                  </div>
-                )}
+                </div>
               </div>
 
               {/* Visibility */}
-              <div className="bg-white rounded-xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
-                <h3 className="text-[#1B2D45] mb-3" style={{ fontSize: "14px", fontWeight: 700 }}>Visibility</h3>
+              <div className="bg-white rounded-[28px] border border-black/[0.05] p-5 sm:p-6" style={{ boxShadow: "0 14px 36px rgba(15, 23, 42, 0.04)" }}>
+                <h3 className="text-[#1B2D45] mb-3" style={{ fontSize: "16px", fontWeight: 800 }}>Visibility</h3>
                 <div className="space-y-2">
-                  <button onClick={() => setEditVisible(true)} className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${editVisible ? "border-[#FF6B35]/20 bg-[#FF6B35]/[0.04]" : "border-black/[0.04]"}`}>
+                  <button onClick={() => editing && setEditVisible(true)} className={`w-full text-left px-4 py-3 rounded-[18px] border transition-all ${editVisible ? "border-[#FF6B35]/20 bg-[#FF6B35]/[0.06]" : "border-black/[0.05] bg-[#FCFBF8]"} ${editing ? "hover:border-[#FF6B35]/20 hover:bg-white" : "cursor-not-allowed opacity-80"}`}>
                     <div style={{ fontSize: "12px", fontWeight: editVisible ? 600 : 400, color: editVisible ? "#FF6B35" : "#1B2D45" }}>Public</div>
                     <div className="text-[#1B2D45]/25" style={{ fontSize: "10px" }}>Anyone can discover your group</div>
                   </button>
-                  <button onClick={() => setEditVisible(false)} className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${!editVisible ? "border-[#FF6B35]/20 bg-[#FF6B35]/[0.04]" : "border-black/[0.04]"}`}>
+                  <button onClick={() => editing && setEditVisible(false)} className={`w-full text-left px-4 py-3 rounded-[18px] border transition-all ${!editVisible ? "border-[#FF6B35]/20 bg-[#FF6B35]/[0.06]" : "border-black/[0.05] bg-[#FCFBF8]"} ${editing ? "hover:border-[#FF6B35]/20 hover:bg-white" : "cursor-not-allowed opacity-80"}`}>
                     <div style={{ fontSize: "12px", fontWeight: !editVisible ? 600 : 400, color: !editVisible ? "#FF6B35" : "#1B2D45" }}>Invite only</div>
                     <div className="text-[#1B2D45]/25" style={{ fontSize: "10px" }}>Only people with the link can find you</div>
+                  </button>
+                </div>
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-[18px] bg-[#FCFBF8] px-4 py-3">
+                  <div className="text-[#1B2D45]/38" style={{ fontSize: "11px", lineHeight: 1.6 }}>
+                    {editing ? "Review your edits, then save to update the live group." : "Use Edit fields first if you want to change the group photo, text, or visibility."}
+                  </div>
+                  <button
+                    onClick={handleSaveSettings}
+                    disabled={!editing || saveDisabled}
+                    className={`shrink-0 rounded-full px-4 py-2.5 text-white transition-all ${!editing || saveDisabled ? "bg-[#1B2D45]/12 cursor-not-allowed" : "bg-[#FF6B35] hover:bg-[#e55e2e]"}`}
+                    style={{ fontSize: "12px", fontWeight: 700, boxShadow: !editing || saveDisabled ? "none" : "0 10px 26px rgba(255,107,53,0.22)" }}
+                  >
+                    Save changes
                   </button>
                 </div>
               </div>
 
               {/* Danger zone */}
-              <div className="bg-white rounded-xl border border-[#E71D36]/10 p-4" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
-                <h3 className="text-[#E71D36]/70 mb-2" style={{ fontSize: "14px", fontWeight: 700 }}>Danger Zone</h3>
+              <div className="bg-white rounded-[28px] border border-[#E71D36]/10 p-5 sm:p-6" style={{ boxShadow: "0 14px 36px rgba(15, 23, 42, 0.04)" }}>
+                <h3 className="text-[#E71D36]/70 mb-2" style={{ fontSize: "15px", fontWeight: 800 }}>Danger Zone</h3>
                 {showDelete ? (
                   <div>
                     <p className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "12px" }}>This will permanently delete the group and remove all members. This cannot be undone.</p>
@@ -415,7 +629,9 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
               </div>
             </motion.div>
           )}
-        </AnimatePresence>
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
     </div>
   );

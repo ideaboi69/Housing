@@ -1,80 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MapPin, ChevronDown } from "lucide-react";
+import { MapPin, ChevronDown, Expand } from "lucide-react";
 import { GUELPH_CENTER, MAPBOX_STYLE, MAPBOX_TOKEN, loadMapboxGl } from "@/lib/mapbox";
-
-/* ════════════════════════════════════════════════════════
-   Landmark type config — colors & labels
-   ════════════════════════════════════════════════════════ */
-
-export const LANDMARK_TYPES: Record<string, { color: string; label: string }> = {
-  campus:     { color: "#1B2D45", label: "Campus" },
-  grocery:    { color: "#4ADE80", label: "Grocery" },
-  gym:        { color: "#2EC4B6", label: "Gym" },
-  shopping:   { color: "#FF6B35", label: "Shopping" },
-  transit:    { color: "#1B2D45", label: "Transit" },
-  park:       { color: "#86EFAC", label: "Parks" },
-  recreation: { color: "#2EC4B6", label: "Recreation" },
-  food:       { color: "#FFB627", label: "Food & Drink" },
-  health:     { color: "#E71D36", label: "Health" },
-  library:    { color: "#A78BFA", label: "Library" },
-  area:       { color: "#98A3B0", label: "Area" },
-};
-
-/* ════════════════════════════════════════════════════════
-   Landmark data for Guelph
-   ════════════════════════════════════════════════════════ */
-
-export const GUELPH_LANDMARKS = [
-  // Campus
-  { name: "Guelph Campus", lat: 43.5305, lng: -80.2262, emoji: "🎓", type: "campus" },
-  { name: "Athletics Centre", lat: 43.5320, lng: -80.2290, emoji: "🏟️", type: "campus" },
-  { name: "Library", lat: 43.5310, lng: -80.2265, emoji: "📚", type: "campus" },
-
-  // Grocery
-  { name: "Zehrs (Stone Road)", lat: 43.5185, lng: -80.2523, emoji: "🥬", type: "grocery" },
-  { name: "Walmart Supercentre", lat: 43.5148, lng: -80.2560, emoji: "🛒", type: "grocery" },
-  { name: "Metro (Paisley)", lat: 43.5420, lng: -80.2710, emoji: "🥬", type: "grocery" },
-  { name: "FreshCo (Eramosa)", lat: 43.5460, lng: -80.2310, emoji: "🥬", type: "grocery" },
-  { name: "Food Basics (Speedvale)", lat: 43.5580, lng: -80.2530, emoji: "🥬", type: "grocery" },
-  { name: "Costco Guelph", lat: 43.5080, lng: -80.2740, emoji: "🛒", type: "grocery" },
-
-  // Shopping
-  { name: "Stone Road Mall", lat: 43.5195, lng: -80.2490, emoji: "🛍️", type: "shopping" },
-  { name: "Canadian Tire", lat: 43.5150, lng: -80.2600, emoji: "🔧", type: "shopping" },
-  { name: "Dollarama (Edinburgh)", lat: 43.5230, lng: -80.2430, emoji: "💲", type: "shopping" },
-
-  // Gyms
-  { name: "GoodLife Fitness", lat: 43.5460, lng: -80.2340, emoji: "💪", type: "gym" },
-  { name: "Movati Athletic", lat: 43.5180, lng: -80.2580, emoji: "💪", type: "gym" },
-  { name: "Fit4Less (Edinburgh)", lat: 43.5230, lng: -80.2410, emoji: "💪", type: "gym" },
-  { name: "Crunch Fitness", lat: 43.5190, lng: -80.2500, emoji: "💪", type: "gym" },
-  { name: "LA Fitness", lat: 43.5120, lng: -80.2650, emoji: "💪", type: "gym" },
-
-  // Transit
-  { name: "Guelph Central Station", lat: 43.5464, lng: -80.2559, emoji: "🚌", type: "transit" },
-
-  // Parks & Recreation
-  { name: "Royal City Park", lat: 43.5500, lng: -80.2530, emoji: "🌳", type: "park" },
-  { name: "Riverside Park", lat: 43.5440, lng: -80.2600, emoji: "🌳", type: "park" },
-  { name: "Exhibition Park", lat: 43.5390, lng: -80.2100, emoji: "🌳", type: "park" },
-  { name: "South End Rec Centre", lat: 43.5130, lng: -80.2420, emoji: "🏊", type: "recreation" },
-  { name: "West End Rec Centre", lat: 43.5370, lng: -80.2780, emoji: "🏊", type: "recreation" },
-
-  // Food & Coffee
-  { name: "Downtown Guelph", lat: 43.5464, lng: -80.2489, emoji: "🏙️", type: "area" },
-  { name: "The Albion Hotel", lat: 43.5470, lng: -80.2500, emoji: "🍺", type: "food" },
-  { name: "Planet Bean Coffee", lat: 43.5467, lng: -80.2475, emoji: "☕", type: "food" },
-
-  // Healthcare
-  { name: "Guelph General Hospital", lat: 43.5430, lng: -80.2430, emoji: "🏥", type: "health" },
-  { name: "Health Services", lat: 43.5300, lng: -80.2250, emoji: "🏥", type: "health" },
-
-  // Other
-  { name: "Guelph Public Library", lat: 43.5470, lng: -80.2520, emoji: "📖", type: "library" },
-  { name: "LCBO (Stone Road)", lat: 43.5190, lng: -80.2510, emoji: "🍷", type: "shopping" },
-];
+import {
+  DEFAULT_DETAIL_LANDMARKS,
+  GUELPH_LANDMARKS,
+  LANDMARK_TYPES,
+} from "@/lib/guelph-landmarks";
 
 /* ════════════════════════════════════════════════════════
    Helper: create a colored dot marker element
@@ -105,7 +38,7 @@ function MapLegend({ activeFilters, onToggle }: { activeFilters: Set<string>; on
   const types = Array.from(new Set(GUELPH_LANDMARKS.map((l) => l.type))).filter((t) => t !== "area");
 
   return (
-    <div className="absolute bottom-3 left-3 z-[10] bg-white/95 backdrop-blur-sm rounded-xl shadow-md overflow-hidden" style={{ maxWidth: "220px" }}>
+    <div className="absolute bottom-3 left-3 z-[10] bg-white/95 backdrop-blur-sm rounded-xl shadow-md overflow-hidden" style={{ maxWidth: "240px" }}>
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-3 py-2 hover:bg-black/[0.02] transition-colors"
@@ -131,10 +64,7 @@ function MapLegend({ activeFilters, onToggle }: { activeFilters: Set<string>; on
                 }`}
                 style={{ fontSize: "10px", fontWeight: 600, color: "#1B2D45" }}
               >
-                <span
-                  className="shrink-0 rounded-full"
-                  style={{ width: "8px", height: "8px", background: config.color }}
-                />
+                <span>{config.emoji}</span>
                 {config.label}
               </button>
             );
@@ -165,7 +95,7 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [ready, setReady] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(
-    () => new Set(Object.keys(LANDMARK_TYPES))
+    () => new Set(DEFAULT_DETAIL_LANDMARKS)
   );
 
   const center = lat && lng ? { lat, lng } : GUELPH_CENTER;
@@ -304,12 +234,18 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
             </div>
           </div>
         )}
-        {/* Expand hint */}
-        {ready && (
-          <div className="absolute bottom-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="text-[#1B2D45]/60" style={{ fontSize: "10px", fontWeight: 600 }}>Click to expand</span>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpanded(true);
+          }}
+          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-2.5 py-1.5 text-[#1B2D45]/75 shadow-sm backdrop-blur-sm transition-colors hover:bg-white"
+          style={{ fontSize: "10px", fontWeight: 700 }}
+        >
+          <Expand className="h-3 w-3" />
+          Expand map
+        </button>
       </div>
 
       {/* Expanded map modal */}
@@ -326,7 +262,14 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
               </button>
             </div>
             <div className="w-full" style={{ height: "calc(80vh - 52px)" }}>
-              <CribbMapExpanded lat={lat} lng={lng} showLandmarks={showLandmarks} zoom={zoom} />
+              <CribbMapExpanded
+                lat={lat}
+                lng={lng}
+                showLandmarks={showLandmarks}
+                zoom={zoom}
+                activeFilters={activeFilters}
+                onToggleFilter={toggleFilter}
+              />
             </div>
           </div>
         </div>
@@ -336,7 +279,21 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
 }
 
 /* Expanded map rendered in modal — separate instance so it fills the modal */
-function CribbMapExpanded({ lat, lng, showLandmarks = true, zoom = 15 }: { lat?: number; lng?: number; showLandmarks?: boolean; zoom?: number }) {
+function CribbMapExpanded({
+  lat,
+  lng,
+  showLandmarks = true,
+  zoom = 15,
+  activeFilters,
+  onToggleFilter,
+}: {
+  lat?: number;
+  lng?: number;
+  showLandmarks?: boolean;
+  zoom?: number;
+  activeFilters: Set<string>;
+  onToggleFilter: (type: string) => void;
+}) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -408,6 +365,9 @@ function CribbMapExpanded({ lat, lng, showLandmarks = true, zoom = 15 }: { lat?:
         <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center">
           <div className="animate-pulse w-10 h-10 rounded-full bg-[#FF6B35]/20" />
         </div>
+      )}
+      {ready && showLandmarks && (
+        <MapLegend activeFilters={activeFilters} onToggle={onToggleFilter} />
       )}
     </div>
   );

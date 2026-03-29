@@ -254,6 +254,15 @@ export interface ListingCreate {
   gender_preference?: GenderPreference;
 }
 
+export interface ListingUpdate {
+  rent_per_room?: number;
+  rent_total?: number;
+  lease_type?: LeaseType;
+  move_in_date?: string;
+  status?: string;
+  gender_preference?: GenderPreference;
+}
+
 export interface ListingFilters {
   price_min?: number;
   price_max?: number;
@@ -544,6 +553,7 @@ export interface WriterResponse {
   business_type?: string;
   website?: string;
   phone?: string;
+  reason?: string;
   status: WriterStatus;
   created_at: string;
 }

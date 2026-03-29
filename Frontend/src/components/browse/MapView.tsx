@@ -1,13 +1,20 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Pin, ZoomIn, ZoomOut, Bed, Bath, Clock, MapPin } from "lucide-react";
+import { Pin, ZoomIn, ZoomOut, Bed, Bath, Clock, MapPin, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { formatPrice, formatPropertyType } from "@/lib/utils";
 import { getListingImages, mockCoordinates } from "@/lib/mock-data";
 import { getProximityLabel } from "@/lib/proximity";
 import { buildStaticMapUrl, GUELPH_CENTER, projectLngLatToContainer } from "@/lib/mapbox";
+import {
+  DEFAULT_MAP_VIEW_LANDMARKS,
+  GUELPH_LANDMARKS,
+  LANDMARK_TYPES,
+  MAP_VIEW_LANDMARK_ORDER,
+  type LandmarkType,
+} from "@/lib/guelph-landmarks";
 import type { ListingDetailResponse } from "@/types";
 
 type SortKey = "recommended" | "price_low" | "price_high" | "closest";
@@ -17,6 +24,128 @@ interface MapViewProps {
   healthScores: Record<number, number>;
   pinnedIds: number[];
   onTogglePin: (id: number) => void;
+}
+
+function MapNearbyFilters({
+  activeTypes,
+  onToggle,
+}: {
+  activeTypes: Set<LandmarkType>;
+  onToggle: (type: LandmarkType) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="absolute bottom-4 left-4 z-[10] overflow-hidden rounded-2xl bg-white/92 shadow-md backdrop-blur-sm">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="flex items-center gap-2 px-3 py-2.5 text-[#1B2D45] transition-colors hover:bg-black/[0.02]"
+        style={{ fontSize: "11px", fontWeight: 800 }}
+      >
+        <span>📍</span>
+        Nearby places
+        <ChevronDown className={`h-3.5 w-3.5 text-[#1B2D45]/40 transition-transform ${expanded ? "rotate-180" : ""}`} />
+      </button>
+      {expanded && (
+        <div className="border-t border-black/[0.06] px-3 pb-3 pt-2">
+          <div className="flex flex-wrap gap-1.5">
+            {MAP_VIEW_LANDMARK_ORDER.map((type) => {
+              const config = LANDMARK_TYPES[type];
+              const isActive = activeTypes.has(type);
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => onToggle(type)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 transition-all ${
+                    isActive ? "bg-white shadow-sm" : "bg-black/[0.03] opacity-45"
+                  }`}
+                  style={{
+                    borderColor: isActive ? `${config.color}30` : "transparent",
+                    color: "#1B2D45",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                  }}
+                >
+                  <span>{config.emoji}</span>
+                  <span>{config.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MapScoreLegend() {
+  return (
+    <div className="mt-2 flex items-center gap-2 sm:gap-3">
+      {[{ color: "#4ADE80", label: "85+" }, { color: "#FFB627", label: "65-84" }, { color: "#E71D36", label: "<65" }].map((item) => (
+        <div key={item.label} className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
+          <span className="text-[#1B2D45]/45" style={{ fontSize: "9px", fontWeight: 600 }}>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MapHintCard({ text }: { text: string }) {
+  return (
+    <div className="absolute bottom-4 right-4 z-[10] hidden max-w-[220px] rounded-2xl bg-white/90 px-3 py-2.5 shadow-md backdrop-blur-sm md:block">
+      <p className="text-[#1B2D45]/55" style={{ fontSize: "10px", fontWeight: 700, lineHeight: 1.45 }}>
+        {text}
+      </p>
+    </div>
+  );
+}
+
+function poiPointSize(type: LandmarkType) {
+  if (type === "campus") return { size: 34, fontSize: "16px" };
+  if (type === "park") return { size: 26, fontSize: "12px" };
+  return { size: 24, fontSize: "11px" };
+}
+
+function poiPointStyle(type: LandmarkType) {
+  const config = LANDMARK_TYPES[type];
+  return {
+    background: `${config.color}E8`,
+    borderColor: "rgba(255,255,255,0.95)",
+  };
+}
+
+function poiZIndex(type: LandmarkType) {
+  return type === "campus" ? 4 : 3;
+}
+
+function BrowseMapSummary({ listings, avgRent }: { listings: ListingDetailResponse[]; avgRent: number }) {
+  return (
+    <div className="absolute left-4 top-4 z-[10] max-w-[calc(100%-5rem)] sm:max-w-[250px] rounded-2xl bg-white/92 px-3 py-2.5 shadow-md backdrop-blur-sm sm:px-4 sm:py-3">
+      <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 800 }}>
+        Guelph student rentals
+      </div>
+      <div className="mt-0.5 text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 600 }}>
+        {listings.length} listings · Avg {formatPrice(avgRent)}/room
+      </div>
+      <MapScoreLegend />
+    </div>
+  );
+}
+
+function MapControls({ onZoomIn, onZoomOut }: { onZoomIn: () => void; onZoomOut: () => void }) {
+  return (
+    <div className="absolute right-4 top-4 z-[10] flex flex-col gap-2">
+      <button onClick={onZoomIn} className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
+        <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1B2D45]" />
+      </button>
+      <button onClick={onZoomOut} className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
+        <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1B2D45]" />
+      </button>
+    </div>
+  );
 }
 
 function ListingRailCard({
@@ -138,6 +267,9 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
   const [mapZoom, setMapZoom] = useState(13.8);
   const [mapSize, setMapSize] = useState({ width: 960, height: 720 });
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
+  const [activePoiTypes, setActivePoiTypes] = useState<Set<LandmarkType>>(
+    () => new Set(DEFAULT_MAP_VIEW_LANDMARKS)
+  );
 
   const avgRent = listings.length > 0
     ? Math.round(listings.reduce((total, listing) => total + Number(listing.rent_per_room), 0) / listings.length)
@@ -208,6 +340,39 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
     }).filter(Boolean) as { listing: ListingDetailResponse; point: { x: number; y: number } }[];
   }, [mapSize.height, mapSize.width, mapZoom, sortedListings]);
 
+  const poiPoints = useMemo(() => {
+    return GUELPH_LANDMARKS.filter((landmark) => activePoiTypes.has(landmark.type))
+      .map((landmark) => {
+        const point = projectLngLatToContainer({
+          lat: landmark.lat,
+          lng: landmark.lng,
+          center: GUELPH_CENTER,
+          zoom: mapZoom,
+          width: mapSize.width,
+          height: mapSize.height,
+        });
+
+        if (point.x < -24 || point.x > mapSize.width + 24 || point.y < -24 || point.y > mapSize.height + 24) {
+          return null;
+        }
+
+        return { landmark, point };
+      })
+      .filter(Boolean) as { landmark: (typeof GUELPH_LANDMARKS)[number]; point: { x: number; y: number } }[];
+  }, [activePoiTypes, mapSize.height, mapSize.width, mapZoom]);
+
+  const togglePoiType = useCallback((type: LandmarkType) => {
+    setActivePoiTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  }, []);
+
   return (
     <div className="max-w-[1440px] mx-auto px-4 md:px-6 py-4 md:py-5">
       <div
@@ -223,39 +388,37 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
               <div className="absolute inset-0 bg-[linear-gradient(180deg,#EEF4F0_0%,#E2ECE7_100%)]" />
             )}
 
-            <div className="absolute left-4 top-4 z-[10] max-w-[calc(100%-5rem)] sm:max-w-none rounded-2xl bg-white/92 backdrop-blur-sm px-3 py-2.5 sm:px-4 sm:py-3 shadow-md">
-              <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 800 }}>
-                Guelph student rentals
-              </div>
-              <div className="mt-0.5 sm:mt-1 text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 600 }}>
-                {listings.length} listings · Avg {formatPrice(avgRent)}/room
-              </div>
-              <div className="flex items-center gap-2 sm:gap-3 mt-2">
-                {[{ color: "#4ADE80", label: "85+" }, { color: "#FFB627", label: "65-84" }, { color: "#E71D36", label: "<65" }].map((item) => (
-                  <div key={item.label} className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
-                    <span className="text-[#1B2D45]/45" style={{ fontSize: "9px", fontWeight: 600 }}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="absolute right-4 top-4 z-[10] flex flex-col gap-2">
-              <button onClick={() => setMapZoom((value) => Math.min(16.5, value + 0.8))} className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
-                <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1B2D45]" />
-              </button>
-              <button onClick={() => setMapZoom((value) => Math.max(11.5, value - 0.8))} className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl shadow-md flex items-center justify-center hover:bg-gray-50">
-                <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#1B2D45]" />
-              </button>
-            </div>
+            <BrowseMapSummary listings={listings} avgRent={avgRent} />
+            <MapControls
+              onZoomIn={() => setMapZoom((value) => Math.min(16.5, value + 0.8))}
+              onZoomOut={() => setMapZoom((value) => Math.max(11.5, value - 0.8))}
+            />
+            <MapNearbyFilters activeTypes={activePoiTypes} onToggle={togglePoiType} />
+            <MapHintCard text="Toggle nearby groceries, gyms, trails, and transit without losing the listing view." />
 
             <div className="absolute inset-0 z-[5]">
-              <div
-                className="absolute flex items-center justify-center rounded-full border-[3px] border-white bg-[#1B2D45] shadow-[0_3px_12px_rgba(0,0,0,0.2)]"
-                style={{ width: 38, height: 38, left: "50%", top: "50%", transform: "translate(-50%, -50%)" }}
-              >
-                <span style={{ fontSize: "18px" }}>🎓</span>
-              </div>
+              {poiPoints.map(({ landmark, point }) => {
+                const { size, fontSize } = poiPointSize(landmark.type);
+                return (
+                  <div
+                    key={landmark.name}
+                    title={landmark.name}
+                    className="absolute flex items-center justify-center rounded-full border-2 border-white shadow-[0_3px_12px_rgba(0,0,0,0.14)]"
+                    style={{
+                      width: size,
+                      height: size,
+                      left: point.x,
+                      top: point.y,
+                      transform: "translate(-50%, -50%)",
+                      ...poiPointStyle(landmark.type),
+                      zIndex: poiZIndex(landmark.type),
+                      fontSize,
+                    }}
+                  >
+                    <span>{landmark.emoji}</span>
+                  </div>
+                );
+              })}
 
               {markerPoints.map(({ listing, point }) => {
                 const score = healthScores[listing.id] ?? 0;
