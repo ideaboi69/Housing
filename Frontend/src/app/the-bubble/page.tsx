@@ -783,26 +783,6 @@ function Sidebar({ isWriter, canContribute, onCreatePost, onApply, onTip, posts 
   return (
     <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
       className="w-[280px] shrink-0 space-y-4 pb-4">
-
-      {/* Create or Apply */}
-      {canContribute ? isWriter ? (
-        <div className="bg-white rounded-2xl border border-black/[0.04] p-4 cursor-pointer hover:shadow-md transition-shadow" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }} onClick={onCreatePost}>
-          <div className="flex items-center gap-2.5">
-            <Avatar initial="Y" gradient="linear-gradient(135deg, #FF6B35, #FFB627)" size={28} />
-            <div className="flex-1 bg-[#FAF8F4] rounded-xl px-3 py-2 text-[#98A3B0]" style={{ fontSize: "12px" }}>Share something with Guelph...</div>
-          </div>
-        </div>
-      ) : (
-        <BecomeWriterCard onApply={onApply} />
-      ) : (
-        <div className="bg-white rounded-2xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
-          <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Read-only for landlords</h4>
-          <p className="mt-2 text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.6 }}>
-            Landlord accounts can browse Bubble posts, but student and writer accounts handle tips and publishing.
-          </p>
-        </div>
-      )}
-
       {/* Trending */}
       <div className="bg-white rounded-2xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
         <div className="flex items-center gap-1.5 mb-3">
@@ -890,24 +870,24 @@ export default function TheBubblePage() {
 
   // Check if user has write access (student with is_writable, or a writer token)
   useEffect(() => {
-    if (!user) {
+    if (user?.role === "landlord") {
       setIsWriter(false);
       return;
     }
-    if (user.role === "landlord") {
-      setIsWriter(false);
+
+    // Logged-in students should only get writer controls if their actual user account has write access.
+    if (user) {
+      setIsWriter(Boolean((user as unknown as Record<string, unknown>).is_writable));
       return;
     }
-    // Check if user has student write access
-    if ((user as unknown as Record<string, unknown>).is_writable) {
-      setIsWriter(true);
-      return;
-    }
-    // Check if there's a writer token stored
+
+    // Logged-out writer sessions can still use the Bubble with their dedicated writer token.
     try {
       const writerToken = localStorage.getItem("cribb_writer_token");
-      if (writerToken) setIsWriter(true);
-    } catch {}
+      setIsWriter(Boolean(writerToken));
+    } catch {
+      setIsWriter(false);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -1014,10 +994,41 @@ export default function TheBubblePage() {
       <FilterBar activeCategory={activeCategory} onSelectCategory={setActiveCategory} sortMode={sortMode} onSelectSort={setSortMode} isMobile={isMobile} />
 
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6 md:py-8">
+        {!isMobile && activeCategory === "all" && (
+          <div className="grid grid-cols-[minmax(0,1fr)_280px] gap-8 items-start mb-5">
+            <WeeklyHighlightsCard />
+            {canUseBubbleActions ? (
+              isWriter ? (
+                <div
+                  className="bg-white rounded-2xl border border-black/[0.04] p-4 cursor-pointer hover:shadow-md transition-shadow"
+                  style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}
+                  onClick={() => setShowPostModal(true)}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Avatar initial="Y" gradient="linear-gradient(135deg, #FF6B35, #FFB627)" size={28} />
+                    <div className="flex-1 bg-[#FAF8F4] rounded-xl px-3 py-2 text-[#98A3B0]" style={{ fontSize: "12px" }}>
+                      Share something with Guelph...
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <BecomeWriterCard onApply={() => router.push("/writers/signup")} />
+              )
+            ) : (
+              <div className="bg-white rounded-2xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+                <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Read-only for landlords</h4>
+                <p className="mt-2 text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.6 }}>
+                  Landlord accounts can browse Bubble posts, but student and writer accounts handle tips and publishing.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className={`flex gap-8 ${isMobile ? "" : "items-start"}`}>
           {/* Feed */}
           <div className="flex-1 min-w-0 space-y-4">
-            {activeCategory === "all" && <WeeklyHighlightsCard />}
+            {isMobile && activeCategory === "all" && <WeeklyHighlightsCard />}
             {isMobile && canUseBubbleActions && !isWriter && activeCategory === "all" && <BecomeWriterCard onApply={() => router.push("/writers/signup")} />}
 
             {/* Mobile sort toggle */}

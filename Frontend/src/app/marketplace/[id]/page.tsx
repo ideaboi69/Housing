@@ -44,7 +44,7 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
   const [current, setCurrent] = useState(0);
   if (images.length === 0) {
     return (
-      <div className="w-full min-h-[320px] sm:min-h-[380px] md:min-h-[620px] rounded-[28px] border border-black/[0.06] bg-[#151A22] flex items-center justify-center">
+      <div className="w-full h-[420px] sm:h-[520px] lg:h-[660px] xl:h-[760px] rounded-[28px] border border-black/[0.06] bg-[#151A22] flex items-center justify-center">
         <Package className="w-20 h-20 text-[#1B2D45]/10" />
       </div>
     );
@@ -55,19 +55,20 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
       className="relative rounded-[28px] overflow-hidden border border-black/[0.06] bg-[#151A22] group"
       style={{ boxShadow: "0 22px 60px rgba(27,45,69,0.12)" }}
     >
-      <div className="relative min-h-[320px] sm:min-h-[380px] md:min-h-[620px]">
+      <div className="relative h-[420px] sm:h-[520px] lg:h-[660px] xl:h-[760px]">
         <img
           src={images[current]?.image_url}
           alt=""
-          className="absolute inset-0 w-full h-full object-cover scale-105 blur-3xl opacity-30"
+          className="absolute inset-0 w-full h-full object-cover scale-110 blur-3xl opacity-35"
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-black/18 via-transparent to-black/30" />
-        <div className="relative z-10 flex min-h-[320px] sm:min-h-[380px] md:min-h-[620px] items-center justify-center px-4 py-5 sm:px-5 sm:py-6 md:px-8 md:py-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-black/18 via-transparent to-black/36" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_56%,rgba(0,0,0,0.18)_100%)]" />
+        <div className="relative z-10 h-full w-full overflow-hidden">
           <img
             src={images[current]?.image_url}
             alt=""
-            className="max-h-[720px] w-auto max-w-full rounded-[22px] object-contain"
-            style={{ boxShadow: "0 20px 70px rgba(0,0,0,0.35)" }}
+            className="h-full w-full object-cover object-center"
+            style={{ filter: "drop-shadow(0 24px 50px rgba(0,0,0,0.22))" }}
           />
         </div>
       </div>

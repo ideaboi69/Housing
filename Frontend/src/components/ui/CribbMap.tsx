@@ -75,6 +75,16 @@ function MapLegend({ activeFilters, onToggle }: { activeFilters: Set<string>; on
   );
 }
 
+function createPropertyMarker(): HTMLDivElement {
+  const el = document.createElement("div");
+  el.innerHTML = `<div style="
+    width: 36px; height: 36px; background: #FF6B35; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 3px solid white; box-shadow: 0 3px 12px rgba(255,107,53,0.35);
+  "><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>`;
+  return el;
+}
+
 /* ════════════════════════════════════════════════════════
    CribbMap — reusable map for detail pages
    ════════════════════════════════════════════════════════ */
@@ -144,13 +154,7 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
 
           // Property pin
           if (lat && lng) {
-            const el = document.createElement("div");
-            el.innerHTML = `<div style="
-              width: 36px; height: 36px; background: #FF6B35; border-radius: 50%;
-              display: flex; align-items: center; justify-content: center;
-              border: 3px solid white; box-shadow: 0 3px 12px rgba(255,107,53,0.35);
-            "><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>`;
-            new (mapboxgl as any).Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+            new (mapboxgl as any).Marker({ element: createPropertyMarker() }).setLngLat([lng, lat]).addTo(map);
           }
 
           // Landmark pins
@@ -206,6 +210,15 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
 
   const [expanded, setExpanded] = useState(false);
 
+  useEffect(() => {
+    if (!expanded) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [expanded]);
+
   if (!MAPBOX_TOKEN) {
     return (
       <div className="rounded-xl bg-[#FAF8F4] flex items-center justify-center border border-black/[0.06]" style={{ height }}>
@@ -251,7 +264,7 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
       {/* Expanded map modal */}
       {expanded && (
         <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4" onClick={() => setExpanded(false)}>
-          <div className="w-full max-w-[900px] h-[80vh] bg-white rounded-2xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-[1020px] h-[84vh] bg-white rounded-[28px] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[#FF6B35]" />
@@ -261,10 +274,11 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
               </button>
             </div>
-            <div className="w-full" style={{ height: "calc(80vh - 52px)" }}>
+            <div className="w-full" style={{ height: "calc(84vh - 52px)" }}>
               <CribbMapExpanded
                 lat={lat}
                 lng={lng}
+                address={address}
                 showLandmarks={showLandmarks}
                 zoom={zoom}
                 activeFilters={activeFilters}
@@ -282,6 +296,7 @@ export function CribbMap({ lat, lng, address, showLandmarks = true, height = "28
 function CribbMapExpanded({
   lat,
   lng,
+  address,
   showLandmarks = true,
   zoom = 15,
   activeFilters,
@@ -289,6 +304,7 @@ function CribbMapExpanded({
 }: {
   lat?: number;
   lng?: number;
+  address?: string;
   showLandmarks?: boolean;
   zoom?: number;
   activeFilters: Set<string>;
@@ -296,13 +312,24 @@ function CribbMapExpanded({
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<any>(null);
+  const markersRef = useRef<Array<{ marker: any; type: string }>>([]);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [ready, setReady] = useState(false);
   const center = lat && lng ? { lat, lng } : GUELPH_CENTER;
 
   useEffect(() => {
+    markersRef.current.forEach(({ marker, type }) => {
+      const el = marker.getElement();
+      if (el) {
+        el.style.display = activeFilters.has(type) ? "block" : "none";
+      }
+    });
+  }, [activeFilters]);
+
+  useEffect(() => {
     if (typeof window === "undefined" || !mapRef.current || !MAPBOX_TOKEN) return;
     let cancelled = false;
+    setReady(false);
 
     async function initMap() {
       try {
@@ -321,21 +348,38 @@ function CribbMapExpanded({
 
         map.on("load", () => {
           if (cancelled) return;
+
+          const bounds = new (mapboxgl as any).LngLatBounds();
+
           if (lat && lng) {
-            const el = document.createElement("div");
-            el.innerHTML = '<div style="width:36px;height:36px;background:#FF6B35;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 3px 12px rgba(255,107,53,0.35);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>';
-            new (mapboxgl as any).Marker({ element: el }).setLngLat([lng, lat]).addTo(map);
+            new (mapboxgl as any).Marker({ element: createPropertyMarker() }).setLngLat([lng, lat]).addTo(map);
+            bounds.extend([lng, lat]);
           }
           if (showLandmarks) {
+            markersRef.current = [];
             GUELPH_LANDMARKS.forEach((lm) => {
               const isCampus = lm.type === "campus" && lm.name === "Guelph Campus";
               const el = createLandmarkMarker(lm.emoji, isCampus);
               const popup = new (mapboxgl as any).Popup({ offset: isCampus ? 20 : 16, closeButton: false })
                 .setHTML('<div style="font-size:12px;font-weight:600;color:#1B2D45;padding:2px 6px;">' + lm.name + '</div>');
-              new (mapboxgl as any).Marker({ element: el }).setLngLat([lm.lng, lm.lat]).setPopup(popup).addTo(map);
+              const marker = new (mapboxgl as any).Marker({ element: el }).setLngLat([lm.lng, lm.lat]).setPopup(popup).addTo(map);
+              markersRef.current.push({ marker, type: lm.type });
+              if (activeFilters.has(lm.type) || lm.type === "campus") {
+                bounds.extend([lm.lng, lm.lat]);
+              } else {
+                const markerEl = marker.getElement();
+                if (markerEl) markerEl.style.display = "none";
+              }
             });
           }
+
           requestAnimationFrame(() => {
+            if (!bounds.isEmpty()) {
+              map.fitBounds(bounds, {
+                padding: { top: 72, right: 72, bottom: 72, left: 72 },
+                maxZoom: zoom,
+              });
+            }
             map.resize();
             setReady(true);
           });
@@ -354,7 +398,11 @@ function CribbMapExpanded({
       cancelled = true;
       resizeObserverRef.current?.disconnect();
       resizeObserverRef.current = null;
-      if (mapInstance.current) { try { mapInstance.current.remove(); } catch {} }
+      markersRef.current = [];
+      if (mapInstance.current) {
+        try { mapInstance.current.remove(); } catch {}
+        mapInstance.current = null;
+      }
     };
   }, [lat, lng, zoom, showLandmarks]);
 
@@ -364,6 +412,14 @@ function CribbMapExpanded({
       {!ready && (
         <div className="absolute inset-0 bg-[#FAF8F4] flex items-center justify-center">
           <div className="animate-pulse w-10 h-10 rounded-full bg-[#FF6B35]/20" />
+        </div>
+      )}
+      {ready && address && (
+        <div className="absolute top-3 left-3 z-[10] rounded-xl bg-white/92 px-3 py-2 shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-[#FF6B35]" />
+            <span className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>{address}</span>
+          </div>
         </div>
       )}
       {ready && showLandmarks && (

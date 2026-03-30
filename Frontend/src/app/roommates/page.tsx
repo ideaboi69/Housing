@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin } from "lucide-react";
+import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin, SlidersHorizontal } from "lucide-react";
 import { useIsMobile } from "@/hooks";
 import { EarlyAdopterBadge } from "@/components/ui/Badges";
 import { useAuthStore } from "@/lib/auth-store";
@@ -450,31 +450,50 @@ const FILTER_OPTIONS = [
   { key: "coed", label: "Co-ed" },
   { key: "campus", label: "Near Campus" },
   { key: "downtown", label: "Downtown" },
-  { key: "under700", label: "< $700" },
 ];
 
 function FilterBar({ active, onFilter }: { active: string; onFilter: (key: string) => void }) {
+  const activeLabel = FILTER_OPTIONS.find((option) => option.key === active)?.label ?? "All Groups";
+
   return (
-    <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-      {FILTER_OPTIONS.map((f) => (
-        <motion.button
-          key={f.key}
-          onClick={() => onFilter(f.key)}
-          className="whitespace-nowrap shrink-0 px-3.5 py-1.5 rounded-full transition-all"
-          style={{
-            fontSize: "11px",
-            fontWeight: 700,
-            color: active === f.key ? "white" : "#1B2D45",
-            background: active === f.key ? "#FF6B35" : "white",
-            border: active === f.key ? "1px solid #e55e2e" : "1px solid rgba(27,45,69,0.12)",
-            boxShadow: active === f.key ? "0 10px 20px rgba(255,107,53,0.12)" : "0 8px 18px rgba(27,45,69,0.04)",
-          }}
-          whileHover={{ y: -1 }}
-          whileTap={{ y: 1, scale: 0.97 }}
+    <div
+      className="inline-flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white px-3 py-2"
+      style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}
+    >
+      <div className="flex items-center gap-2 text-[#1B2D45]/55 shrink-0">
+        <SlidersHorizontal className="w-3.5 h-3.5" />
+        <span style={{ fontSize: "11px", fontWeight: 700 }}>Filter</span>
+      </div>
+      <div className="relative">
+        <select
+          value={active}
+          onChange={(event) => onFilter(event.target.value)}
+          aria-label="Filter roommate groups"
+          className="appearance-none rounded-lg border border-black/[0.06] bg-[#FCFAF7] py-2 pl-3 pr-9 text-[#1B2D45] outline-none transition-all hover:border-black/[0.12] focus:border-[#FF6B35]/30"
+          style={{ fontSize: "11px", fontWeight: 700, minWidth: "150px" }}
         >
-          {f.label}
+          {FILTER_OPTIONS.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronRight className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rotate-90 text-[#1B2D45]/30" />
+      </div>
+      {active !== "all" && (
+        <motion.button
+          type="button"
+          onClick={() => onFilter("all")}
+          className="rounded-lg px-2.5 py-2 text-[#FF6B35] hover:bg-[#FF6B35]/[0.05] transition-colors"
+          style={{ fontSize: "10px", fontWeight: 700 }}
+          whileTap={{ scale: 0.97 }}
+        >
+          Clear
         </motion.button>
-      ))}
+      )}
+      <span className="hidden md:inline text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 600 }}>
+        {activeLabel}
+      </span>
     </div>
   );
 }
@@ -719,7 +738,6 @@ export default function RoommatesPage() {
     else if (activeFilter === "coed") groups = groups.filter((g) => g.genderPreference === "Mixed gender fine" || g.genderPreference === "No preference");
     else if (activeFilter === "campus") groups = groups.filter((g) => g.preferredArea === "Near Campus");
     else if (activeFilter === "downtown") groups = groups.filter((g) => g.preferredArea === "Downtown");
-    else if (activeFilter === "under700") groups = groups.filter((g) => g.budgetMax <= 700);
 
     return groups;
   }, [hasProfile, myTags, myBudget, activeFilter, visibleGroups]);
