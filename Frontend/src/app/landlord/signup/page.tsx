@@ -1,7 +1,7 @@
 "use client";
 import { AuthBackground } from "@/components/ui/AuthBackground";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
@@ -92,7 +92,7 @@ function FileUploadBox({
    Main Page
    ════════════════════════════════════════════════════════ */
 
-export default function LandlordSignupPage() {
+function LandlordSignupPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const setAuthState = useAuthStore.setState;
@@ -545,5 +545,13 @@ export default function LandlordSignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LandlordSignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <LandlordSignupPageContent />
+    </Suspense>
   );
 }

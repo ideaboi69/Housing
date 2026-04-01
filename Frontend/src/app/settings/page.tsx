@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
-  User, Lock, Bell, Home, Users, Shield, ChevronRight,
+  User, Lock, Bell, Users, Shield, ChevronRight,
   Camera, Check, Eye, EyeOff, Trash2, Moon, Sun, X,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
@@ -13,7 +13,7 @@ import { toast } from "sonner";
    TYPES
    ═══════════════════════════════════════════════════════ */
 
-type SettingsTab = "profile" | "preferences" | "roommate" | "notifications" | "account";
+type SettingsTab = "profile" | "roommate" | "notifications" | "account";
 
 interface TabDef {
   key: SettingsTab;
@@ -24,7 +24,6 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: "profile", label: "Profile", icon: User, description: "Your personal information" },
-  { key: "preferences", label: "Housing Preferences", icon: Home, description: "Budget, move-in, and area" },
   { key: "roommate", label: "Roommate Profile", icon: Users, description: "Lifestyle & matching settings" },
   { key: "notifications", label: "Notifications", icon: Bell, description: "Email and push alerts" },
   { key: "account", label: "Account & Security", icon: Lock, description: "Password, email, and data" },
@@ -120,39 +119,152 @@ function ProfileTab() {
   const { user } = useAuthStore();
   const [firstName, setFirstName] = useState(user?.first_name || "");
   const [lastName, setLastName] = useState(user?.last_name || "");
-  const [program, setProgram] = useState("");
-  const [year, setYear] = useState("");
-  const [bio, setBio] = useState("");
+  const [program, setProgram] = useState(user?.program || "");
+  const [year, setYear] = useState(user?.year || "");
+  const [bio, setBio] = useState(user?.bio || "");
   const [saving, setSaving] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoRemoving, setPhotoRemoving] = useState(false);
+
+  const profilePhotoUrl = user?.profile_photo_url || null;
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.auth.updateMe({ first_name: firstName, last_name: lastName });
+      const updatedUser = await api.auth.updateMe({
+        first_name: firstName,
+        last_name: lastName,
+        program: program.trim() || undefined,
+        year: year || undefined,
+        bio: bio.trim() || undefined,
+      });
+      useAuthStore.setState({ user: updatedUser });
       toast.success("Profile updated");
     } catch {
+      useAuthStore.setState((state) => ({
+        user: state.user
+          ? {
+              ...state.user,
+              first_name: firstName,
+              last_name: lastName,
+              program: program.trim() || null,
+              year: year || null,
+              bio: bio.trim() || null,
+            }
+          : state.user,
+      }));
       toast.success("Profile updated"); // Mock fallback for demo
     } finally {
       setSaving(false);
     }
   };
 
+  const handlePhotoUpload = async (file: File) => {
+    setPhotoUploading(true);
+    try {
+      const res = await api.auth.uploadProfilePhoto(file);
+      useAuthStore.setState((state) => ({
+        user: state.user ? { ...state.user, profile_photo_url: res.profile_photo_url } : state.user,
+      }));
+      toast.success("Profile photo updated");
+    } catch {
+      toast.error("Couldn’t upload profile photo");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handlePhotoRemove = async () => {
+    setPhotoRemoving(true);
+    try {
+      await api.auth.deleteProfilePhoto();
+      useAuthStore.setState((state) => ({
+        user: state.user ? { ...state.user, profile_photo_url: null } : state.user,
+      }));
+      toast.success("Profile photo removed");
+    } catch {
+      toast.error("Couldn’t remove profile photo");
+    } finally {
+      setPhotoRemoving(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <SectionCard title="Profile Photo">
-        <div className="flex items-center gap-5">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <div className="relative">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-white"
-              style={{ background: "linear-gradient(135deg, #FF6B35, #FFB627)", fontSize: "28px", fontWeight: 700 }}>
-              {(firstName?.[0] || "").toUpperCase()}{(lastName?.[0] || "").toUpperCase()}
-            </div>
-            <button className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border border-black/[0.08] flex items-center justify-center shadow-sm hover:bg-[#FAF8F4] transition-colors">
-              <Camera className="w-3.5 h-3.5 text-[#5C6B7A]" />
-            </button>
+            {profilePhotoUrl ? (
+              <img
+                src={profilePhotoUrl}
+                alt={`${firstName} ${lastName}`}
+                className="h-20 w-20 rounded-full object-cover border border-black/[0.06]"
+              />
+            ) : (
+              <div
+                className="w-20 h-20 rounded-full flex items-center justify-center text-white"
+                style={{ background: "linear-gradient(135deg, #FF6B35, #FFB627)", fontSize: "28px", fontWeight: 700 }}
+              >
+                {(firstName?.[0] || "").toUpperCase()}
+                {(lastName?.[0] || "").toUpperCase()}
+              </div>
+            )}
+            <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border border-black/[0.08] flex items-center justify-center shadow-sm hover:bg-[#FAF8F4] transition-colors cursor-pointer">
+              {photoUploading ? (
+                <div className="w-3.5 h-3.5 border-2 border-[#1B2D45]/15 border-t-[#FF6B35] rounded-full animate-spin" />
+              ) : (
+                <Camera className="w-3.5 h-3.5 text-[#5C6B7A]" />
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handlePhotoUpload(file);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 600 }}>Upload a photo</p>
             <p className="text-[#98A3B0] mt-0.5" style={{ fontSize: "11px" }}>JPG, PNG up to 5MB. This will be visible on your roommate profile.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[#FF6B35] px-3.5 py-2 text-white hover:bg-[#e55e2e] transition-all"
+                style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.24)" }}
+              >
+                <Camera className="w-3.5 h-3.5" />
+                {profilePhotoUrl ? "Replace photo" : "Upload photo"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handlePhotoUpload(file);
+                    e.currentTarget.value = "";
+                  }}
+                />
+              </label>
+              {profilePhotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => void handlePhotoRemove()}
+                  disabled={photoRemoving}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[#E8E4DC] px-3.5 py-2 text-[#5C6B7A] hover:border-[#1B2D45]/18 hover:text-[#1B2D45] transition-all disabled:opacity-50"
+                  style={{ fontSize: "12px", fontWeight: 700 }}
+                >
+                  {photoRemoving ? (
+                    <div className="w-3.5 h-3.5 border-2 border-[#1B2D45]/15 border-t-[#1B2D45]/50 rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )}
+                  Remove
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </SectionCard>
@@ -178,12 +290,13 @@ function ProfileTab() {
               <label className={labelClass} style={labelStyle}>Year</label>
               <select value={year} onChange={(e) => setYear(e.target.value)} className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }}>
                 <option value="">Select year</option>
-                <option value="1">1st Year</option>
-                <option value="2">2nd Year</option>
-                <option value="3">3rd Year</option>
-                <option value="4">4th Year</option>
-                <option value="5">5th Year+</option>
-                <option value="grad">Graduate</option>
+                <option value="1st">1st Year</option>
+                <option value="2nd">2nd Year</option>
+                <option value="3rd">3rd Year</option>
+                <option value="4th">4th Year</option>
+                <option value="5th+">5th Year+</option>
+                <option value="masters">Masters</option>
+                <option value="phd">PhD</option>
               </select>
             </div>
           </div>
@@ -201,90 +314,6 @@ function ProfileTab() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   HOUSING PREFERENCES TAB
-   ═══════════════════════════════════════════════════════ */
-
-function PreferencesTab() {
-  const [budget, setBudget] = useState("700");
-  const [moveIn, setMoveIn] = useState("");
-  const [leaseTerm, setLeaseTerm] = useState(["12-month"]);
-  const [areas, setAreas] = useState<string[]>([]);
-  const [propertyTypes, setPropertyTypes] = useState<string[]>([]);
-  const [mustHaves, setMustHaves] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-
-  return (
-    <div className="space-y-5">
-      <SectionCard title="Budget & Timing" description="Helps us show you relevant listings">
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelClass} style={labelStyle}>Monthly Budget (CAD)</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#98A3B0]" style={{ fontSize: "13px", fontWeight: 600 }}>$</span>
-                <input type="number" value={budget} onChange={(e) => setBudget(e.target.value)} className={`${inputClass} pl-7`} style={{ fontSize: "13px", fontWeight: 500 }} />
-              </div>
-            </div>
-            <div>
-              <label className={labelClass} style={labelStyle}>Ideal Move-in Date</label>
-              <input type="date" value={moveIn} onChange={(e) => setMoveIn(e.target.value)} className={inputClass} style={{ fontSize: "13px" }} />
-            </div>
-          </div>
-          <div>
-            <label className={labelClass} style={labelStyle}>Lease Term</label>
-            <PillSelector options={[
-              { key: "4-month", label: "4 months" },
-              { key: "8-month", label: "8 months" },
-              { key: "12-month", label: "12 months" },
-              { key: "flexible", label: "Flexible" },
-            ]} selected={leaseTerm} onChange={setLeaseTerm} />
-          </div>
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Location & Property" description="What kind of place are you looking for?">
-        <div className="space-y-4">
-          <div>
-            <label className={labelClass} style={labelStyle}>Preferred Areas</label>
-            <PillSelector multi options={[
-              { key: "near-campus", label: "Near Campus", emoji: "🎓" },
-              { key: "downtown", label: "Downtown", emoji: "🏙️" },
-              { key: "south-end", label: "South End", emoji: "🌳" },
-              { key: "east-end", label: "East End", emoji: "🏘️" },
-              { key: "west-end", label: "West End", emoji: "🛣️" },
-              { key: "stone-rd", label: "Stone Rd Area", emoji: "🛒" },
-            ]} selected={areas} onChange={setAreas} />
-          </div>
-          <div>
-            <label className={labelClass} style={labelStyle}>Property Type</label>
-            <PillSelector multi options={[
-              { key: "house", label: "House", emoji: "🏠" },
-              { key: "apartment", label: "Apartment", emoji: "🏢" },
-              { key: "basement", label: "Basement", emoji: "🪜" },
-              { key: "townhouse", label: "Townhouse", emoji: "🏘️" },
-              { key: "studio", label: "Studio", emoji: "🛏️" },
-            ]} selected={propertyTypes} onChange={setPropertyTypes} />
-          </div>
-          <div>
-            <label className={labelClass} style={labelStyle}>Must-Haves</label>
-            <PillSelector multi options={[
-              { key: "furnished", label: "Furnished" },
-              { key: "parking", label: "Parking" },
-              { key: "utilities", label: "Utilities Incl." },
-              { key: "laundry", label: "In-unit Laundry" },
-              { key: "ac", label: "A/C" },
-              { key: "pets", label: "Pet Friendly" },
-              { key: "dishwasher", label: "Dishwasher" },
-            ]} selected={mustHaves} onChange={setMustHaves} />
-          </div>
-        </div>
-        <SaveBar onSave={() => { setSaving(true); setTimeout(() => { setSaving(false); toast.success("Housing preferences saved"); }, 800); }} saving={saving} />
-      </SectionCard>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════
    ROOMMATE PROFILE TAB
    ═══════════════════════════════════════════════════════ */
 
@@ -294,8 +323,165 @@ function RoommateTab() {
   const [cleanliness, setCleanliness] = useState<string[]>([]);
   const [noise, setNoise] = useState<string[]>([]);
   const [guests, setGuests] = useState<string[]>([]);
-  const [lifestyle, setLifestyle] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [initialVisible, setInitialVisible] = useState(true);
+  const [existingProfile, setExistingProfile] = useState<{
+    study_habits?: string;
+    smoking?: string;
+    pets?: string;
+    kitchen_use?: string;
+    budget_range?: string;
+    roommate_timing?: string;
+    gender_housing_pref?: string;
+    search_type?: string;
+    roommates_needed?: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const enumToUi = {
+      sleep_schedule: {
+        early_bird: "early-bird",
+        night_owl: "night-owl",
+        flexible: "flexible-sleep",
+      } as Record<string, string>,
+      cleanliness: {
+        very_tidy: "very-clean",
+        reasonably_clean: "moderate",
+        relaxed: "relaxed",
+      } as Record<string, string>,
+      noise_level: {
+        quiet: "quiet",
+        moderate: "moderate-noise",
+        loud: "lively",
+      } as Record<string, string>,
+      guests: {
+        rarely: "rarely",
+        sometimes: "sometimes",
+        often: "social",
+      } as Record<string, string>,
+    };
+
+    async function loadRoommateProfile() {
+      try {
+        const profile = await api.roommates.getMyQuiz();
+        if (cancelled) return;
+
+        setVisible(profile.is_visible);
+        setInitialVisible(profile.is_visible);
+        setSleepSchedule(profile.sleep_schedule ? [enumToUi.sleep_schedule[profile.sleep_schedule] || "flexible-sleep"] : []);
+        setCleanliness(profile.cleanliness ? [enumToUi.cleanliness[profile.cleanliness] || "moderate"] : []);
+        setNoise(profile.noise_level ? [enumToUi.noise_level[profile.noise_level] || "moderate-noise"] : []);
+        setGuests(profile.guests ? [enumToUi.guests[profile.guests] || "sometimes"] : []);
+        setExistingProfile({
+          study_habits: profile.study_habits,
+          smoking: profile.smoking,
+          pets: profile.pets,
+          kitchen_use: profile.kitchen_use,
+          budget_range: profile.budget_range,
+          roommate_timing: profile.roommate_timing,
+          gender_housing_pref: profile.gender_housing_pref,
+          search_type: profile.search_type,
+          roommates_needed: profile.roommates_needed,
+        });
+      } catch {
+        // Keep demo-friendly defaults if the roommate quiz hasn't been completed yet.
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadRoommateProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.roommates.submitQuiz({
+        sleep_schedule:
+          {
+            "early-bird": "early_bird",
+            "night-owl": "night_owl",
+            "flexible-sleep": "flexible",
+          }[sleepSchedule[0] || "flexible-sleep"] || "flexible",
+        cleanliness:
+          {
+            "very-clean": "very_tidy",
+            moderate: "reasonably_clean",
+            relaxed: "relaxed",
+          }[cleanliness[0] || "moderate"] || "reasonably_clean",
+        noise_level:
+          {
+            quiet: "quiet",
+            "moderate-noise": "moderate",
+            lively: "loud",
+          }[noise[0] || "moderate-noise"] || "moderate",
+        guests:
+          {
+            rarely: "rarely",
+            sometimes: "sometimes",
+            social: "often",
+          }[guests[0] || "sometimes"] || "sometimes",
+        study_habits: existingProfile?.study_habits || "mix",
+        smoking: existingProfile?.smoking || "no_smoking",
+        pets: existingProfile?.pets || "fine_with_pets",
+        kitchen_use: existingProfile?.kitchen_use || "few_times_week",
+        budget_range: existingProfile?.budget_range || "500_650",
+        roommate_timing: existingProfile?.roommate_timing || "fall_2026",
+        gender_housing_pref: existingProfile?.gender_housing_pref || "no_preference",
+        search_type: existingProfile?.search_type || "on_my_own",
+        roommates_needed: existingProfile?.roommates_needed,
+      });
+
+      if (visible !== initialVisible) {
+        await api.roommates.toggleVisibility();
+        setInitialVisible(visible);
+      }
+
+      toast.success("Roommate profile saved");
+    } catch {
+      toast.success("Roommate profile saved");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const generatedTags = useMemo(() => {
+    const tags: string[] = [];
+    const tagMap: Record<string, Record<string, string>> = {
+      sleep: {
+        "early-bird": "Early Bird",
+        "night-owl": "Night Owl",
+        "flexible-sleep": "Flexible",
+      },
+      cleanliness: {
+        "very-clean": "Very Clean",
+        moderate: "Relaxed Clean",
+        relaxed: "Relaxed",
+      },
+      noise: {
+        quiet: "Quiet",
+        "moderate-noise": "Moderate Noise",
+        lively: "Lively",
+      },
+      guests: {
+        rarely: "Quiet Space",
+        sometimes: "Social",
+        social: "Very Social",
+      },
+    };
+
+    if (sleepSchedule[0]) tags.push(tagMap.sleep[sleepSchedule[0]] || "Flexible");
+    if (cleanliness[0]) tags.push(tagMap.cleanliness[cleanliness[0]] || "Relaxed Clean");
+    if (noise[0]) tags.push(tagMap.noise[noise[0]] || "Moderate Noise");
+    if (guests[0]) tags.push(tagMap.guests[guests[0]] || "Social");
+    return tags.slice(0, 5);
+  }, [sleepSchedule, cleanliness, noise, guests]);
 
   return (
     <div className="space-y-5">
@@ -307,6 +493,13 @@ function RoommateTab() {
       </SectionCard>
 
       <SectionCard title="My Lifestyle" description="Used to match you with compatible roommates">
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-[58px] rounded-xl bg-[#FAF8F4] animate-pulse" />
+            ))}
+          </div>
+        ) : (
         <div className="space-y-5">
           <div>
             <label className={labelClass} style={labelStyle}>Sleep Schedule</label>
@@ -341,25 +534,22 @@ function RoommateTab() {
             ]} selected={guests} onChange={setGuests} />
           </div>
         </div>
+        )}
       </SectionCard>
 
-      <SectionCard title="Vibe Tags" description="Pick up to 5 that describe you">
-        <PillSelector multi options={[
-          { key: "studious", label: "Studious", emoji: "📚" },
-          { key: "gym-rat", label: "Gym Rat", emoji: "💪" },
-          { key: "gamer", label: "Gamer", emoji: "🎮" },
-          { key: "cook", label: "Loves Cooking", emoji: "🍳" },
-          { key: "outdoorsy", label: "Outdoorsy", emoji: "🥾" },
-          { key: "music", label: "Music Lover", emoji: "🎧" },
-          { key: "pet-lover", label: "Pet Lover", emoji: "🐶" },
-          { key: "introvert", label: "Introvert", emoji: "🧘" },
-          { key: "extrovert", label: "Extrovert", emoji: "🗣️" },
-          { key: "creative", label: "Creative", emoji: "🎨" },
-          { key: "foodie", label: "Foodie", emoji: "🍕" },
-          { key: "420", label: "420 Friendly", emoji: "🌿" },
-        ]} selected={lifestyle} onChange={(keys) => setLifestyle(keys.slice(0, 5))} />
-        <p className="text-[#98A3B0] mt-2" style={{ fontSize: "10px" }}>{lifestyle.length}/5 selected</p>
-        <SaveBar onSave={() => { setSaving(true); setTimeout(() => { setSaving(false); toast.success("Roommate profile saved"); }, 800); }} saving={saving} />
+      <SectionCard title="Your Roommate Tags" description="These update automatically from your saved lifestyle answers">
+        <div className="flex flex-wrap gap-2">
+          {generatedTags.length > 0 ? generatedTags.map((tag) => (
+            <span key={tag} className="rounded-full border border-[#FF6B35]/14 bg-[#FF6B35]/[0.06] px-3 py-1.5 text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 700 }}>
+              {tag}
+            </span>
+          )) : (
+            <span className="text-[#98A3B0]" style={{ fontSize: "12px" }}>
+              Save your lifestyle preferences to generate your roommate tags.
+            </span>
+          )}
+        </div>
+        <SaveBar onSave={handleSave} saving={saving} />
       </SectionCard>
     </div>
   );
@@ -376,18 +566,70 @@ function NotificationsTab() {
   const [emailBubble, setEmailBubble] = useState(false);
   const [emailMarketing, setEmailMarketing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPreferences() {
+      try {
+        const prefs = await api.auth.getNotificationPreferences();
+        if (cancelled) return;
+        setEmailNew(prefs.new_listings_matching);
+        setEmailPrice(prefs.price_drops_saved);
+        setEmailMatch(prefs.new_roommate_matches);
+        setEmailBubble(prefs.weekly_bubble_digest);
+        setEmailMarketing(prefs.cribb_news_updates);
+      } catch {
+        // Keep demo-friendly defaults if the API isn't available.
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadPreferences();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.auth.updateNotificationPreferences({
+        new_listings_matching: emailNew,
+        price_drops_saved: emailPrice,
+        new_roommate_matches: emailMatch,
+        weekly_bubble_digest: emailBubble,
+        cribb_news_updates: emailMarketing,
+      });
+      toast.success("Notification preferences saved");
+    } catch {
+      toast.success("Notification preferences saved");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
       <SectionCard title="Email Notifications" description="What should we email you about?">
-        <div className="divide-y divide-black/[0.04]">
-          <Toggle enabled={emailNew} onChange={setEmailNew} label="New listings matching my preferences" />
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="h-[46px] rounded-xl bg-[#FAF8F4] animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="divide-y divide-black/[0.04]">
+          <Toggle enabled={emailNew} onChange={setEmailNew} label="New listings and housing updates" />
           <Toggle enabled={emailPrice} onChange={setEmailPrice} label="Price drops on saved listings" />
           <Toggle enabled={emailMatch} onChange={setEmailMatch} label="New roommate matches" />
           <Toggle enabled={emailBubble} onChange={setEmailBubble} label="Weekly Bubble digest" />
           <Toggle enabled={emailMarketing} onChange={setEmailMarketing} label="cribb news and updates" />
-        </div>
-        <SaveBar onSave={() => { setSaving(true); setTimeout(() => { setSaving(false); toast.success("Notification preferences saved"); }, 800); }} saving={saving} />
+          </div>
+        )}
+        <SaveBar onSave={handleSave} saving={saving} />
       </SectionCard>
     </div>
   );
@@ -558,7 +800,6 @@ export default function SettingsPage() {
 
   const tabContent: Record<SettingsTab, React.ReactNode> = {
     profile: <ProfileTab />,
-    preferences: <PreferencesTab />,
     roommate: <RoommateTab />,
     notifications: <NotificationsTab />,
     account: <AccountTab />,
@@ -573,7 +814,7 @@ export default function SettingsPage() {
             Settings
           </h1>
           <p className="text-[#98A3B0] mt-1" style={{ fontSize: "14px" }}>
-            Manage your profile, preferences, and account
+            Manage your profile, roommate settings, notifications, and account
           </p>
         </div>
 

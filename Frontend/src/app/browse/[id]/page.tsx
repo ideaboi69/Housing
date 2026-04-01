@@ -249,8 +249,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       });
       setContactSent(true);
       setTimeout(() => router.push("/messages"), 1500);
-    } catch {
-      toast.error("We couldn’t open a conversation right now. Please try again.");
+    } catch (err) {
+      if (err instanceof Error && "status" in err && (err as { status?: number }).status === 409) {
+        router.push("/messages");
+      } else {
+        toast.error("We couldn’t open a conversation right now. Please try again.");
+      }
     } finally {
       setContactSending(false);
     }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bookmark, X, MapPin, Home, Calendar, DollarSign, Loader2, ArrowLeft, Sofa, Car } from "lucide-react";
+import { Bookmark, X, MapPin, Home, Calendar, DollarSign, Loader2, ArrowLeft, Sofa, Car, ArrowRight, MessageCircle, LayoutDashboard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/lib/auth-store";
 import { useSavedStore } from "@/lib/saved-store";
@@ -142,21 +142,69 @@ export default function SavedListingsPage() {
     return `$${Math.round(n).toLocaleString()}`;
   }
 
+  const subletCount = listings.filter((item) => item.is_sublet).length;
+  const nearCampusCount = listings.filter((item) => item.distance_to_campus_km != null && Number(item.distance_to_campus_km) <= 1.5).length;
+
   return (
     <div className="min-h-screen" style={{ background: "#FAF8F4" }}>
       <div className="max-w-[900px] mx-auto px-4 md:px-6 pt-6 pb-10">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => router.back()} className="w-8 h-8 rounded-lg bg-white border border-black/[0.06] flex items-center justify-center text-[#1B2D45]/40 hover:text-[#FF6B35] transition-all">
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div>
-            <h1 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.02em" }}>
-              Saved Listings
-            </h1>
-            <p className="text-[#1B2D45]/40 mt-0.5" style={{ fontSize: "13px" }}>
-              {loading ? "Loading..." : `${listings.length} listing${listings.length !== 1 ? "s" : ""} saved`}
-            </p>
+        <div className="mb-8">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <button onClick={() => router.back()} className="mt-1 w-8 h-8 rounded-lg bg-white border border-black/[0.06] flex items-center justify-center text-[#1B2D45]/40 hover:text-[#FF6B35] transition-all">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#FF6B35]/10 px-3 py-1 text-[#FF6B35]">
+                  <Bookmark className="h-3.5 w-3.5" />
+                  <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Student Saved</span>
+                </div>
+                <h1 className="text-[#1B2D45]" style={{ fontSize: "30px", fontWeight: 900, letterSpacing: "-0.03em" }}>
+                  Saved Listings
+                </h1>
+                <p className="text-[#98A3B0] mt-1 max-w-[560px]" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+                  Keep your best options together so you can compare homes, revisit sublets, and move faster when something feels right.
+                </p>
+              </div>
+            </div>
+
+            <div className="hidden md:flex items-center gap-2">
+              <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-xl border border-black/[0.06] bg-white px-3.5 py-2 text-[#1B2D45]/65 hover:text-[#1B2D45] hover:border-[#1B2D45]/12 transition-all" style={{ fontSize: "12px", fontWeight: 700 }}>
+                <LayoutDashboard className="h-3.5 w-3.5" />
+                Dashboard
+              </Link>
+              <Link href="/browse" className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B35] px-3.5 py-2 text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.24)" }}>
+                Browse more
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+              <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Saved</div>
+              <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 900 }}>{loading ? "—" : listings.length}</div>
+            </div>
+            <div className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+              <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Sublets</div>
+              <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 900 }}>{loading ? "—" : subletCount}</div>
+            </div>
+            <div className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+              <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Near Campus</div>
+              <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 900 }}>{loading ? "—" : nearCampusCount}</div>
+            </div>
+            <Link href="/messages" className="rounded-2xl border border-black/[0.04] bg-white p-4 transition-all hover:border-[#FF6B35]/20 hover:shadow-md" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Messages</div>
+                  <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>Open inbox</div>
+                </div>
+                <div className="h-10 w-10 rounded-2xl bg-[#FF6B35]/10 text-[#FF6B35] flex items-center justify-center">
+                  <MessageCircle className="h-4 w-4" />
+                </div>
+              </div>
+            </Link>
           </div>
         </div>
 

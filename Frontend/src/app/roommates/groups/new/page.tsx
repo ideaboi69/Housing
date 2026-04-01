@@ -34,7 +34,7 @@ const STEP_DETAILS = [
   {
     eyebrow: "Step 4",
     title: "Final details",
-    description: "Share the vibe and choose whether the group is public or invite-only.",
+    description: "Share the vibe and the final details people should know before they join.",
   },
 ] as const;
 
@@ -78,7 +78,6 @@ export default function CreateGroupPage() {
   const [address, setAddress] = useState("");
   const [gender, setGender] = useState("No preference");
   const [description, setDescription] = useState("");
-  const [isVisible, setIsVisible] = useState(true);
   const [groupImage, setGroupImage] = useState<string | null>(null);
   const [groupImageFile, setGroupImageFile] = useState<File | null>(null);
   const [showcaseIndex, setShowcaseIndex] = useState(0);
@@ -195,7 +194,7 @@ export default function CreateGroupPage() {
       targetListingTitle: null,
       description: description.trim(),
       inviteCode: code,
-      isVisible,
+      isVisible: true,
       genderPreference: gender,
       moveIn,
       createdAt: new Date().toISOString(),
@@ -793,7 +792,7 @@ export default function CreateGroupPage() {
             </div>
           )}
 
-          {/* Step 4: Description + Visibility */}
+          {/* Step 4: Description */}
           {step === 3 && (
             <div>
               <h2 className="text-[#1B2D45] mb-1" style={{ fontSize: "22px", fontWeight: 800 }}>Describe your group</h2>
@@ -806,20 +805,6 @@ export default function CreateGroupPage() {
                 style={{ fontSize: "14px", lineHeight: 1.6, minHeight: 140 }}
               />
               <p className="text-[#1B2D45]/20 mt-1 text-right" style={{ fontSize: "10px" }}>{description.length} characters</p>
-
-              <div className="mt-5">
-                <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Who can find your group?</label>
-                <div className="space-y-2">
-                  <button onClick={() => setIsVisible(true)} className={`w-full text-left px-4 py-3 rounded-[20px] border transition-all ${isVisible ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08]" : "border-black/[0.06] hover:border-[#FF6B35]/20 bg-[#FCFBF8] hover:bg-white"}`}>
-                    <div style={{ fontSize: "13px", fontWeight: isVisible ? 600 : 400, color: isVisible ? "#FF6B35" : "#1B2D45" }}>Public</div>
-                    <div className="text-[#1B2D45]/30" style={{ fontSize: "11px" }}>Anyone browsing roommates can see your group</div>
-                  </button>
-                  <button onClick={() => setIsVisible(false)} className={`w-full text-left px-4 py-3 rounded-[20px] border transition-all ${!isVisible ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08]" : "border-black/[0.06] hover:border-[#FF6B35]/20 bg-[#FCFBF8] hover:bg-white"}`}>
-                    <div style={{ fontSize: "13px", fontWeight: !isVisible ? 600 : 400, color: !isVisible ? "#FF6B35" : "#1B2D45" }}>Invite only</div>
-                    <div className="text-[#1B2D45]/30" style={{ fontSize: "11px" }}>Only people with your link can find and join</div>
-                  </button>
-                </div>
-              </div>
             </div>
           )}
             </motion.div>

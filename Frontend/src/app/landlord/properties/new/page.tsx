@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
@@ -16,7 +16,7 @@ const propertyTypes = [
   { value: PropertyType.ROOM, label: "Single Room", emoji: "🚪" },
 ];
 
-export default function NewPropertyPage() {
+function NewPropertyPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
@@ -416,5 +416,13 @@ export default function NewPropertyPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function NewPropertyPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewPropertyPageContent />
+    </Suspense>
   );
 }

@@ -2,7 +2,7 @@
 
 import { AuthBackground } from "@/components/ui/AuthBackground";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
@@ -23,7 +23,7 @@ function persistLandlordSession(token: string, landlord: UserResponse) {
   });
 }
 
-export default function LandlordLoginPage() {
+function LandlordLoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/landlord";
@@ -279,5 +279,13 @@ export default function LandlordLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LandlordLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LandlordLoginPageContent />
+    </Suspense>
   );
 }

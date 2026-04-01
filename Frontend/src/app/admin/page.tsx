@@ -442,7 +442,15 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
    Writers Tab
    ════════════════════════════════════════════════════════ */
 
-function WritersTab({ writers, onRefresh }: { writers: WriterResponse[]; onRefresh: () => void }) {
+function WritersTab({
+  writers,
+  pendingUsers,
+  onRefresh,
+}: {
+  writers: WriterResponse[];
+  pendingUsers: AdminUserResponse[];
+  onRefresh: () => void;
+}) {
   const handleApprove = async (id: number) => {
     try { await api.admin.approveWriter(id); toast.success("Writer approved"); onRefresh(); } catch { toast.error("Failed"); }
   };
@@ -456,41 +464,108 @@ function WritersTab({ writers, onRefresh }: { writers: WriterResponse[]; onRefre
     if (!confirm("Delete this writer and all their posts?")) return;
     try { await api.admin.deleteWriter(id); toast.success("Writer deleted"); onRefresh(); } catch { toast.error("Failed"); }
   };
+  const handleGrantWrite = async (id: number) => {
+    try { await api.admin.grantWrite(id); toast.success("Writer access granted"); onRefresh(); } catch { toast.error("Failed"); }
+  };
+  const handleRejectWrite = async (id: number) => {
+    try { await api.admin.rejectWrite(id); toast.success("Write request rejected"); onRefresh(); } catch { toast.error("Failed"); }
+  };
 
   const statusColor = (s: string) => s === "approved" ? "#4ADE80" : s === "pending" ? "#FFB627" : s === "rejected" ? "#E71D36" : "#98A3B0";
 
   return (
-    <div>
-      <h2 className="text-white mb-4" style={{ fontSize: "20px", fontWeight: 800 }}>Writers ({writers.length})</h2>
-      <div className="space-y-1">
-        {writers.map((w) => (
-          <div key={w.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full bg-[#A78BFA]/10 flex items-center justify-center shrink-0">
-              <PenLine className="w-4 h-4 text-[#A78BFA]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
-                {w.business_name}
-                <Badge label={w.status} color={statusColor(w.status)} />
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-white/[0.06] bg-[#1B2D45] p-4">
+          <div className="text-white/25" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>Student Requests</div>
+          <div className="mt-2 text-white" style={{ fontSize: "26px", fontWeight: 800 }}>{pendingUsers.length}</div>
+          <div className="mt-1 text-white/30" style={{ fontSize: "11px" }}>Students asking for Bubble publishing access</div>
+        </div>
+        <div className="rounded-2xl border border-white/[0.06] bg-[#1B2D45] p-4">
+          <div className="text-white/25" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>Writer Accounts</div>
+          <div className="mt-2 text-white" style={{ fontSize: "26px", fontWeight: 800 }}>{writers.length}</div>
+          <div className="mt-1 text-white/30" style={{ fontSize: "11px" }}>Standalone writer accounts and publications</div>
+        </div>
+        <div className="rounded-2xl border border-white/[0.06] bg-[#1B2D45] p-4">
+          <div className="text-white/25" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase" }}>Pending Writer Accounts</div>
+          <div className="mt-2 text-white" style={{ fontSize: "26px", fontWeight: 800 }}>{writers.filter((writer) => writer.status === "pending").length}</div>
+          <div className="mt-1 text-white/30" style={{ fontSize: "11px" }}>External applications still awaiting review</div>
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-4">
+          <h2 className="text-white" style={{ fontSize: "20px", fontWeight: 800 }}>Student writer requests</h2>
+          <p className="text-white/30 mt-1" style={{ fontSize: "12px", lineHeight: 1.55 }}>
+            Existing student accounts that requested Bubble publishing privileges from inside Cribb.
+          </p>
+        </div>
+        <div className="space-y-1">
+          {pendingUsers.map((student) => (
+            <div key={student.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
+              <div className="w-9 h-9 rounded-full bg-[#FF6B35]/10 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-[#FF6B35]" />
               </div>
-              <div className="text-white/30" style={{ fontSize: "11px" }}>
-                {w.first_name} {w.last_name} · {w.email}{w.website ? ` · ${w.website}` : ""}
+              <div className="flex-1 min-w-0">
+                <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
+                  {student.first_name} {student.last_name}
+                  <Badge label="student request" color="#FF6B35" />
+                </div>
+                <div className="text-white/30" style={{ fontSize: "11px" }}>
+                  {student.email} · joined {timeAgo(student.created_at)}
+                </div>
               </div>
-              {w.reason && <div className="text-white/20 mt-1" style={{ fontSize: "10px" }}>Reason: {w.reason}</div>}
+              <div className="flex items-center gap-1 shrink-0">
+                <ActionButton onClick={() => handleGrantWrite(student.id)} icon={Check} label="Grant access" color="#4ADE80" />
+                <ActionButton onClick={() => handleRejectWrite(student.id)} icon={X} label="Reject" color="#E71D36" />
+              </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {w.status === "pending" && (
-                <>
-                  <ActionButton onClick={() => handleApprove(w.id)} icon={Check} label="Approve" color="#4ADE80" />
-                  <ActionButton onClick={() => handleReject(w.id)} icon={X} label="Reject" color="#E71D36" />
-                </>
-              )}
-              {w.status === "approved" && <ActionButton onClick={() => handleRevoke(w.id)} icon={Ban} label="Revoke" color="#FFB627" />}
-              <ActionButton onClick={() => handleDelete(w.id)} icon={Trash2} label="Delete" danger />
+          ))}
+          {pendingUsers.length === 0 && (
+            <div className="text-center py-10 rounded-2xl border border-dashed border-white/[0.08] text-white/20" style={{ fontSize: "13px" }}>
+              No pending student write-access requests
             </div>
-          </div>
-        ))}
-        {writers.length === 0 && <div className="text-center py-12 text-white/20" style={{ fontSize: "13px" }}>No writers</div>}
+          )}
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-4">
+          <h2 className="text-white" style={{ fontSize: "20px", fontWeight: 800 }}>Writer accounts</h2>
+          <p className="text-white/30 mt-1" style={{ fontSize: "12px", lineHeight: 1.55 }}>
+            Dedicated writer signups, publications, and account moderation.
+          </p>
+        </div>
+        <div className="space-y-1">
+          {writers.map((w) => (
+            <div key={w.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
+              <div className="w-9 h-9 rounded-full bg-[#A78BFA]/10 flex items-center justify-center shrink-0">
+                <PenLine className="w-4 h-4 text-[#A78BFA]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
+                  {w.business_name}
+                  <Badge label={w.status} color={statusColor(w.status)} />
+                </div>
+                <div className="text-white/30" style={{ fontSize: "11px" }}>
+                  {w.first_name} {w.last_name} · {w.email}{w.website ? ` · ${w.website}` : ""}
+                </div>
+                {w.reason && <div className="text-white/20 mt-1" style={{ fontSize: "10px" }}>Reason: {w.reason}</div>}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {w.status === "pending" && (
+                  <>
+                    <ActionButton onClick={() => handleApprove(w.id)} icon={Check} label="Approve" color="#4ADE80" />
+                    <ActionButton onClick={() => handleReject(w.id)} icon={X} label="Reject" color="#E71D36" />
+                  </>
+                )}
+                {w.status === "approved" && <ActionButton onClick={() => handleRevoke(w.id)} icon={Ban} label="Revoke" color="#FFB627" />}
+                <ActionButton onClick={() => handleDelete(w.id)} icon={Trash2} label="Delete" danger />
+              </div>
+            </div>
+          ))}
+          {writers.length === 0 && <div className="text-center py-12 text-white/20" style={{ fontSize: "13px" }}>No writer accounts</div>}
+        </div>
       </div>
     </div>
   );
@@ -660,6 +735,7 @@ export default function AdminDashboard() {
   const [listings, setListings] = useState<AdminListingResponse[]>([]);
   const [flags, setFlags] = useState<AdminFlagResponse[]>([]);
   const [writers, setWriters] = useState<WriterResponse[]>([]);
+  const [pendingWriters, setPendingWriters] = useState<AdminUserResponse[]>([]);
   const [posts, setPosts] = useState<PostListResponse[]>([]);
   const [groups, setGroups] = useState<GroupCardResponse[]>([]);
   const [marketplaceItems, setMarketplaceItems] = useState<MarketplaceItemListResponse[]>([]);
@@ -697,8 +773,12 @@ export default function AdminDashboard() {
         const f = await api.admin.getFlags();
         setFlags(f);
       } else if (tab === "writers") {
-        const w = await api.admin.getWriters();
+        const [w, pending] = await Promise.all([
+          api.admin.getWriters(),
+          api.admin.getPendingWriters(),
+        ]);
         setWriters(w);
+        setPendingWriters(pending);
       } else if (tab === "posts") {
         const p = await api.admin.getPosts();
         setPosts(p);
@@ -786,7 +866,7 @@ export default function AdminDashboard() {
             {tab === "landlords" && <LandlordsTab landlords={landlords} onRefresh={fetchData} />}
             {tab === "listings" && <ListingsTab listings={listings} onRefresh={fetchData} />}
             {tab === "flags" && <FlagsTab flags={flags} onRefresh={fetchData} />}
-            {tab === "writers" && <WritersTab writers={writers} onRefresh={fetchData} />}
+            {tab === "writers" && <WritersTab writers={writers} pendingUsers={pendingWriters} onRefresh={fetchData} />}
             {tab === "posts" && <PostsTab posts={posts} onRefresh={fetchData} />}
             {tab === "groups" && <GroupsTab groups={groups} onRefresh={fetchData} />}
             {tab === "marketplace" && <MarketplaceTab items={marketplaceItems} onRefresh={fetchData} />}

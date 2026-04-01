@@ -1,7 +1,7 @@
 "use client";
 import { AuthBackground } from "@/components/ui/AuthBackground";
 
-import { useState, useMemo, useEffect } from "react";
+import { Suspense, useState, useMemo, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Check, X, Eye, EyeOff, ShieldCheck, AlertCircle } from "lucide-react";
@@ -52,7 +52,7 @@ function PasswordChecklist({ password }: { password: string }) {
   );
 }
 
-export default function ResetPasswordPage() {
+function ResetPasswordPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -224,5 +224,13 @@ export default function ResetPasswordPage() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordPageContent />
+    </Suspense>
   );
 }

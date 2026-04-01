@@ -3,7 +3,7 @@
 import { WriterAuthBackground } from "@/components/ui/WriterAuthBackground";
 import { AuthBackLink } from "@/components/ui/AuthBackLink";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useWriterStore } from "@/lib/store";
@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const rotatingLines = ["campus stories", "local deals", "student tips"];
 
-export default function WriterLoginPage() {
+function WriterLoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextPath = searchParams.get("next") || "/writer";
@@ -263,5 +263,13 @@ export default function WriterLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function WriterLoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <WriterLoginPageContent />
+    </Suspense>
   );
 }

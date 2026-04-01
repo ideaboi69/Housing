@@ -25,6 +25,7 @@ import { CribbMap } from "@/components/ui/CribbMap";
 import { getProximityLabel } from "@/lib/proximity";
 import type { ReviewResponse, SubletResponse } from "@/types";
 import type { SubletDetail } from "@/lib/mock-sublets";
+import { toast } from "sonner";
 
 /* ── Helpers ───────────────────────────────────── */
 
@@ -252,8 +253,31 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
 
   const handleMessage = async () => {
     if (messageSending || messageSent) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/sublets/${id}`)}`);
+      return;
+    }
     setMessageSending(true);
-    setTimeout(() => { setMessageSent(true); setMessageSending(false); setTimeout(() => router.push("/messages"), 1500); }, 800);
+    try {
+      if (sublet?.listing_id) {
+        await api.messages.startConversation({
+          listing_id: sublet.listing_id,
+          content: `Hi, I'm interested in "${sublet.title}". Is it still available?`,
+        });
+        setMessageSent(true);
+        setTimeout(() => router.push("/messages"), 1500);
+      } else {
+        toast.error("Messaging isn’t available for this sublet yet.");
+      }
+    } catch (err) {
+      if (err instanceof Error && "status" in err && (err as { status?: number }).status === 409) {
+        router.push("/messages");
+      } else {
+        toast.error("We couldn’t open a conversation right now. Please try again.");
+      }
+    } finally {
+      setMessageSending(false);
+    }
   };
 
   if (loading) {

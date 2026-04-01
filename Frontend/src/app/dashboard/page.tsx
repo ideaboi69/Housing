@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import type { UserDashboardResponse } from "@/types";
+import { RequestWriterAccessModal } from "@/components/ui/RequestWriterAccessModal";
+import type { PostListResponse, UserDashboardResponse } from "@/types";
 
 const emptyDashboard: UserDashboardResponse = {
   sublets_active: 0,
@@ -44,6 +45,8 @@ const emptyDashboard: UserDashboardResponse = {
   pending_invites_received: 0,
   pending_requests_sent: 0,
   profile_completeness: 0,
+  is_writable: false,
+  write_access_requested: false,
 };
 
 function StatCard({
@@ -125,7 +128,9 @@ export default function StudentDashboardPage() {
   const router = useRouter();
   const { user, token, isLoading: authLoading } = useAuthStore();
   const [dashboard, setDashboard] = useState<UserDashboardResponse>(emptyDashboard);
+  const [recentBubblePosts, setRecentBubblePosts] = useState<PostListResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showWriterRequestModal, setShowWriterRequestModal] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -177,6 +182,31 @@ export default function StudentDashboardPage() {
     }
     return "Complete your roommate profile to unlock matching and group creation.";
   }, [dashboard]);
+
+  const hasWriterAccess = Boolean(dashboard.is_writable || user?.is_writable);
+  const writerRequestPending = Boolean(dashboard.write_access_requested || user?.write_access_requested) && !hasWriterAccess;
+
+  useEffect(() => {
+    if (!token || !user || !hasWriterAccess) {
+      setRecentBubblePosts([]);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadRecentBubblePosts() {
+      try {
+        const posts = await api.posts.getMyPosts();
+        if (!cancelled) setRecentBubblePosts(posts.slice(0, 3));
+      } catch {
+        if (!cancelled) setRecentBubblePosts([]);
+      }
+    }
+
+    loadRecentBubblePosts();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user, hasWriterAccess]);
 
   if (authLoading || loading) {
     return (
@@ -273,10 +303,19 @@ export default function StudentDashboardPage() {
                   badge={dashboard.marketplace_drafts > 0 ? `${dashboard.marketplace_drafts} draft${dashboard.marketplace_drafts > 1 ? "s" : ""}` : undefined}
                 />
                 <ActionCard
-                  title="The Bubble"
-                  description={dashboard.posts > 0 ? `${dashboard.posts} post${dashboard.posts > 1 ? "s" : ""} published or drafted.` : "Share campus updates, events, and finds with other students."}
-                  href="/the-bubble"
+                  title={hasWriterAccess ? "Bubble Posts" : "The Bubble"}
+                  description={
+                    hasWriterAccess
+                      ? dashboard.posts > 0
+                        ? `${dashboard.posts} post${dashboard.posts > 1 ? "s" : ""} published or drafted. Open your publishing tools and keep Bubble content moving.`
+                        : "You have writer access. Start sharing updates, events, and useful finds for students."
+                      : writerRequestPending
+                        ? "Your writer access request is under review. We’ll let you know once publishing is approved."
+                        : "Read what’s happening around Guelph and request writer access if you want to post."
+                  }
+                  href={hasWriterAccess ? "/writer" : "/the-bubble"}
                   icon={<PenSquare className="h-5 w-5" />}
+                  badge={hasWriterAccess ? "Writer" : writerRequestPending ? "Pending" : undefined}
                 />
                 <ActionCard
                   title="Browse Listings"
@@ -349,9 +388,121 @@ export default function StudentDashboardPage() {
                 Manage your items <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </div>
+
+            <div className="rounded-2xl border border-black/[0.04] bg-white p-5" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+              <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>
+                Bubble Access
+              </h2>
+              <p className="mt-1 text-[#98A3B0]" style={{ fontSize: "12px", lineHeight: 1.6 }}>
+                Manage your writer status and Bubble publishing access from your student account.
+              </p>
+
+              <div className="mt-4 rounded-xl bg-[#FAF8F4] px-4 py-3">
+                <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                  Status
+                </div>
+                <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>
+                  {hasWriterAccess ? "Writer access approved" : writerRequestPending ? "Application pending" : "No writer access yet"}
+                </div>
+                <p className="mt-1 text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.6 }}>
+                  {hasWriterAccess
+                    ? dashboard.posts > 0
+                      ? `${dashboard.posts} Bubble post${dashboard.posts > 1 ? "s" : ""} on your account.`
+                      : "You can now create and manage Bubble posts."
+                    : writerRequestPending
+                      ? "We review student requests manually and usually get back to you within 24 hours."
+                      : "Want to post campus updates, tips, and local finds? Request access here."}
+                </p>
+              </div>
+
+              <div className="mt-4">
+                {hasWriterAccess ? (
+                  <Link href="/writer" className="inline-flex items-center gap-1.5 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 700 }}>
+                    Open writer dashboard <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                ) : writerRequestPending ? (
+                  <span className="inline-flex rounded-full bg-[#FFB627]/10 px-3 py-1.5 text-[#B8860B]" style={{ fontSize: "11px", fontWeight: 700 }}>
+                    Application under review
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowWriterRequestModal(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B35] px-4 py-2.5 text-white hover:bg-[#e55e2e] transition-all"
+                    style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}
+                  >
+                    Request writer access
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {hasWriterAccess && (
+              <div className="rounded-2xl border border-black/[0.04] bg-white p-5" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>
+                      Your Bubble Posts
+                    </h2>
+                    <p className="mt-1 text-[#98A3B0]" style={{ fontSize: "12px", lineHeight: 1.6 }}>
+                      Keep an eye on what you&apos;ve published without needing to live in the writer dashboard.
+                    </p>
+                  </div>
+                  <Link href="/writer" className="shrink-0 inline-flex items-center gap-1.5 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 700 }}>
+                    Manage all <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+
+                {recentBubblePosts.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {recentBubblePosts.map((post) => (
+                      <Link
+                        key={post.id}
+                        href={`/the-bubble/${post.slug}`}
+                        className="block rounded-xl bg-[#FAF8F4] px-4 py-3 transition-all hover:bg-white hover:shadow-sm"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                              {post.title}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[#98A3B0]" style={{ fontSize: "11px", fontWeight: 600 }}>
+                              <span className="rounded-full bg-white px-2 py-0.5 text-[#1B2D45]/55">{post.status}</span>
+                              <span>{post.view_count} views</span>
+                              <span>{post.category.toLowerCase()}</span>
+                            </div>
+                          </div>
+                          <ArrowRight className="h-4 w-4 shrink-0 text-[#1B2D45]/20" />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl bg-[#FAF8F4] px-4 py-3">
+                    <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                      No Bubble posts yet
+                    </div>
+                    <p className="mt-1 text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.6 }}>
+                      Your writer access is active. When you publish your first post, it&apos;ll show up here.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      <RequestWriterAccessModal
+        open={showWriterRequestModal}
+        onClose={() => setShowWriterRequestModal(false)}
+        onSubmitted={() => {
+          setDashboard((current) => ({
+            ...current,
+            write_access_requested: true,
+          }));
+        }}
+      />
     </div>
   );
 }

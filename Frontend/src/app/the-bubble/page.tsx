@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
+import { RequestWriterAccessModal } from "@/components/ui/RequestWriterAccessModal";
 import type { PostListResponse, PostCategory as PostCategoryType } from "@/types";
 
 /* ═══════════════════════════════════════════════════════
@@ -367,22 +368,22 @@ function WeeklyHighlightsCard() {
    BECOME A WRITER CARD
    ═══════════════════════════════════════════════════════ */
 
-function BecomeWriterCard({ onApply, compact }: { onApply: () => void; compact?: boolean }) {
+function BecomeWriterCard({ onApply, compact, pending }: { onApply: () => void; compact?: boolean; pending?: boolean }) {
   return (
-    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} whileHover={{ scale: 1.02 }}
-      className="bg-white rounded-2xl border border-[#FF6B35]/15 overflow-hidden cursor-pointer"
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} whileHover={pending ? undefined : { scale: 1.02 }}
+      className={`bg-white rounded-2xl border overflow-hidden ${pending ? "" : "cursor-pointer"}`}
       style={{ boxShadow: "0 2px 12px rgba(255,107,53,0.08)", background: "linear-gradient(135deg, #FFFAF7 0%, #FFFFFF 100%)" }}
-      onClick={onApply}>
+      onClick={pending ? undefined : onApply}>
       <div className={compact ? "p-3.5" : "p-5"}>
         <div className="flex items-center gap-3">
           <motion.div animate={{ rotate: [0, -8, 8, -4, 0] }} transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 3 }}
             className="w-10 h-10 rounded-xl bg-[#FF6B35]/10 flex items-center justify-center shrink-0">
-            <BadgeCheck className="w-5 h-5 text-[#FF6B35]" />
+            {pending ? <Calendar className="w-5 h-5 text-[#FF6B35]" /> : <BadgeCheck className="w-5 h-5 text-[#FF6B35]" />}
           </motion.div>
           <div className="flex-1 min-w-0">
-            <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "14px", fontWeight: 700 }}>Become a Writer</h4>
+            <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "14px", fontWeight: 700 }}>{pending ? "Writer application pending" : "Become a Writer"}</h4>
             <p className="text-[#5C6B7A]" style={{ fontSize: compact ? "10px" : "11px", lineHeight: 1.4 }}>
-              Get the verified badge and share with the Guelph community
+              {pending ? "We’re reviewing your request and will email you once posting is approved." : "Get the verified badge and share with the Guelph community"}
             </p>
           </div>
           <motion.div animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity }} className="shrink-0">
@@ -638,7 +639,7 @@ function TipModal({ onClose }: { onClose: () => void }) {
    HERO
    ═══════════════════════════════════════════════════════ */
 
-function HeroSection({ isWriter, canContribute, onCreatePost, onApply, isMobile }: { isWriter: boolean; canContribute: boolean; onCreatePost: () => void; onApply: () => void; isMobile: boolean }) {
+function HeroSection({ isWriter, writerPending, canContribute, onApply, isMobile, isSignedIn }: { isWriter: boolean; writerPending: boolean; canContribute: boolean; onApply: () => void; isMobile: boolean; isSignedIn: boolean }) {
   return (
     <div className="relative overflow-hidden" style={{ background: "radial-gradient(ellipse at 50% 80%, rgba(255,107,53,0.06) 0%, transparent 60%), #FAF8F4" }}>
 
@@ -705,21 +706,23 @@ function HeroSection({ isWriter, canContribute, onCreatePost, onApply, isMobile 
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-5">
-            {canContribute ? isWriter ? (
-              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onCreatePost}
-                className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-[#FF6B35] text-white"
-                style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.3)" }}>
-                ✍️ Post Something
-              </motion.button>
+            {canContribute ? writerPending ? (
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#FFB627]/20 bg-white px-4 py-2.5 text-[#B8860B]" style={{ fontSize: "12px", fontWeight: 700 }}>
+                <Calendar className="w-4 h-4" /> Writer application pending
+              </div>
+            ) : isWriter ? (
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#2EC4B6]/20 bg-white px-4 py-2.5 text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 700 }}>
+                <BadgeCheck className="w-4 h-4 text-[#2EC4B6]" /> Writer access active
+              </div>
             ) : (
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onApply}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF6B35] text-white"
                 style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.3)" }}>
-                <BadgeCheck className="w-4 h-4" /> Become a Writer
+                <BadgeCheck className="w-4 h-4" /> Request Writer Access
               </motion.button>
             ) : (
               <div className="inline-flex items-center gap-2 rounded-full border border-[#1B2D45]/10 bg-white/80 px-4 py-2.5 text-[#1B2D45]/55" style={{ fontSize: "12px", fontWeight: 600 }}>
-                Bubble posting is student-only
+                {isSignedIn ? "Bubble posting is student-only" : "Sign in as a student to request writer access"}
               </div>
             )}
           </motion.div>
@@ -777,7 +780,7 @@ function FilterBar({ activeCategory, onSelectCategory, sortMode, onSelectSort, i
    SIDEBAR
    ═══════════════════════════════════════════════════════ */
 
-function Sidebar({ isWriter, canContribute, onCreatePost, onApply, onTip, posts }: { isWriter: boolean; canContribute: boolean; onCreatePost: () => void; onApply: () => void; onTip: () => void; posts: Post[] }) {
+function Sidebar({ canContribute, onTip, posts }: { canContribute: boolean; onTip: () => void; posts: Post[] }) {
   const trendingPosts = useMemo(() => [...posts].sort((a, b) => b.upvotes - a.upvotes).slice(0, 5), [posts]);
 
   return (
@@ -861,12 +864,16 @@ export default function TheBubblePage() {
   const [sortMode, setSortMode] = useState<SortMode>("trending");
   const [showPostModal, setShowPostModal] = useState(false);
   const [showTipModal, setShowTipModal] = useState(false);
+  const [showWriterRequestModal, setShowWriterRequestModal] = useState(false);
   const [isWriter, setIsWriter] = useState(false);
   const [livePosts, setLivePosts] = useState<Post[]>([]);
   const { user } = useAuthStore();
   const isMobile = useIsMobile();
   const isLandlord = user?.role === "landlord";
   const canUseBubbleActions = !isLandlord;
+  const isStudent = user?.role === "student";
+  const isSignedIn = Boolean(user);
+  const writerRequestPending = Boolean(user?.write_access_requested) && !isWriter;
 
   // Check if user has write access (student with is_writable, or a writer token)
   useEffect(() => {
@@ -875,19 +882,13 @@ export default function TheBubblePage() {
       return;
     }
 
-    // Logged-in students should only get writer controls if their actual user account has write access.
+    // Bubble writer controls only come from the current signed-in account.
     if (user) {
       setIsWriter(Boolean((user as unknown as Record<string, unknown>).is_writable));
       return;
     }
 
-    // Logged-out writer sessions can still use the Bubble with their dedicated writer token.
-    try {
-      const writerToken = localStorage.getItem("cribb_writer_token");
-      setIsWriter(Boolean(writerToken));
-    } catch {
-      setIsWriter(false);
-    }
+    setIsWriter(false);
   }, [user]);
 
   useEffect(() => {
@@ -938,12 +939,75 @@ export default function TheBubblePage() {
 
   const handlePostClick = () => {
     if (isLandlord) return;
+    if (user?.role === "student" && !isWriter) {
+      if (writerRequestPending) return;
+      setShowWriterRequestModal(true);
+      return;
+    }
     if (!user) {
       router.push("/writers/signup");
       return;
     }
     if (isWriter) setShowPostModal(true);
-    else router.push("/writers/signup");
+    else setShowWriterRequestModal(true);
+  };
+
+  const renderWriterCard = (compact?: boolean) => {
+    if (isLandlord) {
+      return (
+        <div className="bg-white rounded-2xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+          <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "13px", fontWeight: 800 }}>Read-only for landlords</h4>
+          <p className="mt-2 text-[#98A3B0]" style={{ fontSize: compact ? "10px" : "11px", lineHeight: 1.6 }}>
+            Landlord accounts can browse Bubble posts, but student and writer accounts handle tips and publishing.
+          </p>
+        </div>
+      );
+    }
+
+    if (!user) {
+      return <BecomeWriterCard compact={compact} onApply={() => router.push("/login?next=/the-bubble")} />;
+    }
+
+    if (isWriter) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.02 }}
+          className="bg-white rounded-2xl border border-[#FF6B35]/15 overflow-hidden cursor-pointer"
+          style={{ boxShadow: "0 2px 12px rgba(255,107,53,0.08)", background: "linear-gradient(135deg, #FFFAF7 0%, #FFFFFF 100%)" }}
+          onClick={() => router.push("/writer")}
+        >
+          <div className={compact ? "p-4" : "p-5"}>
+            <div className="flex items-center gap-3">
+              <motion.div
+                animate={{ rotate: [0, -8, 8, -4, 0] }}
+                transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 3 }}
+                className="w-10 h-10 rounded-xl bg-[#FF6B35]/10 flex items-center justify-center shrink-0"
+              >
+                <Pencil className="w-5 h-5 text-[#FF6B35]" />
+              </motion.div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "14px", fontWeight: 700 }}>Writer access active</h4>
+                <p className="text-[#5C6B7A]" style={{ fontSize: compact ? "10px" : "11px", lineHeight: 1.4 }}>
+                  Open your writer dashboard to publish posts and manage Bubble content
+                </p>
+              </div>
+              <motion.div animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity }} className="shrink-0">
+                <Sparkles className="w-4 h-4 text-[#FF6B35]" />
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
+
+    if (isStudent) {
+      if (writerRequestPending) return <BecomeWriterCard compact={compact} pending onApply={() => {}} />;
+      return <BecomeWriterCard compact={compact} onApply={() => setShowWriterRequestModal(true)} />;
+    }
+
+    return <BecomeWriterCard compact={compact} onApply={() => router.push("/writers/signup")} />;
   };
 
   return (
@@ -989,47 +1053,23 @@ export default function TheBubblePage() {
 
       {/* Page content */}
       <div className="relative z-10">
-      <HeroSection isWriter={isWriter} canContribute={canUseBubbleActions} onCreatePost={() => setShowPostModal(true)} onApply={() => router.push("/writers/signup")} isMobile={isMobile} />
+      <HeroSection
+        isWriter={isWriter}
+        writerPending={writerRequestPending}
+        canContribute={canUseBubbleActions}
+        onApply={() => user?.role === "student" ? setShowWriterRequestModal(true) : !user ? router.push("/login?next=/the-bubble") : router.push("/writers/signup")}
+        isMobile={isMobile}
+        isSignedIn={isSignedIn}
+      />
 
       <FilterBar activeCategory={activeCategory} onSelectCategory={setActiveCategory} sortMode={sortMode} onSelectSort={setSortMode} isMobile={isMobile} />
 
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6 md:py-8">
-        {!isMobile && activeCategory === "all" && (
-          <div className="grid grid-cols-[minmax(0,1fr)_280px] gap-8 items-start mb-5">
-            <WeeklyHighlightsCard />
-            {canUseBubbleActions ? (
-              isWriter ? (
-                <div
-                  className="bg-white rounded-2xl border border-black/[0.04] p-4 cursor-pointer hover:shadow-md transition-shadow"
-                  style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}
-                  onClick={() => setShowPostModal(true)}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Avatar initial="Y" gradient="linear-gradient(135deg, #FF6B35, #FFB627)" size={28} />
-                    <div className="flex-1 bg-[#FAF8F4] rounded-xl px-3 py-2 text-[#98A3B0]" style={{ fontSize: "12px" }}>
-                      Share something with Guelph...
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <BecomeWriterCard onApply={() => router.push("/writers/signup")} />
-              )
-            ) : (
-              <div className="bg-white rounded-2xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
-                <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Read-only for landlords</h4>
-                <p className="mt-2 text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.6 }}>
-                  Landlord accounts can browse Bubble posts, but student and writer accounts handle tips and publishing.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className={`flex gap-8 ${isMobile ? "" : "items-start"}`}>
+        <div className={isMobile ? "" : "grid grid-cols-[minmax(0,1fr)_280px] gap-8 items-start"}>
           {/* Feed */}
           <div className="flex-1 min-w-0 space-y-4">
-            {isMobile && activeCategory === "all" && <WeeklyHighlightsCard />}
-            {isMobile && canUseBubbleActions && !isWriter && activeCategory === "all" && <BecomeWriterCard onApply={() => router.push("/writers/signup")} />}
+            {activeCategory === "all" && <WeeklyHighlightsCard />}
+            {isMobile && activeCategory === "all" && renderWriterCard(true)}
 
             {/* Mobile sort toggle */}
             {isMobile && (
@@ -1052,15 +1092,16 @@ export default function TheBubblePage() {
           </div>
 
           {!isMobile && (
-            <div className="shrink-0 pl-1 pr-1">
-              <Sidebar isWriter={isWriter} canContribute={canUseBubbleActions} onCreatePost={() => setShowPostModal(true)} onApply={() => router.push("/writers/signup")} onTip={() => setShowTipModal(true)} posts={feedPosts} />
+            <div className="shrink-0 pl-1 pr-1 space-y-4">
+              {activeCategory === "all" && renderWriterCard()}
+              <Sidebar canContribute={canUseBubbleActions} onTip={() => setShowTipModal(true)} posts={feedPosts} />
             </div>
           )}
         </div>
       </div>
 
       {/* Mobile FAB */}
-      {isMobile && canUseBubbleActions && (
+      {isMobile && canUseBubbleActions && isWriter && (
         <motion.button initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 350, damping: 20, delay: 0.5 }}
           whileTap={{ scale: 0.9 }} onClick={handlePostClick}
           className="fixed bottom-6 right-4 z-50 w-14 h-14 rounded-full bg-[#FF6B35] text-white flex items-center justify-center"
@@ -1078,6 +1119,10 @@ export default function TheBubblePage() {
           <TipModal onClose={() => setShowTipModal(false)} />
         )}
       </AnimatePresence>
+      <RequestWriterAccessModal
+        open={showWriterRequestModal}
+        onClose={() => setShowWriterRequestModal(false)}
+      />
       </div>{/* end z-10 content wrapper */}
     </div>
   );

@@ -84,6 +84,7 @@ def user_login(request: Request, payload: UserLogin, db: Session = Depends(get_d
         "role": user.role.value,
         "email_verified": user.email_verified,
         "is_writable": user.is_writable,
+        "write_access_requested": user.write_access_requested,
         },
     }
 
@@ -198,7 +199,7 @@ def update_user_profile(payload: UserUpdate, db: Session = Depends(get_db), curr
     if payload.year is not None:
         current_user.year = payload.year
     if payload.bio is not None:
-        current_user.bio = payload.bioye
+        current_user.bio = payload.bio
 
     db.commit()
     db.refresh(current_user)
@@ -452,4 +453,6 @@ def get_dashboard(db: Session = Depends(get_db), current_user: User = Depends(ge
         "pending_invites_received": pending_invites_received,
         "pending_requests_sent": pending_requests_sent,
         "profile_completeness": profile_completeness,
+        "is_writable": current_user.is_writable,
+        "write_access_requested": current_user.write_access_requested,
     }

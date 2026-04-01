@@ -53,6 +53,8 @@ export interface UserResponse {
   role: string;
   email_verified: boolean;
   is_early_adopter?: boolean;
+  is_writable?: boolean;
+  write_access_requested?: boolean;
   profile_photo_url?: string | null;
   program?: string | null;
   year?: string | null;
@@ -88,6 +90,8 @@ export interface UserDashboardResponse {
   pending_invites_received: number;
   pending_requests_sent: number;
   profile_completeness: number;
+  is_writable: boolean;
+  write_access_requested: boolean;
 }
 
 export interface UserCreate {
@@ -106,6 +110,9 @@ export interface UserUpdate {
   first_name?: string;
   last_name?: string;
   email?: string;
+  program?: string;
+  year?: string;
+  bio?: string;
 }
 
 export interface PasswordChange {
@@ -123,6 +130,25 @@ export interface TokenResponse {
   access_token: string;
   token_type: string;
   user: UserResponse;
+}
+
+export interface NotificationPreferencesUpdate {
+  new_listings_matching?: boolean;
+  price_drops_saved?: boolean;
+  new_roommate_matches?: boolean;
+  weekly_bubble_digest?: boolean;
+  cribb_news_updates?: boolean;
+}
+
+export interface NotificationPreferencesResponse {
+  id: number;
+  user_id: number;
+  new_listings_matching: boolean;
+  price_drops_saved: boolean;
+  new_roommate_matches: boolean;
+  weekly_bubble_digest: boolean;
+  cribb_news_updates: boolean;
+  updated_at: string;
 }
 
 // ── Property ───────────────────────────────────────────

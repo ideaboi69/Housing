@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { AuthHydrator } from "@/components/AuthHydrator";
@@ -26,7 +27,9 @@ export default function RootLayout({
       <body className="bg-white text-[#1B2D45] antialiased">
         <AuthHydrator />
         <OnboardingProvider />
-        <Navbar />
+        <Suspense fallback={null}>
+          <Navbar />
+        </Suspense>
         <main>{children}</main>
         <Toaster position="bottom-right" richColors />
       </body>

@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { Building2, ShieldCheck, Home, MessageCircle, ArrowRight, CheckCircle2, Clock, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
-export default function LandlordOnboardingPage() {
+function LandlordOnboardingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuthStore();
@@ -247,5 +247,13 @@ export default function LandlordOnboardingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LandlordOnboardingPage() {
+  return (
+    <Suspense fallback={null}>
+      <LandlordOnboardingPageContent />
+    </Suspense>
   );
 }

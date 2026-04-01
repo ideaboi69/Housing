@@ -110,6 +110,8 @@ class UserResponse(BaseModel):
     role: str
     email_verified: bool
     is_early_adopter: bool = False
+    is_writable: bool = False
+    write_access_requested: bool = False
     profile_photo_url: Optional[str] = None
     program: Optional[str] = None
     year: Optional[StudentYear] = None

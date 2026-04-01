@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
@@ -1002,6 +1002,9 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+  const unreadTotal = conversations.reduce((sum, convo) => sum + convo.unread_count, 0);
+  const uniqueStudents = new Set(conversations.map((convo) => convo.user_id)).size;
+  const recentInquiry = conversations[0]?.last_message?.created_at;
 
   const loadMessages = useCallback(async (convoId: number) => {
     setActiveConvo(convoId);
@@ -1031,25 +1034,56 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
 
   return (
     <div className="space-y-4">
-      <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Messages</h2>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Messages</h2>
+          <p className="text-[#1B2D45]/35 mt-1 max-w-[520px]" style={{ fontSize: "12px", lineHeight: 1.55 }}>
+            Keep student inquiries moving without leaving your landlord workspace.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-2 md:w-[360px]">
+          <div className="rounded-xl border border-black/[0.04] bg-white px-3 py-2.5">
+            <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>UNREAD</div>
+            <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>{unreadTotal}</div>
+          </div>
+          <div className="rounded-xl border border-black/[0.04] bg-white px-3 py-2.5">
+            <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>THREADS</div>
+            <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>{conversations.length}</div>
+          </div>
+          <div className="rounded-xl border border-black/[0.04] bg-white px-3 py-2.5">
+            <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>STUDENTS</div>
+            <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>{uniqueStudents}</div>
+          </div>
+        </div>
+      </div>
 
       {conversations.length === 0 ? (
-        <div className="bg-white rounded-xl border border-black/[0.04] p-10 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[#1B2D45]/[0.06] flex items-center justify-center mx-auto mb-3">
+        <div className="bg-white rounded-2xl border border-black/[0.04] p-10 text-center shadow-[0_10px_30px_rgba(27,45,69,0.04)]">
+          <div className="w-14 h-14 rounded-2xl bg-[#1B2D45]/[0.06] flex items-center justify-center mx-auto mb-3 shadow-[0_8px_18px_rgba(27,45,69,0.08)]">
             <Inbox className="w-7 h-7 text-[#1B2D45]/30" />
           </div>
           <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No messages yet</h3>
-          <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "13px" }}>Student inquiries will appear here.</p>
+          <p className="text-[#1B2D45]/40 mt-1 max-w-[360px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.55 }}>
+            Student inquiries will appear here once someone reaches out from one of your listings.
+          </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-black/[0.04] overflow-hidden flex" style={{ minHeight: 500 }}>
+        <div className="overflow-hidden rounded-2xl border border-black/[0.04] bg-white shadow-[0_10px_30px_rgba(27,45,69,0.04)] md:flex" style={{ minHeight: 560 }}>
           {/* Conversation list */}
-          <div className={`w-full md:w-[280px] shrink-0 border-r border-black/[0.04] overflow-y-auto ${activeConvo ? "hidden md:block" : ""}`}>
+          <div className={`w-full md:w-[300px] shrink-0 border-r border-black/[0.04] overflow-y-auto bg-[#FCFBF8] ${activeConvo ? "hidden md:block" : ""}`}>
+            <div className="border-b border-black/[0.04] px-4 py-3">
+              <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Inbox</div>
+              <div className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "10px" }}>
+                {recentInquiry
+                  ? `Latest inquiry ${new Date(recentInquiry).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                  : "Student listing inquiries"}
+              </div>
+            </div>
             {conversations.map((c) => (
               <button
                 key={c.id}
                 onClick={() => loadMessages(c.id)}
-                className={`w-full text-left px-4 py-3 border-b border-black/[0.03] hover:bg-[#FAF8F4] transition-all ${activeConvo === c.id ? "bg-[#FAF8F4]" : ""}`}
+                className={`w-full text-left px-4 py-3 border-b border-black/[0.03] hover:bg-white transition-all ${activeConvo === c.id ? "bg-white" : ""}`}
               >
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-[#1B2D45]/[0.06] flex items-center justify-center shrink-0">
@@ -1073,15 +1107,23 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
           </div>
 
           {/* Message view */}
-          <div className={`flex-1 flex flex-col ${!activeConvo ? "hidden md:flex" : "flex"}`}>
+          <div className={`flex-1 flex flex-col bg-[radial-gradient(circle_at_top_left,rgba(255,107,53,0.08),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(46,196,182,0.08),transparent_30%),linear-gradient(180deg,#ffffff_0%,#fbf9f5_100%)] ${!activeConvo ? "hidden md:flex" : "flex"}`}>
             {!activeConvo ? (
-              <div className="flex-1 flex items-center justify-center text-[#1B2D45]/20" style={{ fontSize: "13px" }}>
-                Select a conversation
+              <div className="flex-1 flex items-center justify-center px-8">
+                <div className="max-w-[320px] text-center">
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/85 shadow-[0_10px_30px_rgba(27,45,69,0.08)]">
+                    <MessageCircle className="h-6 w-6 text-[#1B2D45]/30" />
+                  </div>
+                  <div className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>Open a student thread</div>
+                  <p className="mt-2 text-[#1B2D45]/35" style={{ fontSize: "12px", lineHeight: 1.6 }}>
+                    Review listing questions, reply quickly, and keep every inquiry in one calm workspace.
+                  </p>
+                </div>
               </div>
             ) : (
               <>
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-black/[0.04] flex items-center gap-2">
+                <div className="px-4 py-3 border-b border-black/[0.04] bg-white/80 backdrop-blur-sm flex items-center gap-2">
                   <button onClick={() => setActiveConvo(null)} className="md:hidden w-7 h-7 rounded-lg flex items-center justify-center text-[#1B2D45]/40 hover:bg-[#1B2D45]/[0.04]">
                     <ChevronRight className="w-4 h-4 rotate-180" />
                   </button>
@@ -1092,7 +1134,7 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+                <div className="flex-1 overflow-y-auto px-4 py-5 space-y-3">
                   {loadingMessages ? (
                     <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#1B2D45]/20" /></div>
                   ) : messages.map((m) => (
@@ -1112,7 +1154,7 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
                 </div>
 
                 {/* Reply */}
-                <div className="px-4 py-3 border-t border-black/[0.04] flex items-center gap-2">
+                <div className="px-4 py-3 border-t border-black/[0.04] bg-white/85 backdrop-blur-sm flex items-center gap-2">
                   <input
                     type="text"
                     value={replyText}
@@ -1513,7 +1555,7 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
    Main Dashboard
    ════════════════════════════════════════════════════════ */
 
-export default function LandlordDashboard() {
+function LandlordDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuthStore();
@@ -1651,26 +1693,96 @@ export default function LandlordDashboard() {
     );
   }
 
+  const totalListings = properties.reduce((sum, property) => sum + property.listings.length, 0);
+  const activeListings = properties.reduce((sum, property) => sum + property.listings.filter((listing) => getListingStatusBucket(listing.status) === "active").length, 0);
+  const draftListings = properties.reduce((sum, property) => sum + property.listings.filter((listing) => getListingStatusBucket(listing.status) === "draft").length, 0);
+  const totalViews = properties.reduce((sum, property) => sum + property.totalViews, 0);
+  const pendingFlags = flags.filter((flag) => flag.status === "pending").length;
+  const actionHref = properties.length > 0 ? "/landlord?tab=listings" : "/landlord/properties/new";
+  const actionLabel = properties.length > 0 ? "Review Listings" : "Add Property";
+
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[1100px] mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 900 }}>
-              {user.company_name ?? `${user.first_name}'s Dashboard`}
-            </h1>
-            <p className="text-[#1B2D45]/35 mt-0.5" style={{ fontSize: "12px" }}>
-              Landlord Dashboard
-            </p>
+        <div className="mb-6 overflow-hidden rounded-[28px] border border-[#1B2D45]/[0.06] bg-[radial-gradient(circle_at_top_left,rgba(27,45,69,0.07),transparent_34%),radial-gradient(circle_at_top_right,rgba(46,196,182,0.12),transparent_28%),linear-gradient(135deg,#ffffff_0%,#fbf9f5_100%)] p-5 md:p-6 shadow-[0_18px_40px_rgba(27,45,69,0.06)]">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-[560px]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#1B2D45]/10 bg-white/80 px-3 py-1 text-[#1B2D45]/55 shadow-[0_6px_18px_rgba(27,45,69,0.04)]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em" }}>
+                <Building2 className="h-3.5 w-3.5" />
+                LANDLORD WORKSPACE
+              </div>
+              <h1 className="mt-4 text-[#1B2D45]" style={{ fontSize: "30px", lineHeight: 1.05, fontWeight: 900 }}>
+                {user.company_name ?? `${user.first_name}'s Dashboard`}
+              </h1>
+              <p className="mt-3 max-w-[520px] text-[#1B2D45]/40" style={{ fontSize: "13px", lineHeight: 1.65 }}>
+                Manage properties, publish listings, reply to student inquiries, and stay on top of reports from one place.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleTabChange("messages")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#1B2D45]/10 bg-white/85 px-3.5 py-2 text-[#1B2D45]/60 hover:border-[#1B2D45]/20 hover:text-[#1B2D45] transition-all"
+                  style={{ fontSize: "11px", fontWeight: 700 }}
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  {unreadCount > 0 ? `${unreadCount} unread messages` : "Open messages"}
+                </button>
+                <button
+                  onClick={() => handleTabChange("reviews")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#1B2D45]/10 bg-white/85 px-3.5 py-2 text-[#1B2D45]/60 hover:border-[#1B2D45]/20 hover:text-[#1B2D45] transition-all"
+                  style={{ fontSize: "11px", fontWeight: 700 }}
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                  {pendingFlags > 0 ? `${pendingFlags} open reports` : "View feedback"}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 lg:w-[380px]">
+              <div className="rounded-2xl border border-[#1B2D45]/[0.06] bg-white/85 px-4 py-3 shadow-[0_8px_24px_rgba(27,45,69,0.04)]">
+                <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em" }}>PROPERTIES</div>
+                <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 900 }}>{properties.length}</div>
+                <div className="mt-1 text-[#1B2D45]/30" style={{ fontSize: "11px" }}>
+                  {activeListings > 0 ? `${activeListings} active listing${activeListings === 1 ? "" : "s"}` : "Ready for new listings"}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[#1B2D45]/[0.06] bg-white/85 px-4 py-3 shadow-[0_8px_24px_rgba(27,45,69,0.04)]">
+                <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em" }}>ATTENTION</div>
+                <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 900 }}>{unreadCount + pendingFlags + draftListings}</div>
+                <div className="mt-1 text-[#1B2D45]/30" style={{ fontSize: "11px" }}>
+                  {draftListings > 0 ? `${draftListings} drafts, ` : ""}{pendingFlags > 0 ? `${pendingFlags} reports` : unreadCount > 0 ? `${unreadCount} new replies` : "Nothing urgent"}
+                </div>
+              </div>
+              <div className="col-span-2 flex flex-wrap gap-2">
+                <Link href={actionHref}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B2D45] px-4 py-2.5 text-white hover:bg-[#152438] transition-all"
+                  style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 10px 24px rgba(27,45,69,0.16)" }}>
+                  <Plus className="w-3.5 h-3.5" /> {actionLabel}
+                </Link>
+                <button
+                  onClick={() => handleTabChange("overview")}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#1B2D45]/10 bg-white/85 px-4 py-2.5 text-[#1B2D45]/60 hover:border-[#1B2D45]/20 hover:text-[#1B2D45] transition-all"
+                  style={{ fontSize: "12px", fontWeight: 700 }}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" /> {totalViews > 0 ? `${totalViews} total views` : `${totalListings} listings tracked`}
+                </button>
+              </div>
+            </div>
           </div>
-          {tab !== "properties" && (
-            <Link href="/landlord/properties/new"
-              className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-all"
-              style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 4px 16px rgba(27,45,69,0.15)" }}>
-              <Plus className="w-3.5 h-3.5" /> Add Property
-            </Link>
-          )}
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              { label: "Total listings", value: totalListings, sub: activeListings > 0 ? `${activeListings} active` : "No live listings yet" },
+              { label: "Drafts", value: draftListings, sub: draftListings > 0 ? "Needs review" : "Up to date" },
+              { label: "Unread replies", value: unreadCount, sub: unreadCount > 0 ? "Reply from inbox" : "All caught up" },
+              { label: "Open reports", value: pendingFlags, sub: pendingFlags > 0 ? "Review feedback" : "No active reports" },
+            ].map((item) => (
+              <div key={item.label} className="rounded-2xl border border-[#1B2D45]/[0.06] bg-white/75 px-4 py-3">
+                <div className="text-[#1B2D45]/30" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>{item.label.toUpperCase()}</div>
+                <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 900 }}>{item.value}</div>
+                <div className="mt-1 text-[#1B2D45]/30" style={{ fontSize: "11px" }}>{item.sub}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Layout: Sidebar + Content */}
@@ -1721,5 +1833,13 @@ export default function LandlordDashboard() {
 
       <MobileTabBar active={tab} onChange={handleTabChange} unreadCount={unreadCount} />
     </div>
+  );
+}
+
+export default function LandlordDashboard() {
+  return (
+    <Suspense fallback={null}>
+      <LandlordDashboardContent />
+    </Suspense>
   );
 }

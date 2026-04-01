@@ -1,5 +1,7 @@
 import type {
   TokenResponse,
+  NotificationPreferencesResponse,
+  NotificationPreferencesUpdate,
   UserCreate,
   UserLogin,
   UserResponse,
@@ -201,6 +203,42 @@ export const auth = {
 
   getDashboard: () => request<UserDashboardResponse>("/api/users/me/dashboard"),
 
+  getNotificationPreferences: () =>
+    request<NotificationPreferencesResponse>("/api/users/me/notifications"),
+
+  updateNotificationPreferences: (data: NotificationPreferencesUpdate) =>
+    request<NotificationPreferencesResponse>("/api/users/me/notifications", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  uploadProfilePhoto: async (file: File) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${API_URL}/api/users/me/profile-photo`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Request failed" }));
+      throw new ApiError(res.status, body.detail || "Request failed");
+    }
+
+    return res.json() as Promise<{ profile_photo_url: string }>;
+  },
+
+  deleteProfilePhoto: () =>
+    request<{ message: string }>("/api/users/me/profile-photo", {
+      method: "DELETE",
+    }),
+
   updateMe: (data: UserUpdate) =>
     request<UserResponse>("/api/users/me", {
       method: "PATCH",
@@ -241,6 +279,30 @@ export const auth = {
     request<{ access_token: string; token_type: string }>("/api/users/refresh", {
       method: "POST",
     }),
+
+  requestWriteAccess: async (reason: string) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("reason", reason);
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_URL}/api/users/request-write-access`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Request failed" }));
+      throw new ApiError(res.status, body.detail || "Request failed");
+    }
+
+    return res.json() as Promise<{ message: string }>;
+  },
 };
 
 // ── Listings ────────────────────────────────────────────

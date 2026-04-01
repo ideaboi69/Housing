@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { Suspense, useState, useEffect, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
@@ -17,7 +17,7 @@ const leaseTypes = [
   { value: LeaseType.FLEXIBLE, label: "Flexible", desc: "Custom dates", emoji: "🔄" },
 ];
 
-export default function NewListingPage({ params }: { params: Promise<{ id: string }> }) {
+function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const propertyId = Number(id);
   const router = useRouter();
@@ -385,5 +385,13 @@ export default function NewListingPage({ params }: { params: Promise<{ id: strin
         </form>
       </div>
     </div>
+  );
+}
+
+export default function NewListingPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={null}>
+      <NewListingPageContent params={params} />
+    </Suspense>
   );
 }
