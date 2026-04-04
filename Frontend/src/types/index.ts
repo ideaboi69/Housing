@@ -43,6 +43,45 @@ export enum FlagStatus {
   RESOLVED = "resolved",
 }
 
+export type AmenityValue = "yes" | "no" | "unknown";
+export type PetPolicy = "allowed" | "not_allowed" | "case_by_case" | "unknown";
+export type SmokingPolicy = "allowed" | "not_allowed" | "outside_only" | "unknown";
+
+export interface SpaceAmenities {
+  furnished: AmenityValue;
+  utilities_included: AmenityValue;
+  parking: AmenityValue;
+  laundry: AmenityValue;
+  wifi: AmenityValue;
+  air_conditioning: AmenityValue;
+  dishwasher: AmenityValue;
+  balcony: AmenityValue;
+  backyard: AmenityValue;
+  elevator: AmenityValue;
+  gym: AmenityValue;
+  wheelchair_accessible: AmenityValue;
+}
+
+export interface ListingPolicies {
+  pet_policy: PetPolicy;
+  smoking_policy: SmokingPolicy;
+}
+
+export interface ListingTermsSummary {
+  lease_type?: string | null;
+  move_in_date?: string | null;
+  gender_preference?: string | null;
+}
+
+export interface SubletTermsSummary {
+  negotiable_price?: boolean | null;
+  flexible_dates?: boolean | null;
+  roommates_staying?: boolean | null;
+  private_room?: boolean | null;
+  entire_place?: boolean | null;
+  verified_place?: boolean | null;
+}
+
 // ── User ───────────────────────────────────────────────
 
 export interface UserResponse {
@@ -168,12 +207,24 @@ export interface PropertyResponse {
   has_parking: boolean;
   has_laundry: boolean;
   utilities_included: boolean;
+  has_wifi: boolean;
+  has_air_conditioning: boolean;
+  has_dishwasher: boolean;
+  has_gym: boolean;
+  has_elevator: boolean;
+  has_backyard: boolean;
+  has_balcony: boolean;
+  wheelchair_accessible: boolean;
+  pet_policy: PetPolicy;
+  smoking_policy: SmokingPolicy;
   estimated_utility_cost: number;
   distance_to_campus_km: number;
   walk_time_minutes: number;
   drive_time_minutes: number;
   bus_time_minutes: number;
   nearest_bus_route: string;
+  amenities?: SpaceAmenities;
+  policies?: ListingPolicies;
   created_at: string;
   updated_at: string;
 }
@@ -191,6 +242,16 @@ export interface PropertyCreate {
   has_parking?: boolean;
   has_laundry?: boolean;
   utilities_included?: boolean;
+  has_wifi?: boolean;
+  has_air_conditioning?: boolean;
+  has_dishwasher?: boolean;
+  has_gym?: boolean;
+  has_elevator?: boolean;
+  has_backyard?: boolean;
+  has_balcony?: boolean;
+  wheelchair_accessible?: boolean;
+  pet_policy?: PetPolicy;
+  smoking_policy?: SmokingPolicy;
   estimated_utility_cost: number;
   distance_to_campus_km: number;
   walk_time_minutes: number;
@@ -255,11 +316,18 @@ export interface ListingDetailResponse {
   has_balcony?: boolean;
   smoking_allowed?: boolean;
   wheelchair_accessible?: boolean;
+  pet_policy?: PetPolicy;
+  smoking_policy?: SmokingPolicy;
   // ──────────────────────────────────────────────────────────────
   estimated_utility_cost: number | null;
   distance_to_campus_km: number | null;
   walk_time_minutes: number | null;
   bus_time_minutes: number | null;
+  drive_time_minutes?: number | null;
+  nearest_bus_route?: string | null;
+  amenities?: SpaceAmenities;
+  policies?: ListingPolicies;
+  terms?: ListingTermsSummary;
   // landlord info
   landlord_id: number;
   landlord_name: string;
@@ -418,6 +486,16 @@ export interface SubletCreate {
   has_parking?: boolean;
   has_laundry?: boolean;
   utilities_included?: boolean;
+  has_wifi?: boolean;
+  has_air_conditioning?: boolean;
+  has_dishwasher?: boolean;
+  has_gym?: boolean;
+  has_elevator?: boolean;
+  has_backyard?: boolean;
+  has_balcony?: boolean;
+  wheelchair_accessible?: boolean;
+  pet_policy?: PetPolicy;
+  smoking_policy?: SmokingPolicy;
   estimated_utility_cost: number;
   rent_per_month: number;
   sublet_start_date: string;
@@ -447,6 +525,16 @@ export interface SubletResponse {
   has_parking: boolean;
   has_laundry: boolean;
   utilities_included: boolean;
+  has_wifi: boolean;
+  has_air_conditioning: boolean;
+  has_dishwasher: boolean;
+  has_gym: boolean;
+  has_elevator: boolean;
+  has_backyard: boolean;
+  has_balcony: boolean;
+  wheelchair_accessible: boolean;
+  pet_policy: PetPolicy;
+  smoking_policy: SmokingPolicy;
   estimated_utility_cost: number;
   rent_per_month: number;
   sublet_start_date: string;
@@ -458,6 +546,9 @@ export interface SubletResponse {
   description?: string | null;
   images: SubletImageResponse[];
   posted_by: string;
+  amenities?: SpaceAmenities;
+  policies?: ListingPolicies;
+  terms?: SubletTermsSummary;
   created_at: string;
   updated_at: string;
 }
@@ -472,6 +563,12 @@ export interface SubletListResponse {
   room_type: SubletRoomType;
   total_rooms: number;
   is_furnished: boolean;
+  has_parking: boolean;
+  has_laundry: boolean;
+  utilities_included: boolean;
+  has_wifi: boolean;
+  pet_policy: PetPolicy;
+  smoking_policy: SmokingPolicy;
   distance_to_campus_km: number;
   walk_time_minutes: number;
   drive_time_minutes: number;
@@ -481,6 +578,9 @@ export interface SubletListResponse {
   primary_image?: string | null;
   images: SubletImageResponse[];
   posted_by: string;
+  amenities?: SpaceAmenities;
+  policies?: ListingPolicies;
+  terms?: SubletTermsSummary;
   created_at: string;
 }
 

@@ -7,7 +7,7 @@ from tables import Sublet, SubletImage, User, get_db
 from Schemas.subletSchema import SubletCreate, SubletUpdate, SubletResponse, SubletListResponse, SubletImageResponse, SubletStatus, RoomType
 from Schemas.listingSchema import GenderPreference
 from Utils.security import get_current_user
-from helpers import upload_to_s3
+from helpers import build_sublet_list_response, build_sublet_response, upload_to_s3
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from decimal import Decimal
 
@@ -39,6 +39,16 @@ def create_sublet(payload: SubletCreate, db: Session = Depends(get_db), current_
         has_parking=payload.has_parking,
         has_laundry=payload.has_laundry,
         utilities_included=payload.utilities_included,
+        has_wifi=payload.has_wifi,
+        has_air_conditioning=payload.has_air_conditioning,
+        has_dishwasher=payload.has_dishwasher,
+        has_gym=payload.has_gym,
+        has_elevator=payload.has_elevator,
+        has_backyard=payload.has_backyard,
+        has_balcony=payload.has_balcony,
+        wheelchair_accessible=payload.wheelchair_accessible,
+        pet_policy=payload.pet_policy.value if hasattr(payload.pet_policy, "value") else payload.pet_policy,
+        smoking_policy=payload.smoking_policy.value if hasattr(payload.smoking_policy, "value") else payload.smoking_policy,
         estimated_utility_cost=payload.estimated_utility_cost,
         rent_per_month=payload.rent_per_month,
         sublet_start_date=payload.sublet_start_date,
@@ -51,8 +61,7 @@ def create_sublet(payload: SubletCreate, db: Session = Depends(get_db), current_
     db.commit()
     db.refresh(sublet)
 
-    response = SubletResponse.model_validate(sublet)
-    return response
+    return build_sublet_response(sublet)
 
 # upload sublet images
 @sublet_router.post("/{sublet_id}/images", status_code=status.HTTP_201_CREATED)
@@ -129,21 +138,21 @@ def get_all_sublets(
 
     sublets = query.order_by(Sublet.created_at.desc()).all()
     
-    return [SubletListResponse.model_validate(sublet) for sublet in sublets]
+    return [build_sublet_list_response(sublet) for sublet in sublets]
 
 # Get current user's sublets
 @sublet_router.get("/my/listings", response_model=list[SubletListResponse])
 def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
 
-    return [SubletListResponse.model_validate(sublet) for sublet in sublets]
+    return [build_sublet_list_response(sublet) for sublet in sublets]
 
 # Get current user's draft sublet listing
 @sublet_router.get("/drafts/my", response_model=list[SubletListResponse])
 def get_my_draft_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id, Sublet.status == SubletStatus.DRAFT).order_by(Sublet.created_at.desc()).all()
 
-    return [SubletListResponse.model_validate(s) for s in sublets]
+    return [build_sublet_list_response(s) for s in sublets]
 
 # Get a single sublet by ID
 @sublet_router.get("/{sublet_id}", response_model=SubletResponse)
@@ -155,10 +164,7 @@ def get_sublet(sublet_id: int, db: Session = Depends(get_db)):
     sublet.view_count += 1
     db.commit()
 
-    user = db.query(User).filter(User.id == sublet.user_id).first()
-
-    response = SubletResponse.model_validate(sublet)
-    return response
+    return build_sublet_response(sublet)
 
 @sublet_router.patch("/{sublet_id}/publish", response_model=SubletResponse)
 def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
@@ -174,7 +180,7 @@ def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: U
     db.commit()
     db.refresh(sublet)
 
-    return SubletResponse.model_validate(sublet)
+    return build_sublet_response(sublet)
 
 @sublet_router.patch("/{sublet_id}/unpublish", response_model=SubletResponse)
 def unpublish_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -190,7 +196,7 @@ def unpublish_sublet(sublet_id: int, db: Session = Depends(get_db), current_user
     db.commit()
     db.refresh(sublet)
 
-    return SubletResponse.model_validate(sublet)
+    return build_sublet_response(sublet)
 
 # Update a sublet
 @sublet_router.patch("/{sublet_id}", response_model=SubletResponse)
@@ -210,14 +216,14 @@ def update_sublet(sublet_id: int, payload: SubletUpdate, db: Session = Depends(g
         raise HTTPException(status_code=400, detail="End date must be after start date")
 
     for field, value in update_data.items():
+        if hasattr(value, "value"):
+            value = value.value
         setattr(sublet, field, value)
 
     db.commit()
     db.refresh(sublet)
 
-    user = db.query(User).filter(User.id == sublet.user_id).first()
-    response = SubletResponse.model_validate(sublet)
-    return response
+    return build_sublet_response(sublet)
 
 # Delete a sublet
 @sublet_router.delete("/{sublet_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -251,4 +257,3 @@ def delete_sublet_image(sublet_id: int, image_id: int, db: Session = Depends(get
     delete_image_from_cloudinary(image.image_url)
     db.delete(image)
     db.commit()
-

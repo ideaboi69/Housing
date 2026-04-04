@@ -142,6 +142,16 @@ class Property(Base):
     has_parking = Column(Boolean, default=False, nullable=False)
     has_laundry = Column(Boolean, default=False, nullable=False)
     utilities_included = Column(Boolean, default=False, nullable=False)
+    has_wifi = Column(Boolean, default=False, nullable=False)
+    has_air_conditioning = Column(Boolean, default=False, nullable=False)
+    has_dishwasher = Column(Boolean, default=False, nullable=False)
+    has_gym = Column(Boolean, default=False, nullable=False)
+    has_elevator = Column(Boolean, default=False, nullable=False)
+    has_backyard = Column(Boolean, default=False, nullable=False)
+    has_balcony = Column(Boolean, default=False, nullable=False)
+    wheelchair_accessible = Column(Boolean, default=False, nullable=False)
+    pet_policy = Column(String(50), default="unknown", nullable=False)
+    smoking_policy = Column(String(50), default="unknown", nullable=False)
     estimated_utility_cost = Column(Numeric(8, 2), nullable=True)
     distance_to_campus_km = Column(Numeric(5, 2), nullable=True)
     walk_time_minutes = Column(Integer, nullable=False)
@@ -344,6 +354,16 @@ class Sublet(Base):
     has_parking = Column(Boolean, default=False, nullable=False)
     has_laundry = Column(Boolean, default=False, nullable=False)
     utilities_included = Column(Boolean, default=False, nullable=False)
+    has_wifi = Column(Boolean, default=False, nullable=False)
+    has_air_conditioning = Column(Boolean, default=False, nullable=False)
+    has_dishwasher = Column(Boolean, default=False, nullable=False)
+    has_gym = Column(Boolean, default=False, nullable=False)
+    has_elevator = Column(Boolean, default=False, nullable=False)
+    has_backyard = Column(Boolean, default=False, nullable=False)
+    has_balcony = Column(Boolean, default=False, nullable=False)
+    wheelchair_accessible = Column(Boolean, default=False, nullable=False)
+    pet_policy = Column(String(50), default="unknown", nullable=False)
+    smoking_policy = Column(String(50), default="unknown", nullable=False)
     estimated_utility_cost = Column(Numeric(8, 2), nullable=True)
     rent_per_month = Column(Numeric(8, 2), nullable=False)
     sublet_start_date = Column(Date, nullable=False)
@@ -854,6 +874,41 @@ class LandlordInvite(Base):
     creator = relationship("User", foreign_keys=[created_by])
 
 Base.metadata.create_all(engine)
+
+
+def _ensure_runtime_columns() -> None:
+    if engine.dialect.name != "postgresql":
+        return
+
+    statements = [
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_wifi BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_air_conditioning BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_dishwasher BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_gym BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_elevator BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_backyard BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_balcony BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS wheelchair_accessible BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS pet_policy VARCHAR(50) DEFAULT 'unknown' NOT NULL",
+        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS smoking_policy VARCHAR(50) DEFAULT 'unknown' NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_wifi BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_air_conditioning BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_dishwasher BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_gym BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_elevator BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_backyard BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_balcony BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS wheelchair_accessible BOOLEAN DEFAULT FALSE NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS pet_policy VARCHAR(50) DEFAULT 'unknown' NOT NULL",
+        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS smoking_policy VARCHAR(50) DEFAULT 'unknown' NOT NULL",
+    ]
+
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.execute(text(statement))
+
+
+_ensure_runtime_columns()
 
 def get_db():
     db = Local_Session()

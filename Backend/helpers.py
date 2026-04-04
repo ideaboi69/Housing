@@ -13,7 +13,10 @@ from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordVerification
 from Utils.security import get_current_user, decode_access_token
 from fastapi import APIRouter, Depends, HTTPException, status
+from Schemas.featureSchema import AmenityValue, ListingPolicies, ListingTerms, PetPolicy, SmokingPolicy, SpaceAmenities, SubletTerms
 from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse
+from Schemas.propertySchema import PropertyResponse
+from Schemas.subletSchema import SubletListResponse, SubletResponse, SubletImageResponse
 from Utils.cloudinary import delete_image_from_cloudinary
 from Schemas.roommateSchema import *
 from Schemas.viewingSchema import BookingResponse
@@ -228,6 +231,249 @@ def get_property_owned_by(property_id: int, landlord_id: int, db: Session) -> Pr
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own this property")
     return prop
 
+
+def _amenity_value(enabled: bool | None) -> AmenityValue:
+    if enabled is None:
+        return AmenityValue.UNKNOWN
+    return AmenityValue.YES if enabled else AmenityValue.NO
+
+
+def build_space_amenities(
+    *,
+    furnished: bool | None,
+    utilities_included: bool | None,
+    parking: bool | None,
+    laundry: bool | None,
+    wifi: bool | None = None,
+    air_conditioning: bool | None = None,
+    dishwasher: bool | None = None,
+    balcony: bool | None = None,
+    backyard: bool | None = None,
+    elevator: bool | None = None,
+    gym: bool | None = None,
+    wheelchair_accessible: bool | None = None,
+) -> SpaceAmenities:
+    return SpaceAmenities(
+        furnished=_amenity_value(furnished),
+        utilities_included=_amenity_value(utilities_included),
+        parking=_amenity_value(parking),
+        laundry=_amenity_value(laundry),
+        wifi=_amenity_value(wifi),
+        air_conditioning=_amenity_value(air_conditioning),
+        dishwasher=_amenity_value(dishwasher),
+        balcony=_amenity_value(balcony),
+        backyard=_amenity_value(backyard),
+        elevator=_amenity_value(elevator),
+        gym=_amenity_value(gym),
+        wheelchair_accessible=_amenity_value(wheelchair_accessible),
+    )
+
+
+def build_listing_policies(
+    *,
+    pet_policy: PetPolicy | str = PetPolicy.UNKNOWN,
+    smoking_policy: SmokingPolicy | str = SmokingPolicy.UNKNOWN,
+) -> ListingPolicies:
+    if isinstance(pet_policy, str):
+        pet_policy = PetPolicy(pet_policy) if pet_policy in PetPolicy._value2member_map_ else PetPolicy.UNKNOWN
+    if isinstance(smoking_policy, str):
+        smoking_policy = SmokingPolicy(smoking_policy) if smoking_policy in SmokingPolicy._value2member_map_ else SmokingPolicy.UNKNOWN
+    return ListingPolicies(
+        pet_policy=pet_policy,
+        smoking_policy=smoking_policy,
+    )
+
+
+def build_property_response(prop: Property) -> PropertyResponse:
+    return PropertyResponse(
+        id=prop.id,
+        landlord_id=prop.landlord_id,
+        title=prop.title,
+        address=prop.address,
+        postal_code=prop.postal_code,
+        latitude=prop.latitude,
+        longitude=prop.longitude,
+        property_type=prop.property_type,
+        total_rooms=prop.total_rooms,
+        bathrooms=prop.bathrooms,
+        is_furnished=prop.is_furnished,
+        has_parking=prop.has_parking,
+        has_laundry=prop.has_laundry,
+        utilities_included=prop.utilities_included,
+        has_wifi=prop.has_wifi,
+        has_air_conditioning=prop.has_air_conditioning,
+        has_dishwasher=prop.has_dishwasher,
+        has_gym=prop.has_gym,
+        has_elevator=prop.has_elevator,
+        has_backyard=prop.has_backyard,
+        has_balcony=prop.has_balcony,
+        wheelchair_accessible=prop.wheelchair_accessible,
+        pet_policy=prop.pet_policy,
+        smoking_policy=prop.smoking_policy,
+        estimated_utility_cost=prop.estimated_utility_cost,
+        distance_to_campus_km=prop.distance_to_campus_km,
+        walk_time_minutes=prop.walk_time_minutes,
+        drive_time_minutes=prop.drive_time_minutes,
+        bus_time_minutes=prop.bus_time_minutes,
+        nearest_bus_route=prop.nearest_bus_route,
+        amenities=build_space_amenities(
+            furnished=prop.is_furnished,
+            utilities_included=prop.utilities_included,
+            parking=prop.has_parking,
+            laundry=prop.has_laundry,
+            wifi=prop.has_wifi,
+            air_conditioning=prop.has_air_conditioning,
+            dishwasher=prop.has_dishwasher,
+            balcony=prop.has_balcony,
+            backyard=prop.has_backyard,
+            elevator=prop.has_elevator,
+            gym=prop.has_gym,
+            wheelchair_accessible=prop.wheelchair_accessible,
+        ),
+        policies=build_listing_policies(
+            pet_policy=prop.pet_policy,
+            smoking_policy=prop.smoking_policy,
+        ),
+        created_at=prop.created_at,
+        updated_at=prop.updated_at,
+    )
+
+
+def build_sublet_terms(sublet: Sublet) -> SubletTerms:
+    duration_days = None
+    if sublet.sublet_start_date and sublet.sublet_end_date:
+        duration_days = (sublet.sublet_end_date - sublet.sublet_start_date).days
+
+    return SubletTerms(
+        negotiable_price=None,
+        flexible_dates=(duration_days >= 60) if duration_days is not None else None,
+        roommates_staying=None,
+        private_room=(
+            sublet.room_type == "private"
+            or getattr(sublet.room_type, "value", None) == "private"
+        ),
+        entire_place=(sublet.total_rooms == 1 and (
+            sublet.room_type == "private"
+            or getattr(sublet.room_type, "value", None) == "private"
+        )),
+        verified_place=None,
+    )
+
+
+def build_sublet_response(sublet: Sublet) -> SubletResponse:
+    return SubletResponse(
+        id=sublet.id,
+        user_id=sublet.user_id,
+        title=sublet.title,
+        address=sublet.address,
+        postal_code=sublet.postal_code,
+        latitude=sublet.latitude,
+        longitude=sublet.longitude,
+        distance_to_campus_km=sublet.distance_to_campus_km,
+        walk_time_minutes=sublet.walk_time_minutes,
+        drive_time_minutes=sublet.drive_time_minutes,
+        bus_time_minutes=sublet.bus_time_minutes,
+        nearest_bus_route=sublet.nearest_bus_route,
+        room_type=sublet.room_type,
+        total_rooms=sublet.total_rooms,
+        bathrooms=sublet.bathrooms,
+        is_furnished=sublet.is_furnished,
+        has_parking=sublet.has_parking,
+        has_laundry=sublet.has_laundry,
+        utilities_included=sublet.utilities_included,
+        has_wifi=sublet.has_wifi,
+        has_air_conditioning=sublet.has_air_conditioning,
+        has_dishwasher=sublet.has_dishwasher,
+        has_gym=sublet.has_gym,
+        has_elevator=sublet.has_elevator,
+        has_backyard=sublet.has_backyard,
+        has_balcony=sublet.has_balcony,
+        wheelchair_accessible=sublet.wheelchair_accessible,
+        pet_policy=sublet.pet_policy,
+        smoking_policy=sublet.smoking_policy,
+        estimated_utility_cost=sublet.estimated_utility_cost,
+        rent_per_month=sublet.rent_per_month,
+        sublet_start_date=sublet.sublet_start_date,
+        sublet_end_date=sublet.sublet_end_date,
+        move_in_date=sublet.move_in_date,
+        gender_preference=sublet.gender_preference,
+        status=sublet.status,
+        view_count=sublet.view_count,
+        description=sublet.description,
+        images=[SubletImageResponse.model_validate(img) for img in sublet.images],
+        posted_by=sublet.posted_by,
+        amenities=build_space_amenities(
+            furnished=sublet.is_furnished,
+            utilities_included=sublet.utilities_included,
+            parking=sublet.has_parking,
+            laundry=sublet.has_laundry,
+            wifi=sublet.has_wifi,
+            air_conditioning=sublet.has_air_conditioning,
+            dishwasher=sublet.has_dishwasher,
+            balcony=sublet.has_balcony,
+            backyard=sublet.has_backyard,
+            elevator=sublet.has_elevator,
+            gym=sublet.has_gym,
+            wheelchair_accessible=sublet.wheelchair_accessible,
+        ),
+        policies=build_listing_policies(
+            pet_policy=sublet.pet_policy,
+            smoking_policy=sublet.smoking_policy,
+        ),
+        terms=build_sublet_terms(sublet),
+        created_at=sublet.created_at,
+        updated_at=sublet.updated_at,
+    )
+
+
+def build_sublet_list_response(sublet: Sublet) -> SubletListResponse:
+    return SubletListResponse(
+        id=sublet.id,
+        title=sublet.title,
+        address=sublet.address,
+        rent_per_month=sublet.rent_per_month,
+        sublet_start_date=sublet.sublet_start_date,
+        sublet_end_date=sublet.sublet_end_date,
+        room_type=sublet.room_type,
+        total_rooms=sublet.total_rooms,
+        is_furnished=sublet.is_furnished,
+        has_parking=sublet.has_parking,
+        has_laundry=sublet.has_laundry,
+        utilities_included=sublet.utilities_included,
+        has_wifi=sublet.has_wifi,
+        pet_policy=sublet.pet_policy,
+        smoking_policy=sublet.smoking_policy,
+        distance_to_campus_km=sublet.distance_to_campus_km,
+        walk_time_minutes=sublet.walk_time_minutes,
+        drive_time_minutes=sublet.drive_time_minutes,
+        bus_time_minutes=sublet.bus_time_minutes,
+        nearest_bus_route=sublet.nearest_bus_route,
+        status=sublet.status,
+        primary_image=sublet.primary_image,
+        images=[SubletImageResponse.model_validate(img) for img in sublet.images],
+        posted_by=sublet.posted_by,
+        amenities=build_space_amenities(
+            furnished=sublet.is_furnished,
+            utilities_included=sublet.utilities_included,
+            parking=sublet.has_parking,
+            laundry=sublet.has_laundry,
+            wifi=sublet.has_wifi,
+            air_conditioning=sublet.has_air_conditioning,
+            dishwasher=sublet.has_dishwasher,
+            balcony=sublet.has_balcony,
+            backyard=sublet.has_backyard,
+            elevator=sublet.has_elevator,
+            gym=sublet.has_gym,
+            wheelchair_accessible=sublet.wheelchair_accessible,
+        ),
+        policies=build_listing_policies(
+            pet_policy=sublet.pet_policy,
+            smoking_policy=sublet.smoking_policy,
+        ),
+        terms=build_sublet_terms(sublet),
+        created_at=sublet.created_at,
+    )
+
 # Listing Helpers
 def get_landlord_for_user(user: User, db: Session) -> Landlord:
     landlord = db.query(Landlord).filter(Landlord.id == user.id).first()
@@ -249,16 +495,23 @@ def get_listing_owned_by(listing_id: int, landlord_id: int, db: Session) -> List
 
 def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -> ListingDetailResponse:
     """Build a full listing detail response with property and landlord info."""
+    lease_type = listing.lease_type if isinstance(listing.lease_type, str) else listing.lease_type.value
+    gender_preference = (
+        listing.gender_preference
+        if isinstance(listing.gender_preference, str)
+        else (listing.gender_preference.value if listing.gender_preference else None)
+    )
+
     return ListingDetailResponse(
         id=listing.id,
         rent_per_room=listing.rent_per_room,
         rent_total=listing.rent_total,
-        lease_type=listing.lease_type if isinstance(listing.lease_type, str) else listing.lease_type.value,
+        lease_type=lease_type,
         move_in_date=listing.move_in_date,
         is_sublet=listing.is_sublet,
         sublet_start_date=listing.sublet_start_date,
         sublet_end_date=listing.sublet_end_date,
-        gender_preference=listing.gender_preference if isinstance(listing.gender_preference, str) else (listing.gender_preference.value if listing.gender_preference else None),
+        gender_preference=gender_preference,
         status=listing.status if isinstance(listing.status, str) else listing.status.value,
         view_count=listing.view_count,
         images=[ListingImageResponse.model_validate(img) for img in listing.images],
@@ -275,12 +528,47 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         has_parking=prop.has_parking,
         has_laundry=prop.has_laundry,
         utilities_included=prop.utilities_included,
+        pet_friendly=prop.pet_policy in (PetPolicy.ALLOWED.value, PetPolicy.CASE_BY_CASE.value),
+        has_air_conditioning=prop.has_air_conditioning,
+        has_wifi=prop.has_wifi,
+        has_dishwasher=prop.has_dishwasher,
+        has_gym=prop.has_gym,
+        has_elevator=prop.has_elevator,
+        has_backyard=prop.has_backyard,
+        has_balcony=prop.has_balcony,
+        smoking_allowed=prop.smoking_policy in (SmokingPolicy.ALLOWED.value, SmokingPolicy.OUTSIDE_ONLY.value),
+        wheelchair_accessible=prop.wheelchair_accessible,
+        pet_policy=prop.pet_policy,
+        smoking_policy=prop.smoking_policy,
         estimated_utility_cost=prop.estimated_utility_cost,
         distance_to_campus_km=prop.distance_to_campus_km,
         walk_time_minutes=prop.walk_time_minutes,
         drive_time_minutes=prop.drive_time_minutes,
         bus_time_minutes=prop.bus_time_minutes,
         nearest_bus_route=prop.nearest_bus_route,
+        amenities=build_space_amenities(
+            furnished=prop.is_furnished,
+            utilities_included=prop.utilities_included,
+            parking=prop.has_parking,
+            laundry=prop.has_laundry,
+            wifi=prop.has_wifi,
+            air_conditioning=prop.has_air_conditioning,
+            dishwasher=prop.has_dishwasher,
+            balcony=prop.has_balcony,
+            backyard=prop.has_backyard,
+            elevator=prop.has_elevator,
+            gym=prop.has_gym,
+            wheelchair_accessible=prop.wheelchair_accessible,
+        ),
+        policies=build_listing_policies(
+            pet_policy=prop.pet_policy,
+            smoking_policy=prop.smoking_policy,
+        ),
+        terms=ListingTerms(
+            lease_type=lease_type,
+            move_in_date=listing.move_in_date,
+            gender_preference=gender_preference,
+        ),
         landlord_id=landlord.id,
         landlord_name=f"{landlord.first_name} {landlord.last_name}",
         landlord_verified=landlord.identity_verified,

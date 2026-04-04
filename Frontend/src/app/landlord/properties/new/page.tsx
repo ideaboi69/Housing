@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { getLandlordClaimCode, setLandlordClaimCode, setLandlordClaimState } from "@/lib/landlord-claim";
+import type { PetPolicy, SmokingPolicy } from "@/types";
 import { PropertyType } from "@/types";
 import { ArrowLeft, MapPin, Home, Check } from "lucide-react";
 
@@ -14,6 +15,20 @@ const propertyTypes = [
   { value: PropertyType.APARTMENT, label: "Apartment", emoji: "🏢" },
   { value: PropertyType.TOWNHOUSE, label: "Townhouse", emoji: "🏘️" },
   { value: PropertyType.ROOM, label: "Single Room", emoji: "🚪" },
+];
+
+const PET_POLICY_OPTIONS: { value: PetPolicy; label: string }[] = [
+  { value: "allowed", label: "Allowed" },
+  { value: "not_allowed", label: "Not allowed" },
+  { value: "case_by_case", label: "Case by case" },
+  { value: "unknown", label: "Not specified" },
+];
+
+const SMOKING_POLICY_OPTIONS: { value: SmokingPolicy; label: string }[] = [
+  { value: "not_allowed", label: "Not allowed" },
+  { value: "outside_only", label: "Outside only" },
+  { value: "allowed", label: "Allowed" },
+  { value: "unknown", label: "Not specified" },
 ];
 
 function NewPropertyPageContent() {
@@ -35,6 +50,16 @@ function NewPropertyPageContent() {
     has_parking: false,
     has_laundry: false,
     utilities_included: false,
+    has_wifi: false,
+    has_air_conditioning: false,
+    has_dishwasher: false,
+    has_gym: false,
+    has_elevator: false,
+    has_backyard: false,
+    has_balcony: false,
+    wheelchair_accessible: false,
+    pet_policy: "unknown" as PetPolicy,
+    smoking_policy: "unknown" as SmokingPolicy,
     estimated_utility_cost: "",
     distance_to_campus_km: "",
     walk_time_minutes: "",
@@ -80,6 +105,16 @@ function NewPropertyPageContent() {
         has_parking: form.has_parking,
         has_laundry: form.has_laundry,
         utilities_included: form.utilities_included,
+        has_wifi: form.has_wifi,
+        has_air_conditioning: form.has_air_conditioning,
+        has_dishwasher: form.has_dishwasher,
+        has_gym: form.has_gym,
+        has_elevator: form.has_elevator,
+        has_backyard: form.has_backyard,
+        has_balcony: form.has_balcony,
+        wheelchair_accessible: form.wheelchair_accessible,
+        pet_policy: form.pet_policy,
+        smoking_policy: form.smoking_policy,
         estimated_utility_cost: form.estimated_utility_cost ? Number(form.estimated_utility_cost) : 0,
         distance_to_campus_km: form.distance_to_campus_km ? Number(form.distance_to_campus_km) : 0,
         walk_time_minutes: form.walk_time_minutes ? Number(form.walk_time_minutes) : 0,
@@ -277,6 +312,14 @@ function NewPropertyPageContent() {
                 { key: "has_parking" as const, label: "Parking", emoji: "🅿️" },
                 { key: "has_laundry" as const, label: "In-unit Laundry", emoji: "🧺" },
                 { key: "utilities_included" as const, label: "Utilities Included", emoji: "💡" },
+                { key: "has_wifi" as const, label: "WiFi Included", emoji: "📶" },
+                { key: "has_air_conditioning" as const, label: "Air Conditioning", emoji: "❄️" },
+                { key: "has_dishwasher" as const, label: "Dishwasher", emoji: "🍽️" },
+                { key: "has_gym" as const, label: "Gym", emoji: "🏋️" },
+                { key: "has_elevator" as const, label: "Elevator", emoji: "🛗" },
+                { key: "has_backyard" as const, label: "Backyard", emoji: "🌿" },
+                { key: "has_balcony" as const, label: "Balcony", emoji: "☀️" },
+                { key: "wheelchair_accessible" as const, label: "Accessible", emoji: "♿" },
               ].map((amenity) => (
                 <button
                   key={amenity.key}
@@ -320,6 +363,50 @@ function NewPropertyPageContent() {
                 </div>
               </div>
             )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "13px", fontWeight: 600 }}>Pets</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PET_POLICY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => update("pet_policy", option.value)}
+                      className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
+                        form.pet_policy === option.value
+                          ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]"
+                          : "border-black/[0.06] text-[#1B2D45]/55 hover:border-[#FF6B35]/15"
+                      }`}
+                      style={{ fontSize: "12px", fontWeight: 600 }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "13px", fontWeight: 600 }}>Smoking</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SMOKING_POLICY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => update("smoking_policy", option.value)}
+                      className={`px-3 py-2.5 rounded-xl border text-left transition-all ${
+                        form.smoking_policy === option.value
+                          ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]"
+                          : "border-black/[0.06] text-[#1B2D45]/55 hover:border-[#FF6B35]/15"
+                      }`}
+                      style={{ fontSize: "12px", fontWeight: 600 }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Location & Transit */}

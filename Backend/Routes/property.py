@@ -5,7 +5,7 @@ from Schemas.propertySchema import PropertyCreate, PropertyUpdate, PropertyRespo
 from Schemas.userSchema import UserRole
 from Utils.security import get_current_user
 from Utils.cloudinary import delete_image_from_cloudinary
-from helpers import require_landlord, get_landlord_for_user, get_property_owned_by
+from helpers import build_property_response, require_landlord, get_landlord_for_user, get_property_owned_by
 
 property_router = APIRouter()
 
@@ -28,6 +28,16 @@ def create_property(payload: PropertyCreate, db: Session = Depends(get_db), curr
         has_parking=payload.has_parking,
         has_laundry=payload.has_laundry,
         utilities_included=payload.utilities_included,
+        has_wifi=payload.has_wifi,
+        has_air_conditioning=payload.has_air_conditioning,
+        has_dishwasher=payload.has_dishwasher,
+        has_gym=payload.has_gym,
+        has_elevator=payload.has_elevator,
+        has_backyard=payload.has_backyard,
+        has_balcony=payload.has_balcony,
+        wheelchair_accessible=payload.wheelchair_accessible,
+        pet_policy=payload.pet_policy.value if hasattr(payload.pet_policy, "value") else payload.pet_policy,
+        smoking_policy=payload.smoking_policy.value if hasattr(payload.smoking_policy, "value") else payload.smoking_policy,
         estimated_utility_cost=payload.estimated_utility_cost,
         distance_to_campus_km=payload.distance_to_campus_km,
         walk_time_minutes=payload.walk_time_minutes,
@@ -39,20 +49,20 @@ def create_property(payload: PropertyCreate, db: Session = Depends(get_db), curr
     db.commit()
     db.refresh(prop)
 
-    return PropertyResponse.model_validate(prop)
+    return build_property_response(prop)
 
 # Browse Properties (public)
 @property_router.get("/", response_model=list[PropertyResponse])
 def list_properties(db: Session = Depends(get_db)):
     properties = db.query(Property).all()
-    return [PropertyResponse.model_validate(p) for p in properties]
+    return [build_property_response(p) for p in properties]
 
 # My Properties (landlord views their own)
 @property_router.get("/me/all", response_model=list[PropertyResponse])
 def list_my_properties(db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
     landlord = get_landlord_for_user(current_user, db)
     properties = db.query(Property).filter(Property.landlord_id == landlord.id).all()
-    return [PropertyResponse.model_validate(p) for p in properties]
+    return [build_property_response(p) for p in properties]
 
 # Browse Specific Properties (public)
 @property_router.get("/{property_id}", response_model=PropertyResponse)
@@ -61,7 +71,7 @@ def get_property(property_id: int, db: Session = Depends(get_db)):
     if not prop:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
-    return PropertyResponse.model_validate(prop)
+    return build_property_response(prop)
 
 # Update Properties (landlord only, must own it)
 @property_router.patch("/{property_id}", response_model=PropertyResponse)
@@ -71,12 +81,14 @@ def update_property(property_id: int, payload: PropertyUpdate, db: Session = Dep
 
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
+        if hasattr(value, "value"):
+            value = value.value
         setattr(prop, field, value)
 
     db.commit()
     db.refresh(prop)
 
-    return PropertyResponse.model_validate(prop)
+    return build_property_response(prop)
 
 # Delete Properties (landlord only, must own it). Cascades: listings → images, scores, saves, flags + reviews
 @property_router.delete("/{property_id}", status_code=status.HTTP_204_NO_CONTENT)

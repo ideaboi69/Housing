@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 from decimal import Decimal
 import enum
+from Schemas.featureSchema import ListingPolicies, ListingTerms, SpaceAmenities
 
 # Enum
 class LeaseType(str, enum.Enum):
@@ -108,10 +109,27 @@ class ListingDetailResponse(BaseModel):
     has_parking: bool
     has_laundry: bool
     utilities_included: bool
+    pet_friendly: Optional[bool] = None
+    has_air_conditioning: Optional[bool] = None
+    has_wifi: Optional[bool] = None
+    has_dishwasher: Optional[bool] = None
+    has_gym: Optional[bool] = None
+    has_elevator: Optional[bool] = None
+    has_backyard: Optional[bool] = None
+    has_balcony: Optional[bool] = None
+    smoking_allowed: Optional[bool] = None
+    wheelchair_accessible: Optional[bool] = None
+    pet_policy: Optional[str] = None
+    smoking_policy: Optional[str] = None
     estimated_utility_cost: Optional[Decimal] = None
     distance_to_campus_km: Optional[Decimal] = None
     walk_time_minutes: Optional[int] = None
     bus_time_minutes: Optional[int] = None
+    drive_time_minutes: Optional[int] = None
+    nearest_bus_route: Optional[str] = None
+    amenities: SpaceAmenities
+    policies: ListingPolicies
+    terms: ListingTerms
     # landlord info
     landlord_id: int
     landlord_name: str

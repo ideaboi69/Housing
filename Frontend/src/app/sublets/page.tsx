@@ -1911,7 +1911,6 @@ export default function SubletsPage() {
   const isMobile = useIsMobile();
   const user = useAuthStore((s) => s.user);
   const [hydrated, setHydrated] = useState(false);
-  const [showListForm, setShowListForm] = useState(false);
   const [listings, setListings] = useState<SubletListing[]>(subletListings);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState<[number, number]>([4, 6]); // May-Jul default (summer feel)
@@ -1922,17 +1921,14 @@ export default function SubletsPage() {
   const [showPicksSheet, setShowPicksSheet] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const isLandlord = user?.role === "landlord";
+  const router = useRouter();
 
   const handleListClick = () => {
     if (isLandlord) {
       toast.info("Sublet posting is only available for student accounts.");
       return;
     }
-    setShowListForm((prev) => !prev);
-  };
-  const handleSubletCreated = (listing: SubletListing) => {
-    setListings((prev) => [listing, ...prev]);
-    setViewMode("board");
+    router.push("/sublets/create");
   };
   const proximityFilterKeys = PROXIMITY_FILTER_OPTIONS.map((option) => option.key);
 
@@ -2005,12 +2001,6 @@ export default function SubletsPage() {
       <SummerBanner />
       <SubletHero onListClick={handleListClick} canList={!isLandlord} />
       <InsightStats />
-      <ListSubletForm
-        visible={showListForm}
-        selectedRange={selectedRange}
-        onCreated={handleSubletCreated}
-        onClose={() => setShowListForm(false)}
-      />
       <DateRangeSelector selectedRange={selectedRange} onChange={setSelectedRange} />
       <SearchAndFilters
         onSearchChange={setSearchQuery}
