@@ -80,7 +80,7 @@ def send_message( conversation_id: int, payload: MessageCreate, background_tasks
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Determine sender type and verify access
-    if isinstance(current_user,landlord) and conversation.landlord_id == current_user.id:
+    if isinstance(current_user,Landlord) and conversation.landlord_id == current_user.id:
         sender_type = SenderType.LANDLORD
     elif conversation.user_id == current_user.id:
         sender_type = SenderType.STUDENT
