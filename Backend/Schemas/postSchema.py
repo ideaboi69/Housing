@@ -52,6 +52,8 @@ class PostResponse(BaseModel):
     author_type: str
     status: PostStatus
     view_count: int
+    upvote_count: int = 0
+    user_has_upvoted: bool = False
     event_date: Optional[date] = None
     event_location: Optional[str] = None
     event_link: Optional[str] = None
@@ -66,6 +68,7 @@ class PostListResponse(BaseModel):
     id: int
     title: str
     slug: str
+    content: str
     preview: Optional[str] = None
     cover_image_url: Optional[str] = None
     category: PostCategory
@@ -73,6 +76,8 @@ class PostListResponse(BaseModel):
     author_type: str
     status: PostStatus
     view_count: int
+    upvote_count: int = 0
+    user_has_upvoted: bool = False
     event_date: Optional[date] = None
     deal_expires: Optional[date] = None
     created_at: datetime

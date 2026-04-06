@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from typing import Optional
-from tables import get_db, Post, User, Writer
+from tables import get_db, Post, User, Writer, PostVote
 from Schemas.postSchema import PostCreate, PostUpdate, PostResponse, PostListResponse, PostCategory, PostStatus
 from Utils.security import get_current_user, get_current_author
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
@@ -179,6 +179,37 @@ def get_posts_by_writer(writer_id: int, db: Session = Depends(get_db)):
     posts = db.query(Post).filter(Post.writer_id == writer_id, Post.status == PostStatus.PUBLISHED).order_by(Post.created_at.desc()).all()
 
     return [PostListResponse.model_validate(p) for p in posts]
+
+# Upvote a post
+@post_router.post("/{post_id}/upvote", status_code=status.HTTP_201_CREATED)
+def upvote_post(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    post = db.query(Post).filter(Post.id == post_id, Post.status == PostStatus.PUBLISHED).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    existing = db.query(PostVote).filter(PostVote.post_id == post_id, PostVote.user_id == current_user.id).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Already upvoted")
+
+    vote = PostVote(post_id=post_id, user_id=current_user.id)
+    db.add(vote)
+    db.commit()
+
+    count = db.query(func.count(PostVote.id)).filter(PostVote.post_id == post_id).scalar()
+    return {"post_id": post_id, "upvote_count": count, "user_has_upvoted": True}
+
+# Remove upvote
+@post_router.delete("/{post_id}/upvote", status_code=status.HTTP_200_OK)
+def remove_upvote(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    vote = db.query(PostVote).filter(PostVote.post_id == post_id, PostVote.user_id == current_user.id).first()
+    if not vote:
+        raise HTTPException(status_code=404, detail="You haven't upvoted this post")
+
+    db.delete(vote)
+    db.commit()
+
+    count = db.query(func.count(PostVote.id)).filter(PostVote.post_id == post_id).scalar()
+    return {"post_id": post_id, "upvote_count": count, "user_has_upvoted": False}
 
 # Get post by slug (public)
 @post_router.get("/{slug}", response_model=PostResponse)

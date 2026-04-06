@@ -212,7 +212,7 @@ def get_landlord_conversations( db: Session = Depends(get_db), landlord: Landlor
         unread_count = db.query(func.count(Message.id)).filter(
             and_(
                 Message.conversation_id == conv.id,
-                Message.sender_type == "user",
+                Message.sender_type == SenderType.STUDENT,
                 Message.is_read == False,
             )).scalar()
 

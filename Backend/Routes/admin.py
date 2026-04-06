@@ -345,7 +345,14 @@ def delete_landlord(landlord_id: int, db: Session = Depends(get_db), admin: User
 @admin_router.get("/listings", response_model=list[AdminListingResponse])
 def list_all_listings(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     listings = db.query(Listing).all()
-    return [AdminListingResponse.model_validate(l) for l in listings]
+    results = []
+    for l in listings:
+        data = AdminListingResponse.model_validate(l)
+        if l.property:
+            data.property_title = l.property.title
+            data.address = l.property.address
+        results.append(data)
+    return results
 
 @admin_router.delete("/listings/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_listing(listing_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
@@ -397,14 +404,29 @@ def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(requ
         else:
             flag_type = "unknown"
  
+        flagged_title = None
+        if f.listing_id and f.listing:
+            flagged_title = f.listing.property.title if f.listing.property else f"Listing #{f.listing_id}"
+        elif f.review_id and f.review:
+            flagged_title = f"Review on property #{f.review.property_id}"
+        elif f.marketplace_item_id and f.marketplace_item:
+            flagged_title = f.marketplace_item.title
+        elif f.sublet_id and f.sublet:
+            flagged_title = f.sublet.title
+
+        reporter = db.query(User).filter(User.id == f.reporter_id).first()
+        reporter_name = f"{reporter.first_name} {reporter.last_name}" if reporter else f"User #{f.reporter_id}"
+
         results.append({
             "id": f.id,
             "reporter_id": f.reporter_id,
+            "reporter_name": reporter_name,
             "flag_type": flag_type,
             "listing_id": f.listing_id,
             "review_id": f.review_id,
             "marketplace_item_id": f.marketplace_item_id,
             "sublet_id": f.sublet_id,
+            "flagged_title": flagged_title,
             "reason": f.reason,
             "status": f.status.value if hasattr(f.status, "value") else f.status,
             "created_at": str(f.created_at),
@@ -524,7 +546,7 @@ def delete_writer(writer_id: int, db: Session = Depends(get_db), admin: Admin = 
 @admin_router.get("/posts", response_model=list[PostListResponse])
 def list_all_posts(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     posts = db.query(Post).order_by(Post.created_at.desc()).all()
-    return [PostListResponse.model_validate(p) for p in posts]
+    return [PostResponse.model_validate(p) for p in posts]
 
 @admin_router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 def admin_delete_post(post_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):

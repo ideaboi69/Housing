@@ -5,7 +5,7 @@ from typing import Optional
 from tables import *
 from Schemas.roommateSchema import *
 from helpers import *
-from Utils.security import get_current_user
+from Utils.security import get_current_student
 from Utils.roommate import build_group_card, build_group_detail, build_invite_response, build_listing_detail, build_request_response
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 
@@ -15,7 +15,7 @@ REQUIRED_FIELDS = ["first_name", "last_name", "program", "year"]
 
 # Profile check (popup flow)
 @roommate_router.get("/profile-check", response_model=ProfileCompletionCheck)
-def check_profile_completion(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def check_profile_completion(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     fields = {
         "first_name": current_user.first_name,
         "last_name": current_user.last_name,
@@ -47,7 +47,7 @@ def check_profile_completion(db: Session = Depends(get_db), current_user: User =
     )
 
 @roommate_router.patch("/complete-profile", response_model=ProfileCompletionCheck)
-def complete_profile_for_roommates(payload: ProfileCompletionSubmit, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def complete_profile_for_roommates(payload: ProfileCompletionSubmit, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     update_data = payload.model_dump(exclude_unset=True)
 
     if "year" in update_data and update_data["year"]:
@@ -88,7 +88,7 @@ def complete_profile_for_roommates(payload: ProfileCompletionSubmit, db: Session
 
 # Quiz
 @roommate_router.post("/quiz", response_model=RoommateProfileResponse, status_code=status.HTTP_201_CREATED)
-def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     if not current_user.year or not current_user.program:
         raise HTTPException(
             status_code=400,
@@ -115,16 +115,23 @@ def submit_quiz(payload: QuizSubmit, db: Session = Depends(get_db), current_user
     return RoommateProfileResponse.model_validate(profile)
 
 @roommate_router.get("/quiz/me", response_model=RoommateProfileResponse)
-def get_my_quiz(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_quiz(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id).first()
 
     if not profile:
-        raise HTTPException(status_code=404, detail="Take the quiz first")
+        return RoommateProfileResponse(
+            id=0,
+            user_id=current_user.id,
+            is_visible=True,
+            quiz_completed=False,
+            lifestyle_tags=[],
+            created_at=current_user.created_at,
+        )
 
     return RoommateProfileResponse.model_validate(profile)
 
 @roommate_router.patch("/visibility")
-def toggle_visibility(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def toggle_visibility(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id).first()
 
     if not profile:
@@ -137,7 +144,7 @@ def toggle_visibility(db: Session = Depends(get_db), current_user: User = Depend
 
 # Groups
 @roommate_router.post("/groups", response_model=GroupDetailResponse, status_code=status.HTTP_201_CREATED)
-def create_group(payload: GroupCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_group(payload: GroupCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id,RoommateProfile.quiz_completed == True).first()
 
     if not profile:
@@ -177,7 +184,7 @@ def create_group(payload: GroupCreate, db: Session = Depends(get_db), current_us
     return build_group_detail(group, db)
 
 @roommate_router.patch("/groups/{group_id}", response_model=GroupDetailResponse)
-def update_group(group_id: int, payload: GroupUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_group(group_id: int, payload: GroupUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
 
     if not group:
@@ -198,7 +205,7 @@ def update_group(group_id: int, payload: GroupUpdate, db: Session = Depends(get_
     return build_group_detail(group, db)
 
 @roommate_router.delete("/groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_group(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_group(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
 
     if not group:
@@ -211,7 +218,7 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
  
 # Upload group photo (owner only)
 @roommate_router.post("/groups/{group_id}/photo", status_code=status.HTTP_200_OK)
-async def upload_group_photo(group_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def upload_group_photo(group_id: int, file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found or not yours")
@@ -230,7 +237,7 @@ async def upload_group_photo(group_id: int, file: UploadFile = File(...), db: Se
  
 # Delete group photo (owner only)
 @roommate_router.delete("/groups/{group_id}/photo", status_code=status.HTTP_200_OK)
-def delete_group_photo(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_group_photo(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found or not yours")
@@ -245,7 +252,7 @@ def delete_group_photo(group_id: int, db: Session = Depends(get_db), current_use
     return {"message": "Group photo removed"}
 
 @roommate_router.get("/groups/my/group", response_model=GroupDetailResponse)
-def get_my_group(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_group(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.owner_id == current_user.id, RoommateGroup.is_active == True).first()
 
     if not group:
@@ -260,7 +267,7 @@ def browse_groups(
     max_rent: Optional[float] = Query(None),
     has_place: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_student),
 ):
     profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id, RoommateProfile.quiz_completed == True).first()
 
@@ -296,7 +303,7 @@ def browse_groups(
     return results
 
 @roommate_router.get("/groups/{group_id}", response_model=GroupDetailResponse)
-def get_group(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_group(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
@@ -305,7 +312,7 @@ def get_group(group_id: int, db: Session = Depends(get_db), current_user: User =
 
 # Individuals
 @roommate_router.get("/individuals", response_model=list[IndividualCardResponse])
-def browse_individuals(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def browse_individuals(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     my_profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id, RoommateProfile.quiz_completed == True).first()
 
     if not my_profile:
@@ -355,7 +362,7 @@ def search_individuals(
     pets: Optional[PetPreference] = Query(None),
     gender_pref: Optional[GenderHousingPref] = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_student),
 ):
     my_profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id, RoommateProfile.quiz_completed == True).first()
 
@@ -424,7 +431,7 @@ def search_individuals(
 
 # Invites
 @roommate_router.post("/invites", response_model=InviteResponse, status_code=status.HTTP_201_CREATED)
-def send_invite(payload: InviteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def send_invite(payload: InviteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.owner_id == current_user.id, RoommateGroup.is_active == True).first()
 
     if not group:
@@ -467,7 +474,7 @@ def send_invite(payload: InviteCreate, db: Session = Depends(get_db), current_us
     return build_invite_response(invite, db)
 
 @roommate_router.patch("/invites/{invite_id}/accept", response_model=InviteResponse)
-def accept_invite(invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def accept_invite(invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     invite = db.query(RoommateInvite).filter(
         RoommateInvite.id == invite_id,
         RoommateInvite.invited_user_id == current_user.id,
@@ -502,7 +509,7 @@ def accept_invite(invite_id: int, db: Session = Depends(get_db), current_user: U
     return build_invite_response(invite, db)
 
 @roommate_router.patch("/invites/{invite_id}/decline", response_model=InviteResponse)
-def decline_invite(invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def decline_invite(invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     invite = db.query(RoommateInvite).filter(
         RoommateInvite.id == invite_id,
         RoommateInvite.invited_user_id == current_user.id,
@@ -519,12 +526,12 @@ def decline_invite(invite_id: int, db: Session = Depends(get_db), current_user: 
     return build_invite_response(invite, db)
 
 @roommate_router.get("/invites/received", response_model=list[InviteResponse])
-def get_my_invites(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_invites(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     invites = db.query(RoommateInvite).filter(RoommateInvite.invited_user_id == current_user.id).order_by(RoommateInvite.created_at.desc()).all()
     return [build_invite_response(inv, db) for inv in invites]
 
 @roommate_router.get("/invites/sent", response_model=list[InviteResponse])
-def get_sent_invites(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_sent_invites(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.owner_id == current_user.id, RoommateGroup.is_active == True).first()
 
     if not group:
@@ -536,7 +543,7 @@ def get_sent_invites(db: Session = Depends(get_db), current_user: User = Depends
 
 # Requests
 @roommate_router.post("/requests", response_model=RequestResponse, status_code=status.HTTP_201_CREATED)
-def send_request(payload: RequestCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def send_request(payload: RequestCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id, RoommateProfile.quiz_completed == True).first()
 
     if not profile:
@@ -574,7 +581,7 @@ def send_request(payload: RequestCreate, db: Session = Depends(get_db), current_
     return build_request_response(request, db)
 
 @roommate_router.patch("/requests/{request_id}/accept", response_model=RequestResponse)
-def accept_request(request_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def accept_request(request_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     req = db.query(RoommateRequest).filter(RoommateRequest.id == request_id, RoommateRequest.status == RequestStatus.PENDING).first()
 
     if not req:
@@ -608,7 +615,7 @@ def accept_request(request_id: int, db: Session = Depends(get_db), current_user:
     return build_request_response(req, db)
 
 @roommate_router.patch("/requests/{request_id}/decline", response_model=RequestResponse)
-def decline_request(request_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
+def decline_request(request_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_student)):
     req = db.query(RoommateRequest).filter(RoommateRequest.id == request_id, RoommateRequest.status == RequestStatus.PENDING).first()
 
     if not req:
@@ -625,7 +632,7 @@ def decline_request(request_id: int, db: Session = Depends(get_db),current_user:
     return build_request_response(req, db)
 
 @roommate_router.get("/requests/received", response_model=list[RequestResponse])
-def get_group_requests(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_group_requests(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.owner_id == current_user.id, RoommateGroup.is_active == True).first()
 
     if not group:
@@ -636,14 +643,14 @@ def get_group_requests(db: Session = Depends(get_db), current_user: User = Depen
     return [build_request_response(req, db) for req in requests]
 
 @roommate_router.get("/requests/sent", response_model=list[RequestResponse])
-def get_my_sent_requests(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_sent_requests(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     requests = db.query(RoommateRequest).filter(RoommateRequest.user_id == current_user.id).order_by(RoommateRequest.created_at.desc()).all()
 
     return [build_request_response(req, db) for req in requests]
 
 # Member management
 @roommate_router.delete("/groups/{group_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def remove_member(group_id: int, user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def remove_member(group_id: int, user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
 
     if not group:
@@ -665,7 +672,7 @@ def remove_member(group_id: int, user_id: int, db: Session = Depends(get_db), cu
     db.commit()
 
 @roommate_router.delete("/groups/{group_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
-def leave_group(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def leave_group(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")

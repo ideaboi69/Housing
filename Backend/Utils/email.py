@@ -69,7 +69,7 @@ def send_verification_email(to_email: str, first_name: str, token: str):
                         <tr>
                             <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
                                 <p style="margin: 0; color: #a1a1aa; font-size: 12px;">
-                                    &copy; 2025 FindYourCribb. All rights reserved.
+                                    &copy; 2026 FindYourCribb. All rights reserved.
                                 </p>
                             </td>
                         </tr>
@@ -155,7 +155,7 @@ def send_password_reset_email(to_email: str, first_name: str, token: str):
                         <tr>
                             <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
                                 <p style="margin: 0; color: #a1a1aa; font-size: 12px;">
-                                    &copy; 2025 FindYourCribb. All rights reserved.
+                                    &copy; 2026 FindYourCribb. All rights reserved.
                                 </p>
                             </td>
                         </tr>
@@ -338,7 +338,7 @@ def send_approval_email(to_email: str, name: str, account_type: str):
 
                         <tr>
                             <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
-                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
                             </td>
                         </tr>
 
@@ -425,7 +425,7 @@ def send_rejection_email(to_email: str, name: str, account_type: str):
 
                         <tr>
                             <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
-                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
                             </td>
                         </tr>
 
@@ -512,7 +512,7 @@ def send_revoked_email(to_email: str, name: str, account_type: str):
 
                         <tr>
                             <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
-                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
                             </td>
                         </tr>
 
@@ -611,7 +611,7 @@ def send_booking_confirmed_email(to_email: str, name: str, role: str, booking_de
 
                         <tr>
                             <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
-                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
                             </td>
                         </tr>
 
@@ -693,7 +693,7 @@ def send_booking_cancelled_email(to_email: str, name: str, cancelled_by: str, bo
 
                         <tr>
                             <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
-                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
                             </td>
                         </tr>
 
@@ -791,7 +791,7 @@ def send_booking_reminder_email(to_email: str, name: str, role: str, booking_det
 
                         <tr>
                             <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
-                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2025 FindYourCribb. All rights reserved.</p>
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
                             </td>
                         </tr>
 

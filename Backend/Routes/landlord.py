@@ -5,7 +5,7 @@ from sqlalchemy import func as sql_func
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, LandlordDocuments
 from Schemas.landlordSchema import LandlordLogin, LandlordUpdate, LandlordResponse, LandlordPublicResponse, LandlordPropertyResponse, LandlordReviewResponse, LandlordFlagResponse, PropertyRange, IDType, DocumentType, LandlordVerification, LandlordTokenResponse
 from Schemas.userSchema import UserRole, TokenResponse
-from Utils.security import get_current_user, hash_password, verify_password, create_access_token, validate_password
+from Utils.security import get_current_landlord, hash_password, verify_password, create_access_token, validate_password
 from Utils.textract import extract_document_data
 from Utils.verification import compare_landlord_data
 from helpers import require_landlord, get_landlord_profile, compute_landlord_stats, upload_to_s3, BUCKET_NAME
@@ -120,12 +120,12 @@ def login_landlord(request: Request, payload: OAuth2PasswordRequestForm = Depend
 
 # Private Landlord Profile
 @landlord_router.get("/me", response_model=LandlordResponse)
-def view_my_landlord_profile(db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+def view_my_landlord_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_landlord)):
     landlord = get_landlord_profile(current_user, db)
     return LandlordResponse.model_validate(landlord)
 
 @landlord_router.patch("/me", response_model=LandlordResponse)
-def update_my_landlord_profile(payload: LandlordUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+def update_my_landlord_profile(payload: LandlordUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_landlord)):
     landlord = get_landlord_profile(current_user, db)
 
     if payload.company_name is not None:
@@ -142,7 +142,7 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
  
 # Upload profile photo
 @landlord_router.post("/me/profile-photo", status_code=status.HTTP_200_OK)
-async def upload_landlord_profile_photo(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+async def upload_landlord_profile_photo(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_landlord)):
     landlord = get_landlord_profile(current_user, db)
  
     if file.content_type not in ALLOWED_IMAGE_TYPES:
@@ -159,7 +159,7 @@ async def upload_landlord_profile_photo(file: UploadFile = File(...), db: Sessio
  
 # Delete profile photo
 @landlord_router.delete("/me/profile-photo", status_code=status.HTTP_200_OK)
-def delete_landlord_profile_photo(db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+def delete_landlord_profile_photo(db: Session = Depends(get_db), current_user: User = Depends(get_current_landlord)):
     landlord = get_landlord_profile(current_user, db)
  
     if not landlord.profile_photo_url:
@@ -238,7 +238,7 @@ def get_landlord_reviews(landlord_id: int, db: Session = Depends(get_db)):
     return [LandlordReviewResponse.model_validate(r) for r in reviews]
 
 @landlord_router.get("/me/flags", response_model=list[LandlordFlagResponse])
-def get_my_listing_flags(current_landlord: Landlord = Depends(require_landlord), db: Session = Depends(get_db)):
+def get_my_listing_flags(current_landlord: Landlord = Depends(get_current_landlord), db: Session = Depends(get_db)):
     rows = (
         db.query(Flag, Listing, Property)
         .join(Listing, Flag.listing_id == Listing.id)

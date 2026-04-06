@@ -58,6 +58,8 @@ class AdminLandlordResponse(BaseModel):
 class AdminListingResponse(BaseModel):
     id: int
     property_id: int
+    property_title: str = ""
+    address: str = ""
     rent_per_room: float
     rent_total: float
     lease_type: str

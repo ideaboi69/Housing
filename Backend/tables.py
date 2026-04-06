@@ -66,7 +66,8 @@ class User(Base):
     roommate_requests_sent = relationship("RoommateRequest", back_populates="user")
     viewing_bookings = relationship("ViewingBooking", foreign_keys="[ViewingBooking.student_id]", back_populates="student")
     viewing_availabilities = relationship("ViewingAvailability", foreign_keys="[ViewingAvailability.owner_id]", back_populates="owner")
-
+    post_votes = relationship("PostVote", back_populates="user")
+    
     __table_args__ = (
         CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
     )
@@ -460,6 +461,7 @@ class Post(Base):
 
     user = relationship("User", back_populates="posts", foreign_keys=[user_id])
     writer = relationship("Writer", back_populates="posts", foreign_keys=[writer_id])
+    votes = relationship("PostVote", back_populates="post")
 
     __table_args__ = (
         CheckConstraint(
@@ -876,42 +878,22 @@ class LandlordInvite(Base):
     group = relationship("RoommateGroup", backref="landlord_invite")
     creator = relationship("User", foreign_keys=[created_by])
 
+class PostVote(Base):
+    __tablename__ = "post_votes"
+ 
+    id = Column(Integer, primary_key=True)
+    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+ 
+    post = relationship("Post", back_populates="votes")
+    user = relationship("User", back_populates="post_votes")
+ 
+    __table_args__ = (
+        UniqueConstraint("post_id", "user_id", name="uq_post_vote_user"),
+    )
+ 
 Base.metadata.create_all(engine)
-
-
-def _ensure_runtime_columns() -> None:
-    if engine.dialect.name != "postgresql":
-        return
-
-    statements = [
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_wifi BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_air_conditioning BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_dishwasher BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_gym BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_elevator BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_backyard BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS has_balcony BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS wheelchair_accessible BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS pet_policy VARCHAR(50) DEFAULT 'unknown' NOT NULL",
-        "ALTER TABLE properties ADD COLUMN IF NOT EXISTS smoking_policy VARCHAR(50) DEFAULT 'unknown' NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_wifi BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_air_conditioning BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_dishwasher BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_gym BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_elevator BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_backyard BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS has_balcony BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS wheelchair_accessible BOOLEAN DEFAULT FALSE NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS pet_policy VARCHAR(50) DEFAULT 'unknown' NOT NULL",
-        "ALTER TABLE sublets ADD COLUMN IF NOT EXISTS smoking_policy VARCHAR(50) DEFAULT 'unknown' NOT NULL",
-    ]
-
-    with engine.begin() as conn:
-        for statement in statements:
-            conn.execute(text(statement))
-
-
-_ensure_runtime_columns()
 
 def get_db():
     db = Local_Session()
