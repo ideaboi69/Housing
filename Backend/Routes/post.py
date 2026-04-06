@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from typing import Optional
+from sqlalchemy import func
 from tables import get_db, Post, User, Writer, PostVote
 from Schemas.postSchema import PostCreate, PostUpdate, PostResponse, PostListResponse, PostCategory, PostStatus
 from Utils.security import get_current_user, get_current_author
