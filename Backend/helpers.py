@@ -590,9 +590,7 @@ def compute_price_vs_market(listing: Listing, db: Session) -> float:
         return 50.0
 
     # get average rent for active listings on same property type
-    avg_rent = db.query(sql_func.avg(Listing.rent_per_room)).join(
-        Property, Listing.property_id == Property.id
-    ).filter(
+    avg_rent = db.query(sql_func.avg(Listing.rent_per_room)).join( Property, Listing.property_id == Property.id).filter(
         Property.property_type == prop.property_type,
         Listing.status == "active",
     ).scalar()
@@ -661,21 +659,152 @@ def compute_lease_clarity(listing: Listing, prop: Property) -> float:
 
     return round((score / total_checks) * 100, 1)
 
-def compute_overall_score(price: float, reputation: float, maintenance: float, clarity: float) -> float:
-    """Weighted average of all four sub-scores."""
-    weights = {
-        "price": 0.30,
-        "reputation": 0.30,
-        "maintenance": 0.20,
-        "clarity": 0.20,
-    }
-    overall = (
-        price * weights["price"]
-        + reputation * weights["reputation"]
-        + maintenance * weights["maintenance"]
-        + clarity * weights["clarity"]
-    )
+def compute_amenity_score(prop: Property) -> float:
+    """Score based on how many amenities the property offers. 0-100.
+    Base score of 20 (having a roof counts for something)."""
+    amenity_fields = [
+        "is_furnished", "has_parking", "has_laundry",
+        "utilities_included", "has_wifi", "has_air_conditioning",
+        "has_dishwasher", "has_gym", "has_elevator",
+        "has_backyard", "has_balcony", "wheelchair_accessible",
+    ]
+ 
+    total = len(amenity_fields)
+    count = sum(1 for field in amenity_fields if getattr(prop, field, False))
+ 
+    # Also check pet_policy (not a boolean)
+    if getattr(prop, "pet_policy", "unknown") not in ("unknown", "no_pets"):
+        count += 1
+        total += 1
+    else:
+        total += 1
+ 
+    score = 20 + (count / total) * 80
+    return round(score, 1)
+
+def compute_proximity_score(prop: Property) -> float:
+    """Score based on distance to campus. 0-100.
+    Uses walk_time_minutes primarily, falls back to distance_to_campus_km."""
+    if prop.walk_time_minutes is not None:
+        walk = prop.walk_time_minutes
+        if walk <= 10:
+            score = 100
+        elif walk <= 15:
+            score = 90
+        elif walk <= 20:
+            score = 75
+        elif walk <= 30:
+            score = 60
+        elif walk <= 45:
+            score = 40
+        else:
+            score = 20
+        return float(score)
+ 
+    if prop.distance_to_campus_km is not None:
+        km = float(prop.distance_to_campus_km)
+        if km <= 0.5:
+            score = 100
+        elif km <= 1.0:
+            score = 90
+        elif km <= 2.0:
+            score = 75
+        elif km <= 3.0:
+            score = 60
+        elif km <= 5.0:
+            score = 40
+        else:
+            score = 20
+        return float(score)
+ 
+    return 50.0
+
+def compute_overall_score(price: float, reputation: float, maintenance: float, clarity: float, amenity: float, proximity: float, review_count: int) -> float:
+    """Cribb Score v2 — dynamic weighting based on review count.
+ 
+    Property Score = Price (30%) + Proximity (25%) + Listing Completeness (25%) + Amenities (20%)
+    Landlord Score = Reputation (50%) + Maintenance (50%)
+ 
+    0-2 reviews: 100% Property Score
+    3-4 reviews: 70% Property + 30% Landlord
+    5+ reviews:  50% Property + 50% Landlord
+    """
+
+    property_score = (price * 0.30 + proximity * 0.25 + clarity * 0.25 + amenity * 0.20)
+ 
+    landlord_score = (reputation * 0.50 + maintenance * 0.50)
+ 
+    if review_count < 3:
+        overall = property_score
+    elif review_count < 5:
+        overall = property_score * 0.70 + landlord_score * 0.30
+    else:
+        overall = property_score * 0.50 + landlord_score * 0.50
+ 
     return round(overall, 1)
+
+def compute_and_save(listing_id: int, db: Session) -> HousingHealthScore:
+    """Shared logic for computing and upserting a cribb score."""
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found")
+ 
+    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+    if not prop:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+ 
+    landlord_id = prop.landlord_id
+ 
+    # Compute all sub-scores
+    price_score = compute_price_vs_market(listing, db)
+    reputation_score = compute_landlord_reputation(landlord_id, db)
+    maint_score = compute_maintenance_score(landlord_id, db)
+    clarity_score = compute_lease_clarity(listing, prop)
+    amenity = compute_amenity_score(prop)
+    proximity = compute_proximity_score(prop)
+ 
+    # Count reviews for dynamic weighting
+    review_count = db.query(Review).filter(Review.landlord_id == landlord_id).count()
+ 
+    overall = compute_overall_score(
+        price_score, reputation_score, maint_score,
+        clarity_score, amenity, proximity, review_count,
+    )
+ 
+    # Upsert
+    existing = db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing_id).first()
+ 
+    if existing:
+        existing.price_vs_market_score = price_score
+        existing.landlord_reputation_score = reputation_score
+        existing.maintenance_score = maint_score
+        existing.lease_clarity_score = clarity_score
+        existing.amenity_score = amenity
+        existing.proximity_score = proximity
+        existing.review_count = review_count
+        existing.overall_score = overall
+        existing.created_at = datetime.utcnow()
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        health_score = HousingHealthScore(
+            listing_id=listing_id,
+            price_vs_market_score=price_score,
+            landlord_reputation_score=reputation_score,
+            maintenance_score=maint_score,
+            lease_clarity_score=clarity_score,
+            amenity_score=amenity,
+            proximity_score=proximity,
+            review_count=review_count,
+            overall_score=overall,
+            created_at=datetime.utcnow(),
+        )
+        db.add(health_score)
+        db.commit()
+        db.refresh(health_score)
+        return health_score
+ 
 
 # Upload to S3 helpers (Landlord)
 
@@ -690,7 +819,7 @@ class S3UploadResponse(BaseModel):
     s3_url: str
     filename: str
 
-# Helper
+# Cloudinary helper
 def upload_to_s3(file: UploadFile, landlord_id: int, folder: str) -> tuple[str, str]:
     file_ext = file.filename.split(".")[-1] if file.filename else "bin"
     s3_key = f"documents/landlord_{landlord_id}/{folder}/{uuid.uuid4()}.{file_ext}"
@@ -716,6 +845,7 @@ def slugify_group_name(name: str) -> str:
     slug = re.sub(r"[^\w\s-]", "", name.lower())
     slug = re.sub(r"[\s_]+", "-", slug).strip("-")
     return slug
+
 # Helpers calculating compatibility 
 def calculate_compatibility(profile_a: RoommateProfile, profile_b: RoommateProfile) -> int:
     if not profile_a or not profile_b:
@@ -877,6 +1007,7 @@ def get_host_info(booking: ViewingBooking, db: Session):
     else:
         owner = db.query(User).filter(User.id == booking.owner_id).first()
         return owner.email, owner.first_name, f"{owner.first_name} {owner.last_name}"
+    
 # AI Compare helper (Prompt builder)
 def build_listing_prompt_data(listing: Listing, prop: Property, landlord: Landlord, score: Optional[int]) -> str:
     """Format a single listing's data for the AI prompt."""

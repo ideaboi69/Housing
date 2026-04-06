@@ -1,11 +1,14 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Review, Flag
+from tables import get_db, User, Landlord, Property, Listing, Review, Flag, HousingHealthScore
 from Schemas.reviewSchema import ReviewCreate, ReviewUpdate, ReviewResponse
 from Utils.security import get_current_user
 from helpers import require_verified_student
+import logging
+
 review_router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # CREATE REVIEW (verified students only)
 @review_router.post("/", response_model=ReviewResponse, status_code=status.HTTP_201_CREATED)
@@ -37,6 +40,17 @@ def create_review(payload: ReviewCreate, db: Session = Depends(get_db), current_
     db.add(review)
     db.commit()
     db.refresh(review)
+
+    try:
+        from Routes.healthscore import compute_and_save
+        listings = db.query(Listing).join(Property).filter(Property.landlord_id == prop.landlord_id).all()
+        for listing in listings:
+            try:
+                compute_and_save(listing.id, db)
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f"Failed to recalculate Cribb Scores after review: {e}")
 
     return ReviewResponse.model_validate(review)
 

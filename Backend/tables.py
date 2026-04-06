@@ -255,6 +255,9 @@ class HousingHealthScore(Base):
     landlord_reputation_score = Column(Numeric(4, 2), nullable=False)
     maintenance_score = Column(Numeric(4, 2), nullable=False)
     lease_clarity_score = Column(Numeric(4, 2), nullable=False)
+    amenity_score = Column(Numeric(4, 2), nullable=True)
+    proximity_score = Column(Numeric(4, 2), nullable=True)
+    review_count = Column(Integer, default=0, nullable=False)
     overall_score = Column(Numeric(4, 2), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 

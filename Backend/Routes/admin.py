@@ -129,10 +129,104 @@ def list_all_users(db: Session = Depends(get_db), admin: User = Depends(require_
     users = db.query(User).all()
     return [AdminUserResponse.model_validate(u) for u in users]
 
+# WRITE ENDPOINTS
 @admin_router.get("/users/pending-writers", response_model=list[AdminUserResponse])
 def list_pending_write_requests(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     users = db.query(User).filter(User.write_access_requested == True,User.is_writable == False).all()
     return [AdminUserResponse.model_validate(u) for u in users]
+
+@admin_router.patch("/users/{user_id}/grant-write", status_code=status.HTTP_200_OK)
+def grant_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.is_writable:
+        raise HTTPException(status_code=400, detail="User already has write access")
+
+    user.is_writable = True
+    user.write_access_requested = False 
+    db.commit()
+
+    background_tasks.add_task(
+        send_approval_email,
+        to_email=user.email,
+        name=user.first_name,
+        account_type="student",
+    )
+
+    return {"message": f"Write access granted to {user.first_name} {user.last_name}"}
+
+@admin_router.patch("/users/{user_id}/reject-write", status_code=status.HTTP_200_OK)
+def reject_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.write_access_requested:
+        raise HTTPException(status_code=400, detail="No pending request from this user")
+
+    user.write_access_requested = False
+    db.commit()
+
+    background_tasks.add_task(
+        send_rejection_email,
+        to_email=user.email,
+        name=user.first_name,
+        account_type="student",
+    )
+
+    return {"message": f"Write request rejected for {user.first_name} {user.last_name}"}
+
+@admin_router.patch("/users/{user_id}/revoke-write", status_code=status.HTTP_200_OK)
+def revoke_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.is_writable:
+        raise HTTPException(status_code=400, detail="User doesn't have write access")
+
+    user.is_writable = False
+    user.write_access_requested = False
+    db.commit()
+
+    background_tasks.add_task(
+        send_revoked_email,
+        to_email=user.email,
+        name=user.first_name,
+        account_type="student",
+    )
+
+    return {"message": f"Write access revoked for {user.first_name} {user.last_name}"}
+
+@admin_router.patch("/users/{user_id}/grant-og", status_code=status.HTTP_200_OK)
+def grant_og_badge(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+ 
+    if user.is_early_adopter:
+        raise HTTPException(status_code=400, detail="User already has OG badge")
+ 
+    user.is_early_adopter = True
+    db.commit()
+ 
+    return {"message": f"OG badge granted to {user.first_name} {user.last_name}"}
+ 
+@admin_router.patch("/users/{user_id}/revoke-og", status_code=status.HTTP_200_OK)
+def revoke_og_badge(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+ 
+    if not user.is_early_adopter:
+        raise HTTPException(status_code=400, detail="User doesn't have OG badge")
+ 
+    user.is_early_adopter = False
+    db.commit()
+ 
+    return {"message": f"OG badge revoked for {user.first_name} {user.last_name}"}
 
 @admin_router.get("/users/{user_id}", response_model=AdminUserResponse)
 def get_user_by_id(user_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
@@ -409,100 +503,6 @@ def delete_writer(writer_id: int, db: Session = Depends(get_db), admin: Admin = 
 
     db.delete(writer)
     db.commit()
-
-# STUDENT WRITE ENDPOINTS
-@admin_router.patch("/users/{user_id}/grant-write", status_code=status.HTTP_200_OK)
-def grant_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if user.is_writable:
-        raise HTTPException(status_code=400, detail="User already has write access")
-
-    user.is_writable = True
-    user.write_access_requested = False 
-    db.commit()
-
-    background_tasks.add_task(
-        send_approval_email,
-        to_email=user.email,
-        name=user.first_name,
-        account_type="student",
-    )
-
-    return {"message": f"Write access granted to {user.first_name} {user.last_name}"}
-
-@admin_router.patch("/users/{user_id}/reject-write", status_code=status.HTTP_200_OK)
-def reject_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if not user.write_access_requested:
-        raise HTTPException(status_code=400, detail="No pending request from this user")
-
-    user.write_access_requested = False
-    db.commit()
-
-    background_tasks.add_task(
-        send_rejection_email,
-        to_email=user.email,
-        name=user.first_name,
-        account_type="student",
-    )
-
-    return {"message": f"Write request rejected for {user.first_name} {user.last_name}"}
-
-@admin_router.patch("/users/{user_id}/revoke-write", status_code=status.HTTP_200_OK)
-def revoke_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    if not user.is_writable:
-        raise HTTPException(status_code=400, detail="User doesn't have write access")
-
-    user.is_writable = False
-    user.write_access_requested = False
-    db.commit()
-
-    background_tasks.add_task(
-        send_revoked_email,
-        to_email=user.email,
-        name=user.first_name,
-        account_type="student",
-    )
-
-    return {"message": f"Write access revoked for {user.first_name} {user.last_name}"}
-
-@admin_router.patch("/users/{user_id}/grant-og", status_code=status.HTTP_200_OK)
-def grant_og_badge(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
- 
-    if user.is_early_adopter:
-        raise HTTPException(status_code=400, detail="User already has OG badge")
- 
-    user.is_early_adopter = True
-    db.commit()
- 
-    return {"message": f"OG badge granted to {user.first_name} {user.last_name}"}
- 
-@admin_router.patch("/users/{user_id}/revoke-og", status_code=status.HTTP_200_OK)
-def revoke_og_badge(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
- 
-    if not user.is_early_adopter:
-        raise HTTPException(status_code=400, detail="User doesn't have OG badge")
- 
-    user.is_early_adopter = False
-    db.commit()
- 
-    return {"message": f"OG badge revoked for {user.first_name} {user.last_name}"}
 
 # POST ENDPOINTS
 @admin_router.get("/posts", response_model=list[PostListResponse])
