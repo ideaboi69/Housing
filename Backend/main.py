@@ -57,7 +57,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         settings.FRONTEND_URL,
-        # "https://findyourcribb.com",
+        "https://findyourcribb.com",
+        "https://housing-viqx.onrender.com",
         "https://cribb-frontend.onrender.com",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
