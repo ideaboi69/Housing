@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, Building2, Home, Flag, PenLine, FileText,
@@ -363,6 +363,8 @@ function LandlordsTab({ landlords, onRefresh }: { landlords: AdminLandlordRespon
    ════════════════════════════════════════════════════════ */
 
 function ListingsTab({ listings, onRefresh }: { listings: AdminListingResponse[]; onRefresh: () => void }) {
+  const router = useRouter();
+  
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this listing?")) return;
     try { await api.admin.deleteListing(id); toast.success("Listing deleted"); onRefresh(); } catch { toast.error("Failed"); }
@@ -376,15 +378,20 @@ function ListingsTab({ listings, onRefresh }: { listings: AdminListingResponse[]
           <div key={l.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
             <div className="flex-1">
               <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
-                Listing #{l.id}
+                <button onClick={() => router.push(`/browse/${l.id}`)} className="hover:text-[#FF6B35] transition-colors text-left">
+                  {l.property_title || `Listing #${l.id}`}
+                </button>
                 <Badge label={l.status} color={l.status === "active" ? "#4ADE80" : l.status === "draft" ? "#FFB627" : "#98A3B0"} />
                 {l.is_sublet && <Badge label="Sublet" color="#2EC4B6" />}
               </div>
               <div className="text-white/30" style={{ fontSize: "11px" }}>
-                ${l.rent_per_room}/room · ${l.rent_total} total · {l.lease_type} · Property #{l.property_id} · {timeAgo(l.created_at)}
+                {l.address ? `${l.address} · ` : ""}${l.rent_per_room}/room · ${l.rent_total} total · {l.lease_type} · {timeAgo(l.created_at)}
               </div>
             </div>
-            <ActionButton onClick={() => handleDelete(l.id)} icon={Trash2} label="Delete" danger />
+            <div className="flex items-center gap-1 shrink-0">
+              <ActionButton onClick={() => router.push(`/browse/${l.id}`)} icon={Eye} label="View" color="#60A5FA" />
+              <ActionButton onClick={() => handleDelete(l.id)} icon={Trash2} label="Delete" danger />
+            </div>
           </div>
         ))}
         {listings.length === 0 && <div className="text-center py-12 text-white/20" style={{ fontSize: "13px" }}>No listings</div>}
@@ -398,11 +405,32 @@ function ListingsTab({ listings, onRefresh }: { listings: AdminListingResponse[]
    ════════════════════════════════════════════════════════ */
 
 function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh: () => void }) {
+  const router = useRouter();
+  
   const handleResolve = async (id: number) => {
     try { await api.admin.resolveFlag(id); toast.success("Flag resolved"); onRefresh(); } catch { toast.error("Failed"); }
   };
   const handleDismiss = async (id: number) => {
     try { await api.admin.dismissFlag(id); toast.success("Flag dismissed"); onRefresh(); } catch { toast.error("Failed"); }
+  };
+
+ const handleViewFlagged = (f: AdminFlagResponse) => {
+    if (f.listing_id) router.push(`/browse/${f.listing_id}`);
+    else if (f.sublet_id) router.push(`/sublets/${f.sublet_id}`);
+    else if (f.marketplace_item_id) router.push(`/marketplace/${f.marketplace_item_id}`);
+  };
+
+  const typeLabel = (f: AdminFlagResponse) => {
+    if (f.listing_id) return `Listing: ${f.flagged_title || `#${f.listing_id}`}`;
+    if (f.review_id) return `Review: ${f.flagged_title || `#${f.review_id}`}`;
+    if (f.marketplace_item_id) return `Marketplace: ${f.flagged_title || `#${f.marketplace_item_id}`}`;
+    if (f.sublet_id) return `Sublet: ${f.flagged_title || `#${f.sublet_id}`}`;
+    return "Unknown";
+  };
+
+  const typeColor = (t: string) => {
+    const map: Record<string, string> = { listing: "#FF6B35", review: "#A78BFA", marketplace_item: "#2EC4B6", sublet: "#FFB627" };
+    return map[t] || "#98A3B0";
   };
 
   return (
@@ -415,13 +443,21 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
               <Flag className="w-4 h-4 text-[#E71D36]" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-white" style={{ fontSize: "13px", fontWeight: 600 }}>
-                {f.listing_id ? `Listing #${f.listing_id}` : ""}{f.review_id ? `Review #${f.review_id}` : ""} flagged
+              <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
+                <button
+                  onClick={() => handleViewFlagged(f)}
+                  className="hover:text-[#FF6B35] transition-colors text-left"
+                  disabled={!!f.review_id}
+                >
+                  {typeLabel(f)}
+                </button>
+                <Badge label={f.flag_type} color={typeColor(f.flag_type)} />
               </div>
               <div className="text-white/40 mt-0.5" style={{ fontSize: "11px", lineHeight: 1.5 }}>{f.reason}</div>
-              <div className="text-white/20 mt-1" style={{ fontSize: "10px" }}>By user #{f.reporter_id} · {timeAgo(f.created_at)}</div>
+              <div className="text-white/20 mt-1" style={{ fontSize: "10px" }}>Reported by {f.reporter_name} · {timeAgo(f.created_at)}</div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <ActionButton onClick={() => handleViewFlagged(f)} icon={Eye} label="View" color="#60A5FA" />
               <ActionButton onClick={() => handleResolve(f.id)} icon={Check} label="Resolve" color="#4ADE80" />
               <ActionButton onClick={() => handleDismiss(f.id)} icon={X} label="Dismiss" color="#98A3B0" />
             </div>
@@ -576,6 +612,9 @@ function WritersTab({
    ════════════════════════════════════════════════════════ */
 
 function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: () => void }) {
+  const router = useRouter();
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this post?")) return;
     try { await api.admin.deletePost(id); toast.success("Post deleted"); onRefresh(); } catch { toast.error("Failed"); }
@@ -591,18 +630,40 @@ function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: 
       <h2 className="text-white mb-4" style={{ fontSize: "20px", fontWeight: 800 }}>Posts ({posts.length})</h2>
       <div className="space-y-1">
         {posts.map((p) => (
-          <div key={p.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
-                {p.title}
-                <Badge label={p.category} color={catColor(p.category)} />
-                <Badge label={p.status} color={p.status === "published" ? "#4ADE80" : "#FFB627"} />
+          <div key={p.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] overflow-hidden">
+            <div className="px-4 py-3 flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
+                  <button onClick={() => router.push("/the-bubble")} className="hover:text-[#FF6B35] transition-colors text-left">
+                    {p.title}
+                  </button>
+                  <Badge label={p.category} color={catColor(p.category)} />
+                  <Badge label={p.status} color={p.status === "published" ? "#4ADE80" : "#FFB627"} />
+                </div>
+                <div className="text-white/30" style={{ fontSize: "11px" }}>
+                  By {p.author_name} · {p.view_count} views · {timeAgo(p.created_at)}
+                </div>
               </div>
-              <div className="text-white/30" style={{ fontSize: "11px" }}>
-                By {p.author_name} · {p.view_count} views · {timeAgo(p.created_at)}
+              <div className="flex items-center gap-1 shrink-0">
+                <ActionButton onClick={() => router.push("/the-bubble")} icon={Eye} label="Bubble" color="#60A5FA" />
+                <ActionButton
+                  onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                  icon={expandedId === p.id ? ChevronDown : Eye}
+                  label={expandedId === p.id ? "Hide" : "Content"}
+                  color="#A78BFA"
+                />
+                <ActionButton onClick={() => handleDelete(p.id)} icon={Trash2} label="Delete" danger />
               </div>
             </div>
-            <ActionButton onClick={() => handleDelete(p.id)} icon={Trash2} label="Delete" danger />
+            {expandedId === p.id && p.content && (
+              <div className="px-4 pb-4 border-t border-white/[0.04] pt-3">
+                <div
+                  className="text-white/60 max-w-none"
+                  style={{ fontSize: "12px", lineHeight: 1.7, whiteSpace: "pre-wrap" }}
+                  dangerouslySetInnerHTML={{ __html: p.content }}
+                />
+              </div>
+            )}
           </div>
         ))}
         {posts.length === 0 && <div className="text-center py-12 text-white/20" style={{ fontSize: "13px" }}>No posts</div>}

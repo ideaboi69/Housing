@@ -618,6 +618,16 @@ export const posts = {
     }
     return res.json() as Promise<PostResponse>;
   },
+
+  upvote: (postId: number) =>
+    request<{ post_id: number; upvote_count: number; user_has_upvoted: boolean }>(
+      `/api/posts/${postId}/upvote`, { method: "POST" }
+    ),
+ 
+  removeUpvote: (postId: number) =>
+    request<{ post_id: number; upvote_count: number; user_has_upvoted: boolean }>(
+      `/api/posts/${postId}/upvote`, { method: "DELETE" }
+    ),
 };
 
 // ── Messages / Conversations ────────────────────────────

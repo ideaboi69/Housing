@@ -741,6 +741,8 @@ export interface PostResponse {
   author_type: string;
   status: PostStatus;
   view_count: number;
+  upvote_count: number;
+  user_has_upvoted: boolean;
   event_date?: string;
   event_location?: string;
   event_link?: string;
@@ -753,6 +755,7 @@ export interface PostListResponse {
   id: number;
   title: string;
   slug: string;
+  content?: string;
   preview?: string;
   cover_image_url?: string;
   category: PostCategory;
@@ -760,6 +763,8 @@ export interface PostListResponse {
   author_type: string;
   status: PostStatus;
   view_count: number;
+  upvote_count: number;
+  user_has_upvoted: boolean;
   event_date?: string;
   deal_expires?: string;
   created_at: string;
@@ -1119,6 +1124,8 @@ export interface AdminLandlordResponse {
 export interface AdminListingResponse {
   id: number;
   property_id: number;
+  property_title: string;
+  address: string;
   rent_per_room: number;
   rent_total: number;
   lease_type: string;
@@ -1130,8 +1137,13 @@ export interface AdminListingResponse {
 export interface AdminFlagResponse {
   id: number;
   reporter_id: number;
+  reporter_name: string;
+  flag_type: "listing" | "review" | "marketplace_item" | "sublet" | "unknown";
   listing_id?: number;
   review_id?: number;
+  marketplace_item_id?: number;
+  sublet_id?: number;
+  flagged_title?: string;
   reason: string;
   status: string;
   created_at: string;
