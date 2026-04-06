@@ -268,6 +268,22 @@ def list_all_landlords(db: Session = Depends(get_db), admin: Admin = Depends(req
         for l in landlords
     ]
 
+@admin_router.get("/landlords/unverified", response_model=list[AdminLandlordResponse])
+def list_unverified_landlords(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    landlords = db.query(Landlord).filter(Landlord.identity_verified == False).all()
+    return [
+        AdminLandlordResponse(
+            id=l.id,
+            first_name=l.first_name,
+            last_name=l.last_name,
+            email=l.email,
+            company_name=l.company_name,
+            phone=l.phone,
+            identity_verified=l.identity_verified,
+        )
+        for l in landlords
+    ]
+
 @admin_router.get("/landlords/{landlord_id}", response_model=AdminLandlordResponse)
 def get_landlord_by_id(landlord_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     landlord = db.query(Landlord).filter(Landlord.id == landlord_id).first()
@@ -282,18 +298,6 @@ def get_landlord_by_id(landlord_id: int, db: Session = Depends(get_db), admin: U
             company_name=landlord.company_name,
             phone=landlord.phone,
             identity_verified=landlord.identity_verified)
-
-@admin_router.delete("/landlords/{landlord_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_landlord(landlord_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    """Delete a landlord profile and cascade delete all their properties, listings, etc"""
-    landlord = db.query(Landlord).filter(Landlord.id == landlord_id).first()
-    if not landlord:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Landlord not found")
-
-    cascade_delete_landlord(landlord, db)
-    db.commit()
-
-    return None
 
 @admin_router.patch("/landlords/{landlord_id}/verify", status_code=status.HTTP_200_OK)
 def verify_landlord(landlord_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
@@ -324,6 +328,18 @@ def unverify_landlord(landlord_id: int, db: Session = Depends(get_db), admin: Us
     db.commit()
 
     return {"message": f"Landlord {landlord_id} verification revoked"}
+
+@admin_router.delete("/landlords/{landlord_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_landlord(landlord_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Delete a landlord profile and cascade delete all their properties, listings, etc"""
+    landlord = db.query(Landlord).filter(Landlord.id == landlord_id).first()
+    if not landlord:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Landlord not found")
+
+    cascade_delete_landlord(landlord, db)
+    db.commit()
+
+    return None
 
 # LISTING ENDPOINTS
 @admin_router.get("/listings", response_model=list[AdminListingResponse])
