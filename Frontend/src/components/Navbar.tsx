@@ -141,6 +141,7 @@ export function Navbar() {
     : [
         { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { label: "Messages", href: "/messages", icon: MessageCircle },
+        { label: "Marketplace Messages", href: "/marketplace/messages", icon: ShoppingBag },
         { label: "Saved Listings", href: "/saved", icon: Bookmark },
         { label: "Your Listings", href: "/marketplace/my", icon: ShoppingBag },
         { label: "My Group", href: "/roommates", icon: Heart },

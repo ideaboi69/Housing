@@ -74,6 +74,8 @@ import type {
   MarketplaceItemUpdate,
   MarketplaceImageResponse,
   MarketplaceConversationResponse,
+  MarketplaceConversationDetailResponse,
+  MarketplaceMessageResponse,
 } from "@/types";
 
 // ── Base ────────────────────────────────────────────────
@@ -992,19 +994,22 @@ export const marketplace = {
 
   // Conversations
   startConversation: (data: { item_id: number; content: string }) =>
-    request<unknown>("/api/marketplace/conversations/start", {
+    request<MarketplaceMessageResponse>("/api/marketplace/conversations/start", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   sendMessage: (conversationId: number, data: { content: string }) =>
-    request<unknown>(`/api/marketplace/conversations/${conversationId}/messages`, {
+    request<MarketplaceMessageResponse>(`/api/marketplace/conversations/${conversationId}/messages`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   getConversations: () =>
     request<MarketplaceConversationResponse[]>("/api/marketplace/conversations"),
+
+  getConversation: (conversationId: number) =>
+    request<MarketplaceConversationDetailResponse>(`/api/marketplace/conversations/${conversationId}`),
 
   getUnreadCount: () =>
     request<{ unread_count: number }>("/api/marketplace/unread-count"),

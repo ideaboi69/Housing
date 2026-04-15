@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Users, Shield, ChevronRight, MapPin, Home, Send, Check, Link2, Camera } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { type LifestyleProfile, type RoommateGroup, TAG_SHORT_LABELS, getRoommateGroupByInviteCode } from "@/components/roommates/roommate-data";
 
 /* ── Member Preview ── */
@@ -43,11 +43,46 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
   const [requestMessage, setRequestMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [requestError, setRequestError] = useState("");
+  const [existingRequestStatus, setExistingRequestStatus] = useState<"pending" | "accepted" | "declined" | null>(null);
 
   useEffect(() => {
     // TODO: GET /api/groups/join/{code}
     setGroup(getRoommateGroupByInviteCode(code) ?? null);
   }, [code]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadExistingRequest() {
+      if (!user || !group) {
+        setExistingRequestStatus(null);
+        return;
+      }
+
+      const numId = parseInt(group.id, 10);
+      if (isNaN(numId)) {
+        setExistingRequestStatus(null);
+        return;
+      }
+
+      try {
+        const requests = await api.roommates.getSentRequests();
+        if (cancelled) return;
+        const match = requests.find((request) => request.group_id === numId && request.status !== "declined");
+        setExistingRequestStatus(match?.status ?? null);
+        setSent(Boolean(match && (match.status === "pending" || match.status === "accepted")));
+      } catch {
+        if (!cancelled) setExistingRequestStatus(null);
+      }
+    }
+
+    loadExistingRequest();
+    return () => {
+      cancelled = true;
+    };
+  }, [group, user]);
 
   if (group === undefined) {
     return (
@@ -95,16 +130,32 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
 
   const handleRequest = async () => {
     if (!user) {
-      router.push(`/login?redirect=/roommates/groups/join/${code}`);
+      router.push(`/login?next=${encodeURIComponent(`/roommates/groups/join/${code}`)}`);
       return;
     }
+    setSending(true);
+    setRequestError("");
     try {
       const numId = parseInt(group.id, 10);
       if (!isNaN(numId)) {
         await api.roommates.sendRequest({ group_id: numId, message: requestMessage || undefined });
       }
-    } catch { /* API failed — still show success for demo */ }
-    setSent(true);
+      setExistingRequestStatus("pending");
+      setSent(true);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 409) {
+          setExistingRequestStatus("pending");
+          setSent(true);
+        } else {
+          setRequestError(err.detail || "Could not send your request.");
+        }
+      } else {
+        setRequestError("Could not send your request.");
+      }
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -301,12 +352,23 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
                     <div className="w-12 h-12 rounded-full bg-[#4ADE80]/10 flex items-center justify-center mx-auto mb-2">
                       <Check className="w-6 h-6 text-[#4ADE80]" />
                     </div>
-                    <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Request sent</h3>
-                    <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px" }}>The group will review and get back to you.</p>
+                    <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>
+                      {existingRequestStatus === "accepted" ? "Request accepted" : "Request sent"}
+                    </h3>
+                    <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px" }}>
+                      {existingRequestStatus === "accepted"
+                        ? "This group has already accepted you. Head to roommates to keep things moving."
+                        : "The group will review and get back to you."}
+                    </p>
                   </div>
                 ) : showForm ? (
                   <div>
                     <h3 className="text-[#1B2D45] mb-2" style={{ fontSize: "15px", fontWeight: 800 }}>Introduce yourself</h3>
+                    {requestError && (
+                      <div className="mb-3 rounded-xl bg-[#E71D36]/5 px-3 py-2 text-[#E71D36]" style={{ fontSize: "12px", fontWeight: 600 }}>
+                        {requestError}
+                      </div>
+                    )}
                     <textarea
                       value={requestMessage}
                       onChange={(e) => setRequestMessage(e.target.value)}
@@ -318,19 +380,19 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
                     <p className="text-[#1B2D45]/18 mt-2 mb-3" style={{ fontSize: "10px" }}>Your profile will be shared with this message.</p>
                     <div className="flex items-center gap-2">
                       <button onClick={() => setShowForm(false)} className="px-4 py-2.5 rounded-full text-[#1B2D45]/40 hover:bg-[#1B2D45]/[0.04]" style={{ fontSize: "12px", fontWeight: 600 }}>Cancel</button>
-                      <button onClick={handleRequest} className="flex-1 py-3 rounded-full bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all flex items-center justify-center gap-1.5" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 8px 24px rgba(255,107,53,0.22)" }}>
-                        <Send className="w-3.5 h-3.5" /> Send request
+                      <button onClick={handleRequest} disabled={sending} className="flex-1 py-3 rounded-full bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 8px 24px rgba(255,107,53,0.22)" }}>
+                        <Send className="w-3.5 h-3.5" /> {sending ? "Sending..." : "Send request"}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <button onClick={() => user ? setShowForm(true) : router.push(`/login?redirect=/roommates/groups/join/${code}`)} className="w-full py-3.5 rounded-full bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 8px 24px rgba(255,107,53,0.22)" }}>
+                    <button onClick={() => user ? setShowForm(true) : router.push(`/login?next=${encodeURIComponent(`/roommates/groups/join/${code}`)}`)} className="w-full py-3.5 rounded-full bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 8px 24px rgba(255,107,53,0.22)" }}>
                       {user ? "Request this availability" : "Sign up to join"}
                     </button>
                     {!user && (
                       <p className="text-[#1B2D45]/20 mt-2 text-center" style={{ fontSize: "10px" }}>
-                        Already have an account? <Link href={`/login?redirect=/roommates/groups/join/${code}`} className="text-[#FF6B35] hover:underline">Log in</Link>
+                        Already have an account? <Link href={`/login?next=${encodeURIComponent(`/roommates/groups/join/${code}`)}`} className="text-[#FF6B35] hover:underline">Log in</Link>
                       </p>
                     )}
                   </div>

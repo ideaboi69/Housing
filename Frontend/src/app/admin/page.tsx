@@ -413,11 +413,19 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
   const handleDismiss = async (id: number) => {
     try { await api.admin.dismissFlag(id); toast.success("Flag dismissed"); onRefresh(); } catch { toast.error("Failed"); }
   };
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!confirm("Delete this flagged review?")) return;
+    try {
+      await api.admin.deleteReview(reviewId);
+      toast.success("Review deleted");
+      onRefresh();
+    } catch {
+      toast.error("Failed");
+    }
+  };
 
  const handleViewFlagged = (f: AdminFlagResponse) => {
-    if (f.listing_id) router.push(`/browse/${f.listing_id}`);
-    else if (f.sublet_id) router.push(`/sublets/${f.sublet_id}`);
-    else if (f.marketplace_item_id) router.push(`/marketplace/${f.marketplace_item_id}`);
+    if (f.target_path) router.push(f.target_path);
   };
 
   const typeLabel = (f: AdminFlagResponse) => {
@@ -438,6 +446,9 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
       <h2 className="text-white mb-4" style={{ fontSize: "20px", fontWeight: 800 }}>Pending Flags ({flags.length})</h2>
       <div className="space-y-1">
         {flags.map((f) => (
+          (() => {
+            const reviewId = typeof f.review_id === "number" ? f.review_id : null;
+            return (
           <div key={f.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
             <div className="w-9 h-9 rounded-full bg-[#E71D36]/10 flex items-center justify-center shrink-0">
               <Flag className="w-4 h-4 text-[#E71D36]" />
@@ -447,7 +458,7 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
                 <button
                   onClick={() => handleViewFlagged(f)}
                   className="hover:text-[#FF6B35] transition-colors text-left"
-                  disabled={!!f.review_id}
+                  disabled={!f.target_path}
                 >
                   {typeLabel(f)}
                 </button>
@@ -457,11 +468,14 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
               <div className="text-white/20 mt-1" style={{ fontSize: "10px" }}>Reported by {f.reporter_name} · {timeAgo(f.created_at)}</div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <ActionButton onClick={() => handleViewFlagged(f)} icon={Eye} label="View" color="#60A5FA" />
+              {f.target_path && <ActionButton onClick={() => handleViewFlagged(f)} icon={Eye} label="View" color="#60A5FA" />}
+              {reviewId !== null && <ActionButton onClick={() => handleDeleteReview(reviewId)} icon={Trash2} label="Delete Review" danger />}
               <ActionButton onClick={() => handleResolve(f.id)} icon={Check} label="Resolve" color="#4ADE80" />
               <ActionButton onClick={() => handleDismiss(f.id)} icon={X} label="Dismiss" color="#98A3B0" />
             </div>
           </div>
+            );
+          })()
         ))}
         {flags.length === 0 && (
           <div className="text-center py-12">
@@ -612,7 +626,6 @@ function WritersTab({
    ════════════════════════════════════════════════════════ */
 
 function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: () => void }) {
-  const router = useRouter();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   
   const handleDelete = async (id: number) => {
@@ -634,9 +647,7 @@ function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: 
             <div className="px-4 py-3 flex items-center gap-4">
               <div className="flex-1 min-w-0">
                 <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
-                  <button onClick={() => router.push("/the-bubble")} className="hover:text-[#FF6B35] transition-colors text-left">
-                    {p.title}
-                  </button>
+                  <span>{p.title}</span>
                   <Badge label={p.category} color={catColor(p.category)} />
                   <Badge label={p.status} color={p.status === "published" ? "#4ADE80" : "#FFB627"} />
                 </div>
@@ -645,23 +656,46 @@ function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: 
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <ActionButton onClick={() => router.push("/the-bubble")} icon={Eye} label="Bubble" color="#60A5FA" />
                 <ActionButton
                   onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
                   icon={expandedId === p.id ? ChevronDown : Eye}
-                  label={expandedId === p.id ? "Hide" : "Content"}
+                  label={expandedId === p.id ? "Hide" : "Inspect"}
                   color="#A78BFA"
                 />
                 <ActionButton onClick={() => handleDelete(p.id)} icon={Trash2} label="Delete" danger />
               </div>
             </div>
-            {expandedId === p.id && p.content && (
+            {expandedId === p.id && (
               <div className="px-4 pb-4 border-t border-white/[0.04] pt-3">
-                <div
-                  className="text-white/60 max-w-none"
-                  style={{ fontSize: "12px", lineHeight: 1.7, whiteSpace: "pre-wrap" }}
-                  dangerouslySetInnerHTML={{ __html: p.content }}
-                />
+                <div className="grid gap-3 lg:grid-cols-[1fr_240px]">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      {p.author_type && <Badge label={p.author_type} color="#60A5FA" />}
+                      {p.event_date && <Badge label={`Event ${p.event_date}`} color="#6C5CE7" />}
+                      {"deal_expires" in p && p.deal_expires ? <Badge label={`Deal until ${p.deal_expires}`} color="#2EC4B6" /> : null}
+                    </div>
+                    {p.preview && (
+                      <div className="mb-3 rounded-xl bg-white/[0.04] px-3 py-2.5 text-white/50" style={{ fontSize: "11px", lineHeight: 1.6 }}>
+                        {p.preview}
+                      </div>
+                    )}
+                    <div
+                      className="text-white/60 max-w-none"
+                      style={{ fontSize: "12px", lineHeight: 1.7, whiteSpace: "pre-wrap" }}
+                      dangerouslySetInnerHTML={{ __html: p.content || "<em>No stored content body.</em>" }}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    {p.cover_image_url && (
+                      <img src={p.cover_image_url} alt="" className="w-full rounded-xl border border-white/[0.06] object-cover" style={{ aspectRatio: "4 / 3" }} />
+                    )}
+                    <div className="rounded-xl bg-white/[0.04] px-3 py-3 text-white/55" style={{ fontSize: "11px", lineHeight: 1.6 }}>
+                      <div><span className="text-white/25">Slug:</span> {p.slug || "n/a"}</div>
+                      <div><span className="text-white/25">Created:</span> {new Date(p.created_at).toLocaleString("en-CA")}</div>
+                      {"updated_at" in p && typeof p.updated_at === "string" ? <div><span className="text-white/25">Updated:</span> {new Date(p.updated_at).toLocaleString("en-CA")}</div> : null}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

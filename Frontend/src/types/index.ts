@@ -1144,6 +1144,7 @@ export interface AdminFlagResponse {
   marketplace_item_id?: number;
   sublet_id?: number;
   flagged_title?: string;
+  target_path?: string | null;
   reason: string;
   status: string;
   created_at: string;
@@ -1231,4 +1232,24 @@ export interface MarketplaceConversationResponse {
   unread_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface MarketplaceMessageResponse {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface MarketplaceConversationDetailResponse {
+  id: number;
+  item_id: number;
+  item_title: string;
+  buyer_id: number;
+  buyer_name: string;
+  seller_id: number;
+  seller_name: string;
+  messages: MarketplaceMessageResponse[];
 }

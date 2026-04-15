@@ -393,14 +393,18 @@ def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(requ
     flags = db.query(Flag).filter(Flag.status == FlagStatus.PENDING).all()
     results = []
     for f in flags:
+        target_path = None
         if f.listing_id:
             flag_type = "listing"
+            target_path = f"/browse/{f.listing_id}"
         elif f.review_id:
             flag_type = "review"
         elif f.marketplace_item_id:
             flag_type = "marketplace_item"
+            target_path = f"/marketplace/{f.marketplace_item_id}"
         elif f.sublet_id:
             flag_type = "sublet"
+            target_path = f"/sublets/{f.sublet_id}"
         else:
             flag_type = "unknown"
  
@@ -427,6 +431,7 @@ def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(requ
             "marketplace_item_id": f.marketplace_item_id,
             "sublet_id": f.sublet_id,
             "flagged_title": flagged_title,
+            "target_path": target_path,
             "reason": f.reason,
             "status": f.status.value if hasattr(f.status, "value") else f.status,
             "created_at": str(f.created_at),

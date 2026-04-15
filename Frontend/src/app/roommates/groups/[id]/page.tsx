@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Shield, ShieldCheck, ChevronLeft, MessageCircle, Link2, Copy, Check, MapPin, Home, Calendar, DollarSign, Sparkles, Send, Settings, Search, Share2, Camera, ExternalLink } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import {
   type LifestyleProfile, type RoommateGroup, type GroupHousing,
@@ -100,6 +100,9 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
   const [requestMessage, setRequestMessage] = useState("");
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestError, setRequestError] = useState("");
+  const [existingRequestStatus, setExistingRequestStatus] = useState<"pending" | "accepted" | "declined" | null>(null);
 
   useEffect(() => {
     async function fetchGroup() {
@@ -157,6 +160,40 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     setClaimState(getLandlordClaimState());
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadExistingRequest() {
+      if (!user) {
+        setExistingRequestStatus(null);
+        return;
+      }
+
+      const numId = parseInt(id, 10);
+      if (isNaN(numId)) {
+        setExistingRequestStatus(null);
+        return;
+      }
+
+      try {
+        const requests = await api.roommates.getSentRequests();
+        if (cancelled) return;
+        const match = requests.find((request) => request.group_id === numId && request.status !== "declined");
+        setExistingRequestStatus(match?.status ?? null);
+        setRequestSent(Boolean(match && (match.status === "pending" || match.status === "accepted")));
+      } catch {
+        if (!cancelled) {
+          setExistingRequestStatus(null);
+        }
+      }
+    }
+
+    loadExistingRequest();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, user]);
 
   if (group === undefined) {
     return (
@@ -219,16 +256,32 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
 
   const handleRequestJoin = async () => {
     if (!user) {
-      router.push("/login");
+      router.push(`/login?next=${encodeURIComponent(`/roommates/groups/${group.id}`)}`);
       return;
     }
+    setRequestSubmitting(true);
+    setRequestError("");
     try {
       const numId = parseInt(group.id, 10);
       if (!isNaN(numId)) {
         await api.roommates.sendRequest({ group_id: numId, message: requestMessage || undefined });
       }
-    } catch { /* API failed — still show success for demo */ }
-    setRequestSent(true);
+      setExistingRequestStatus("pending");
+      setRequestSent(true);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 409) {
+          setExistingRequestStatus("pending");
+          setRequestSent(true);
+        } else {
+          setRequestError(err.detail || "Could not send your request.");
+        }
+      } else {
+        setRequestError("Could not send your request.");
+      }
+    } finally {
+      setRequestSubmitting(false);
+    }
   };
 
   return (
@@ -534,14 +587,20 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="w-12 h-12 rounded-full bg-[#4ADE80]/10 flex items-center justify-center mx-auto mb-3">
                   <Check className="w-6 h-6 text-[#4ADE80]" />
                 </div>
-                <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>Request Sent!</h3>
-                <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px" }}>The group will review your profile and get back to you.</p>
+                <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>
+                  {existingRequestStatus === "accepted" ? "Request accepted" : "Request sent"}
+                </h3>
+                <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px" }}>
+                  {existingRequestStatus === "accepted"
+                    ? "This group has already accepted you. Open your roommate dashboard to keep things moving."
+                    : "The group will review your profile and get back to you."}
+                </p>
               </div>
             ) : !showRequestForm ? (
               <div className="text-center">
                 <h3 className="text-[#1B2D45] mb-1" style={{ fontSize: "16px", fontWeight: 700 }}>Interested in joining?</h3>
                 <p className="text-[#1B2D45]/35 mb-4" style={{ fontSize: "12px" }}>Send a request and introduce yourself to the group.</p>
-                <button onClick={() => user ? setShowRequestForm(true) : router.push("/login")} className="px-6 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.25)" }}>
+                <button onClick={() => user ? setShowRequestForm(true) : router.push(`/login?next=${encodeURIComponent(`/roommates/groups/${group.id}`)}`)} className="px-6 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.25)" }}>
                   {user ? "Request to Join" : "Log in to Request"}
                 </button>
                 {!user && (
@@ -551,6 +610,11 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
             ) : (
               <div>
                 <h3 className="text-[#1B2D45] mb-3" style={{ fontSize: "15px", fontWeight: 700 }}>Say hi to the group 👋</h3>
+                {requestError && (
+                  <div className="mb-3 rounded-xl bg-[#E71D36]/5 px-3 py-2 text-[#E71D36]" style={{ fontSize: "12px", fontWeight: 600 }}>
+                    {requestError}
+                  </div>
+                )}
                 <textarea
                   value={requestMessage}
                   onChange={(e) => setRequestMessage(e.target.value)}
@@ -561,8 +625,8 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                 <p className="text-[#1B2D45]/20 mt-1 mb-3" style={{ fontSize: "10px" }}>Your lifestyle profile will be shared with the group along with this message.</p>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setShowRequestForm(false)} className="px-4 py-2.5 rounded-xl text-[#1B2D45]/40 hover:bg-[#1B2D45]/[0.04] transition-all" style={{ fontSize: "13px", fontWeight: 600 }}>Cancel</button>
-                  <button onClick={handleRequestJoin} className="flex-1 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all flex items-center justify-center gap-1.5" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}>
-                    <Send className="w-4 h-4" /> Send Request
+                  <button onClick={handleRequestJoin} disabled={requestSubmitting} className="flex-1 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}>
+                    <Send className="w-4 h-4" /> {requestSubmitting ? "Sending..." : "Send Request"}
                   </button>
                 </div>
               </div>

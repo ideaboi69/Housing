@@ -311,7 +311,7 @@ export function CreateSubletForm({
       toast.success("Your sublet is live.");
 
       if (redirectAfterCreate) {
-        router.push(`/sublets/${response.id}`);
+        router.push(`/sublets?created=${response.id}`);
       }
     } catch (error) {
       console.error("Failed to create sublet", error);

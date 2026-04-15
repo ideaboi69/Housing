@@ -387,6 +387,9 @@ export default function StudentDashboardPage() {
               <Link href="/marketplace/my" className="mt-4 inline-flex items-center gap-1.5 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 700 }}>
                 Manage your items <ArrowRight className="h-3.5 w-3.5" />
               </Link>
+              <Link href="/marketplace/messages" className="mt-2 inline-flex items-center gap-1.5 text-[#1B2D45]/55 hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>
+                Open marketplace messages <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
             </div>
 
             <div className="rounded-2xl border border-black/[0.04] bg-white p-5" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>

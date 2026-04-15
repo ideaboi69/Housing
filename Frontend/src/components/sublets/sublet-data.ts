@@ -155,3 +155,69 @@ export function generateSubletCompareSummary(listings: SubletListing[]): string 
   }
   return parts.join(" ");
 }
+
+export function mapApiSubletToListing(sublet: SubletListResponse): SubletListing {
+  const startMonth = new Date(sublet.sublet_start_date).getMonth();
+  const endMonth = new Date(sublet.sublet_end_date).getMonth();
+  const availableMonths = MONTHS.map((_, index) => index >= startMonth && index <= endMonth);
+  const distance = Number(sublet.distance_to_campus_km ?? 0);
+  const originalPrice = Math.round(Number(sublet.rent_per_month) * 1.18);
+  const walkTime = Number(sublet.walk_time_minutes ?? 0);
+  const bedsTotal = Number(sublet.total_rooms ?? 1);
+  const terms = sublet.terms;
+
+  const amenities = [
+    sublet.is_furnished ? "Furnished" : null,
+    sublet.utilities_included ? "Utilities Incl." : null,
+    sublet.has_parking ? "Parking" : null,
+    sublet.has_laundry ? "Laundry" : null,
+    sublet.has_wifi ? "WiFi" : null,
+    sublet.pet_policy === "allowed" ? "Pets Allowed" : sublet.pet_policy === "case_by_case" ? "Pets Case-by-case" : null,
+  ].filter(Boolean) as string[];
+
+  const neighborhood =
+    distance <= 0.7
+      ? "Campus"
+      : distance <= 1.5
+        ? "Near Campus"
+        : distance <= 2.4
+          ? "Stone Road"
+          : "Guelph";
+
+  return {
+    id: String(sublet.id),
+    title: sublet.title,
+    street: sublet.address.split(",")[0]?.trim() || sublet.address,
+    coverImage: sublet.primary_image || sublet.images?.[0]?.image_url || "/demo/listings/house.jpg",
+    subletPrice: Number(sublet.rent_per_month),
+    originalPrice,
+    healthScore: Math.min(
+      96,
+      70
+        + (distance <= 0.7 ? 12 : distance <= 1.4 ? 7 : 3)
+        + (sublet.is_furnished ? 4 : 0)
+        + (sublet.utilities_included ? 3 : 0)
+        + (sublet.has_laundry ? 2 : 0)
+        + (sublet.has_wifi ? 2 : 0)
+    ),
+    verified: false,
+    posterType: sublet.posted_by || "Student poster",
+    posterIsStudent: true,
+    availableMonths,
+    neighborhood,
+    furnished: Boolean(sublet.is_furnished),
+    negotiablePrice: Boolean(terms?.negotiable_price),
+    flexibleDates: Boolean(terms?.flexible_dates),
+    roommatesStaying: terms?.roommates_staying ? Math.max(0, bedsTotal - 1) : null,
+    roommateDesc: terms?.roommates_staying ? "Roommates staying during the sublet term" : null,
+    bedsAvailable: terms?.entire_place ? bedsTotal : 1,
+    bedsTotal,
+    distance: `${distance.toFixed(1)} km`,
+    walkTime: `${walkTime} min`,
+    amenities,
+    views: 0,
+    saves: 0,
+    rotation: Number(sublet.id) % 2 === 0 ? 1.2 : -1.2,
+  };
+}
+import type { SubletListResponse } from "@/types";

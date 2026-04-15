@@ -287,6 +287,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const campusAccess = listing.walk_time_minutes != null
     ? getProximityLabel(listing.walk_time_minutes)
     : getProximityFromKm(listing.distance_to_campus_km != null ? Number(listing.distance_to_campus_km) : null);
+  const userReview = user ? reviews.find((review) => review.student_id === user.id) : null;
 
   const amenities = getAmenityChecklist(listing as unknown as Record<string, unknown>);
   const hasAmenities = amenities.filter((a) => a.has);
@@ -493,11 +494,18 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   {user ? (
                     <motion.button
                       whileTap={{ scale: 0.97 }}
-                      onClick={() => setReviewOpen(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FFB627]/10 text-[#FFB627] hover:bg-[#FFB627]/15 transition-colors"
+                      onClick={() => {
+                        if (!userReview) setReviewOpen(true);
+                      }}
+                      disabled={Boolean(userReview)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors ${
+                        userReview
+                          ? "bg-[#1B2D45]/[0.05] text-[#1B2D45]/35 cursor-default"
+                          : "bg-[#FFB627]/10 text-[#FFB627] hover:bg-[#FFB627]/15"
+                      }`}
                       style={{ fontSize: "12px", fontWeight: 600 }}
                     >
-                      <Star className="w-3.5 h-3.5" /> Leave a Review
+                      <Star className="w-3.5 h-3.5" /> {userReview ? "Review submitted" : "Leave a Review"}
                     </motion.button>
                   ) : (
                     <Link

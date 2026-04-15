@@ -95,7 +95,7 @@ export default function CreateSubletPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: 0.06 }}
           >
-            <CreateSubletForm selectedRange={[4, 8]} />
+            <CreateSubletForm selectedRange={[4, 8]} redirectAfterCreate />
           </motion.section>
         </div>
       </div>

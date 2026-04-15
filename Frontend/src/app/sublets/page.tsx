@@ -35,7 +35,7 @@ import { BrowseGridSkeleton } from "@/components/ui/Skeletons";
 import type { GenderPreference } from "@/types";
 import {
   type SubletListing, type SubletViewMode, type SubletCellValue,
-  MONTHS, subletListings, getScoreLabel, filterOptions,
+  MONTHS, subletListings, getScoreLabel, filterOptions, mapApiSubletToListing,
   getSubletBestIndex, parseSubletDistance, parseSubletWalkTime, generateSubletCompareSummary,
 } from "@/components/sublets/sublet-data";
 
@@ -1922,6 +1922,34 @@ export default function SubletsPage() {
   const [compareOpen, setCompareOpen] = useState(false);
   const isLandlord = user?.role === "landlord";
   const router = useRouter();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLiveSublets() {
+      try {
+        const liveSublets = await api.sublets.browse();
+        if (cancelled || liveSublets.length === 0) return;
+
+        const normalized = liveSublets.map(mapApiSubletToListing);
+        const seenIds = new Set(normalized.map((listing) => listing.id));
+        const merged = [...normalized, ...subletListings.filter((listing) => !seenIds.has(listing.id))];
+
+        if (!cancelled) {
+          setListings(merged);
+        }
+      } catch {
+        if (!cancelled) {
+          setListings(subletListings);
+        }
+      }
+    }
+
+    loadLiveSublets();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleListClick = () => {
     if (isLandlord) {

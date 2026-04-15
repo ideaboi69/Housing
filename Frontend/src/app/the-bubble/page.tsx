@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronUp, Bookmark, Share2, MoreHorizontal, X, ImagePlus,
@@ -12,6 +12,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
 import { RequestWriterAccessModal } from "@/components/ui/RequestWriterAccessModal";
 import type { PostListResponse, PostCategory as PostCategoryType } from "@/types";
+import { toast } from "sonner";
 
 /* ═══════════════════════════════════════════════════════
    TYPES
@@ -22,6 +23,7 @@ type SortMode = "trending" | "new" | "top";
 
 interface Post {
   id: string;
+  sourcePostId?: number;
   author: string;
   initial: string;
   avatarGradient: string;
@@ -38,6 +40,7 @@ interface Post {
   postedAt: number; // unix ms for sorting
   slug?: string;
   viewCount?: number;
+  userHasUpvoted?: boolean;
 }
 
 function formatRelativeTimestamp(dateStr: string): string {
@@ -58,6 +61,7 @@ function buildLivePost(post: PostListResponse): Post {
 
   return {
     id: `live-${post.id}`,
+    sourcePostId: post.id,
     author: authorName,
     initial: authorName[0]?.toUpperCase() || "W",
     avatarGradient: `linear-gradient(135deg, ${meta.color}, #1B2D45)`,
@@ -68,10 +72,11 @@ function buildLivePost(post: PostListResponse): Post {
     body: post.preview || "Tap through to read the full post.",
     image: post.cover_image_url || undefined,
     eventDate: post.event_date,
-    upvotes: post.view_count || 0,
+    upvotes: post.upvote_count || 0,
     postedAt: new Date(post.created_at).getTime(),
     slug: post.slug,
     viewCount: post.view_count,
+    userHasUpvoted: post.user_has_upvoted,
   };
 }
 
@@ -207,12 +212,64 @@ function CategoryPill({ cat, small }: { cat: Category; small?: boolean }) {
    POST CARD
    ═══════════════════════════════════════════════════════ */
 
-function PostCard({ post, index }: { post: Post; index: number }) {
-  const [upvoted, setUpvoted] = useState(false);
+function PostCard({
+  post,
+  index,
+  onPostUpdated,
+}: {
+  post: Post;
+  index: number;
+  onPostUpdated?: (postId: string, updates: Partial<Post>) => void;
+}) {
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const [upvoted, setUpvoted] = useState(Boolean(post.userHasUpvoted));
+  const [voteCount, setVoteCount] = useState(post.upvotes);
   const [saved, setSaved] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const voteCount = upvoted ? post.upvotes + 1 : post.upvotes;
+  const [upvoteLoading, setUpvoteLoading] = useState(false);
+
+  useEffect(() => {
+    setUpvoted(Boolean(post.userHasUpvoted));
+    setVoteCount(post.upvotes);
+  }, [post.userHasUpvoted, post.upvotes]);
+
+  const handleUpvote = async () => {
+    if (user?.role === "landlord") return;
+    if (!user) {
+      router.push("/login?next=/the-bubble");
+      return;
+    }
+
+    if (!post.sourcePostId) {
+      const nextUpvoted = !upvoted;
+      const nextCount = Math.max(0, voteCount + (nextUpvoted ? 1 : -1));
+      setUpvoted(nextUpvoted);
+      setVoteCount(nextCount);
+      return;
+    }
+
+    if (upvoteLoading) return;
+    setUpvoteLoading(true);
+
+    try {
+      const response = upvoted
+        ? await api.posts.removeUpvote(post.sourcePostId)
+        : await api.posts.upvote(post.sourcePostId);
+
+      setUpvoted(response.user_has_upvoted);
+      setVoteCount(response.upvote_count);
+      onPostUpdated?.(post.id, {
+        upvotes: response.upvote_count,
+        userHasUpvoted: response.user_has_upvoted,
+      });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : "Could not update vote.");
+    } finally {
+      setUpvoteLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -301,8 +358,8 @@ function PostCard({ post, index }: { post: Post; index: number }) {
         {/* Actions */}
         <div className="flex items-center justify-between pt-2 border-t border-black/[0.04]">
           <div className="relative">
-            <motion.button onClick={() => setUpvoted(!upvoted)} whileTap={{ scale: 1.2 }}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full transition-colors ${upvoted ? "bg-[#FF6B35]/10 text-[#FF6B35]" : "text-[#98A3B0] hover:bg-[#1B2D45]/5"}`}
+            <motion.button onClick={handleUpvote} whileTap={{ scale: 1.2 }} disabled={upvoteLoading}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full transition-colors disabled:opacity-60 ${upvoted ? "bg-[#FF6B35]/10 text-[#FF6B35]" : "text-[#98A3B0] hover:bg-[#1B2D45]/5"}`}
               style={{ fontSize: "12px", fontWeight: 600 }}>
               <ChevronUp className="w-4 h-4" />{voteCount}
             </motion.button>
@@ -403,7 +460,7 @@ function BecomeWriterCard({ onApply, compact, pending }: { onApply: () => void; 
    POST CREATION MODAL
    ═══════════════════════════════════════════════════════ */
 
-function PostModal({ onClose }: { onClose: () => void }) {
+function PostModal({ onClose, onPublished }: { onClose: () => void; onPublished?: () => Promise<void> | void }) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -432,6 +489,7 @@ function PostModal({ onClose }: { onClose: () => void }) {
       } catch {
         // Publish failed — post stays as draft, still close the modal
       }
+      await onPublished?.();
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Failed to create post.");
@@ -711,9 +769,11 @@ function HeroSection({ isWriter, writerPending, canContribute, onApply, isMobile
                 <Calendar className="w-4 h-4" /> Writer application pending
               </div>
             ) : isWriter ? (
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#2EC4B6]/20 bg-white px-4 py-2.5 text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 700 }}>
-                <BadgeCheck className="w-4 h-4 text-[#2EC4B6]" /> Writer access active
-              </div>
+              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onApply}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1B2D45] text-white"
+                style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(27,45,69,0.22)" }}>
+                <Pencil className="w-4 h-4" /> Open Writer Dashboard
+              </motion.button>
             ) : (
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onApply}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#FF6B35] text-white"
@@ -870,10 +930,32 @@ export default function TheBubblePage() {
   const { user } = useAuthStore();
   const isMobile = useIsMobile();
   const isLandlord = user?.role === "landlord";
-  const canUseBubbleActions = !isLandlord;
+  const canUseBubbleActions = Boolean(user) && !isLandlord;
   const isStudent = user?.role === "student";
   const isSignedIn = Boolean(user);
   const writerRequestPending = Boolean(user?.write_access_requested) && !isWriter;
+
+  const handlePostUpdated = useCallback((postId: string, updates: Partial<Post>) => {
+    setLivePosts((current) =>
+      current.map((post) => (post.id === postId ? { ...post, ...updates } : post))
+    );
+  }, []);
+
+  const handleWriterAction = useCallback(() => {
+    if (isWriter) {
+      router.push("/writer");
+      return;
+    }
+    if (user?.role === "student") {
+      if (!writerRequestPending) setShowWriterRequestModal(true);
+      return;
+    }
+    if (!user) {
+      router.push("/login?next=/the-bubble");
+      return;
+    }
+    router.push("/writers/signup");
+  }, [isWriter, router, user, writerRequestPending]);
 
   // Check if user has write access (student with is_writable, or a writer token)
   useEffect(() => {
@@ -891,10 +973,19 @@ export default function TheBubblePage() {
     setIsWriter(false);
   }, [user]);
 
+  const loadPublishedPosts = useCallback(async () => {
+    try {
+      const data = await api.posts.getAll();
+      setLivePosts(data.filter((post) => post.status === "published").map(buildLivePost));
+    } catch {
+      setLivePosts([]);
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
-    async function loadPublishedPosts() {
+    async function loadPosts() {
       try {
         const data = await api.posts.getAll();
         if (!cancelled) {
@@ -905,7 +996,7 @@ export default function TheBubblePage() {
       }
     }
 
-    loadPublishedPosts();
+    loadPosts();
     return () => {
       cancelled = true;
     };
@@ -945,7 +1036,7 @@ export default function TheBubblePage() {
       return;
     }
     if (!user) {
-      router.push("/writers/signup");
+      router.push("/login?next=/the-bubble");
       return;
     }
     if (isWriter) setShowPostModal(true);
@@ -988,7 +1079,7 @@ export default function TheBubblePage() {
                 <Pencil className="w-5 h-5 text-[#FF6B35]" />
               </motion.div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "14px", fontWeight: 700 }}>Writer access active</h4>
+                <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "14px", fontWeight: 700 }}>Open writer dashboard</h4>
                 <p className="text-[#5C6B7A]" style={{ fontSize: compact ? "10px" : "11px", lineHeight: 1.4 }}>
                   Open your writer dashboard to publish posts and manage Bubble content
                 </p>
@@ -1057,7 +1148,7 @@ export default function TheBubblePage() {
         isWriter={isWriter}
         writerPending={writerRequestPending}
         canContribute={canUseBubbleActions}
-        onApply={() => user?.role === "student" ? setShowWriterRequestModal(true) : !user ? router.push("/login?next=/the-bubble") : router.push("/writers/signup")}
+        onApply={handleWriterAction}
         isMobile={isMobile}
         isSignedIn={isSignedIn}
       />
@@ -1069,7 +1160,7 @@ export default function TheBubblePage() {
           {/* Feed */}
           <div className="flex-1 min-w-0 space-y-4">
             {activeCategory === "all" && <WeeklyHighlightsCard />}
-            {isMobile && activeCategory === "all" && renderWriterCard(true)}
+            {isMobile && renderWriterCard(true)}
 
             {/* Mobile sort toggle */}
             {isMobile && (
@@ -1085,7 +1176,7 @@ export default function TheBubblePage() {
             )}
 
             {filteredAndSorted.length > 0 ? (
-              filteredAndSorted.map((post, i) => <PostCard key={post.id} post={post} index={i} />)
+              filteredAndSorted.map((post, i) => <PostCard key={post.id} post={post} index={i} onPostUpdated={handlePostUpdated} />)
             ) : (
               <EmptyState onReset={() => setActiveCategory("all")} />
             )}
@@ -1093,7 +1184,7 @@ export default function TheBubblePage() {
 
           {!isMobile && (
             <div className="shrink-0 pl-1 pr-1 space-y-4">
-              {activeCategory === "all" && renderWriterCard()}
+              {renderWriterCard()}
               <Sidebar canContribute={canUseBubbleActions} onTip={() => setShowTipModal(true)} posts={feedPosts} />
             </div>
           )}
@@ -1112,7 +1203,7 @@ export default function TheBubblePage() {
 
       {/* Modals */}
       <AnimatePresence>
-        {showPostModal && canUseBubbleActions && isWriter && <PostModal onClose={() => setShowPostModal(false)} />}
+        {showPostModal && canUseBubbleActions && isWriter && <PostModal onClose={() => setShowPostModal(false)} onPublished={loadPublishedPosts} />}
       </AnimatePresence>
       <AnimatePresence>
         {showTipModal && canUseBubbleActions && (
