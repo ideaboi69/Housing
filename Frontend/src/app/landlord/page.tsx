@@ -21,6 +21,7 @@ import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
 import { ShowingsManager } from "@/components/landlord/ShowingsManager";
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
 import { LandlordOverviewSkeleton } from "@/components/ui/Skeletons";
+import { TenantCardModal } from "@/components/ui/TenantCardModal";
 
 /* ════════════════════════════════════════════════════════
    Types
@@ -1002,6 +1003,7 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+  const [tenantCardOpen, setTenantCardOpen] = useState(false);
   const unreadTotal = conversations.reduce((sum, convo) => sum + convo.unread_count, 0);
   const uniqueStudents = new Set(conversations.map((convo) => convo.user_id)).size;
   const recentInquiry = conversations[0]?.last_message?.created_at;
@@ -1123,15 +1125,31 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
             ) : (
               <>
                 {/* Header */}
-                <div className="px-4 py-3 border-b border-black/[0.04] bg-white/80 backdrop-blur-sm flex items-center gap-2">
+                <div className="px-4 py-3 border-b border-black/[0.04] bg-white/80 backdrop-blur-sm flex items-center gap-3">
                   <button onClick={() => setActiveConvo(null)} className="md:hidden w-7 h-7 rounded-lg flex items-center justify-center text-[#1B2D45]/40 hover:bg-[#1B2D45]/[0.04]">
                     <ChevronRight className="w-4 h-4 rotate-180" />
                   </button>
-                  <div>
+                  {/* Clickable student avatar with pulse */}
+                  <button onClick={() => setTenantCardOpen(true)} className="relative shrink-0 group" title="View student profile">
+                    <div className="w-8 h-8 rounded-full bg-[#1B2D45]/[0.06] flex items-center justify-center group-hover:bg-[#FF6B35]/10 transition-colors">
+                      <span className="text-[#1B2D45]/40 group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "11px", fontWeight: 700 }}>{(activeConvoData?.user_name ?? "S")[0].toUpperCase()}</span>
+                    </div>
+                    <span className="absolute inset-0 rounded-full animate-ping bg-[#FF6B35]/20" style={{ animationDuration: "2s", animationIterationCount: 3 }} />
+                  </button>
+                  <div className="flex-1 min-w-0">
                     <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{activeConvoData?.user_name ?? "Student"}</div>
                     <div className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>Re: {activeConvoData?.listing_title}</div>
                   </div>
                 </div>
+
+                {/* Tenant Card Modal */}
+                {activeConvoData && (
+                  <TenantCardModal
+                    isOpen={tenantCardOpen}
+                    onClose={() => setTenantCardOpen(false)}
+                    userId={activeConvoData.user_id}
+                  />
+                )}
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto px-4 py-5 space-y-3">

@@ -9,6 +9,7 @@ import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
 import { BookShowingModal } from "@/components/landlord/BookShowingModal";
+import { TenantProfilePrompt } from "@/components/ui/TenantProfilePrompt";
 import {
   formatPrice, formatLeaseType, formatPropertyType, formatDate, getScoreColor, getScoreLabel,
 } from "@/lib/utils";
@@ -165,6 +166,10 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [showingOpen, setShowingOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [showTenantPrompt, setShowTenantPrompt] = useState(false);
+  const [hasTenantProfile, setHasTenantProfile] = useState<boolean | null>(null);
+  const [pendingAction, setPendingAction] = useState<"contact" | "showing" | null>(null);
+  const tenantChecked = useRef(false);
 
   const user = useAuthStore((s) => s.user);
 
@@ -235,17 +240,29 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     load();
   }, [listingId, isInvalidId]);
 
-  const handleContact = async () => {
-    if (contactSending || contactSent) return;
-    if (!user) {
-      router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
-      return;
-    }
+  // Check if student has filled tenant profile
+  useEffect(() => {
+    if (!user || user.role !== "student" || tenantChecked.current) return;
+    tenantChecked.current = true;
+    api.auth.getTenantStatus()
+      .then((res) => setHasTenantProfile(res.has_tenant_profile))
+      .catch(() => setHasTenantProfile(true));
+  }, [user]);
+
+  const handleTenantComplete = () => {
+    setShowTenantPrompt(false);
+    setHasTenantProfile(true);
+    if (pendingAction === "contact") doContact();
+    else if (pendingAction === "showing") setShowingOpen(true);
+    setPendingAction(null);
+  };
+
+  const doContact = async () => {
     setContactSending(true);
     try {
       await api.messages.startConversation({
         listing_id: listingId,
-        content: `Hi, I'm interested in "${listing?.title}". Is it still available?`,
+        content: `Hi, I\u2019m interested in "${listing?.title}". Is it still available?`,
       });
       setContactSent(true);
       setTimeout(() => router.push("/messages"), 1500);
@@ -253,14 +270,41 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       if (err instanceof Error && "status" in err && (err as { status?: number }).status === 409) {
         router.push("/messages");
       } else {
-        toast.error("We couldn’t open a conversation right now. Please try again.");
+        toast.error("We couldn\u2019t open a conversation right now. Please try again.");
       }
     } finally {
       setContactSending(false);
     }
   };
 
-  if (isLoading) {
+  const handleContact = async () => {
+    if (contactSending || contactSent) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
+      return;
+    }
+    if (!hasTenantProfile === false) {
+      setPendingAction("contact");
+      setShowTenantPrompt(true);
+      return;
+    }
+    doContact();
+  };
+
+  const handleBookShowing = () => {
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
+      return;
+    }
+    if (!hasTenantProfile === false) {
+      setPendingAction("showing");
+      setShowTenantPrompt(true);
+      return;
+    }
+    setShowingOpen(true);
+  };
+
+    if (isLoading) {
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
         <motion.div className="flex flex-col items-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -578,7 +622,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               </motion.button>
 
               {/* Book Showing */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowingOpen(true)}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={handleBookShowing}
                 className="w-full mt-2 py-3 rounded-xl border border-[#FF6B35]/20 text-[#FF6B35] bg-[#FF6B35]/[0.04] hover:bg-[#FF6B35]/[0.08] transition-all flex items-center justify-center gap-2"
                 style={{ fontSize: "14px", fontWeight: 600 }}>
                 <Calendar className="w-4 h-4" /> Book a Showing
@@ -664,6 +708,13 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
         onReviewSubmitted={(newReview) => {
           setReviews((prev) => [newReview, ...prev]);
         }}
+      />
+
+      {/* Tenant Profile Prompt */}
+      <TenantProfilePrompt
+        isOpen={showTenantPrompt}
+        onClose={() => { setShowTenantPrompt(false); setPendingAction(null); }}
+        onComplete={handleTenantComplete}
       />
     </div>
   );

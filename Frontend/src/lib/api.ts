@@ -305,6 +305,19 @@ export const auth = {
 
     return res.json() as Promise<{ message: string }>;
   },
+
+  // Tenant Profile Pop-up
+  getTenantStatus: () =>
+  request<{ has_tenant_profile: boolean }>("/api/users/me/tenant-status"),
+
+submitTenantProfile: (data: { smoking: string; pets: string; gender_housing_pref: string; cleanliness: string }) =>
+  request<{ message: string; has_tenant_profile: boolean }>("/api/users/me/tenant-profile", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
+
+getTenantCard: (userId: number) =>
+  request<import("@/types").TenantCardResponse>(`/api/users/${userId}/tenant-card`), 
 };
 
 // ── Listings ────────────────────────────────────────────

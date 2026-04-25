@@ -106,6 +106,28 @@ export interface UserResponse {
   phone?: string | null;
 }
 
+export interface TenantProfileCreate {
+  smoking: string;
+  pets: string;
+  gender_housing_pref: string;
+  cleanliness: string;
+}
+ 
+export interface TenantCardResponse {
+  id: number;
+  first_name: string;
+  last_name: string;
+  profile_photo_url?: string | null;
+  program?: string | null;
+  year?: string | null;
+  bio?: string | null;
+  smoking?: string | null;
+  pets?: string | null;
+  gender_housing_pref?: string | null;
+  cleanliness?: string | null;
+  has_tenant_profile: boolean;
+}
+
 export interface UserDashboardResponse {
   sublets_active: number;
   sublets_drafts: number;

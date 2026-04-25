@@ -15,7 +15,7 @@ const rotatingLines = ["direct student messages", "verified listings", "faster r
 
 function persistLandlordSession(token: string, landlord: UserResponse) {
   localStorage.setItem("cribb_token", token);
-  sessionStorage.setItem("cribb_landlord_profile", JSON.stringify(landlord));
+  localStorage.setItem("cribb_landlord_profile", JSON.stringify(landlord));
   useAuthStore.setState({
     user: landlord,
     token,

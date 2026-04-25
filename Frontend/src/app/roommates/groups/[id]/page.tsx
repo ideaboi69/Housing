@@ -63,7 +63,7 @@ function MemberCard({ member }: { member: LifestyleProfile }) {
       )}
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className="px-2 py-0.5 rounded bg-[#1B2D45]/[0.04] text-[#1B2D45]/40" style={{ fontSize: "9px", fontWeight: 600 }}>{budgetLabel}/mo</span>
-        {topTags.map((t) => (
+        {Array.from(new Set(topTags)).map((t) => (
           <span key={t} className="px-2 py-0.5 rounded bg-[#FF6B35]/[0.06] text-[#FF6B35]/60" style={{ fontSize: "9px", fontWeight: 500 }}>{t}</span>
         ))}
       </div>

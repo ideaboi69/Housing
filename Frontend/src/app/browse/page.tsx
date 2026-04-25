@@ -96,17 +96,20 @@ function normalizeBrowseListing(listing: ListingDetailResponse): ListingDetailRe
 }
 
 function mergeBrowseListings(liveListings: ListingDetailResponse[]): ListingDetailResponse[] {
-  const seen = new Set<string>();
+  const seen = new Set<number>();
+  const seenComposite = new Set<string>();
   const merged: ListingDetailResponse[] = [];
 
   const addListing = (listing: ListingDetailResponse) => {
+    if (seen.has(listing.id)) return;
     const key = [
       listing.id,
       listing.address?.trim().toLowerCase(),
       listing.title?.trim().toLowerCase(),
     ].join("::");
-    if (seen.has(key)) return;
-    seen.add(key);
+    if (seenComposite.has(key)) return;
+    seen.add(listing.id);
+    seenComposite.add(key);
     merged.push(listing);
   };
 
@@ -342,15 +345,15 @@ export default function BrowsePage() {
               transition={{ duration: 0.25 }}
             >
               <div className={isMobile ? "relative z-[1] flex flex-col gap-5" : "relative z-[1] grid grid-cols-3 gap-5"}>
-                {filteredListings.map((listing, i) => {
-                  const row = Math.floor(i / 3);
-                  const col = i % 3;
-                  return (
-                    <div
-                      key={listing.id}
-                      className="min-w-0"
-                      style={isMobile ? undefined : { marginTop: `${(staggers[row % 3] ?? staggers[0])[col] ?? 0}px` }}
-                    >
+                  {Array.from(new Map(filteredListings.map(l => [l.id, l])).values()).map((listing, i) => {
+                    const row = Math.floor(i / 3);
+                    const col = i % 3;
+                    return (
+                      <div
+                        key={listing.id}
+                        className="min-w-0"
+                        style={isMobile ? undefined : { marginTop: `${(staggers[row % 3] ?? staggers[0])[col] ?? 0}px` }}
+                      >
                       <PolaroidCard
                         listing={listing}
                         healthScore={healthScores[listing.id] ?? null}

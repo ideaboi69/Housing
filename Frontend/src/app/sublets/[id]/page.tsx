@@ -6,6 +6,7 @@ import { ReportModal } from "@/components/ui/ReportModal";
 import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
+import { TenantProfilePrompt } from "@/components/ui/TenantProfilePrompt";
 import { getScoreColor } from "@/lib/utils";
 import { getAmenityChecklist } from "@/lib/amenities";
 import { getMockSublet } from "@/lib/mock-sublets";
@@ -191,6 +192,9 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   const [messageSent, setMessageSent] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [showTenantPrompt, setShowTenantPrompt] = useState(false);
+  const [hasTenantProfile, setHasTenantProfile] = useState<boolean | null>(null);
+  const tenantChecked = useRef(false);
 
   const user = useAuthStore((s) => s.user);
 
@@ -251,18 +255,22 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     }
   }, [sublet, reviews.length]);
 
-  const handleMessage = async () => {
-    if (messageSending || messageSent) return;
-    if (!user) {
-      router.push(`/login?next=${encodeURIComponent(`/sublets/${id}`)}`);
-      return;
-    }
+  // Check if student has filled tenant profile
+  useEffect(() => {
+    if (!user || user.role !== "student" || tenantChecked.current) return;
+    tenantChecked.current = true;
+    api.auth.getTenantStatus()
+      .then((res) => setHasTenantProfile(res.has_tenant_profile))
+      .catch(() => setHasTenantProfile(true));
+  }, [user]);
+
+  const doMessage = async () => {
     setMessageSending(true);
     try {
       if (sublet?.listing_id) {
         await api.messages.startConversation({
           listing_id: sublet.listing_id,
-          content: `Hi, I'm interested in "${sublet.title}". Is it still available?`,
+          content: `Hi, I’m interested in "${sublet.title}". Is it still available?`,
         });
         setMessageSent(true);
         setTimeout(() => router.push("/messages"), 1500);
@@ -280,7 +288,26 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  if (loading) {
+  const handleMessage = async () => {
+    if (messageSending || messageSent) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/sublets/${id}`)}`);
+      return;
+    }
+    if (!hasTenantProfile === false) {
+      setShowTenantPrompt(true);
+      return;
+    }
+    doMessage();
+  };
+
+  const handleTenantComplete = () => {
+    setShowTenantPrompt(false);
+    setHasTenantProfile(true);
+    doMessage();
+  };
+
+    if (loading) {
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
         <motion.div className="text-center" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -616,6 +643,13 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
         onReviewSubmitted={(newReview) => {
           setReviews((prev) => [newReview, ...prev]);
         }}
+      />
+
+      {/* Tenant Profile Prompt */}
+      <TenantProfilePrompt
+        isOpen={showTenantPrompt}
+        onClose={() => setShowTenantPrompt(false)}
+        onComplete={handleTenantComplete}
       />
     </div>
   );

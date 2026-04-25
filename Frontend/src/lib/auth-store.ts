@@ -74,7 +74,7 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: typeof window !== "undefined" ? localStorage.getItem("cribb_token") : null,
-  isLoading: false,
+  isLoading: typeof window !== "undefined" ? !!localStorage.getItem("cribb_token") : false,
   error: null,
 
   /** Student login — calls /api/users/login */

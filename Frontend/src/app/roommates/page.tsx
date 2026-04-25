@@ -283,17 +283,20 @@ function IndividualCard({ profile }: { profile: LifestyleProfile }) {
    Profile Quiz
    ════════════════════════════════════════════════════════ */
 
-function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>, budget: [number, number], moveIn: string, gender: string) => void }) {
+function ProfileQuiz({ onComplete, skipKeys = [], skipGenderHousing = false }: { onComplete: (tags: Record<string, string>, budget: [number, number], moveIn: string, gender: string) => void; skipKeys?: string[]; skipGenderHousing?: boolean }) {
+  const categories = LIFESTYLE_CATEGORIES.filter((c) => !skipKeys.includes(c.key));
   const [step, setStep] = useState(0);
   const [tags, setTags] = useState<Record<string, string>>({});
   const [budget, setBudget] = useState<[number, number] | null>(null);
   const [moveIn, setMoveIn] = useState("");
   const [genderHousing, setGenderHousing] = useState("");
-  const totalSteps = LIFESTYLE_CATEGORIES.length + 2;
+  const totalSteps = categories.length + (skipGenderHousing ? 1 : 2);
   const progress = ((step + 1) / totalSteps) * 100;
-  const currentCat = step < LIFESTYLE_CATEGORIES.length ? LIFESTYLE_CATEGORIES[step] : null;
-  const canNext = currentCat ? !!tags[currentCat.key] : step === LIFESTYLE_CATEGORIES.length ? !!budget && !!moveIn : !!genderHousing;
-  function next() { if (step < totalSteps - 1) setStep(step + 1); else onComplete(tags, budget!, moveIn, genderHousing); }
+  const currentCat = step < categories.length ? categories[step] : null;
+  const isBudgetStep = step === categories.length;
+  const isGenderStep = !skipGenderHousing && step === categories.length + 1;
+  const canNext = currentCat ? !!tags[currentCat.key] : isBudgetStep ? !!budget && !!moveIn : !!genderHousing;
+  function next() { if (step < totalSteps - 1) setStep(step + 1); else onComplete(tags, budget!, moveIn, skipGenderHousing ? "" : genderHousing); }
 
   return (
     <div className="max-w-[520px] mx-auto">
@@ -320,7 +323,7 @@ function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>
               </div>
             </div>
           )}
-          {step === LIFESTYLE_CATEGORIES.length && (
+          {isBudgetStep && (
             <div>
               <h2 className="text-[#1B2D45] mb-1" style={{ fontSize: "22px", fontWeight: 800 }}>💰 Budget &amp; Timeline</h2>
               <p className="text-[#1B2D45]/55 mb-5" style={{ fontSize: "13px" }}>Helps match you with students in the same range</p>
@@ -334,7 +337,7 @@ function ProfileQuiz({ onComplete }: { onComplete: (tags: Record<string, string>
               </div>
             </div>
           )}
-          {step === LIFESTYLE_CATEGORIES.length + 1 && (
+          {isGenderStep && (
             <div>
               <h2 className="text-[#1B2D45] mb-1" style={{ fontSize: "22px", fontWeight: 800 }}>🏠 Housing Preference</h2>
               <p className="text-[#1B2D45]/55 mb-5" style={{ fontSize: "13px" }}>Used to filter matches — never shown on your profile</p>
@@ -546,6 +549,9 @@ export default function RoommatesPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [apiGroups, setApiGroups] = useState<RoommateGroup[] | null>(null);
   const [apiIndividuals, setApiIndividuals] = useState<LifestyleProfile[] | null>(null);
+  const [tenantSkipKeys, setTenantSkipKeys] = useState<string[]>([]);
+  const [tenantGender, setTenantGender] = useState<string | null>(null);
+  const [tenantValues, setTenantValues] = useState<Record<string, string>>({});
   const visibleGroups = useMemo(() => (hydrated ? (apiGroups !== null ? [] : getVisibleRoommateGroups()) : []), [hydrated, apiGroups]);
   const claimState = useMemo(() => (hydrated ? getLandlordClaimState() : null), [hydrated]);
 
@@ -630,6 +636,20 @@ export default function RoommatesPage() {
             return;
           }
         } catch { /* no API profile — check localStorage */ }
+
+        // Check for partial tenant profile (tenant card filled, quiz not done)
+        try {
+          const profile = await api.roommates.getMyQuiz();
+          if (profile && !profile.quiz_completed) {
+            const skip: string[] = [];
+            const vals: Record<string, string> = {};
+            if (profile.cleanliness) { skip.push("cleanliness"); vals.cleanliness = profile.cleanliness; }
+            if (profile.smoking) { skip.push("smoking"); vals.smoking = profile.smoking; }
+            if (profile.pets) { skip.push("pets"); vals.pets = profile.pets; }
+            if (skip.length > 0) { setTenantSkipKeys(skip); setTenantValues(vals); }
+            if (profile.gender_housing_pref) { setTenantGender(profile.gender_housing_pref); vals.gender_housing_pref = profile.gender_housing_pref; setTenantValues(vals); }
+          }
+        } catch { /* no profile at all */ }
       }
 
       // Fallback to localStorage
@@ -689,21 +709,21 @@ export default function RoommatesPage() {
 
         await api.roommates.submitQuiz({
           sleep_schedule: tagToEnum.sleep?.[tags.sleep] || "flexible",
-          cleanliness: tagToEnum.cleanliness?.[tags.cleanliness] || "reasonably_clean",
+          cleanliness: tagToEnum.cleanliness?.[tags.cleanliness] || tenantValues.cleanliness || "reasonably_clean",
           noise_level: tagToEnum.noise?.[tags.noise] || "moderate",
           guests: tagToEnum.guests?.[tags.guests] || "sometimes",
           study_habits: tagToEnum.study?.[tags.study] || "mix",
-          smoking: tagToEnum.smoking?.[tags.smoking] || "no_smoking",
-          pets: tagToEnum.pets?.[tags.pets] || "fine_with_pets",
+          smoking: tagToEnum.smoking?.[tags.smoking] || tenantValues.smoking || "no_smoking",
+          pets: tagToEnum.pets?.[tags.pets] || tenantValues.pets || "fine_with_pets",
           kitchen_use: tagToEnum.cooking?.[tags.cooking] || "few_times_week",
           budget_range: budgetToEnum(budget),
           roommate_timing: moveInToEnum(moveIn),
-          gender_housing_pref: genderToEnum(genderHousing),
+          gender_housing_pref: genderHousing ? genderToEnum(genderHousing) : (tenantGender || "no_preference"),
           search_type: "on_my_own",
         });
       } catch { /* API failed — quiz still works locally */ }
     }
-  }, [user]);
+  }, [user, tenantValues, tenantGender]);
 
   const handleSetupSelect = (mode: Exclude<LookingMode, null>, have: number, need: number) => {
     setMyMode(mode);
@@ -855,7 +875,7 @@ export default function RoommatesPage() {
     );
   }
 
-  if (!hasProfile) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><ProfileQuiz onComplete={handleQuizComplete} /></div></div>;
+  if (!hasProfile) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><ProfileQuiz onComplete={handleQuizComplete} skipKeys={tenantSkipKeys} skipGenderHousing={!!tenantGender} /></div></div>;
   if (!setupDone) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><GettingStarted onSelect={handleSetupSelect} allowGroupCreation={!isLandlord} /></div></div>;
 
   /* ── Browse page ── */
