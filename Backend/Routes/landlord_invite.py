@@ -6,7 +6,7 @@ from tables import get_db, User, Landlord, Property, Listing, RoommateGroup, Lan
 from Schemas.landlordInviteSchema import LandlordInviteCreate, LandlordInviteResponse, LandlordInviteDetailResponse
 from Schemas.listingSchema import ListingStatus, LeaseType, GenderPreference
 from Schemas.propertySchema import PropertyType
-from Utils.security import get_current_user
+from Utils.security import get_current_user, get_current_student
 from helpers import require_landlord, generate_slug, slugify_group_name
 from config import settings
 import secrets
@@ -16,7 +16,7 @@ landlord_invite_router = APIRouter()
 
 # Create a landlord invite (group owner only)
 @landlord_invite_router.post("/groups/{group_id}/landlord-invite", response_model=LandlordInviteResponse, status_code=status.HTTP_201_CREATED)
-def create_landlord_invite(group_id: int, payload: LandlordInviteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_landlord_invite(group_id: int, payload: LandlordInviteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found or not yours")
@@ -91,7 +91,7 @@ def create_landlord_invite(group_id: int, payload: LandlordInviteCreate, db: Ses
  
 # Get current invite status (group owner only)
 @landlord_invite_router.get("/groups/{group_id}/landlord-invite", response_model=LandlordInviteResponse)
-def get_landlord_invite(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_landlord_invite(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter( RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found or not yours")
@@ -131,7 +131,7 @@ def get_landlord_invite(group_id: int, db: Session = Depends(get_db), current_us
  
 # Cancel an invite (group owner only)
 @landlord_invite_router.delete("/groups/{group_id}/landlord-invite", status_code=status.HTTP_200_OK)
-def cancel_landlord_invite( group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def cancel_landlord_invite( group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found or not yours")

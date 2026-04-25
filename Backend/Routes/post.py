@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy import func
 from tables import get_db, Post, User, Writer, PostVote
 from Schemas.postSchema import PostCreate, PostUpdate, PostResponse, PostListResponse, PostCategory, PostStatus
-from Utils.security import get_current_user, get_current_author
+from Utils.security import get_current_user, get_current_author, get_current_student
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from helpers import generate_slug, get_owned_post
 post_router = APIRouter()
@@ -183,7 +183,7 @@ def get_posts_by_writer(writer_id: int, db: Session = Depends(get_db)):
 
 # Upvote a post
 @post_router.post("/{post_id}/upvote", status_code=status.HTTP_201_CREATED)
-def upvote_post(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def upvote_post(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     post = db.query(Post).filter(Post.id == post_id, Post.status == PostStatus.PUBLISHED).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -201,7 +201,7 @@ def upvote_post(post_id: int, db: Session = Depends(get_db), current_user: User 
 
 # Remove upvote
 @post_router.delete("/{post_id}/upvote", status_code=status.HTTP_200_OK)
-def remove_upvote(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def remove_upvote(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     vote = db.query(PostVote).filter(PostVote.post_id == post_id, PostVote.user_id == current_user.id).first()
     if not vote:
         raise HTTPException(status_code=404, detail="You haven't upvoted this post")

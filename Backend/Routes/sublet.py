@@ -6,7 +6,7 @@ from datetime import date
 from tables import Sublet, SubletImage, User, get_db
 from Schemas.subletSchema import SubletCreate, SubletUpdate, SubletResponse, SubletListResponse, SubletImageResponse, SubletStatus, RoomType
 from Schemas.listingSchema import GenderPreference
-from Utils.security import get_current_user
+from Utils.security import get_current_user, get_current_student
 from helpers import build_sublet_list_response, build_sublet_response, upload_to_s3
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from decimal import Decimal
@@ -15,7 +15,7 @@ sublet_router = APIRouter()
 
 # Create a sublet
 @sublet_router.post("/", response_model=SubletResponse, status_code=status.HTTP_201_CREATED)
-def create_sublet(payload: SubletCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_sublet(payload: SubletCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     
     if payload.sublet_end_date <= payload.sublet_start_date:
         raise HTTPException(status_code=400, detail="End date must be after start date")
@@ -65,7 +65,7 @@ def create_sublet(payload: SubletCreate, db: Session = Depends(get_db), current_
 
 # upload sublet images
 @sublet_router.post("/{sublet_id}/images", status_code=status.HTTP_201_CREATED)
-async def upload_sublet_images(sublet_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def upload_sublet_images(sublet_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     
     sublet = db.query(Sublet).filter(Sublet.id == sublet_id,Sublet.user_id == current_user.id).first()
 
@@ -142,14 +142,14 @@ def get_all_sublets(
 
 # Get current user's sublets
 @sublet_router.get("/my/listings", response_model=list[SubletListResponse])
-def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
 
     return [build_sublet_list_response(sublet) for sublet in sublets]
 
 # Get current user's draft sublet listing
 @sublet_router.get("/drafts/my", response_model=list[SubletListResponse])
-def get_my_draft_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_draft_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id, Sublet.status == SubletStatus.DRAFT).order_by(Sublet.created_at.desc()).all()
 
     return [build_sublet_list_response(s) for s in sublets]
@@ -167,7 +167,7 @@ def get_sublet(sublet_id: int, db: Session = Depends(get_db)):
     return build_sublet_response(sublet)
 
 @sublet_router.patch("/{sublet_id}/publish", response_model=SubletResponse)
-def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
+def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_student)):
     sublet = db.query(Sublet).filter(Sublet.id == sublet_id, Sublet.user_id == current_user.id).first()
 
     if not sublet:
@@ -183,7 +183,7 @@ def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: U
     return build_sublet_response(sublet)
 
 @sublet_router.patch("/{sublet_id}/unpublish", response_model=SubletResponse)
-def unpublish_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def unpublish_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     sublet = db.query(Sublet).filter(Sublet.id == sublet_id, Sublet.user_id == current_user.id).first()
 
     if not sublet:
@@ -200,7 +200,7 @@ def unpublish_sublet(sublet_id: int, db: Session = Depends(get_db), current_user
 
 # Update a sublet
 @sublet_router.patch("/{sublet_id}", response_model=SubletResponse)
-def update_sublet(sublet_id: int, payload: SubletUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_sublet(sublet_id: int, payload: SubletUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     
     sublet = db.query(Sublet).filter(and_(Sublet.id == sublet_id, Sublet.user_id == current_user.id)).first()
 
@@ -227,7 +227,7 @@ def update_sublet(sublet_id: int, payload: SubletUpdate, db: Session = Depends(g
 
 # Delete a sublet
 @sublet_router.delete("/{sublet_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     
     sublet = db.query(Sublet).filter(and_(Sublet.id == sublet_id, Sublet.user_id == current_user.id)).first()
 
@@ -242,7 +242,7 @@ def delete_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: U
 
 # Delete an image from a sublet
 @sublet_router.delete("/{sublet_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_sublet_image(sublet_id: int, image_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_sublet_image(sublet_id: int, image_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     
     sublet = db.query(Sublet).filter(and_(Sublet.id == sublet_id, Sublet.user_id == current_user.id)).first()
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, Review, Flag, HousingHealthScore
 from Schemas.reviewSchema import ReviewCreate, ReviewUpdate, ReviewResponse
-from Utils.security import get_current_user
+from Utils.security import get_current_user, get_current_student
 from helpers import require_verified_student
 import logging
 
@@ -77,18 +77,13 @@ def get_review(review_id: int, db: Session = Depends(get_db)):
 
 # My Reviews (student views their own)
 @review_router.get("/me/all", response_model=list[ReviewResponse])
-def list_my_reviews(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_my_reviews(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     reviews = db.query(Review).filter(Review.student_id == current_user.id).all()
     return [ReviewResponse.model_validate(r) for r in reviews]
 
 # Update Reviews (student only, must own it)
 @review_router.patch("/{review_id}", response_model=ReviewResponse)
-def update_review(
-    review_id: int,
-    payload: ReviewUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
+def update_review(review_id: int, payload: ReviewUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     review = db.query(Review).filter(Review.id == review_id).first()
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
@@ -106,7 +101,7 @@ def update_review(
 
 # Delete reviews (student only, must own it)
 @review_router.delete("/{review_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_review(review_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_review(review_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     review = db.query(Review).filter(Review.id == review_id).first()
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")

@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from tables import get_db, User, Listing, Property, SavedListing, Sublet
 from Schemas.savedSchema import SavedListingResponse, SavedListingDetailResponse
-from Utils.security import get_current_user
+from Utils.security import get_current_user, get_current_student
 
 saved_router = APIRouter()
 
 # Save a listing (logged in only)
 @saved_router.post("/{listing_id}", response_model=SavedListingResponse, status_code=status.HTTP_201_CREATED)
-def save_listing(listing_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def save_listing(listing_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     # verify listing exists
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
@@ -34,7 +34,7 @@ def save_listing(listing_id: int, db: Session = Depends(get_db), current_user: U
 
 # Unsave a listing (logged in only)
 @saved_router.delete("/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
-def unsave_listing(listing_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def unsave_listing(listing_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     saved = db.query(SavedListing).filter(
         SavedListing.student_id == current_user.id,
         SavedListing.listing_id == listing_id,
@@ -49,7 +49,7 @@ def unsave_listing(listing_id: int, db: Session = Depends(get_db), current_user:
 
 # View my saved listings (logged in only)
 @saved_router.get("/", response_model=list[SavedListingDetailResponse])
-def list_saved_listings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_saved_listings(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     results = db.query(SavedListing, Listing, Property).join(
         Listing, SavedListing.listing_id == Listing.id
     ).join(
@@ -88,7 +88,7 @@ def list_saved_listings(db: Session = Depends(get_db), current_user: User = Depe
 
 # Check if listing is saved (logged in only)
 @saved_router.get("/{listing_id}/check")
-def check_saved(listing_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def check_saved(listing_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     exists = db.query(SavedListing).filter(
         SavedListing.student_id == current_user.id,
         SavedListing.listing_id == listing_id,

@@ -2,13 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from tables import get_db, User, Listing, Review, Flag, MarketplaceItem, Sublet
 from Schemas.flagSchema import FlagCreate, FlagResponse, FlagStatus
-from Utils.security import get_current_user
+from Utils.security import get_current_user, get_current_student
 
 flag_router = APIRouter()
 
 # Create flag (logged in only)
 @flag_router.post("/", response_model=FlagResponse, status_code=status.HTTP_201_CREATED)
-def create_flag(payload: FlagCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_flag(payload: FlagCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     # Validation is handled by the schema's model_validator (exactly one target required)
  
     # Verify the target exists
@@ -59,7 +59,7 @@ def create_flag(payload: FlagCreate, db: Session = Depends(get_db), current_user
 
 # My Flag (logged in only)
 @flag_router.get("/me", response_model=list[FlagResponse])
-def list_my_flags(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_my_flags(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     flags = db.query(Flag).filter(
         Flag.reporter_id == current_user.id
     ).order_by(Flag.created_at.desc()).all()
@@ -68,7 +68,7 @@ def list_my_flags(db: Session = Depends(get_db), current_user: User = Depends(ge
 
 # Get Single Flag (logged in, must own it)
 @flag_router.get("/{flag_id}", response_model=FlagResponse)
-def get_flag(flag_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_flag(flag_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     flag = db.query(Flag).filter(Flag.id == flag_id).first()
     if not flag:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")

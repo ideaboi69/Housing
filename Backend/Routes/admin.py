@@ -9,7 +9,7 @@ from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse
 from helpers import require_admin, cascade_delete_landlord
-from Utils.security import get_current_user, hash_password, create_access_token, verify_password, validate_password
+from Utils.security import hash_password, create_access_token, verify_password, validate_password
 from Utils.cloudinary import delete_image_from_cloudinary
 from Utils.email import send_approval_email, send_rejection_email, send_revoked_email
 from Utils.rate_limit import limiter

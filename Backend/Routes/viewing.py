@@ -187,7 +187,7 @@ def get_available_slots(listing_id: Optional[int] = Query(None), sublet_id: Opti
 
 # USER - book viewing
 @viewing_router.post("/book", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
-def book_viewing(payload: BookingCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def book_viewing(payload: BookingCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     slot = db.query(ViewingSlot).filter(ViewingSlot.id == payload.slot_id).with_for_update().first()
     if not slot:
         raise HTTPException(status_code=404, detail="Slot not found")
@@ -285,7 +285,7 @@ def book_viewing(payload: BookingCreate, background_tasks: BackgroundTasks, db: 
 
 # USER - Cancel booking
 @viewing_router.patch("/bookings/{booking_id}/cancel", response_model=BookingResponse)
-def student_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def student_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     booking = db.query(ViewingBooking).filter(ViewingBooking.id == booking_id, ViewingBooking.student_id == current_user.id).first()
 
     if not booking:
@@ -383,7 +383,7 @@ def host_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, db: 
 
 # USER - Get my bookings
 @viewing_router.get("/bookings/my", response_model=list[BookingResponse])
-def get_my_bookings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_bookings(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     bookings = db.query(ViewingBooking).filter(ViewingBooking.student_id == current_user.id).order_by(ViewingBooking.created_at.desc()).all()
 
     return [build_booking_response(b, db) for b in bookings]
@@ -428,7 +428,7 @@ def get_hosting_upcoming_bookings(db: Session = Depends(get_db), current_user = 
 
 # User - Get Upcoming Bookings
 @viewing_router.get("/bookings/my/upcoming", response_model=list[BookingResponse])
-def get_my_upcoming_bookings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_my_upcoming_bookings(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     bookings = db.query(ViewingBooking).join(ViewingSlot).filter(
         ViewingBooking.student_id == current_user.id,
         ViewingBooking.status == BookingStatus.CONFIRMED,

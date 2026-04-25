@@ -5,9 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile
 from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation
 from Schemas.listingSchema import ListingCreate, ListingUpdate, ListingResponse, ListingDetailResponse, SubletConvert, ListingStatus, ListingImageResponse
-from Schemas.userSchema import UserRole
 from Schemas.propertySchema import PropertyType
-from Utils.security import get_current_user
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from helpers import get_landlord_for_user, require_landlord, build_listing_detail, get_listing_owned_by
 

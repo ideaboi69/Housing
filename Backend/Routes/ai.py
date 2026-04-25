@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from tables import get_db, User, Listing, Property, Landlord, HousingHealthScore
-from Utils.security import get_current_user
+from Utils.security import get_current_student
 from Utils.rate_limit import limiter
 from Schemas.aiSchema import CompareRequest, CompareResponse
 from config import settings
@@ -16,7 +16,7 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 @ai_router.post("/compare", response_model=CompareResponse)
 @limiter.limit("10/hour")
-def compare_listings(request: Request, payload: CompareRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def compare_listings(request: Request, payload: CompareRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     if not current_user.email_verified:
         raise HTTPException(status_code=403, detail="Verify your email to use AI comparison")
 

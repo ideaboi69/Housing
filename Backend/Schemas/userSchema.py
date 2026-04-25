@@ -5,6 +5,7 @@ from typing import List
 from enum import Enum
 from pydantic import BaseModel, HttpUrl, condecimal, EmailStr, field_validator
 from typing import Annotated, Optional, Literal
+from Schemas.roommateSchema import SmokingVaping, PetPreference, GenderHousingPref, Cleanliness
 
 #Enums
 class UserRole(str, enum.Enum):
@@ -145,5 +146,29 @@ class NotificationPreferencesResponse(BaseModel):
     cribb_news_updates: bool
     updated_at: datetime
 
+    class Config:
+        from_attributes = True
+
+# Tenant Card
+class TenantProfileCreate(BaseModel):
+    smoking: SmokingVaping
+    pets: PetPreference
+    gender_housing_pref: GenderHousingPref
+    cleanliness: Cleanliness
+
+class TenantCardResponse(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    profile_photo_url: Optional[str] = None
+    program: Optional[str] = None
+    year: Optional[str] = None
+    bio: Optional[str] = None
+    smoking: Optional[SmokingVaping] = None
+    pets: Optional[PetPreference] = None
+    gender_housing_pref: Optional[GenderHousingPref] = None
+    cleanliness: Optional[Cleanliness] = None
+    has_tenant_profile: bool = False
+ 
     class Config:
         from_attributes = True

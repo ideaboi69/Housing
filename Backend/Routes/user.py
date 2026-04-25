@@ -4,9 +4,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
 from tables import *
-from Schemas.userSchema import UserRole, UserCreate, UserUpdate, UserLogin, UserResponse, TokenResponse, PasswordChange, ForgotPasswordRequest, ResetPasswordRequest, NotificationPreferencesUpdate, NotificationPreferencesResponse
+from Schemas.userSchema import *
 from helpers import check_uoguelph_email, cascade_delete_user
-from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password, create_password_reset_token, decode_password_reset_token
+from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password, create_password_reset_token, decode_password_reset_token, get_current_student
 from Utils.email_token import create_email_verification_token, decode_email_verification_token
 from Utils.email import send_verification_email, send_password_reset_email
 from Schemas.subletSchema import SubletStatus
@@ -321,6 +321,66 @@ def request_write_access( reason: str = Form(...), db: Session = Depends(get_db)
 def delete_me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     cascade_delete_user(current_user, db)
     db.commit()
+
+# Submit tenant profile (4 questions before first message/booking)
+@user_router.post("/me/tenant-profile", status_code=status.HTTP_200_OK)
+def submit_tenant_profile(payload: TenantProfileCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id).first()
+ 
+    if profile:
+        for field, value in payload.model_dump().items():
+            setattr(profile, field, value)
+    else:
+        profile = RoommateProfile(
+            user_id=current_user.id,
+            quiz_completed=False,
+            **payload.model_dump(),
+        )
+        db.add(profile)
+ 
+    db.commit()
+    db.refresh(profile)
+ 
+    return {"message": "Tenant profile saved", "has_tenant_profile": True}
+ 
+# Check if student has filled tenant profile
+@user_router.get("/me/tenant-status")
+def get_tenant_status(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id).first()
+ 
+    if not profile:
+        return {"has_tenant_profile": False}
+ 
+    has_tenant = all([profile.smoking, profile.pets, profile.gender_housing_pref, profile.cleanliness])
+    return {"has_tenant_profile": has_tenant}
+ 
+# Tenant card (landlord taps student profile picture in chat)
+@user_router.get("/{user_id}/tenant-card", response_model=TenantCardResponse)
+def get_tenant_card(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+ 
+    profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == user_id).first()
+ 
+    has_tenant = False
+    if profile:
+        has_tenant = all([profile.smoking, profile.pets, profile.gender_housing_pref, profile.cleanliness])
+ 
+    return TenantCardResponse(
+        id=user.id,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        profile_photo_url=user.profile_photo_url,
+        program=user.program,
+        year=user.year.value if user.year else None,
+        bio=user.bio,
+        smoking=profile.smoking if profile else None,
+        pets=profile.pets if profile else None,
+        gender_housing_pref=profile.gender_housing_pref if profile else None,
+        cleanliness=profile.cleanliness if profile else None,
+        has_tenant_profile=has_tenant,
+    )
 
 # Get user by ID
 @user_router.get("/{user_id}", response_model=UserResponse)

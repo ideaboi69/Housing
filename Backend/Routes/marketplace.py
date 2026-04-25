@@ -4,7 +4,7 @@ from sqlalchemy import and_, func
 from typing import Optional
 from tables import get_db, User, MarketplaceItem, MarketplaceImage, MarketplaceConversation, MarketplaceMessage
 from Schemas.marketplaceSchema import *
-from Utils.security import get_current_user, get_current_student
+from Utils.security import get_current_student
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.email import send_message_notification
 

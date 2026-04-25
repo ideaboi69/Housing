@@ -4,8 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
 from tables import get_db, User, Landlord, Property, Listing, Review, HousingHealthScore
 from Schemas.healthscoreSchema import HealthScoreResponse
-from Utils.security import get_current_user
-from helpers import compute_price_vs_market, compute_landlord_reputation, compute_maintenance_score, compute_lease_clarity, compute_amenity_score, compute_proximity_score, compute_overall_score, compute_and_save
+from helpers import compute_and_save
 
 health_score_router = APIRouter()
 

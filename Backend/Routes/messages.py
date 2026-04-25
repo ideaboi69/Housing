@@ -4,7 +4,7 @@ from sqlalchemy import func, and_
 from tables import Listing, Conversation, User, get_db, Landlord, Message, Property
 from Schemas.convoSchema import SenderType
 from Schemas.convoSchema import ConversationDetailResponse, StartConversation, MessageCreate, MessageResponse, ConversationResponse
-from Utils.security import get_current_user
+from Utils.security import get_current_user, get_current_student
 from helpers import require_landlord
 from Utils.email import send_message_notification
 
@@ -12,7 +12,7 @@ message_router = APIRouter()
 
 # User starting a conversation 
 @message_router.post("/conversations", response_model=ConversationDetailResponse, status_code=status.HTTP_201_CREATED)
-def start_conversation(payload: StartConversation, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def start_conversation(payload: StartConversation, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     
     listing = db.query(Listing).filter(Listing.id == payload.listing_id).first()
     if not listing:
@@ -73,7 +73,7 @@ def start_conversation(payload: StartConversation, background_tasks: BackgroundT
 
 # Send a message in an existing conversation
 @message_router.post("/conversations/{conversation_id}", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-def send_message( conversation_id: int, payload: MessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def send_message( conversation_id: int, payload: MessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user=Depends(get_current_student)):
     
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conversation:
@@ -163,7 +163,7 @@ def landlord_reply(conversation_id: int, payload: MessageCreate, background_task
 
 # Get all conversations for a user
 @message_router.get("/conversations", response_model=list[ConversationResponse])
-def get_conversations( db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def get_conversations( db: Session = Depends(get_db), current_user=Depends(get_current_student)):
     
     conversations = db.query(Conversation).filter(Conversation.user_id == current_user.id).order_by(Conversation.updated_at.desc()).all()
 
@@ -279,7 +279,7 @@ def get_specific_conversation( conversation_id: int, db: Session = Depends(get_d
     )
 # Get unread count for a user 
 @message_router.get("/unread-count")
-def get_user_unread_count(db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
+def get_user_unread_count(db: Session = Depends(get_db),current_user: User = Depends(get_current_student)):
   
     conversations = db.query(Conversation.id).filter(Conversation.user_id == current_user.id).all()
     conversation_ids = [c.id for c in conversations]
@@ -342,7 +342,7 @@ def delete_message(conversation_id: int, message_id: int, db: Session = Depends(
 
 # User deletes a conversation
 @message_router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.user_id == current_user.id).first()
 
     if not conversation:
