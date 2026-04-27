@@ -387,6 +387,27 @@ export const sublets = {
       body: JSON.stringify(data),
     }),
 
+  getMine: () =>
+    request<SubletListResponse[]>("/api/sublets/my/listings"),
+
+  getMyDrafts: () =>
+    request<SubletListResponse[]>("/api/sublets/drafts/my"),
+
+  publish: (id: number) =>
+    request<SubletResponse>(`/api/sublets/${id}/publish`, {
+      method: "PATCH",
+    }),
+
+  unpublish: (id: number) =>
+    request<SubletResponse>(`/api/sublets/${id}/unpublish`, {
+      method: "PATCH",
+    }),
+
+  delete: (id: number) =>
+    request<null>(`/api/sublets/${id}`, {
+      method: "DELETE",
+    }),
+
   uploadImages: async (subletId: number, files: File[]) => {
     const token = getToken();
     const formData = new FormData();
@@ -879,13 +900,13 @@ export const viewings = {
   // Get availability for a listing
   getListingAvailability: (listingId: number, fromDate?: string) =>
     request<ViewingAvailabilityResponse[]>(
-      `/api/viewings/availability/listing/${listingId}${fromDate ? `?from_date=${fromDate}` : ""}`
+      `/api/viewings/availability?listing_id=${listingId}${fromDate ? `&from_date=${fromDate}` : ""}`
     ),
 
   // Get available slots
   getAvailableSlots: (listingId: number, fromDate?: string) =>
     request<ViewingSlotResponse[]>(
-      `/api/viewings/slots/listing/${listingId}${fromDate ? `?from_date=${fromDate}` : ""}`
+      `/api/viewings/slots?listing_id=${listingId}${fromDate ? `&from_date=${fromDate}` : ""}`
     ),
 
   // Student: book a slot
@@ -902,7 +923,7 @@ export const viewings = {
     }),
 
   landlordCancel: (bookingId: number) =>
-    request<ViewingBookingResponse>(`/api/viewings/bookings/${bookingId}/landlord-cancel`, {
+    request<ViewingBookingResponse>(`/api/viewings/bookings/${bookingId}/host-cancel`, {
       method: "PATCH",
     }),
 
@@ -915,11 +936,11 @@ export const viewings = {
 
   getLandlordBookings: (listingId?: number) =>
     request<ViewingBookingResponse[]>(
-      `/api/viewings/bookings/landlord${listingId ? `?listing_id=${listingId}` : ""}`
+      `/api/viewings/bookings/hosting${listingId ? `?listing_id=${listingId}` : ""}`
     ),
 
   getLandlordUpcoming: () =>
-    request<ViewingBookingResponse[]>("/api/viewings/bookings/landlord/upcoming"),
+    request<ViewingBookingResponse[]>("/api/viewings/bookings/hosting/upcoming"),
 };
 
 // ── Admin ──────────────────────────────────────────────

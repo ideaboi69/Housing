@@ -163,6 +163,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [error, setError] = useState<string | null>(null);
   const [contactSending, setContactSending] = useState(false);
   const [contactSent, setContactSent] = useState(false);
+  const [activeQuickMessage, setActiveQuickMessage] = useState<string | null>(null);
   const [showingOpen, setShowingOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -240,6 +241,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     load();
   }, [listingId, isInvalidId]);
 
+<<<<<<< Updated upstream
   // Check if student has filled tenant profile
   useEffect(() => {
     if (!user || user.role !== "student" || tenantChecked.current) return;
@@ -258,13 +260,33 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   };
 
   const doContact = async () => {
+=======
+  const handleContact = async () => {
+    await openConversation(`Hi, I'm interested in "${listing?.title}". Is it still available?`);
+  };
+
+  const openConversation = async (content: string, quickKey?: string) => {
+    if (contactSending || contactSent) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
+      return;
+    }
+>>>>>>> Stashed changes
     setContactSending(true);
+    setActiveQuickMessage(quickKey ?? null);
     try {
       await api.messages.startConversation({
         listing_id: listingId,
+<<<<<<< Updated upstream
         content: `Hi, I\u2019m interested in "${listing?.title}". Is it still available?`,
+=======
+        content,
+>>>>>>> Stashed changes
       });
       setContactSent(true);
+      if (quickKey) {
+        toast.success("Opening your chat with the landlord...");
+      }
       setTimeout(() => router.push("/messages"), 1500);
     } catch (err) {
       if (err instanceof Error && "status" in err && (err as { status?: number }).status === 409) {
@@ -274,9 +296,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       }
     } finally {
       setContactSending(false);
+      setActiveQuickMessage(null);
     }
   };
 
+<<<<<<< Updated upstream
   const handleContact = async () => {
     if (contactSending || contactSent) return;
     if (!user) {
@@ -305,6 +329,27 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   };
 
     if (isLoading) {
+=======
+  const quickMessageOptions = [
+    {
+      key: "available",
+      label: "Still available?",
+      content: `Hi, I'm interested in "${listing?.title}". Is it still available?`,
+    },
+    {
+      key: "tour",
+      label: "Can I tour it?",
+      content: `Hi, I'd love to book a showing for "${listing?.title}". What times are available?`,
+    },
+    {
+      key: "rent",
+      label: "What's included?",
+      content: `Hi, I'm interested in "${listing?.title}". Can you let me know what's included in the rent?`,
+    },
+  ] as const;
+
+  if (isLoading) {
+>>>>>>> Stashed changes
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
         <motion.div className="flex flex-col items-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -620,6 +665,29 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   <><MessageCircle className="w-4 h-4" /> Contact Landlord</>
                 )}
               </motion.button>
+
+              <div className="mt-3">
+                <div className="text-[#1B2D45]/30 mb-2" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em" }}>
+                  QUICK MESSAGE
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {quickMessageOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => void openConversation(option.content, option.key)}
+                      disabled={contactSending || contactSent}
+                      className={`rounded-full border px-3 py-1.5 transition-all ${
+                        activeQuickMessage === option.key
+                          ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
+                          : "border-black/[0.06] text-[#1B2D45]/45 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]"
+                      } disabled:opacity-50`}
+                      style={{ fontSize: "11px", fontWeight: 700 }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Book Showing */}
               <motion.button whileTap={{ scale: 0.97 }} onClick={handleBookShowing}

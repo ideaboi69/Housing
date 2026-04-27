@@ -26,7 +26,7 @@ import {
   type LandmarkType,
 } from "@/lib/guelph-landmarks";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
@@ -1910,6 +1910,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
 export default function SubletsPage() {
   const isMobile = useIsMobile();
   const user = useAuthStore((s) => s.user);
+  const searchParams = useSearchParams();
   const [hydrated, setHydrated] = useState(false);
   const [listings, setListings] = useState<SubletListing[]>(subletListings);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -1922,25 +1923,75 @@ export default function SubletsPage() {
   const [compareOpen, setCompareOpen] = useState(false);
   const isLandlord = user?.role === "landlord";
   const router = useRouter();
+  const createdSubletId = searchParams.get("created");
+  const createdSubletHandledRef = useRef<string | null>(null);
+
+  const focusCreatedSublet = useCallback((listing: SubletListing) => {
+    const firstMonth = listing.availableMonths.findIndex(Boolean);
+    const lastMonth = listing.availableMonths.lastIndexOf(true);
+    if (firstMonth >= 0 && lastMonth >= firstMonth) {
+      setSelectedRange([firstMonth, lastMonth]);
+    }
+    setActiveFilters([]);
+    setSearchQuery("");
+    setViewMode("board");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadLiveSublets() {
+      const parseStoredCreatedSublet = () => {
+        if (typeof window === "undefined" || !createdSubletId) return null;
+        const storedCreatedSublet = window.sessionStorage.getItem("cribb-created-sublet");
+        if (!storedCreatedSublet) return null;
+        try {
+          const parsed = JSON.parse(storedCreatedSublet) as SubletListing;
+          return parsed.id === createdSubletId ? parsed : null;
+        } catch {
+          return null;
+        }
+      };
+
       try {
         const liveSublets = await api.sublets.browse();
-        if (cancelled || liveSublets.length === 0) return;
-
         const normalized = liveSublets.map(mapApiSubletToListing);
         const seenIds = new Set(normalized.map((listing) => listing.id));
-        const merged = [...normalized, ...subletListings.filter((listing) => !seenIds.has(listing.id))];
+        let merged = [...normalized, ...subletListings.filter((listing) => !seenIds.has(listing.id))];
+
+        if (createdSubletId) {
+          const parsedCreatedSublet = parseStoredCreatedSublet();
+          const liveCreatedSublet = merged.find((listing) => listing.id === createdSubletId);
+          const createdListing = liveCreatedSublet || (parsedCreatedSublet?.id === createdSubletId ? parsedCreatedSublet : null);
+
+          if (createdListing) {
+            merged = [createdListing, ...merged.filter((listing) => listing.id !== createdListing.id)];
+
+            if (createdSubletHandledRef.current !== createdSubletId) {
+              focusCreatedSublet(createdListing);
+              createdSubletHandledRef.current = createdSubletId;
+              toast.success("Your sublet is now live in the feed.");
+            }
+          }
+        }
 
         if (!cancelled) {
           setListings(merged);
         }
       } catch {
         if (!cancelled) {
-          setListings(subletListings);
+          const parsedCreatedSublet = parseStoredCreatedSublet();
+          const fallbackListings = parsedCreatedSublet
+            ? [parsedCreatedSublet, ...subletListings.filter((listing) => listing.id !== parsedCreatedSublet.id)]
+            : subletListings;
+
+          if (parsedCreatedSublet && createdSubletHandledRef.current !== createdSubletId) {
+            focusCreatedSublet(parsedCreatedSublet);
+            createdSubletHandledRef.current = createdSubletId;
+            toast.success("Your sublet is now live in the feed.");
+          }
+
+          setListings(fallbackListings);
         }
       }
     }
@@ -1949,7 +2000,18 @@ export default function SubletsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [createdSubletId, focusCreatedSublet]);
+
+  useEffect(() => {
+    if (!createdSubletId || typeof window === "undefined") return;
+    if (createdSubletHandledRef.current !== createdSubletId) return;
+
+    window.sessionStorage.removeItem("cribb-created-sublet");
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("created");
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `/sublets?${nextQuery}` : "/sublets");
+  }, [createdSubletId, router, searchParams]);
 
   const handleListClick = () => {
     if (isLandlord) {

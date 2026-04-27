@@ -186,7 +186,7 @@ export default function MarketplacePage() {
             <p className="text-[#1B2D45]/45 mt-0.5" style={{ fontSize: "13px" }}>Buy &amp; sell student essentials in Guelph</p>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
-            {!isLandlord && user && <Link href="/marketplace/my" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Your Listings</Link>}
+            {!isLandlord && user && <Link href="/marketplace/my" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Marketplace Listings</Link>}
             {!isLandlord && user && <Link href="/marketplace/messages" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Messages</Link>}
             {!isLandlord ? (
               <Link href={user ? "/marketplace/create" : "/login"} className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}><Plus className="w-4 h-4" /> Sell Something</Link>

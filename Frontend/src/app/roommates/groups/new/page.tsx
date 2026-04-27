@@ -69,6 +69,7 @@ const GROUP_SHOWCASE = [
 export default function CreateGroupPage() {
   const { user } = useAuthStore();
   const searchParams = useSearchParams();
+<<<<<<< Updated upstream
 
   // Pre-fill counts from the quiz setup if they came in via "I have friends already"
   const initialHave = (() => {
@@ -79,6 +80,8 @@ export default function CreateGroupPage() {
     const raw = parseInt(searchParams.get("need") || "", 10);
     return !isNaN(raw) && raw >= 1 && raw <= 4 ? raw : 2;
   })();
+=======
+>>>>>>> Stashed changes
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
@@ -112,6 +115,19 @@ export default function CreateGroupPage() {
     if (step === 3) return description.trim().length >= 10;
     return true;
   };
+
+  useEffect(() => {
+    const haveParam = Number(searchParams.get("have"));
+    const needParam = Number(searchParams.get("need"));
+
+    if (Number.isFinite(haveParam) && haveParam >= 2 && haveParam <= 6) {
+      setHaveCount(haveParam);
+    }
+
+    if (Number.isFinite(needParam) && needParam >= 1 && needParam <= 4) {
+      setGroupSize(Math.max(haveParam || haveCount, 2) + needParam);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!user) {

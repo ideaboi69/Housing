@@ -190,6 +190,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   const [saved, setSaved] = useState(false);  // fallback for sublets without listing_id
   const [messageSending, setMessageSending] = useState(false);
   const [messageSent, setMessageSent] = useState(false);
+  const [activeQuickMessage, setActiveQuickMessage] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [showTenantPrompt, setShowTenantPrompt] = useState(false);
@@ -255,6 +256,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     }
   }, [sublet, reviews.length]);
 
+<<<<<<< Updated upstream
   // Check if student has filled tenant profile
   useEffect(() => {
     if (!user || user.role !== "student" || tenantChecked.current) return;
@@ -265,14 +267,34 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   }, [user]);
 
   const doMessage = async () => {
+=======
+  const handleMessage = async () => {
+    await openSubletConversation(`Hi, I'm interested in "${sublet?.title}". Is it still available?`);
+  };
+
+  const openSubletConversation = async (content: string, quickKey?: string) => {
+    if (messageSending || messageSent) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/sublets/${id}`)}`);
+      return;
+    }
+>>>>>>> Stashed changes
     setMessageSending(true);
+    setActiveQuickMessage(quickKey ?? null);
     try {
       if (sublet?.listing_id) {
         await api.messages.startConversation({
           listing_id: sublet.listing_id,
+<<<<<<< Updated upstream
           content: `Hi, I’m interested in "${sublet.title}". Is it still available?`,
+=======
+          content,
+>>>>>>> Stashed changes
         });
         setMessageSent(true);
+        if (quickKey) {
+          toast.success("Opening your chat about this sublet...");
+        }
         setTimeout(() => router.push("/messages"), 1500);
       } else {
         toast.error("Messaging isn’t available for this sublet yet.");
@@ -285,9 +307,11 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
       }
     } finally {
       setMessageSending(false);
+      setActiveQuickMessage(null);
     }
   };
 
+<<<<<<< Updated upstream
   const handleMessage = async () => {
     if (messageSending || messageSent) return;
     if (!user) {
@@ -308,6 +332,27 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   };
 
     if (loading) {
+=======
+  const quickMessageOptions = [
+    {
+      key: "available",
+      label: "Still available?",
+      content: `Hi, I'm interested in "${sublet?.title}". Is it still available?`,
+    },
+    {
+      key: "tour",
+      label: "Can I tour it?",
+      content: `Hi, I'd love to book a viewing for "${sublet?.title}". What times work best?`,
+    },
+    {
+      key: "terms",
+      label: "Dates flexible?",
+      content: `Hi, I'm interested in "${sublet?.title}". Are the sublet dates flexible at all?`,
+    },
+  ] as const;
+
+  if (loading) {
+>>>>>>> Stashed changes
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
         <motion.div className="text-center" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -561,6 +606,29 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
                 {messageSent ? <><Check className="w-4 h-4" /> Message Sent</> : messageSending ? "Sending..." : <><MessageCircle className="w-4 h-4" /> Message {sublet.posterName}</>}
               </motion.button>
+
+              <div className="mt-3">
+                <div className="text-[#1B2D45]/30 mb-2" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em" }}>
+                  QUICK MESSAGE
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {quickMessageOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => void openSubletConversation(option.content, option.key)}
+                      disabled={messageSending || messageSent}
+                      className={`rounded-full border px-3 py-1.5 transition-all ${
+                        activeQuickMessage === option.key
+                          ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
+                          : "border-black/[0.06] text-[#1B2D45]/45 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]"
+                      } disabled:opacity-50`}
+                      style={{ fontSize: "11px", fontWeight: 700 }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* Save */}
               <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave}

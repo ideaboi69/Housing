@@ -260,7 +260,7 @@ export default function MyListingsPage() {
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>Your Listings</h1>
+            <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>Marketplace Listings</h1>
             <p className="text-[#1B2D45]/40 mt-0.5" style={{ fontSize: "12px" }}>Manage your marketplace items</p>
           </div>
           <Link

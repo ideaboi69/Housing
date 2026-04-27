@@ -997,7 +997,13 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
    Messages Tab
    ════════════════════════════════════════════════════════ */
 
-function MessagesTab({ conversations }: { conversations: ConversationResponse[] }) {
+function MessagesTab({
+  conversations,
+  onRefreshConversations,
+}: {
+  conversations: ConversationResponse[];
+  onRefreshConversations: () => Promise<void>;
+}) {
   const [activeConvo, setActiveConvo] = useState<number | null>(null);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -1021,6 +1027,30 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
     }
   }, []);
 
+  useEffect(() => {
+    if (conversations.length === 0) {
+      setActiveConvo(null);
+      setMessages([]);
+      return;
+    }
+
+    const activeStillExists = activeConvo != null && conversations.some((conversation) => conversation.id === activeConvo);
+    if (!activeStillExists) {
+      void loadMessages(conversations[0].id);
+    }
+  }, [activeConvo, conversations, loadMessages]);
+
+  useEffect(() => {
+    if (!activeConvo) return;
+
+    const interval = window.setInterval(() => {
+      void loadMessages(activeConvo);
+      void onRefreshConversations();
+    }, 8000);
+
+    return () => window.clearInterval(interval);
+  }, [activeConvo, loadMessages, onRefreshConversations]);
+
   async function handleSendReply() {
     if (!replyText.trim() || !activeConvo) return;
     setSending(true);
@@ -1028,6 +1058,8 @@ function MessagesTab({ conversations }: { conversations: ConversationResponse[] 
       const msg = await api.messages.landlordReply(activeConvo, { content: replyText.trim() });
       setMessages((prev) => [...prev, msg]);
       setReplyText("");
+      await onRefreshConversations();
+      await loadMessages(activeConvo);
     } catch { /* failed */ }
     finally { setSending(false); }
   }
@@ -1609,6 +1641,19 @@ function LandlordDashboardContent() {
     router.replace(target, { scroll: false });
   }, [router]);
 
+  const refreshConversationState = useCallback(async () => {
+    try {
+      const [convos, unread] = await Promise.all([
+        api.messages.getLandlordConversations(),
+        api.messages.getLandlordUnreadCount(),
+      ]);
+      setConversations(convos);
+      setUnreadCount(unread.unread_count);
+    } catch {
+      // Ignore refresh failures and keep the current inbox visible.
+    }
+  }, []);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user) { router.replace("/landlord/login"); return; }
@@ -1658,12 +1703,6 @@ function LandlordDashboardContent() {
         );
         setProperties(enriched);
 
-        // Fetch conversations
-        try {
-          const convos = await api.messages.getLandlordConversations();
-          setConversations(convos);
-        } catch { /* */ }
-
         try {
           const reviewData = await api.reviews.browse({ landlord_id: landlordUser.id, limit: 100 });
           setReviews(reviewData);
@@ -1674,11 +1713,7 @@ function LandlordDashboardContent() {
           setFlags(flagData);
         } catch { /* */ }
 
-        // Fetch unread count
-        try {
-          const { unread_count } = await api.messages.getLandlordUnreadCount();
-          setUnreadCount(unread_count);
-        } catch { /* */ }
+        await refreshConversationState();
 
       } catch {
         // Dashboard load failed — will use fallback/empty state
@@ -1688,7 +1723,7 @@ function LandlordDashboardContent() {
     }
 
     load();
-  }, [user, authLoading, router]);
+  }, [user, authLoading, refreshConversationState, router]);
 
   if (!user || authLoading || isLoading) {
     return (
@@ -1841,7 +1876,12 @@ function LandlordDashboardContent() {
                   })));
                 }} />}
                 {tab === "reviews" && <ReviewsTab reviews={reviews} flags={flags} />}
-                {tab === "messages" && <MessagesTab conversations={conversations} />}
+                {tab === "messages" && (
+                  <MessagesTab
+                    conversations={conversations}
+                    onRefreshConversations={refreshConversationState}
+                  />
+                )}
                 {tab === "settings" && <SettingsTab user={user} />}
               </motion.div>
             </AnimatePresence>

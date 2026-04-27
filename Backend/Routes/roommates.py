@@ -270,7 +270,19 @@ def get_my_group(db: Session = Depends(get_db), current_user: User = Depends(get
     group = db.query(RoommateGroup).filter(RoommateGroup.owner_id == current_user.id, RoommateGroup.is_active == True).first()
 
     if not group:
-        raise HTTPException(status_code=404, detail="You don't have a group")
+        member_record = db.query(RoommateGroupMember).filter(
+            RoommateGroupMember.user_id == current_user.id,
+            RoommateGroupMember.is_active == True,
+        ).first()
+
+        if member_record:
+            group = db.query(RoommateGroup).filter(
+                RoommateGroup.id == member_record.group_id,
+                RoommateGroup.is_active == True,
+            ).first()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="You don't have an active group")
 
     return build_group_detail(group, db)
 

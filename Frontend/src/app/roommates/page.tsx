@@ -668,6 +668,7 @@ function clearRoommateProfile() {
 }
 
 export default function RoommatesPage() {
+  const router = useRouter();
   const isMobile = useIsMobile();
   const router = useRouter();
   const { user } = useAuthStore();
@@ -947,8 +948,18 @@ export default function RoommatesPage() {
     const defaultTab = mode === "solo" ? "groups" : "individuals";
     setTab(defaultTab as "groups" | "individuals");
     saveProfile({ tags: myTags, budget: myBudget, moveIn: "", genderHousing: "", mode, defaultTab: defaultTab as "groups" | "individuals" });
+<<<<<<< Updated upstream
     if (mode === "with-friends") {
       router.push(`/roommates/groups/new?have=${have}&need=${need}`);
+=======
+
+    if (mode === "with-friends" && !isLandlord) {
+      const params = new URLSearchParams({
+        have: String(have),
+        need: String(need),
+      });
+      router.push(`/roommates/groups/new?${params.toString()}`);
+>>>>>>> Stashed changes
     }
   };
 

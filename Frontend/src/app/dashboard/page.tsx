@@ -294,7 +294,7 @@ export default function StudentDashboardPage() {
                 <ActionCard
                   title="Sublets"
                   description={`${dashboard.sublets_active} active, ${dashboard.sublets_drafts} draft${dashboard.sublets_drafts === 1 ? "" : "s"}, ${dashboard.sublets_total} total.`}
-                  href="/sublets"
+                  href="/sublets/my"
                   icon={<Home className="h-5 w-5" />}
                   badge={dashboard.sublets_drafts > 0 ? `${dashboard.sublets_drafts} draft${dashboard.sublets_drafts > 1 ? "s" : ""}` : undefined}
                 />

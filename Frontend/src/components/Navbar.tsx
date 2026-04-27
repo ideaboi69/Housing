@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Menu, X, Settings, Bookmark, Heart, LogOut, ChevronDown,
-  User, Shield, LayoutDashboard, MessageCircle, ShoppingBag,
+  User, Shield, LayoutDashboard, MessageCircle, ShoppingBag, Home,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
@@ -182,8 +182,14 @@ export function Navbar() {
         { label: "Messages", href: "/messages", icon: MessageCircle },
         { label: "Marketplace Messages", href: "/marketplace/messages", icon: ShoppingBag },
         { label: "Saved Listings", href: "/saved", icon: Bookmark },
+<<<<<<< Updated upstream
         { label: "Your Listings", href: "/marketplace/my", icon: ShoppingBag },
         { label: "My Group", href: myGroupHref, icon: Heart },
+=======
+        { label: "Marketplace Listings", href: "/marketplace/my", icon: ShoppingBag },
+        { label: "My Sublets", href: "/sublets/my", icon: Home },
+        { label: "My Group", href: "/roommates/my-group", icon: Heart },
+>>>>>>> Stashed changes
         { label: "Settings", href: "/settings", icon: Settings },
       ];
 

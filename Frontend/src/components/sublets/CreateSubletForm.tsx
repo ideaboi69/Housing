@@ -311,6 +311,9 @@ export function CreateSubletForm({
       toast.success("Your sublet is live.");
 
       if (redirectAfterCreate) {
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("cribb-created-sublet", JSON.stringify(createdListing));
+        }
         router.push(`/sublets?created=${response.id}`);
       }
     } catch (error) {
