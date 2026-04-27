@@ -81,6 +81,9 @@ class RequestStatus(str, enum.Enum):
     ACCEPTED = "accepted"
     DECLINED = "declined"
 
+class VisibilityUpdate(BaseModel):
+    is_visible: bool
+
 class QuizSubmit(BaseModel):
     sleep_schedule: SleepSchedule
     cleanliness: Cleanliness
@@ -131,8 +134,27 @@ class IndividualCardResponse(BaseModel):
     budget_range: Optional[BudgetRange] = None
     roommate_timing: Optional[RoommateTiming] = None
     lifestyle_tags: list[str] = []
-    compatibility_score: int = 0
+    compatibility_score: Optional[int] = None
     profile_photo_url: Optional[str] = None
+    sleep_schedule: Optional[str] = None
+    cleanliness: Optional[str] = None
+    noise_level: Optional[str] = None
+    smoking: Optional[str] = None
+    pets: Optional[str] = None
+
+class IndividualDetailResponse(IndividualCardResponse):
+    """Richer profile shown when someone clicks 'View' on an individual."""
+    sleep_schedule: Optional[str] = None
+    cleanliness: Optional[str] = None
+    noise_level: Optional[str] = None
+    guests: Optional[str] = None
+    study_habits: Optional[str] = None
+    smoking: Optional[str] = None
+    pets: Optional[str] = None
+    kitchen_use: Optional[str] = None
+    gender_housing_pref: Optional[str] = None
+    search_type: Optional[str] = None
+    compatibility_breakdown: Optional[dict[str, str]] = None
 
 # ──────────────────────────────────────────────
 # GROUPS
@@ -183,8 +205,10 @@ class GroupCardResponse(BaseModel):
     has_place: bool
     address: Optional[str] = None
     is_verified: bool
+    is_visible: bool = True
+    group_photo_url: Optional[str] = None
     members: list[GroupMemberResponse] = []
-    compatibility_score: int = 0
+    compatibility_score: Optional[int] = None
     created_at: datetime
 
     class Config:

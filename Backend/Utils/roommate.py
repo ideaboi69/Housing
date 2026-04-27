@@ -19,9 +19,7 @@ def build_group_card(group: RoommateGroup, db: Session, viewer_profile: Roommate
             joined_at=m.joined_at,
         ))
 
-    score = 0
-    if viewer_profile:
-        score = calculate_group_compatibility(viewer_profile, group, db)
+    score = calculate_group_compatibility(viewer_profile, group, db) if viewer_profile else None
 
     return GroupCardResponse(
         id=group.id,
@@ -37,7 +35,9 @@ def build_group_card(group: RoommateGroup, db: Session, viewer_profile: Roommate
         has_place=group.has_place,
         address=group.address,
         is_verified=group.is_verified,
+        is_visible=group.is_visible,
         members=members,
+        group_photo_url=group.group_photo_url,
         compatibility_score=score,
         created_at=group.created_at,
     )

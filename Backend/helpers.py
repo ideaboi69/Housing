@@ -136,12 +136,33 @@ def cascade_delete_landlord(landlord: Landlord, db: Session):
             db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).delete(synchronize_session=False)
             db.query(SavedListing).filter(SavedListing.listing_id == listing.id).delete(synchronize_session=False)
             db.query(Flag).filter(Flag.listing_id == listing.id).delete(synchronize_session=False)
+            db.query(ViewingBooking).filter(ViewingBooking.listing_id == listing.id).delete(synchronize_session=False)
+            db.query(ViewingSlot).filter(ViewingSlot.listing_id == listing.id).delete(synchronize_session=False)
+            db.query(ViewingAvailability).filter(ViewingAvailability.listing_id == listing.id).delete(synchronize_session=False)
             db.delete(listing)
 
         db.query(Review).filter(Review.property_id == prop.id).delete(synchronize_session=False)
         db.delete(prop)
 
+    # Direct landlord-level cleanup (rows tied to landlord but not to a specific listing)
+    landlord_convo_ids = [c.id for c in db.query(Conversation.id).filter(Conversation.landlord_id == landlord.id).all()]
+    if landlord_convo_ids:
+        db.query(Message).filter(Message.conversation_id.in_(landlord_convo_ids)).delete(synchronize_session=False)
+        db.query(Conversation).filter(Conversation.landlord_id == landlord.id).delete(synchronize_session=False)
+
+    db.query(ViewingBooking).filter(ViewingBooking.landlord_id == landlord.id).delete(synchronize_session=False)
+    db.query(ViewingAvailability).filter(ViewingAvailability.landlord_id == landlord.id).delete(synchronize_session=False)
     db.query(Review).filter(Review.landlord_id == landlord.id).delete(synchronize_session=False)
+
+    # Deletes the S3 files first, then DB rows
+    docs = db.query(LandlordDocuments).filter(LandlordDocuments.landlord_id == landlord.id).all()
+    for doc in docs:
+        try:
+            s3_client.delete_object(Bucket=BUCKET_NAME, Key=doc.id_filepath)
+            s3_client.delete_object(Bucket=BUCKET_NAME, Key=doc.document_filepath)
+        except Exception:
+            pass
+    db.query(LandlordDocuments).filter(LandlordDocuments.landlord_id == landlord.id).delete(synchronize_session=False)
     db.delete(landlord)
 
 def cascade_delete_user(user: User, db: Session):
@@ -894,6 +915,48 @@ def calculate_compatibility(profile_a: RoommateProfile, profile_b: RoommateProfi
         return 0
 
     return round((score / total_weight) * 100)
+
+def calculate_compatibility_breakdown(profile_a: RoommateProfile, profile_b: RoommateProfile) -> dict[str, str]:
+    """Per-category match status: 'match' | 'partial' | 'differ'.
+    Mirrors the fields used in calculate_compatibility but returns per-field labels
+    instead of a single rolled-up score.
+    """
+    if not profile_a or not profile_b:
+        return {}
+
+    fields = [
+        "sleep_schedule", "cleanliness", "noise_level", "guests",
+        "study_habits", "smoking", "pets", "kitchen_use",
+        "budget_range", "roommate_timing",
+    ]
+
+    breakdown: dict[str, str] = {}
+    for field in fields:
+        val_a = getattr(profile_a, field)
+        val_b = getattr(profile_b, field)
+
+        if val_a is None or val_b is None:
+            continue
+
+        if val_a == val_b:
+            breakdown[field] = "match"
+            continue
+
+        options = [e.value for e in type(val_a)]
+        try:
+            idx_a = options.index(val_a.value)
+            idx_b = options.index(val_b.value)
+            distance = abs(idx_a - idx_b)
+            max_distance = len(options) - 1
+            # 1 step apart on a 3-step scale → partial; further → differ
+            if max_distance > 0 and distance / max_distance <= 0.5:
+                breakdown[field] = "partial"
+            else:
+                breakdown[field] = "differ"
+        except (ValueError, ZeroDivisionError):
+            breakdown[field] = "differ"
+
+    return breakdown
 
 def calculate_group_compatibility(user_profile: RoommateProfile, group: RoommateGroup, db: Session) -> int:
     active_members = [m for m in group.members if m.is_active]
