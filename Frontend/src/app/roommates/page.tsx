@@ -412,6 +412,93 @@ function IndividualCard({ profile, canInvite, inviteReason, invited, onInvite, o
   );
 }
 
+function MyIndividualCard({
+  user,
+  budgetText,
+  moveInText,
+  categoryPills,
+}: {
+  user: { first_name?: string | null; last_name?: string | null; program?: string | null; year?: string | null; profile_photo_url?: string | null } | null;
+  budgetText: string;
+  moveInText: string;
+  categoryPills: Array<{ category: string; label: string }>;
+}) {
+  const initials = `${user?.first_name?.[0] ?? "Y"}${user?.last_name?.[0] ?? ""}`;
+
+  return (
+    <div
+      className="rounded-[24px] border border-[#FF6B35]/15 bg-white p-4 transition-all"
+      style={{ boxShadow: "0 16px 34px rgba(27,45,69,0.06)" }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 border border-[#FF6B35]/15 overflow-hidden" style={{ boxShadow: "0 8px 18px rgba(27,45,69,0.08)" }}>
+            {user?.profile_photo_url ? (
+              <img src={user.profile_photo_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "#FF6B35" }}>{initials}</span>
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#FF6B35]/10 px-2.5 py-1 text-[#FF6B35]" style={{ fontSize: "9px", fontWeight: 800 }}>
+                Your profile
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#2EC4B6]/10 px-2.5 py-1 text-[#2EC4B6]" style={{ fontSize: "9px", fontWeight: 800 }}>
+                Live in matching
+              </span>
+            </div>
+            <h3 className="mt-2 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 800 }}>
+              {user?.first_name || "You"} {user?.last_name?.[0] ? `${user.last_name[0]}.` : ""}
+            </h3>
+            <p className="text-[#1B2D45]/55" style={{ fontSize: "11px" }}>
+              {[user?.year, user?.program].filter(Boolean).join(" · ") || "Roommate profile"}
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/settings?tab=roommates"
+          className="rounded-xl border border-black/[0.08] bg-[#FCFAF7] px-3 py-2 text-[#1B2D45]/70 hover:text-[#1B2D45] transition-all"
+          style={{ fontSize: "11px", fontWeight: 700 }}
+        >
+          Edit
+        </Link>
+      </div>
+
+      <p className="mt-2 text-[#1B2D45]/60" style={{ fontSize: "11px", lineHeight: 1.55 }}>
+        Other solo students can discover this profile when they browse roommate matching.
+      </p>
+
+      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ fontSize: "9px", fontWeight: 700, background: CATEGORY_STYLE.budget_range.bg, color: CATEGORY_STYLE.budget_range.text, border: `1px solid ${CATEGORY_STYLE.budget_range.border}` }}>
+          <DollarSign className="w-2.5 h-2.5" />{budgetText}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ fontSize: "9px", fontWeight: 700, background: CATEGORY_STYLE.roommate_timing.bg, color: CATEGORY_STYLE.roommate_timing.text, border: `1px solid ${CATEGORY_STYLE.roommate_timing.border}` }}>
+          <Calendar className="w-2.5 h-2.5" />{moveInText}
+        </span>
+      </div>
+
+      {categoryPills.length > 0 && (
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+          {categoryPills.map((pill, idx) => {
+            const style = CATEGORY_STYLE[pill.category];
+            const Icon = style?.icon;
+            const bg = style?.bg ?? "rgba(255, 107, 53, 0.06)";
+            const text = style?.text ?? "#FF6B35";
+            const border = style?.border ?? "rgba(255, 107, 53, 0.10)";
+            return (
+              <span key={`${pill.category}-${idx}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ fontSize: "9px", fontWeight: 600, background: bg, color: text, border: `1px solid ${border}` }}>
+                {Icon && <Icon className="w-2.5 h-2.5" />}
+                {pill.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ════════════════════════════════════════════════════════
    Profile Quiz
    ════════════════════════════════════════════════════════ */
@@ -645,8 +732,10 @@ interface SavedProfile {
   budget: [number, number];
   moveIn: string;
   genderHousing: string;
-  mode: "solo" | "with-friends";
-  defaultTab: "groups" | "individuals";
+  mode?: "solo" | "with-friends";
+  defaultTab?: "groups" | "individuals";
+  setupDone?: boolean;
+  started?: boolean;
 }
 
 function loadProfile(): SavedProfile | null {
@@ -654,7 +743,7 @@ function loadProfile(): SavedProfile | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (data && data.tags && data.budget && data.mode) return data as SavedProfile;
+    if (data && data.tags && data.budget) return data as SavedProfile;
   } catch { /* corrupted — ignore */ }
   return null;
 }
@@ -670,7 +759,6 @@ function clearRoommateProfile() {
 export default function RoommatesPage() {
   const router = useRouter();
   const isMobile = useIsMobile();
-  const router = useRouter();
   const { user } = useAuthStore();
   const isLandlord = user?.role === "landlord";
   const [hydrated, setHydrated] = useState(false);
@@ -680,6 +768,8 @@ export default function RoommatesPage() {
   const [myMode, setMyMode] = useState<"solo" | "with-friends" | null>(null);
   const [myTags, setMyTags] = useState<Record<string, string>>({});
   const [myBudget, setMyBudget] = useState<[number, number]>([500, 650]);
+  const [myMoveIn, setMyMoveIn] = useState("");
+  const [myGenderHousing, setMyGenderHousing] = useState("");
   const [tab, setTab] = useState<"groups" | "individuals">("groups");
   const [activeFilter, setActiveFilter] = useState("all");
   const [apiGroups, setApiGroups] = useState<RoommateGroup[] | null>(null);
@@ -749,9 +839,13 @@ export default function RoommatesPage() {
             const budget = profile.budget_range ? (budgetMap[profile.budget_range] || [500, 650]) : [500, 650];
             const mode = profile.search_type === "have_friends" ? "with-friends" : "solo";
             const defaultTab = mode === "solo" ? "groups" : "individuals";
+            const moveIn = profile.roommate_timing ? (TIMING_LABEL[profile.roommate_timing] || "Flexible") : "Flexible";
+            const genderHousing = profile.gender_housing_pref ? (GENDER_LABEL[profile.gender_housing_pref] || "No preference") : "No preference";
 
             setMyTags(tags);
             setMyBudget(budget as [number, number]);
+            setMyMoveIn(moveIn);
+            setMyGenderHousing(genderHousing);
             setMyMode(mode);
             setStarted(true);
             setHasProfile(true);
@@ -759,7 +853,16 @@ export default function RoommatesPage() {
             setTab(defaultTab);
 
             // Cache locally too
-            saveProfile({ tags, budget: budget as [number, number], moveIn: "", genderHousing: "", mode, defaultTab });
+            saveProfile({
+              tags,
+              budget: budget as [number, number],
+              moveIn,
+              genderHousing,
+              mode,
+              defaultTab,
+              started: true,
+              setupDone: true,
+            });
 
             // Try fetching API groups and individuals
             try {
@@ -772,40 +875,38 @@ export default function RoommatesPage() {
 
             try {
               const individuals = await api.roommates.browseIndividuals();
-              if (individuals && individuals.length > 0) {
-                setApiIndividuals(individuals.map((p) => {
-                  const cardCategoryTags: Array<{ category: string; label: string }> = [];
-                  const candidates: Array<[string, string | null | undefined]> = [
-                    ["sleep_schedule", p.sleep_schedule],
-                    ["cleanliness", p.cleanliness],
-                    ["noise_level", p.noise_level],
-                    ["smoking", p.smoking],
-                    ["pets", p.pets],
-                  ];
-                  for (const [category, value] of candidates) {
-                    if (value) cardCategoryTags.push({ category, label: shortLabelFor(category, value) });
-                    if (cardCategoryTags.length >= 4) break;
-                  }
+              setApiIndividuals(individuals.map((p) => {
+                const cardCategoryTags: Array<{ category: string; label: string }> = [];
+                const candidates: Array<[string, string | null | undefined]> = [
+                  ["sleep_schedule", p.sleep_schedule],
+                  ["cleanliness", p.cleanliness],
+                  ["noise_level", p.noise_level],
+                  ["smoking", p.smoking],
+                  ["pets", p.pets],
+                ];
+                for (const [category, value] of candidates) {
+                  if (value) cardCategoryTags.push({ category, label: shortLabelFor(category, value) });
+                  if (cardCategoryTags.length >= 4) break;
+                }
 
-                  return {
-                    id: String(p.user_id),
-                    firstName: p.first_name,
-                    initial: p.last_initial,
-                    year: p.year || "",
-                    program: p.program || "",
-                    budget: [0, 0] as [number, number],
-                    moveIn: p.roommate_timing || "",
-                    leaseLength: "",
-                    bio: p.bio || "",
-                    tags: {},
-                    compatibility: p.compatibility_score ?? undefined,
-                    avatar: p.profile_photo_url || undefined,
-                    budgetLabel: p.budget_range ? BUDGET_LABEL[p.budget_range] : undefined,
-                    moveInLabel: p.roommate_timing ? TIMING_LABEL[p.roommate_timing] : undefined,
-                    cardCategoryTags,
-                  };
-                }));
-              }
+                return {
+                  id: String(p.user_id),
+                  firstName: p.first_name,
+                  initial: p.last_initial,
+                  year: p.year || "",
+                  program: p.program || "",
+                  budget: [0, 0] as [number, number],
+                  moveIn: p.roommate_timing || "",
+                  leaseLength: "",
+                  bio: p.bio || "",
+                  tags: {},
+                  compatibility: p.compatibility_score ?? undefined,
+                  avatar: p.profile_photo_url || undefined,
+                  budgetLabel: p.budget_range ? BUDGET_LABEL[p.budget_range] : undefined,
+                  moveInLabel: p.roommate_timing ? TIMING_LABEL[p.roommate_timing] : undefined,
+                  cardCategoryTags,
+                };
+              }));
             } catch { /* use mock */ }
 
             setHydrated(true);
@@ -833,11 +934,13 @@ export default function RoommatesPage() {
       if (saved) {
         setMyTags(saved.tags);
         setMyBudget(saved.budget);
-        setMyMode(saved.mode);
-        setStarted(true);
+        setMyMoveIn(saved.moveIn);
+        setMyGenderHousing(saved.genderHousing);
+        setMyMode(saved.mode ?? null);
+        setStarted(saved.started ?? true);
         setHasProfile(true);
-        setSetupDone(true);
-        setTab(saved.defaultTab);
+        setSetupDone(saved.setupDone ?? !!saved.mode);
+        setTab(saved.defaultTab ?? (saved.mode === "with-friends" ? "individuals" : "groups"));
       }
       setHydrated(true);
     }
@@ -885,73 +988,117 @@ export default function RoommatesPage() {
     }
   };
 
+  const buildRoommateQuizPayload = useCallback((
+    tags: Record<string, string>,
+    budget: [number, number],
+    moveIn: string,
+    genderHousing: string,
+    searchType: "on_my_own" | "have_friends",
+    roommatesNeeded?: number,
+  ) => {
+    const tagToEnum: Record<string, Record<string, string>> = {
+      sleep: { "Early Bird (before 10pm)": "early_bird", "Night Owl (after midnight)": "night_owl", "Flexible": "flexible" },
+      cleanliness: { "Very Tidy": "very_tidy", "Reasonably Clean": "reasonably_clean", "Relaxed": "relaxed" },
+      noise: { "Quiet — I need silence": "quiet", "Moderate — music at a normal volume": "moderate", "Loud — I play music / have people over": "loud" },
+      guests: { "Rarely / Never": "rarely", "Sometimes (weekends)": "sometimes", "Often — I'm social": "often" },
+      study: { "Study at home": "at_home", "Library / campus mostly": "library", "Mix of both": "mix" },
+      smoking: { "No smoking at all": "no_smoking", "Outside only": "outside_only", "I smoke / vape": "i_smoke" },
+      pets: { "No pets please": "no_pets", "I'm fine with pets": "fine_with_pets", "I have a pet": "i_have_a_pet" },
+      cooking: { "I cook daily": "cook_daily", "A few times a week": "few_times_week", "Mostly takeout / meal plan": "takeout" },
+    };
+
+    const budgetToEnum = (range: [number, number]) => {
+      if (range[1] <= 500) return "under_500";
+      if (range[1] <= 650) return "500_650";
+      if (range[1] <= 800) return "650_800";
+      return "800_plus";
+    };
+
+    const moveInToEnum = (value: string) => {
+      if (value.includes("Fall")) return "fall_2026";
+      if (value.includes("Winter")) return "winter_2027";
+      if (value.includes("Summer")) return "summer_2026";
+      return "flexible";
+    };
+
+    const genderToEnum = (value: string) => {
+      if (value.includes("Mixed")) return "mixed_gender";
+      if (value.includes("Same")) return "same_gender";
+      return "no_preference";
+    };
+
+    return {
+      sleep_schedule: tagToEnum.sleep?.[tags.sleep] || "flexible",
+      cleanliness: tagToEnum.cleanliness?.[tags.cleanliness] || tenantValues.cleanliness || "reasonably_clean",
+      noise_level: tagToEnum.noise?.[tags.noise] || "moderate",
+      guests: tagToEnum.guests?.[tags.guests] || "sometimes",
+      study_habits: tagToEnum.study?.[tags.study] || "mix",
+      smoking: tagToEnum.smoking?.[tags.smoking] || tenantValues.smoking || "no_smoking",
+      pets: tagToEnum.pets?.[tags.pets] || tenantValues.pets || "fine_with_pets",
+      kitchen_use: tagToEnum.cooking?.[tags.cooking] || "few_times_week",
+      budget_range: budgetToEnum(budget),
+      roommate_timing: moveInToEnum(moveIn),
+      gender_housing_pref: genderHousing ? genderToEnum(genderHousing) : (tenantGender || "no_preference"),
+      search_type: searchType,
+      ...(typeof roommatesNeeded === "number" ? { roommates_needed: roommatesNeeded } : {}),
+    };
+  }, [tenantGender, tenantValues]);
+
   const handleQuizComplete = useCallback(async (tags: Record<string, string>, budget: [number, number], moveIn: string, genderHousing: string) => {
     setMyTags(tags);
     setMyBudget(budget);
+    setMyMoveIn(moveIn);
+    setMyGenderHousing(genderHousing);
     setHasProfile(true);
+    saveProfile({
+      tags,
+      budget,
+      moveIn,
+      genderHousing,
+      started: true,
+      setupDone: false,
+    });
 
     // Try submitting to API
     if (user) {
       try {
-        const tagToEnum: Record<string, Record<string, string>> = {
-          sleep: { "Early Bird (before 10pm)": "early_bird", "Night Owl (after midnight)": "night_owl", "Flexible": "flexible" },
-          cleanliness: { "Very Tidy": "very_tidy", "Reasonably Clean": "reasonably_clean", "Relaxed": "relaxed" },
-          noise: { "Quiet — I need silence": "quiet", "Moderate — music at a normal volume": "moderate", "Loud — I play music / have people over": "loud" },
-          guests: { "Rarely / Never": "rarely", "Sometimes (weekends)": "sometimes", "Often — I'm social": "often" },
-          study: { "Study at home": "at_home", "Library / campus mostly": "library", "Mix of both": "mix" },
-          smoking: { "No smoking at all": "no_smoking", "Outside only": "outside_only", "I smoke / vape": "i_smoke" },
-          pets: { "No pets please": "no_pets", "I'm fine with pets": "fine_with_pets", "I have a pet": "i_have_a_pet" },
-          cooking: { "I cook daily": "cook_daily", "A few times a week": "few_times_week", "Mostly takeout / meal plan": "takeout" },
-        };
-
-        const budgetToEnum = (b: [number, number]) => {
-          if (b[1] <= 500) return "under_500";
-          if (b[1] <= 650) return "500_650";
-          if (b[1] <= 800) return "650_800";
-          return "800_plus";
-        };
-
-        const moveInToEnum = (m: string) => {
-          if (m.includes("Fall")) return "fall_2026";
-          if (m.includes("Winter")) return "winter_2027";
-          if (m.includes("Summer")) return "summer_2026";
-          return "flexible";
-        };
-
-        const genderToEnum = (g: string) => {
-          if (g.includes("Mixed")) return "mixed_gender";
-          if (g.includes("Same")) return "same_gender";
-          return "no_preference";
-        };
-
-        await api.roommates.submitQuiz({
-          sleep_schedule: tagToEnum.sleep?.[tags.sleep] || "flexible",
-          cleanliness: tagToEnum.cleanliness?.[tags.cleanliness] || tenantValues.cleanliness || "reasonably_clean",
-          noise_level: tagToEnum.noise?.[tags.noise] || "moderate",
-          guests: tagToEnum.guests?.[tags.guests] || "sometimes",
-          study_habits: tagToEnum.study?.[tags.study] || "mix",
-          smoking: tagToEnum.smoking?.[tags.smoking] || tenantValues.smoking || "no_smoking",
-          pets: tagToEnum.pets?.[tags.pets] || tenantValues.pets || "fine_with_pets",
-          kitchen_use: tagToEnum.cooking?.[tags.cooking] || "few_times_week",
-          budget_range: budgetToEnum(budget),
-          roommate_timing: moveInToEnum(moveIn),
-          gender_housing_pref: genderHousing ? genderToEnum(genderHousing) : (tenantGender || "no_preference"),
-          search_type: "on_my_own",
-        });
+        await api.roommates.submitQuiz(
+          buildRoommateQuizPayload(tags, budget, moveIn, genderHousing, "on_my_own"),
+        );
       } catch { /* API failed — quiz still works locally */ }
     }
-  }, [user, tenantValues, tenantGender]);
+  }, [buildRoommateQuizPayload, user]);
 
   const handleSetupSelect = (mode: Exclude<LookingMode, null>, have: number, need: number) => {
     setMyMode(mode);
     setSetupDone(true);
     const defaultTab = mode === "solo" ? "groups" : "individuals";
     setTab(defaultTab as "groups" | "individuals");
-    saveProfile({ tags: myTags, budget: myBudget, moveIn: "", genderHousing: "", mode, defaultTab: defaultTab as "groups" | "individuals" });
-<<<<<<< Updated upstream
-    if (mode === "with-friends") {
-      router.push(`/roommates/groups/new?have=${have}&need=${need}`);
-=======
+    saveProfile({
+      tags: myTags,
+      budget: myBudget,
+      moveIn: myMoveIn,
+      genderHousing: myGenderHousing,
+      mode,
+      defaultTab: defaultTab as "groups" | "individuals",
+      started: true,
+      setupDone: true,
+    });
+
+    if (user) {
+      api.roommates.submitQuiz(
+        buildRoommateQuizPayload(
+          myTags,
+          myBudget,
+          myMoveIn,
+          myGenderHousing,
+          mode === "with-friends" ? "have_friends" : "on_my_own",
+          mode === "solo" ? need : undefined,
+        ),
+      ).catch(() => {
+        /* keep local flow usable if persistence fails */
+      });
+    }
 
     if (mode === "with-friends" && !isLandlord) {
       const params = new URLSearchParams({
@@ -959,7 +1106,6 @@ export default function RoommatesPage() {
         need: String(need),
       });
       router.push(`/roommates/groups/new?${params.toString()}`);
->>>>>>> Stashed changes
     }
   };
 
@@ -971,6 +1117,8 @@ export default function RoommatesPage() {
     setMyMode(null);
     setMyTags({});
     setMyBudget([500, 650]);
+    setMyMoveIn("");
+    setMyGenderHousing("");
     setTab("groups");
     setActiveFilter("all");
     setApiGroups(null);
@@ -993,10 +1141,32 @@ export default function RoommatesPage() {
   }, [hasProfile, myTags, myBudget, activeFilter, visibleGroups]);
 
   const individualsWithCompat = useMemo(() => {
-    if (apiIndividuals && apiIndividuals.length > 0) return apiIndividuals;
+    if (apiIndividuals !== null) return apiIndividuals;
     if (!hasProfile) return MOCK_PROFILES;
     return MOCK_PROFILES.map((p) => ({ ...p, compatibility: computeCompatibility(myTags, p.tags, myBudget, p.budget) })).sort((a, b) => (b.compatibility ?? 0) - (a.compatibility ?? 0));
   }, [hasProfile, myTags, myBudget, apiIndividuals]);
+
+  const myIndividualPills = useMemo(() => {
+    const categoryKeyMap: Record<string, string> = {
+      sleep: "sleep_schedule",
+      cleanliness: "cleanliness",
+      noise: "noise_level",
+      smoking: "smoking",
+      pets: "pets",
+      cooking: "kitchen_use",
+    };
+
+    return Object.entries(myTags)
+      .slice(0, 4)
+      .map(([key, value]) => ({ category: categoryKeyMap[key] || key, label: TAG_SHORT_LABELS[value] || value }));
+  }, [myTags]);
+
+  const myBudgetText = useMemo(() => {
+    if (myBudget[1] >= 2000) return `$${myBudget[0]}+/mo`;
+    return `$${myBudget[0]}–$${myBudget[1]}/mo`;
+  }, [myBudget]);
+
+  const myMoveInText = myMoveIn || "Flexible";
 
   /* ── Loading while hydrating from localStorage ── */
   if (!hydrated) {
@@ -1182,22 +1352,42 @@ export default function RoommatesPage() {
           )}
           {tab === "individuals" && !isLandlord && (
             <motion.div key="individuals" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {individualsWithCompat.map((p) => {
-                  const numId = parseInt(p.id, 10);
-                  return (
-                    <IndividualCard
-                      key={p.id}
-                      profile={p}
-                      canInvite={inviteCapability.canInvite}
-                      inviteReason={inviteCapability.reason}
-                      invited={!isNaN(numId) && invitedIds.has(numId)}
-                      onInvite={() => !isNaN(numId) ? handleInviteIndividual(numId) : Promise.resolve()}
-                      onView={() => setViewingProfile(p)}
-                    />
-                  );
-                })}
+              <div className="mb-4">
+                <MyIndividualCard
+                  user={user}
+                  budgetText={myBudgetText}
+                  moveInText={myMoveInText}
+                  categoryPills={myIndividualPills}
+                />
               </div>
+              {individualsWithCompat.length === 0 ? (
+                <div className="bg-white rounded-2xl p-10 text-center" style={{ border: "2.5px dashed rgba(27,45,69,0.12)" }}>
+                  <User className="w-10 h-10 text-[#1B2D45]/10 mx-auto mb-2" />
+                  <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>
+                    No solo profiles yet
+                  </h3>
+                  <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>
+                    Your profile is live in matching. As more students choose “on my own,” they’ll show up here and the invite flow will work normally.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {individualsWithCompat.map((p) => {
+                    const numId = parseInt(p.id, 10);
+                    return (
+                      <IndividualCard
+                        key={p.id}
+                        profile={p}
+                        canInvite={inviteCapability.canInvite}
+                        inviteReason={inviteCapability.reason}
+                        invited={!isNaN(numId) && invitedIds.has(numId)}
+                        onInvite={() => !isNaN(numId) ? handleInviteIndividual(numId) : Promise.resolve()}
+                        onView={() => setViewingProfile(p)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   User, Lock, Bell, Users, Shield, ChevronRight,
   Camera, Check, Eye, EyeOff, Trash2, Moon, Sun, X,
@@ -336,6 +337,7 @@ function RoommateTab() {
   const [cleanliness, setCleanliness] = useState<string[]>([]);
   const [noise, setNoise] = useState<string[]>([]);
   const [guests, setGuests] = useState<string[]>([]);
+  const [savedTags, setSavedTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [initialVisible, setInitialVisible] = useState(true);
@@ -388,6 +390,7 @@ function RoommateTab() {
         setCleanliness(profile.cleanliness ? [enumToUi.cleanliness[profile.cleanliness] || "moderate"] : []);
         setNoise(profile.noise_level ? [enumToUi.noise_level[profile.noise_level] || "moderate-noise"] : []);
         setGuests(profile.guests ? [enumToUi.guests[profile.guests] || "sometimes"] : []);
+        setSavedTags(profile.lifestyle_tags || []);
         setExistingProfile({
           study_habits: profile.study_habits,
           smoking: profile.smoking,
@@ -415,7 +418,7 @@ function RoommateTab() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.roommates.submitQuiz({
+      const updatedProfile = await api.roommates.submitQuiz({
         sleep_schedule:
           {
             "early-bird": "early_bird",
@@ -450,6 +453,19 @@ function RoommateTab() {
         search_type: existingProfile?.search_type || "on_my_own",
         roommates_needed: existingProfile?.roommates_needed,
       });
+
+      setExistingProfile({
+        study_habits: updatedProfile.study_habits,
+        smoking: updatedProfile.smoking,
+        pets: updatedProfile.pets,
+        kitchen_use: updatedProfile.kitchen_use,
+        budget_range: updatedProfile.budget_range,
+        roommate_timing: updatedProfile.roommate_timing,
+        gender_housing_pref: updatedProfile.gender_housing_pref,
+        search_type: updatedProfile.search_type,
+        roommates_needed: updatedProfile.roommates_needed,
+      });
+      setSavedTags(updatedProfile.lifestyle_tags || []);
 
       if (visible !== initialVisible) {
         await api.roommates.toggleVisibility(visible);
@@ -495,6 +511,11 @@ function RoommateTab() {
     if (guests[0]) tags.push(tagMap.guests[guests[0]] || "Social");
     return tags.slice(0, 5);
   }, [sleepSchedule, cleanliness, noise, guests]);
+
+  const displayedTags = useMemo(() => {
+    const normalizedSaved = savedTags.filter(Boolean);
+    return normalizedSaved.length > 0 ? normalizedSaved.slice(0, 5) : generatedTags;
+  }, [generatedTags, savedTags]);
 
   return (
     <div className="space-y-5">
@@ -552,7 +573,7 @@ function RoommateTab() {
 
       <SectionCard title="Your Roommate Tags" description="These update automatically from your saved lifestyle answers">
         <div className="flex flex-wrap gap-2">
-          {generatedTags.length > 0 ? generatedTags.map((tag) => (
+          {displayedTags.length > 0 ? displayedTags.map((tag) => (
             <span key={tag} className="rounded-full border border-[#FF6B35]/14 bg-[#FF6B35]/[0.06] px-3 py-1.5 text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 700 }}>
               {tag}
             </span>
@@ -808,8 +829,25 @@ function AccountTab() {
    ═══════════════════════════════════════════════════════ */
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const getTabFromQuery = (value: string | null): SettingsTab => {
+    if (value === "profile" || value === "roommate" || value === "notifications" || value === "account") return value;
+    return "profile";
+  };
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => getTabFromQuery(searchParams.get("tab")));
   const { user } = useAuthStore();
+
+  useEffect(() => {
+    const nextTab = getTabFromQuery(searchParams.get("tab"));
+    setActiveTab((current) => (current === nextTab ? current : nextTab));
+  }, [searchParams]);
+
+  const handleTabChange = (tab: SettingsTab) => {
+    setActiveTab(tab);
+    const target = tab === "profile" ? "/settings" : `/settings?tab=${tab}`;
+    router.replace(target, { scroll: false });
+  };
 
   const tabContent: Record<SettingsTab, React.ReactNode> = {
     profile: <ProfileTab />,
@@ -838,7 +876,7 @@ export default function SettingsPage() {
               const Icon = tab.icon;
               const isActive = activeTab === tab.key;
               return (
-                <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                <button key={tab.key} onClick={() => handleTabChange(tab.key)}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition-all ${
                     isActive
                       ? "bg-white border border-black/[0.04] text-[#1B2D45]"
@@ -866,7 +904,7 @@ export default function SettingsPage() {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.key;
                 return (
-                  <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                  <button key={tab.key} onClick={() => handleTabChange(tab.key)}
                     className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border whitespace-nowrap shrink-0 transition-all ${
                       isActive
                         ? "border-[#FF6B35] bg-[#FF6B35]/10 text-[#FF6B35]"

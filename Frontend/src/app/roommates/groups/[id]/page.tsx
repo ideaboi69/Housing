@@ -5,7 +5,7 @@ import { use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Users, Shield, ShieldCheck, ChevronLeft, MessageCircle, Link2, Copy, Check, MapPin, Home, Calendar, DollarSign, Sparkles, Send, Settings, Search, Share2, Camera, ExternalLink, X, UserCheck, LogOut } from "lucide-react";
+import { Users, Shield, ShieldCheck, ChevronLeft, ChevronRight, MessageCircle, Link2, Copy, Check, MapPin, Home, Calendar, DollarSign, Sparkles, Send, Settings, Search, Share2, Camera, ExternalLink, X, UserCheck, LogOut } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
@@ -809,6 +809,23 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                     ? "This group has already accepted you. Open your roommate dashboard to keep things moving."
                     : "The group will review your profile and get back to you."}
                 </p>
+                {existingRequestStatus === "accepted" && viewerDashboard?.is_in_group && viewerDashboard.group_id ? (
+                  <Link
+                    href={`/roommates/groups/${viewerDashboard.group_id}`}
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#1B2D45] px-4 py-2.5 text-white hover:bg-[#152438] transition-all"
+                    style={{ fontSize: "12px", fontWeight: 700 }}
+                  >
+                    Open my group <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                ) : (
+                  <Link
+                    href="/roommates"
+                    className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-[#1B2D45]/10 px-4 py-2.5 text-[#1B2D45]/60 hover:text-[#1B2D45] transition-all"
+                    style={{ fontSize: "12px", fontWeight: 700 }}
+                  >
+                    Back to roommates <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
               </div>
             ) : !showRequestForm ? (
               <div className="text-center">

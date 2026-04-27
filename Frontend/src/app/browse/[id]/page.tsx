@@ -241,7 +241,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     load();
   }, [listingId, isInvalidId]);
 
-<<<<<<< Updated upstream
   // Check if student has filled tenant profile
   useEffect(() => {
     if (!user || user.role !== "student" || tenantChecked.current) return;
@@ -254,15 +253,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const handleTenantComplete = () => {
     setShowTenantPrompt(false);
     setHasTenantProfile(true);
-    if (pendingAction === "contact") doContact();
+    if (pendingAction === "contact") {
+      void openConversation(`Hi, I'm interested in "${listing?.title}". Is it still available?`);
+    }
     else if (pendingAction === "showing") setShowingOpen(true);
     setPendingAction(null);
-  };
-
-  const doContact = async () => {
-=======
-  const handleContact = async () => {
-    await openConversation(`Hi, I'm interested in "${listing?.title}". Is it still available?`);
   };
 
   const openConversation = async (content: string, quickKey?: string) => {
@@ -271,17 +266,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
       return;
     }
->>>>>>> Stashed changes
     setContactSending(true);
     setActiveQuickMessage(quickKey ?? null);
     try {
       await api.messages.startConversation({
         listing_id: listingId,
-<<<<<<< Updated upstream
-        content: `Hi, I\u2019m interested in "${listing?.title}". Is it still available?`,
-=======
         content,
->>>>>>> Stashed changes
       });
       setContactSent(true);
       if (quickKey) {
@@ -300,7 +290,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-<<<<<<< Updated upstream
   const handleContact = async () => {
     if (contactSending || contactSent) return;
     if (!user) {
@@ -312,7 +301,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       setShowTenantPrompt(true);
       return;
     }
-    doContact();
+    await openConversation(`Hi, I'm interested in "${listing?.title}". Is it still available?`);
   };
 
   const handleBookShowing = () => {
@@ -328,8 +317,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     setShowingOpen(true);
   };
 
-    if (isLoading) {
-=======
   const quickMessageOptions = [
     {
       key: "available",
@@ -349,7 +336,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   ] as const;
 
   if (isLoading) {
->>>>>>> Stashed changes
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
         <motion.div className="flex flex-col items-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

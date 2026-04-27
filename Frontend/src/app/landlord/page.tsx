@@ -413,6 +413,20 @@ function PropertiesTab({ properties, onListingUpdated }: { properties: PropertyW
         )}
       </div>
 
+      <div className="rounded-xl border border-black/[0.04] bg-white px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-[#1B2D45]/[0.06] text-[#1B2D45]">
+            <Building2 className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Properties are the homes you manage</div>
+            <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px", lineHeight: 1.55 }}>
+              Add an address once, then create one or more listings under it. This is also where you jump into photos, showing times, and the full property page.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {!hasProperties ? (
         <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-10 text-center">
           <div className="w-14 h-14 rounded-2xl bg-[#1B2D45]/[0.06] flex items-center justify-center mx-auto mb-3">
@@ -510,14 +524,14 @@ function PropertiesTab({ properties, onListingUpdated }: { properties: PropertyW
                               className="flex items-center gap-1 px-2 py-1 rounded text-[#1B2D45]/35 hover:text-[#1B2D45] hover:bg-white transition-all"
                               style={{ fontSize: "10px", fontWeight: 600 }}
                             >
-                              <Image className="w-3 h-3" /> Photos
+                              <Image className="w-3 h-3" /> Manage Photos
                             </button>
                             <button
                               onClick={() => setShowingsListing({ id: listing.id, title: `${prop.title} — $${listing.rent_per_room}/rm` })}
                               className="flex items-center gap-1 px-2 py-1 rounded text-[#1B2D45]/35 hover:text-[#1B2D45] hover:bg-white transition-all"
                               style={{ fontSize: "10px", fontWeight: 600 }}
                             >
-                              <CalendarDays className="w-3 h-3" /> Showings
+                              <CalendarDays className="w-3 h-3" /> Viewing Slots
                             </button>
                           </div>
                         </div>
@@ -589,14 +603,18 @@ function PropertiesTab({ properties, onListingUpdated }: { properties: PropertyW
 function ListingsTab({
   properties,
   onListingUpdated,
+  onListingDeleted,
 }: {
   properties: PropertyWithListings[];
   onListingUpdated?: (listingId: number, updated: ListingResponse) => void;
+  onListingDeleted?: (listingId: number) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
   const [editListing, setEditListing] = useState<ListingResponse | null>(null);
   const [photosListing, setPhotosListing] = useState<{ id: number; title: string } | null>(null);
   const [showingsListing, setShowingsListing] = useState<{ id: number; title: string } | null>(null);
+  const [deletingListingId, setDeletingListingId] = useState<number | null>(null);
+  const [showCreatePicker, setShowCreatePicker] = useState(false);
 
   const allListings = properties.flatMap((property) =>
     property.listings.map((listing) => ({
@@ -616,6 +634,21 @@ function ListingsTab({
     archived: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "archived").length,
   };
 
+  async function handleDeleteListing(listingId: number) {
+    const confirmed = window.confirm("Delete this listing? This cannot be undone.");
+    if (!confirmed) return;
+
+    setDeletingListingId(listingId);
+    try {
+      await api.listings.delete(listingId);
+      onListingDeleted?.(listingId);
+    } catch {
+      // keep the UI stable if deletion fails
+    } finally {
+      setDeletingListingId(null);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -625,26 +658,82 @@ function ListingsTab({
             Active, draft, and archived listings in one place. Tenant reviews live in the reviews tab.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: "all", label: "All" },
-            { key: "active", label: "Active" },
-            { key: "draft", label: "Draft" },
-            { key: "archived", label: "Archived" },
-          ].map((filter) => (
-            <button
-              key={filter.key}
-              onClick={() => setStatusFilter(filter.key as typeof statusFilter)}
-              className={`rounded-full border px-3 py-1.5 transition-all ${
-                statusFilter === filter.key
-                  ? "border-[#1B2D45]/20 bg-[#1B2D45]/[0.06] text-[#1B2D45]"
-                  : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#1B2D45]/15 hover:text-[#1B2D45]"
-              }`}
-              style={{ fontSize: "11px", fontWeight: 700 }}
-            >
-              {filter.label} ({counts[filter.key as keyof typeof counts]})
-            </button>
-          ))}
+        <div className="flex flex-col gap-2 md:items-end">
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: "all", label: "All" },
+              { key: "active", label: "Active" },
+              { key: "draft", label: "Draft" },
+              { key: "archived", label: "Archived" },
+            ].map((filter) => (
+              <button
+                key={filter.key}
+                onClick={() => setStatusFilter(filter.key as typeof statusFilter)}
+                className={`rounded-full border px-3 py-1.5 transition-all ${
+                  statusFilter === filter.key
+                    ? "border-[#1B2D45]/20 bg-[#1B2D45]/[0.06] text-[#1B2D45]"
+                    : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#1B2D45]/15 hover:text-[#1B2D45]"
+                }`}
+                style={{ fontSize: "11px", fontWeight: 700 }}
+              >
+                {filter.label} ({counts[filter.key as keyof typeof counts]})
+              </button>
+            ))}
+            {properties.length > 0 && (
+              properties.length === 1 ? (
+                <Link
+                  href={`/landlord/properties/${properties[0].id}/listings/new`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#1B2D45] px-3.5 py-1.5 text-white hover:bg-[#152438] transition-all"
+                  style={{ fontSize: "11px", fontWeight: 700 }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Create Listing
+                </Link>
+              ) : (
+                <button
+                  onClick={() => setShowCreatePicker((value) => !value)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#1B2D45] px-3.5 py-1.5 text-white hover:bg-[#152438] transition-all"
+                  style={{ fontSize: "11px", fontWeight: 700 }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Create Listing
+                </button>
+              )
+            )}
+          </div>
+
+          {showCreatePicker && properties.length > 1 && (
+            <div className="rounded-xl border border-black/[0.06] bg-white p-3 shadow-[0_10px_30px_rgba(27,45,69,0.06)] md:max-w-[440px]">
+              <div className="text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 700 }}>
+                Pick a property for the new listing
+              </div>
+              <div className="mt-2 flex flex-col gap-2">
+                {properties.map((property) => (
+                  <Link
+                    key={property.id}
+                    href={`/landlord/properties/${property.id}/listings/new`}
+                    className="flex items-center justify-between rounded-lg border border-black/[0.05] px-3 py-2 text-[#1B2D45]/60 hover:border-[#1B2D45]/12 hover:text-[#1B2D45] hover:bg-[#FAF8F4] transition-all"
+                    style={{ fontSize: "11px", fontWeight: 700 }}
+                  >
+                    <span className="truncate pr-3">{property.title}</span>
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-black/[0.04] bg-white px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFB627]/10 text-[#FFB627]">
+            <Home className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Listings are what students actually see</div>
+            <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px", lineHeight: 1.55 }}>
+              Edit rent and status here, manage photos and viewing slots, or delete a listing directly. Need to create a new one? Start from the property it belongs to.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -745,21 +834,29 @@ function ListingsTab({
                     className="rounded-lg border border-black/[0.06] px-3 py-2 text-[#1B2D45]/55 hover:border-[#1B2D45]/15 hover:text-[#1B2D45] transition-all"
                     style={{ fontSize: "11px", fontWeight: 700 }}
                   >
-                    Photos
+                    Manage Photos
                   </button>
                   <button
                     onClick={() => setShowingsListing({ id: listing.id, title: `${property.title} — $${listing.rent_per_room}/rm` })}
                     className="rounded-lg border border-black/[0.06] px-3 py-2 text-[#1B2D45]/55 hover:border-[#1B2D45]/15 hover:text-[#1B2D45] transition-all"
                     style={{ fontSize: "11px", fontWeight: 700 }}
                   >
-                    Showings
+                    Viewing Slots
+                  </button>
+                  <button
+                    onClick={() => void handleDeleteListing(listing.id)}
+                    disabled={deletingListingId === listing.id}
+                    className="rounded-lg border border-[#E71D36]/15 px-3 py-2 text-[#E71D36]/70 hover:bg-[#E71D36]/[0.05] hover:border-[#E71D36]/25 transition-all disabled:opacity-40"
+                    style={{ fontSize: "11px", fontWeight: 700 }}
+                  >
+                    {deletingListingId === listing.id ? "Deleting..." : "Delete Listing"}
                   </button>
                   <Link
                     href={`/landlord/properties/${property.id}`}
                     className="rounded-lg bg-[#1B2D45] px-3 py-2 text-white hover:bg-[#152438] transition-all"
                     style={{ fontSize: "11px", fontWeight: 700 }}
                   >
-                    View Property
+                    Open Property
                   </Link>
                 </div>
               </div>
@@ -808,6 +905,7 @@ function ListingsTab({
    ════════════════════════════════════════════════════════ */
 
 function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: LandlordFlagResponse[] }) {
+  const [viewMode, setViewMode] = useState<"all" | "reviews" | "reports">("all");
   const avg =
     reviews.length > 0
       ? (
@@ -829,6 +927,8 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
       : null;
   const pendingFlags = flags.filter((flag) => flag.status === "pending").length;
   const resolvedFlags = flags.filter((flag) => flag.status === "resolved").length;
+  const showReports = viewMode === "all" || viewMode === "reports";
+  const showReviews = viewMode === "all" || viewMode === "reviews";
 
   return (
     <div className="space-y-4">
@@ -846,6 +946,28 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
         <StatCard icon={<Flag className="w-4 h-4 text-[#E71D36]" />} label="Open Reports" value={pendingFlags} sub={flags.length > 0 ? `${resolvedFlags} resolved` : "No reports yet"} />
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {[
+          { key: "all", label: "All feedback" },
+          { key: "reviews", label: `Reviews (${reviews.length})` },
+          { key: "reports", label: `Reports (${flags.length})` },
+        ].map((option) => (
+          <button
+            key={option.key}
+            onClick={() => setViewMode(option.key as typeof viewMode)}
+            className={`rounded-full border px-3 py-1.5 transition-all ${
+              viewMode === option.key
+                ? "border-[#1B2D45]/20 bg-[#1B2D45]/[0.06] text-[#1B2D45]"
+                : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#1B2D45]/15 hover:text-[#1B2D45]"
+            }`}
+            style={{ fontSize: "11px", fontWeight: 700 }}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      {showReports && (
       <div className="bg-white rounded-xl border border-black/[0.04] p-4">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#E71D36]/[0.07] text-[#E71D36]">
@@ -859,8 +981,9 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
           </div>
         </div>
       </div>
+      )}
 
-      {flags.length === 0 ? (
+      {showReports && (flags.length === 0 ? (
         <div className="bg-white rounded-xl border border-black/[0.04] p-8 text-center">
           <div className="w-12 h-12 rounded-2xl bg-[#E71D36]/[0.05] flex items-center justify-center mx-auto mb-3">
             <Flag className="w-6 h-6 text-[#E71D36]/50" />
@@ -912,9 +1035,9 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
             </div>
           ))}
         </div>
-      )}
+      ))}
 
-      {reviews.length === 0 ? (
+      {showReviews && (reviews.length === 0 ? (
         <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-10 text-center">
           <div className="w-14 h-14 rounded-2xl bg-[#FFB627]/10 flex items-center justify-center mx-auto mb-3">
             <Star className="w-7 h-7 text-[#FFB627]" />
@@ -988,7 +1111,7 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
             );
           })}
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -1655,6 +1778,16 @@ function LandlordDashboardContent() {
   }, []);
 
   useEffect(() => {
+    if (authLoading || !user || user.role !== "landlord") return;
+
+    const interval = window.setInterval(() => {
+      void refreshConversationState();
+    }, 10000);
+
+    return () => window.clearInterval(interval);
+  }, [authLoading, refreshConversationState, user]);
+
+  useEffect(() => {
     if (authLoading) return;
     if (!user) { router.replace("/landlord/login"); return; }
     if (user.role !== "landlord") { router.replace("/"); return; }
@@ -1873,6 +2006,11 @@ function LandlordDashboardContent() {
                   setProperties(prev => prev.map(p => ({
                     ...p,
                     listings: p.listings.map(l => l.id === lid ? updated : l),
+                  })));
+                }} onListingDeleted={(lid) => {
+                  setProperties(prev => prev.map((p) => ({
+                    ...p,
+                    listings: p.listings.filter((l) => l.id !== lid),
                   })));
                 }} />}
                 {tab === "reviews" && <ReviewsTab reviews={reviews} flags={flags} />}

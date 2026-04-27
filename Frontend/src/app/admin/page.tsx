@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, use } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard, Users, Building2, Home, Flag, PenLine, FileText,
   Shield, ShieldCheck, ShieldX, Trash2, Check, X, Search,
@@ -23,6 +23,23 @@ import type {
    ════════════════════════════════════════════════════════ */
 
 type Tab = "overview" | "users" | "landlords" | "listings" | "flags" | "writers" | "posts" | "groups" | "marketplace";
+
+function getTabFromQuery(value: string | null): Tab {
+  if (
+    value === "overview" ||
+    value === "users" ||
+    value === "landlords" ||
+    value === "listings" ||
+    value === "flags" ||
+    value === "writers" ||
+    value === "posts" ||
+    value === "groups" ||
+    value === "marketplace"
+  ) {
+    return value;
+  }
+  return "overview";
+}
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -819,7 +836,8 @@ function MarketplaceTab({ items, onRefresh }: { items: MarketplaceItemListRespon
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("overview");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => getTabFromQuery(searchParams.get("tab")));
   const [loading, setLoading] = useState(true);
   const [adminProfile, setAdminProfile] = useState<{ first_name: string; last_name: string } | null>(null);
 
@@ -895,6 +913,17 @@ export default function AdminDashboard() {
     if (!loading) fetchData();
   }, [loading, fetchData]);
 
+  useEffect(() => {
+    const nextTab = getTabFromQuery(searchParams.get("tab"));
+    setTab((current) => (current === nextTab ? current : nextTab));
+  }, [searchParams]);
+
+  const handleTabChange = useCallback((nextTab: Tab) => {
+    setTab(nextTab);
+    const target = nextTab === "overview" ? "/admin" : `/admin?tab=${nextTab}`;
+    router.replace(target, { scroll: false });
+  }, [router]);
+
   // Also fetch flag count for sidebar badge
   useEffect(() => {
     if (loading) return;
@@ -922,7 +951,7 @@ export default function AdminDashboard() {
     <div className="flex min-h-screen bg-[#0F1923]">
       <Sidebar
         active={tab}
-        onChange={setTab}
+        onChange={handleTabChange}
         flagCount={flags.filter((f) => f.status === "pending").length}
         onLogout={handleLogout}
         adminName={adminName}
@@ -944,7 +973,7 @@ export default function AdminDashboard() {
         {TABS.slice(0, 5).map((t) => {
           const Icon = t.icon;
           return (
-            <button key={t.key} onClick={() => setTab(t.key)} className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-all ${tab === t.key ? "text-[#FF6B35]" : "text-white/25"}`}>
+            <button key={t.key} onClick={() => handleTabChange(t.key)} className={`flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-all ${tab === t.key ? "text-[#FF6B35]" : "text-white/25"}`}>
               <Icon className="w-4 h-4" />
               <span style={{ fontSize: "9px", fontWeight: 600 }}>{t.label}</span>
             </button>

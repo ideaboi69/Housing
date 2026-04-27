@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useWriterStore } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
-import { AlertCircle, ArrowRight, PenLine, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowRight, PenLine, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const rotatingLines = ["campus stories", "local deals", "student tips"];
@@ -21,6 +21,7 @@ function WriterLoginPageContent() {
   const { login, isLoading, error, clearError } = useWriterStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [rotatingIndex, setRotatingIndex] = useState(0);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ function WriterLoginPageContent() {
     clearError();
     try {
       await login(email, password);
+      useAuthStore.getState().logout();
       router.push(nextPath);
     } catch {
       // store sets the error
@@ -207,14 +209,27 @@ function WriterLoginPageContent() {
 
                 <div>
                   <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Password</label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Your password"
-                    required
-                    className="mt-2 w-full rounded-2xl border border-[#FF6B35]/10 bg-[#FAFBFA] px-4 py-3.5 text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/25 focus:bg-white focus:outline-none transition-all"
-                  />
+                  <div className="relative mt-2">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Your password"
+                      required
+                      className="w-full rounded-2xl border border-[#FF6B35]/10 bg-[#FAFBFA] px-4 py-3.5 pr-12 text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/25 focus:bg-white focus:outline-none transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#1B2D45]/28 hover:text-[#1B2D45]/55 transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-[#1B2D45]/38" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                    Use the password from your application. Strong passwords usually include an uppercase letter, a number, and a symbol.
+                  </p>
                 </div>
 
                 {error && (

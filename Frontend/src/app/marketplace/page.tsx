@@ -4,13 +4,27 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Search, X, Eye, Clock, MapPin, Package, SlidersHorizontal } from "lucide-react";
+import { Plus, Search, X, Eye, Clock, MapPin, Package, SlidersHorizontal, Heart } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
 import { MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo, MOCK_ITEMS_WITH_ZONES } from "@/components/marketplace/marketplace-data";
 import type { MarketplaceItemListResponse, MarketplaceCategory, ItemCondition } from "@/types";
+import { toast } from "sonner";
 
-function ItemCard({ item, pickupZone }: { item: MarketplaceItemListResponse; pickupZone?: string }) {
+function ItemCard({
+  item,
+  pickupZone,
+  isSaved,
+  isSaving,
+  onToggleSave,
+}: {
+  item: MarketplaceItemListResponse;
+  pickupZone?: string;
+  isSaved: boolean;
+  isSaving: boolean;
+  onToggleSave: (itemId: number) => void;
+}) {
   const price = getPriceLabel(item.pricing_type, item.price);
   const condition = CONDITION_LABELS[item.condition];
   return (
@@ -22,6 +36,24 @@ function ItemCard({ item, pickupZone }: { item: MarketplaceItemListResponse; pic
             <span style={{ fontSize: "14px", fontWeight: 800, color: price.color }}>{price.text}</span>
             {price.badge && <span className="ml-1.5 text-[#FF6B35]" style={{ fontSize: "10px", fontWeight: 700 }}>{price.badge}</span>}
           </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleSave(item.id);
+            }}
+            aria-label={isSaved ? "Unsave item" : "Save item"}
+            className={`absolute top-3 right-3 w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition-all ${
+              isSaved
+                ? "bg-white text-[#E71D36]"
+                : "bg-white/92 text-[#1B2D45]/45 hover:text-[#1B2D45]"
+            }`}
+            style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.12)" }}
+            disabled={isSaving}
+          >
+            <Heart className={`w-4.5 h-4.5 ${isSaved ? "fill-[#E71D36]" : ""}`} />
+          </button>
         </div>
         <div className="p-3.5">
           <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{item.title}</h3>
@@ -112,6 +144,9 @@ function FilterModal({ isOpen, onClose, filters, onApply }: { isOpen: boolean; o
 export default function MarketplacePage() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const isSaved = useMarketplaceSavedStore((s) => s.isSaved);
+  const isSaving = useMarketplaceSavedStore((s) => s.isToggling);
+  const toggleSave = useMarketplaceSavedStore((s) => s.toggleSave);
   const isLandlord = user?.role === "landlord";
   const [items, setItems] = useState<(MarketplaceItemListResponse & { pickup_zone?: string })[]>(MOCK_ITEMS_WITH_ZONES);
   const [isLoading, setIsLoading] = useState(true);
@@ -137,6 +172,20 @@ export default function MarketplacePage() {
     } catch { setItems(MOCK_ITEMS_WITH_ZONES); setUseMock(true); }
     finally { setIsLoading(false); }
   }, [activeCategory, searchQuery]);
+
+  const handleToggleSave = async (itemId: number) => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    try {
+      const wasSaved = isSaved(itemId);
+      await toggleSave(itemId);
+      toast.success(wasSaved ? "Item removed from saved" : "Item saved");
+    } catch {
+      router.push("/login");
+    }
+  };
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
@@ -187,6 +236,7 @@ export default function MarketplacePage() {
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
             {!isLandlord && user && <Link href="/marketplace/my" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Marketplace Listings</Link>}
+            {!isLandlord && <Link href={user ? "/marketplace/saved" : "/login"} className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Saved Items</Link>}
             {!isLandlord && user && <Link href="/marketplace/messages" className="px-4 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45]/50 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all text-center" style={{ fontSize: "13px", fontWeight: 600 }}>Messages</Link>}
             {!isLandlord ? (
               <Link href={user ? "/marketplace/create" : "/login"} className="flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}><Plus className="w-4 h-4" /> Sell Something</Link>
@@ -253,7 +303,7 @@ export default function MarketplacePage() {
         ) : filteredItems.length === 0 ? (
           <div className="text-center py-16"><Package className="w-12 h-12 text-[#1B2D45]/10 mx-auto mb-3" /><h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No items found</h3><p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "13px" }}>{searchQuery ? "Try a different search term" : isLandlord ? "Student accounts can create marketplace listings." : "Be the first to list something!"}</p>{!isLandlord && <Link href={user ? "/marketplace/create" : "/login"} className="inline-flex items-center gap-1.5 mt-4 px-5 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "13px", fontWeight: 700 }}><Plus className="w-4 h-4" /> Sell Something</Link>}</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{filteredItems.map((item, i) => (<motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}><ItemCard item={item} pickupZone={(item as typeof item & { pickup_zone?: string }).pickup_zone} /></motion.div>))}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{filteredItems.map((item, i) => (<motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}><ItemCard item={item} pickupZone={(item as typeof item & { pickup_zone?: string }).pickup_zone} isSaved={isSaved(item.id)} isSaving={isSaving(item.id)} onToggleSave={handleToggleSave} /></motion.div>))}</div>
         )}
       </div>
       <AnimatePresence>{showFilters && <FilterModal isOpen={showFilters} onClose={() => setShowFilters(false)} filters={advancedFilters} onApply={setAdvancedFilters} />}</AnimatePresence>

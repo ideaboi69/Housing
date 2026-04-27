@@ -85,6 +85,9 @@ export default function AdminLoginPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              <p className="mt-2 text-white/30" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                Use the password your team set up. Strong passwords usually include an uppercase letter, a number, and a symbol.
+              </p>
             </div>
 
             <AnimatePresence>

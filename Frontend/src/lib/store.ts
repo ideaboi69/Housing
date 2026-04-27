@@ -49,12 +49,19 @@ export const useWriterStore = create<WriterAuthState>((set) => ({
     if (token && writerStr) {
       try {
         const writer = JSON.parse(writerStr) as WriterResponse;
-        set({ writer, writerToken: token });
+        set({ writer, writerToken: token, isLoading: false, error: null });
       } catch {
         localStorage.removeItem("cribb_writer_token");
         localStorage.removeItem("cribb_writer");
+        set({ writer: null, writerToken: null, isLoading: false });
       }
+      return;
     }
+    if (token || writerStr) {
+      localStorage.removeItem("cribb_writer_token");
+      localStorage.removeItem("cribb_writer");
+    }
+    set({ writer: null, writerToken: null, isLoading: false });
   },
 
   clearError: () => set({ error: null }),

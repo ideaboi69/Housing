@@ -9,7 +9,7 @@ import type { PropertyResponse, ListingDetailResponse, HealthScoreResponse } fro
 import { formatPrice, formatLeaseType, formatDate, getScoreColor } from "@/lib/utils";
 import {
   ArrowLeft, Plus, Eye, Trash2, Edit3, Home, Calendar, DollarSign,
-  MapPin, Loader2, AlertTriangle, Check, X,
+  MapPin, Loader2, AlertTriangle, Check, X, Image as ImageIcon,
 } from "lucide-react";
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -215,6 +215,51 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                     >
                       {deleting === listing.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                     </button>
+                  </div>
+
+                  <div className="mt-4">
+                    {(listing.images?.length ?? 0) > 0 ? (
+                      <div className="grid gap-2 md:grid-cols-[minmax(0,1.6fr)_180px]">
+                        <div className="relative overflow-hidden rounded-xl bg-[#FAF8F4] aspect-[16/9]">
+                          <img
+                            src={listing.images?.[0]?.image_url}
+                            alt={`${property.title} listing cover`}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-white" style={{ fontSize: "10px", fontWeight: 700 }}>
+                            {listing.images?.length} photo{listing.images?.length === 1 ? "" : "s"}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 md:grid-cols-1 gap-2">
+                          {listing.images?.slice(1, 4).map((image, index) => (
+                            <div key={image.id} className="relative overflow-hidden rounded-xl bg-[#FAF8F4] aspect-[4/3]">
+                              <img
+                                src={image.image_url}
+                                alt={`${property.title} listing photo ${index + 2}`}
+                                className="w-full h-full object-cover"
+                              />
+                              {index === 2 && (listing.images?.length ?? 0) > 4 && (
+                                <div className="absolute inset-0 bg-black/45 flex items-center justify-center text-white" style={{ fontSize: "12px", fontWeight: 800 }}>
+                                  +{(listing.images?.length ?? 0) - 4}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-black/[0.08] bg-[#FAF8F4] px-4 py-5 flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-black/[0.05]">
+                          <ImageIcon className="w-4 h-4 text-[#1B2D45]/25" />
+                        </div>
+                        <div>
+                          <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>No listing photos yet</div>
+                          <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                            Add photos so students get a better first impression of this home.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Health score breakdown */}

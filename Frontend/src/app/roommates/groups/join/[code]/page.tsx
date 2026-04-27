@@ -50,6 +50,7 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
   const [sending, setSending] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [existingRequestStatus, setExistingRequestStatus] = useState<"pending" | "accepted" | "declined" | null>(null);
+  const [viewerDashboard, setViewerDashboard] = useState<{ is_in_group: boolean; group_id: number | null; group_name: string | null } | null>(null);
 
   useEffect(() => {
     // TODO: GET /api/groups/join/{code}
@@ -87,6 +88,32 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
       cancelled = true;
     };
   }, [group, user]);
+
+  useEffect(() => {
+    if (!user) {
+      setViewerDashboard(null);
+      return;
+    }
+    let cancelled = false;
+    async function loadDashboard() {
+      try {
+        const d = await api.auth.getDashboard();
+        if (!cancelled) {
+          setViewerDashboard({
+            is_in_group: d.is_in_group,
+            group_id: d.group_id ?? null,
+            group_name: d.group_name ?? null,
+          });
+        }
+      } catch {
+        if (!cancelled) setViewerDashboard(null);
+      }
+    }
+    loadDashboard();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, existingRequestStatus]);
 
   if (group === undefined) {
     return (
@@ -368,6 +395,23 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
                         ? "This group has already accepted you. Head to roommates to keep things moving."
                         : "The group will review and get back to you."}
                     </p>
+                    {existingRequestStatus === "accepted" && viewerDashboard?.is_in_group && viewerDashboard.group_id ? (
+                      <Link
+                        href={`/roommates/groups/${viewerDashboard.group_id}`}
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#1B2D45] px-4 py-2.5 text-white hover:bg-[#152438] transition-all"
+                        style={{ fontSize: "12px", fontWeight: 700 }}
+                      >
+                        Open my group <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/roommates"
+                        className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-white px-4 py-2.5 text-[#1B2D45]/65 hover:text-[#1B2D45] transition-all"
+                        style={{ fontSize: "12px", fontWeight: 700 }}
+                      >
+                        Back to roommates <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
+                    )}
                   </div>
                 ) : showForm ? (
                   <div>

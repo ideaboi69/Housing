@@ -297,8 +297,15 @@ export interface ListingResponse {
   gender_preference: string | null;
   status: string;
   view_count: number;
+  images?: ListingImageResponse[];
   created_at: string;
   updated_at: string;
+}
+
+export interface ListingImageResponse {
+  id: number;
+  image_url: string;
+  display_order: number;
 }
 
 export interface ListingDetailResponse {
@@ -354,6 +361,7 @@ export interface ListingDetailResponse {
   landlord_id: number;
   landlord_name: string;
   landlord_verified: boolean;
+  images?: ListingImageResponse[];
   // engagement
   save_count?: number;
 }

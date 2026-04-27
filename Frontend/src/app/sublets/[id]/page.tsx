@@ -256,7 +256,6 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     }
   }, [sublet, reviews.length]);
 
-<<<<<<< Updated upstream
   // Check if student has filled tenant profile
   useEffect(() => {
     if (!user || user.role !== "student" || tenantChecked.current) return;
@@ -266,30 +265,19 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
       .catch(() => setHasTenantProfile(true));
   }, [user]);
 
-  const doMessage = async () => {
-=======
-  const handleMessage = async () => {
-    await openSubletConversation(`Hi, I'm interested in "${sublet?.title}". Is it still available?`);
-  };
-
   const openSubletConversation = async (content: string, quickKey?: string) => {
     if (messageSending || messageSent) return;
     if (!user) {
       router.push(`/login?next=${encodeURIComponent(`/sublets/${id}`)}`);
       return;
     }
->>>>>>> Stashed changes
     setMessageSending(true);
     setActiveQuickMessage(quickKey ?? null);
     try {
       if (sublet?.listing_id) {
         await api.messages.startConversation({
           listing_id: sublet.listing_id,
-<<<<<<< Updated upstream
-          content: `Hi, I’m interested in "${sublet.title}". Is it still available?`,
-=======
           content,
->>>>>>> Stashed changes
         });
         setMessageSent(true);
         if (quickKey) {
@@ -311,7 +299,6 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
-<<<<<<< Updated upstream
   const handleMessage = async () => {
     if (messageSending || messageSent) return;
     if (!user) {
@@ -322,17 +309,15 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
       setShowTenantPrompt(true);
       return;
     }
-    doMessage();
+    await openSubletConversation(`Hi, I'm interested in "${sublet?.title}". Is it still available?`);
   };
 
   const handleTenantComplete = () => {
     setShowTenantPrompt(false);
     setHasTenantProfile(true);
-    doMessage();
+    void openSubletConversation(`Hi, I'm interested in "${sublet?.title}". Is it still available?`);
   };
 
-    if (loading) {
-=======
   const quickMessageOptions = [
     {
       key: "available",
@@ -352,7 +337,6 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   ] as const;
 
   if (loading) {
->>>>>>> Stashed changes
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
         <motion.div className="text-center" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>

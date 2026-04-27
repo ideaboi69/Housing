@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, MapPin, Eye, Clock, MessageCircle, Share2, ChevronLeft, ChevronRight,
-  ShieldCheck, Package, X,
+  ShieldCheck, Package, X, Heart,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
 import {
   MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo,
   MOCK_MARKETPLACE_ITEMS,
@@ -139,6 +140,9 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
   const { id } = use(params);
   const router = useRouter();
   const { user } = useAuthStore();
+  const isSaved = useMarketplaceSavedStore((s) => s.isSaved);
+  const isSaving = useMarketplaceSavedStore((s) => s.isToggling);
+  const toggleSave = useMarketplaceSavedStore((s) => s.toggleSave);
   const [item, setItem] = useState<MarketplaceItemResponse | null>(null);
   const [similarItems, setSimilarItems] = useState<MarketplaceItemListResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,6 +216,21 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
     const url = typeof window !== "undefined" ? window.location.href : "";
     navigator.clipboard.writeText(url);
     toast.success("Link copied!");
+  };
+
+  const handleToggleSave = async () => {
+    if (!item) return;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    try {
+      const wasSaved = isSaved(item.id);
+      await toggleSave(item.id);
+      toast.success(wasSaved ? "Item removed from saved" : "Item saved");
+    } catch {
+      router.push("/login");
+    }
   };
 
   if (loading) {
@@ -328,6 +347,19 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                 >
                   <MessageCircle className="w-4.5 h-4.5" />
                   Message
+                </button>
+                <button
+                  onClick={handleToggleSave}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-xl border transition-all ${
+                    isSaved(item.id)
+                      ? "border-[#E71D36]/18 bg-[#E71D36]/[0.05] text-[#E71D36]"
+                      : "border-black/[0.06] text-[#1B2D45]/60 hover:text-[#1B2D45] hover:border-[#1B2D45]/15"
+                  }`}
+                  style={{ fontSize: "14px", fontWeight: 700 }}
+                  disabled={isSaving(item.id)}
+                >
+                  <Heart className={`w-4 h-4 ${isSaved(item.id) ? "fill-[#E71D36]" : ""}`} />
+                  {isSaved(item.id) ? "Saved" : "Save Item"}
                 </button>
                 <button
                   onClick={handleShare}

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   Menu, X, Settings, Bookmark, Heart, LogOut, ChevronDown,
-  User, Shield, LayoutDashboard, MessageCircle, ShoppingBag, Home,
+  User, Shield, LayoutDashboard, MessageCircle, ShoppingBag, Home, PenLine,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
+import { useWriterStore } from "@/lib/store";
 import { api } from "@/lib/api";
 
 const navItems = [
@@ -62,10 +63,34 @@ export function Navbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
+  const {
+    writer,
+    writerToken,
+    loadWriter,
+    logout: logoutWriter,
+  } = useWriterStore();
   const [unreadCount, setUnreadCount] = useState(0);
   const [myGroupHref, setMyGroupHref] = useState<string>("/roommates");
 
-  const isLandlord = user?.role === "landlord";
+  useEffect(() => {
+    loadWriter();
+  }, [loadWriter]);
+
+  const writerSessionActive = !user && Boolean(writerToken && writer);
+  const displayUser = user ?? (writerSessionActive
+    ? {
+        id: writer!.id,
+        email: writer!.email,
+        first_name: writer!.first_name,
+        last_name: writer!.last_name,
+        role: "writer",
+        email_verified: true,
+        created_at: writer!.created_at,
+        updated_at: writer!.created_at,
+      }
+    : null);
+
+  const isLandlord = displayUser?.role === "landlord";
   const landlordTab = searchParams.get("tab");
 
   const allNavItems = isLandlord
@@ -136,7 +161,7 @@ export function Navbar() {
   }
 
   // Minimal navbar on landing page — just logo + auth buttons
-  if (pathname === "/" && !user) {
+  if (pathname === "/" && !displayUser) {
     return (
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
         <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[64px] md:h-[72px]">
@@ -171,7 +196,12 @@ export function Navbar() {
     );
   }
 
-  const dropdownLinks = isLandlord
+  const dropdownLinks = writerSessionActive
+    ? [
+        { label: "Writer Dashboard", href: "/writer", icon: PenLine },
+        { label: "The Bubble", href: "/the-bubble", icon: LayoutDashboard },
+      ]
+    : isLandlord
     ? [
         { label: "Dashboard", href: "/landlord", icon: LayoutDashboard },
         { label: "Messages", href: "/landlord?tab=messages", icon: MessageCircle },
@@ -182,14 +212,10 @@ export function Navbar() {
         { label: "Messages", href: "/messages", icon: MessageCircle },
         { label: "Marketplace Messages", href: "/marketplace/messages", icon: ShoppingBag },
         { label: "Saved Listings", href: "/saved", icon: Bookmark },
-<<<<<<< Updated upstream
-        { label: "Your Listings", href: "/marketplace/my", icon: ShoppingBag },
-        { label: "My Group", href: myGroupHref, icon: Heart },
-=======
+        { label: "Saved Items", href: "/marketplace/saved", icon: Heart },
         { label: "Marketplace Listings", href: "/marketplace/my", icon: ShoppingBag },
         { label: "My Sublets", href: "/sublets/my", icon: Home },
-        { label: "My Group", href: "/roommates/my-group", icon: Heart },
->>>>>>> Stashed changes
+        { label: "My Group", href: myGroupHref, icon: Heart },
         { label: "Settings", href: "/settings", icon: Settings },
       ];
 
@@ -239,27 +265,29 @@ export function Navbar() {
 
         {/* Right side – desktop */}
         <div className="hidden md:flex items-center gap-2">
-          {user ? (
+          {displayUser ? (
             <>
               {/* Message icon */}
-              <Link
-                href={isLandlord ? "/landlord?tab=messages" : "/messages"}
-                className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                  (!isLandlord && pathname === "/messages") || (isLandlord && pathname === "/landlord" && landlordTab === "messages")
-                    ? "bg-[#FF6B35]/10 text-[#FF6B35]"
-                    : "text-[#1B2D45]/40 hover:bg-[#1B2D45]/5 hover:text-[#1B2D45]/60"
-                }`}
-              >
-                <MessageCircle className="w-[18px] h-[18px]" />
-                {unreadCount > 0 && (
-                  <span
-                    className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#FF6B35] text-white flex items-center justify-center"
-                    style={{ fontSize: "9px", fontWeight: 800 }}
-                  >
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </Link>
+              {!writerSessionActive && (
+                <Link
+                  href={isLandlord ? "/landlord?tab=messages" : "/messages"}
+                  className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+                    (!isLandlord && pathname === "/messages") || (isLandlord && pathname === "/landlord" && landlordTab === "messages")
+                      ? "bg-[#FF6B35]/10 text-[#FF6B35]"
+                      : "text-[#1B2D45]/40 hover:bg-[#1B2D45]/5 hover:text-[#1B2D45]/60"
+                  }`}
+                >
+                  <MessageCircle className="w-[18px] h-[18px]" />
+                  {unreadCount > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#FF6B35] text-white flex items-center justify-center"
+                      style={{ fontSize: "9px", fontWeight: 800 }}
+                    >
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
+              )}
 
             <div className="relative" ref={dropdownRef}>
               {/* Avatar trigger */}
@@ -267,12 +295,12 @@ export function Navbar() {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-[#1B2D45]/[0.04] transition-all"
               >
-                <UserAvatar firstName={user.first_name} lastName={user.last_name} photoUrl={user.profile_photo_url} />
+                <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} />
                 <span
                   className="text-[#1B2D45]/80 max-w-[120px] truncate"
                   style={{ fontSize: "13px", fontWeight: 600 }}
                 >
-                  {user.first_name}
+                  {displayUser.first_name}
                 </span>
                 <ChevronDown
                   className={`w-3.5 h-3.5 text-[#1B2D45]/40 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
@@ -288,22 +316,22 @@ export function Navbar() {
                   {/* User info header */}
                   <div className="px-4 pt-4 pb-3 border-b border-black/[0.04]">
                     <div className="flex items-center gap-3">
-                      <UserAvatar firstName={user.first_name} lastName={user.last_name} photoUrl={user.profile_photo_url} size={40} />
+                      <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} size={40} />
                       <div className="min-w-0 flex-1">
                         <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
-                          {user.first_name} {user.last_name}
+                          {displayUser.first_name} {displayUser.last_name}
                         </p>
                         <p className="text-[#98A3B0] truncate" style={{ fontSize: "11px" }}>
-                          {user.email}
+                          {displayUser.email}
                         </p>
                       </div>
-                      {user.email_verified && (
+                      {displayUser.email_verified && (
                         <div className="w-5 h-5 rounded-full bg-[#2EC4B6]/10 flex items-center justify-center shrink-0" title="Email verified">
                           <Shield className="w-3 h-3 text-[#2EC4B6]" />
                         </div>
                       )}
                     </div>
-                    {!isLandlord && (
+                    {!isLandlord && !writerSessionActive && (
                       <Link
                         href="/writers/login"
                         className="mt-3 flex items-center justify-center gap-1.5 w-full py-2 rounded-xl bg-[#FAF8F4] border border-[#E8E4DC] text-[#1B2D45]/60 hover:border-[#FF6B35]/30 hover:text-[#FF6B35] transition-all"
@@ -341,7 +369,14 @@ export function Navbar() {
                   {/* Logout */}
                   <div className="border-t border-black/[0.04] py-1.5">
                     <button
-                      onClick={() => { logout(); setDropdownOpen(false); }}
+                      onClick={() => {
+                        if (writerSessionActive) {
+                          logoutWriter();
+                        } else {
+                          logout();
+                        }
+                        setDropdownOpen(false);
+                      }}
                       className="flex items-center gap-3 px-4 py-2.5 w-full text-left text-[#E71D36]/80 hover:bg-[#E71D36]/5 transition-colors"
                       style={{ fontSize: "13px", fontWeight: 500 }}
                     >
@@ -391,15 +426,15 @@ export function Navbar() {
         <div className="md:hidden absolute top-[56px] left-0 right-0 bg-white/95 backdrop-blur-xl border-b border-black/[0.08] shadow-lg z-40 max-h-[calc(100vh-56px)] overflow-y-auto">
           <div className="px-4 py-3 space-y-1 pb-[calc(env(safe-area-inset-bottom)+12px)]">
             {/* User info on mobile */}
-            {user && (
+            {displayUser && (
               <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-[#FAF8F4] rounded-xl">
-                <UserAvatar firstName={user.first_name} lastName={user.last_name} photoUrl={user.profile_photo_url} size={36} />
+                <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} size={36} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
-                    {user.first_name} {user.last_name}
+                    {displayUser.first_name} {displayUser.last_name}
                   </p>
                   <p className="text-[#98A3B0] truncate" style={{ fontSize: "11px" }}>
-                    {user.email}
+                    {displayUser.email}
                   </p>
                 </div>
               </div>
@@ -426,7 +461,7 @@ export function Navbar() {
             })}
 
             {/* User-specific links on mobile */}
-            {user && (
+            {displayUser && (
               <div className="border-t border-black/5 mt-2 pt-2 space-y-1">
                 {dropdownLinks.map((item) => {
                   const Icon = item.icon;
@@ -453,9 +488,16 @@ export function Navbar() {
 
             {/* Auth actions */}
             <div className="flex items-center gap-2 pt-3 pb-1 px-2 border-t border-black/5 mt-2">
-              {user ? (
+              {displayUser ? (
                 <button
-                  onClick={() => { logout(); setMobileMenuOpen(false); }}
+                  onClick={() => {
+                    if (writerSessionActive) {
+                      logoutWriter();
+                    } else {
+                      logout();
+                    }
+                    setMobileMenuOpen(false);
+                  }}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-[#E71D36]/20 text-[#E71D36]/70"
                   style={{ fontSize: "14px", fontWeight: 500 }}
                 >

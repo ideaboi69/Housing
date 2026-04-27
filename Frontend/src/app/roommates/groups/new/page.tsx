@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, Users, Copy, Check, Link2, Sparkles, Camera, X } from "lucide-react";
+import { toast } from "sonner";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import {
@@ -12,7 +13,6 @@ import {
   type RoommateGroup,
   MOVE_IN_OPTIONS,
   GENDER_HOUSING_OPTIONS,
-  getStoredRoommateGroupByOwner,
   upsertStoredRoommateGroup,
 } from "@/components/roommates/roommate-data";
 
@@ -69,7 +69,6 @@ const GROUP_SHOWCASE = [
 export default function CreateGroupPage() {
   const { user } = useAuthStore();
   const searchParams = useSearchParams();
-<<<<<<< Updated upstream
 
   // Pre-fill counts from the quiz setup if they came in via "I have friends already"
   const initialHave = (() => {
@@ -80,8 +79,6 @@ export default function CreateGroupPage() {
     const raw = parseInt(searchParams.get("need") || "", 10);
     return !isNaN(raw) && raw >= 1 && raw <= 4 ? raw : 2;
   })();
-=======
->>>>>>> Stashed changes
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
@@ -134,12 +131,39 @@ export default function CreateGroupPage() {
       setExistingGroup(null);
       return;
     }
+    let cancelled = false;
 
-    setExistingGroup(
-      getStoredRoommateGroupByOwner(`user:${user.id}`) ??
-      getStoredRoommateGroupByOwner(`${user.id}-member-1`) ??
-      null
-    );
+    (async () => {
+      try {
+        const group = await api.roommates.getMyGroup();
+        if (cancelled) return;
+        setExistingGroup({
+          id: String(group.id),
+          name: group.name,
+          createdBy: String(group.owner_id),
+          members: [],
+          groupSize: group.total_capacity,
+          spotsNeeded: group.spots_remaining,
+          budgetMin: group.rent_per_person ? Number(group.rent_per_person) : 0,
+          budgetMax: group.rent_per_person ? Number(group.rent_per_person) : 0,
+          preferredArea: null,
+          targetListingId: null,
+          targetListingTitle: null,
+          description: group.description || "",
+          inviteCode: `G${group.id}`,
+          isVisible: true,
+          genderPreference: group.gender_preference || null,
+          moveIn: group.move_in_timing || "Flexible",
+          createdAt: group.created_at,
+        });
+      } catch {
+        if (!cancelled) setExistingGroup(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   useEffect(() => {
@@ -195,52 +219,46 @@ export default function CreateGroupPage() {
         address: address.trim() || undefined,
       });
 
+      const members = Array.from({ length: haveCount }, (_, index) => buildMember(index));
+      const createdGroup: RoommateGroup = {
+        id: String(apiGroup.id),
+        name: name.trim(),
+        createdBy: ownerKey || `${user.id}-member-1`,
+        members,
+        groupSize,
+        spotsNeeded,
+        budgetMin: rentPerPerson,
+        budgetMax: rentPerPerson,
+        preferredArea: null,
+        targetListingId: null,
+        targetListingTitle: null,
+        description: description.trim(),
+        inviteCode: code,
+        isVisible: true,
+        genderPreference: gender,
+        moveIn,
+        createdAt: new Date().toISOString(),
+        housing: {
+          status: "pending",
+          selfReportedAddress: address.trim(),
+          selfReportedRent: rentPerPerson,
+          selfReportedUtilitiesIncluded: utilitiesIncluded,
+          landlordInviteUrl: landlordUrl,
+        },
+        bannerGradient: "linear-gradient(135deg, #FF6B35 0%, #FFB627 100%)",
+      };
+
+      upsertStoredRoommateGroup(createdGroup);
       setCreatedGroupId(String(apiGroup.id));
       setInviteCode(code);
       setLandlordInviteUrl(landlordUrl);
       setCreated(true);
-    } catch {
-      // API failed — fall back to localStorage
+      setExistingGroup(createdGroup);
+    } catch (error) {
+      const message = error instanceof Error && error.message ? error.message : "We couldn't publish this group right now.";
+      toast.error(message);
+      return;
     }
-
-    // Always save locally as cache/fallback
-    const groupId = `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    const members = Array.from({ length: haveCount }, (_, index) => buildMember(index));
-
-    const group: RoommateGroup = {
-      id: createdGroupId || groupId,
-      name: name.trim(),
-      createdBy: ownerKey || `${user.id}-member-1`,
-      members,
-      groupSize,
-      spotsNeeded,
-      budgetMin: rentPerPerson,
-      budgetMax: rentPerPerson,
-      preferredArea: null,
-      targetListingId: null,
-      targetListingTitle: null,
-      description: description.trim(),
-      inviteCode: code,
-      isVisible: true,
-      genderPreference: gender,
-      moveIn,
-      createdAt: new Date().toISOString(),
-      housing: {
-        status: "pending",
-        selfReportedAddress: address.trim(),
-        selfReportedRent: rentPerPerson,
-        selfReportedUtilitiesIncluded: utilitiesIncluded,
-        landlordInviteUrl: landlordUrl,
-      },
-      bannerGradient: "linear-gradient(135deg, #FF6B35 0%, #FFB627 100%)",
-    };
-
-    upsertStoredRoommateGroup(group);
-    if (!createdGroupId) setCreatedGroupId(groupId);
-    setInviteCode(code);
-    setLandlordInviteUrl(landlordUrl);
-    setCreated(true);
-    setExistingGroup(group);
   };
 
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/roommates/groups/join/${inviteCode}` : `cribb.ca/join/${inviteCode}`;

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { UserResponse, UserCreate, UserLogin } from "@/types";
 import { api, ApiError } from "@/lib/api";
+import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
 import { useSavedStore } from "@/lib/saved-store";
 
 /* ────────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.setItem("cribb_token", res.access_token);
       set({ user: res.user, token: res.access_token, isLoading: false });
       useSavedStore.getState().loadSaved();
+      useMarketplaceSavedStore.getState().loadSaved();
     } catch (err) {
       const message = err instanceof ApiError ? err.detail : "Login failed";
       set({ error: message, isLoading: false });
@@ -100,6 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         localStorage.setItem("cribb_token", res.access_token);
         set({ user: (res as { access_token: string; user: UserResponse }).user, token: res.access_token, isLoading: false });
         useSavedStore.getState().loadSaved();
+        useMarketplaceSavedStore.getState().loadSaved();
       } else {
         set({ isLoading: false });
       }
@@ -115,6 +118,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem("cribb_token");
     clearLandlordCache();
     useSavedStore.getState().clear();
+    useMarketplaceSavedStore.getState().clear();
     set({ user: null, token: null });
   },
 
@@ -184,6 +188,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const user = await api.auth.getMe();
         set({ user, token, isLoading: false });
         useSavedStore.getState().loadSaved();
+        useMarketplaceSavedStore.getState().loadSaved();
       }
     } catch {
       localStorage.removeItem("cribb_token");
