@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, Users, Copy, Check, Link2, Sparkles, Camera, X } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
@@ -67,11 +68,22 @@ const GROUP_SHOWCASE = [
 
 export default function CreateGroupPage() {
   const { user } = useAuthStore();
+  const searchParams = useSearchParams();
+
+  // Pre-fill counts from the quiz setup if they came in via "I have friends already"
+  const initialHave = (() => {
+    const raw = parseInt(searchParams.get("have") || "", 10);
+    return !isNaN(raw) && raw >= 2 && raw <= 6 ? raw : 2;
+  })();
+  const initialNeed = (() => {
+    const raw = parseInt(searchParams.get("need") || "", 10);
+    return !isNaN(raw) && raw >= 1 && raw <= 4 ? raw : 2;
+  })();
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
-  const [groupSize, setGroupSize] = useState(4);
-  const [haveCount, setHaveCount] = useState(2);
+  const [groupSize, setGroupSize] = useState(initialHave + initialNeed);
+  const [haveCount, setHaveCount] = useState(initialHave);
   const [rentPerPerson, setRentPerPerson] = useState(650);
   const [utilitiesIncluded, setUtilitiesIncluded] = useState(false);
   const [moveIn, setMoveIn] = useState("Fall 2026");
@@ -90,7 +102,6 @@ export default function CreateGroupPage() {
   const [copied, setCopied] = useState(false);
   const [landlordCopied, setLandlordCopied] = useState(false);
   const [existingGroup, setExistingGroup] = useState<RoommateGroup | null | undefined>(undefined);
-
   const spotsNeeded = groupSize - haveCount;
   const ownerKey = user ? `user:${user.id}` : "";
 

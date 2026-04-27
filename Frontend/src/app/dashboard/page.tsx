@@ -162,8 +162,11 @@ export default function StudentDashboardPage() {
   }, [authLoading, token, user, router]);
 
   const roommateHref = useMemo(() => {
+    if (!dashboard.is_in_group && dashboard.pending_invites_received > 0) {
+      return "/roommates/invites";
+    }
     if (dashboard.is_in_group && dashboard.group_id) {
-      return dashboard.is_group_owner ? `/roommates/groups/${dashboard.group_id}/manage` : `/roommates/groups/${dashboard.group_id}`;
+      return `/roommates/groups/${dashboard.group_id}`;
     }
     return dashboard.roommate_quiz_completed ? "/roommates" : "/settings";
   }, [dashboard]);

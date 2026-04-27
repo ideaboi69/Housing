@@ -16,8 +16,12 @@ function MemberPreview({ member }: { member: LifestyleProfile }) {
   const tags = Object.entries(member.tags).slice(0, 3).map(([_, v]) => TAG_SHORT_LABELS[v] || v);
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-black/[0.04]">
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0">
-        <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden">
+        {member.avatar ? (
+          <img src={member.avatar} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>{member.firstName} {member.initial}</div>
@@ -242,16 +246,20 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
                       {group.description}
                     </p>
                     <div className="mt-4 flex items-center">
-                      {group.members.map((member, index) => (
+                    {group.members.map((member, index) => (
                         <motion.div
                           key={member.id}
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.1 + index * 0.04, duration: 0.25 }}
-                          className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[linear-gradient(135deg,#FFE3D3_0%,#FFF7F0_100%)] text-[#FF6B35]"
+                          className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[linear-gradient(135deg,#FFE3D3_0%,#FFF7F0_100%)] text-[#FF6B35] overflow-hidden"
                           style={{ fontSize: "13px", fontWeight: 800, marginLeft: index === 0 ? 0 : -10 }}
                         >
-                          {member.firstName[0]}
+                          {member.avatar ? (
+                            <img src={member.avatar} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            member.firstName[0]
+                          )}
                         </motion.div>
                       ))}
                     </div>

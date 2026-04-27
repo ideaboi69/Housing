@@ -51,6 +51,7 @@ import type {
   GroupCreate,
   GroupUpdate,
   IndividualCardResponse,
+  IndividualDetailResponse,
   InviteCreate,
   InviteResponse,
   RoommateRequestCreate,
@@ -727,9 +728,10 @@ export const roommates = {
   getMyQuiz: () =>
     request<RoommateProfileResponse>("/api/roommates/quiz/me"),
 
-  toggleVisibility: () =>
+  toggleVisibility: (isVisible: boolean) =>
     request<{ is_visible: boolean }>("/api/roommates/visibility", {
       method: "PATCH",
+      body: JSON.stringify({ is_visible: isVisible }),
     }),
 
   // Groups
@@ -757,12 +759,48 @@ export const roommates = {
   getGroup: (groupId: number) =>
     request<GroupDetailResponse>(`/api/roommates/groups/${groupId}`),
 
+  uploadGroupPhoto: async (groupId: number, file: File) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${API_URL}/api/roommates/groups/${groupId}/photo`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Request failed" }));
+      throw new ApiError(res.status, body.detail || "Request failed");
+    }
+
+    return res.json() as Promise<{ group_photo_url: string }>;
+  },
+
+  deleteGroupPhoto: (groupId: number) =>
+    request<{ message: string }>(`/api/roommates/groups/${groupId}/photo`, {
+      method: "DELETE",
+    }),
+
+  setGroupVisibility: (groupId: number, isVisible: boolean) =>
+    request<{ is_visible: boolean }>(`/api/roommates/groups/${groupId}/visibility`, {
+      method: "PATCH",
+      body: JSON.stringify({ is_visible: isVisible }),
+    }),
+
   // Individuals
   browseIndividuals: () =>
     request<IndividualCardResponse[]>("/api/roommates/individuals"),
 
   searchIndividuals: (filters?: Record<string, string>) =>
     request<IndividualCardResponse[]>(`/api/roommates/individuals/search${toQueryString(filters || {})}`),
+
+  getIndividual: (userId: number) =>
+    request<IndividualDetailResponse>(`/api/roommates/individuals/${userId}`),
 
   // Invites
   sendInvite: (data: InviteCreate) =>

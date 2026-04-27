@@ -2,19 +2,86 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin, SlidersHorizontal } from "lucide-react";
+import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin, SlidersHorizontal, Check, DollarSign, Calendar } from "lucide-react";
+import { toast } from "sonner";
 import { useIsMobile } from "@/hooks";
 import { EarlyAdopterBadge } from "@/components/ui/Badges";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
+import { IndividualDetailModal } from "@/components/roommates/IndividualDetailModal";
+import type { GroupCardResponse, GroupDetailResponse } from "@/types";
 import {
   type LifestyleProfile, type RoommateGroup,
   LIFESTYLE_CATEGORIES, TAG_SHORT_LABELS, BUDGET_OPTIONS, MOVE_IN_OPTIONS, GENDER_HOUSING_OPTIONS,
   computeCompatibility, computeGroupCompatibility,
   MOCK_PROFILES, getVisibleRoommateGroups,
 } from "@/components/roommates/roommate-data";
+import { CATEGORY_STYLE, BUDGET_LABEL, TIMING_LABEL, shortLabelFor } from "@/lib/lifestyle-display";
+
+/* ════════════════════════════════════════════════════════
+   API → Local shape mapper
+   ════════════════════════════════════════════════════════ */
+
+   const MOVE_IN_LABEL: Record<string, string> = {
+    fall_2026: "Fall 2026",
+    winter_2027: "Winter 2027",
+    summer_2026: "Summer 2026",
+    flexible: "Flexible",
+  };
+  
+  const GENDER_LABEL: Record<string, string> = {
+    mixed_gender: "Mixed gender fine",
+    same_gender: "Same gender preferred",
+    no_preference: "No preference",
+  };
+  
+  function mapApiGroupToLocal(g: GroupCardResponse): RoommateGroup {
+    const rent = g.rent_per_person ? Number(g.rent_per_person) : null;
+    return {
+      id: String(g.id),
+      name: g.name,
+      createdBy: String(g.members.find((m) => m.role === "owner")?.user_id ?? ""),
+      members: g.members.map((m) => ({
+        id: String(m.user_id),
+        firstName: m.first_name,
+        initial: m.last_initial,
+        year: "",
+        program: "",
+        budget: [0, 0] as [number, number],
+        moveIn: "",
+        leaseLength: "",
+        bio: "",
+        tags: {},
+        avatar: m.profile_photo_url || undefined,
+      })),
+      groupSize: g.total_capacity,
+      spotsNeeded: g.spots_remaining,
+      budgetMin: rent ?? 0,
+      budgetMax: rent ?? 0,
+      preferredArea: null,
+      targetListingId: null,
+      targetListingTitle: null,
+      description: g.description || "",
+      inviteCode: `G${g.id}`,
+      isVisible: true,
+      genderPreference: g.gender_preference ? GENDER_LABEL[g.gender_preference] ?? null : null,
+      moveIn: g.move_in_timing ? MOVE_IN_LABEL[g.move_in_timing] ?? "Flexible" : "Flexible",
+      createdAt: g.created_at,
+      housing: g.has_place && g.address
+        ? {
+            status: "pending",
+            selfReportedAddress: g.address,
+            selfReportedRent: rent ?? undefined,
+            selfReportedUtilitiesIncluded: g.utilities_included,
+          }
+        : undefined,
+      groupImage: g.group_photo_url || undefined,
+      bannerGradient: "linear-gradient(135deg, #1B2D45 0%, #2a4060 100%)",
+    };
+  }
 
 /* ════════════════════════════════════════════════════════
    Shared Helpers
@@ -235,9 +302,25 @@ function DossierGroupCard({
 
 /* ── Individual Card ── */
 
-function IndividualCard({ profile }: { profile: LifestyleProfile }) {
-  const topTags = Object.entries(profile.tags).slice(0, 3).map(([_, v]) => TAG_SHORT_LABELS[v] || v);
-  const budgetLabel = profile.budget[1] >= 2000 ? `$${profile.budget[0]}+` : `$${profile.budget[0]}–$${profile.budget[1]}`;
+function IndividualCard({ profile, canInvite, inviteReason, invited, onInvite, onView}: { profile: LifestyleProfile; canInvite: boolean;inviteReason?: string; 
+  invited: boolean; onInvite: () => Promise<void> | void; onView: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const fallbackBudgetText = profile.budget[1] >= 2000 ? `$${profile.budget[0]}+` : `$${profile.budget[0]}–$${profile.budget[1]}`;
+  const budgetText = profile.budgetLabel || `${fallbackBudgetText}/mo`;
+  const moveInText = profile.moveInLabel || profile.moveIn || "Flexible";
+
+  const categoryPills =
+    profile.cardCategoryTags && profile.cardCategoryTags.length > 0
+      ? profile.cardCategoryTags.slice(0, 4)
+      : Object.entries(profile.tags).slice(0, 4).map(([k, v]) => ({ category: k === "sleep" ? "sleep_schedule" : k === "cleanliness" ? "cleanliness" : k === "noise" ? "noise_level" : k === "smoking" ? "smoking" : k === "pets" ? "pets" : k, label: TAG_SHORT_LABELS[v] || v }));
+
+  const handleInviteClick = async () => {
+    if (!canInvite || invited || busy) return;
+    setBusy(true);
+    try { await onInvite(); } finally { setBusy(false); }
+  };
+
   return (
     <motion.div
       className="rounded-[24px] border border-black/[0.08] bg-white p-3.5 transition-all hover:translate-y-[-3px]"
@@ -246,8 +329,8 @@ function IndividualCard({ profile }: { profile: LifestyleProfile }) {
     >
       <div className="flex items-start gap-3">
         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 border border-[#1B2D45]/10 overflow-hidden" style={{ boxShadow: "0 8px 18px rgba(27,45,69,0.08)" }}>
-          {(profile as typeof profile & { avatar?: string }).avatar ? (
-            <img src={(profile as typeof profile & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
+          {profile.avatar ? (
+            <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
           ) : (
             <span style={{ fontSize: "15px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
           )}
@@ -263,17 +346,67 @@ function IndividualCard({ profile }: { profile: LifestyleProfile }) {
           <p className="text-[#1B2D45]/55" style={{ fontSize: "11px" }}>{profile.year} · {profile.program}</p>
         </div>
       </div>
+
       <p className="text-[#1B2D45]/60 mt-2" style={{ fontSize: "11px", lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>{profile.bio}</p>
+
+      {/* Budget + Move-in row (slate, factual) */}
       <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-        <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/60 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 600 }}>{budgetLabel}/mo</span>
-        <span className="px-2 py-0.5 rounded-lg bg-[#1B2D45]/[0.05] text-[#1B2D45]/60 border border-[#1B2D45]/[0.06]" style={{ fontSize: "9px", fontWeight: 600 }}>{profile.moveIn}</span>
-        {topTags.map((t) => <span key={t} className="px-2 py-0.5 rounded-lg bg-[#FF6B35]/[0.06] text-[#FF6B35]/70 border border-[#FF6B35]/10" style={{ fontSize: "9px", fontWeight: 500 }}>{t}</span>)}
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ fontSize: "9px", fontWeight: 700, background: CATEGORY_STYLE.budget_range.bg, color: CATEGORY_STYLE.budget_range.text, border: `1px solid ${CATEGORY_STYLE.budget_range.border}` }}>
+          <DollarSign className="w-2.5 h-2.5" />{budgetText}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ fontSize: "9px", fontWeight: 700, background: CATEGORY_STYLE.roommate_timing.bg, color: CATEGORY_STYLE.roommate_timing.text, border: `1px solid ${CATEGORY_STYLE.roommate_timing.border}` }}>
+          <Calendar className="w-2.5 h-2.5" />{moveInText}
+        </span>
       </div>
+
+      {/* Category pills row — up to 4, color-coded per category */}
+      {categoryPills.length > 0 && (
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+          {categoryPills.map((pill, idx) => {
+            const style = CATEGORY_STYLE[pill.category];
+            const Icon = style?.icon;
+            const bg = style?.bg ?? "rgba(255, 107, 53, 0.06)";
+            const text = style?.text ?? "#FF6B35";
+            const border = style?.border ?? "rgba(255, 107, 53, 0.10)";
+            return (
+              <span key={`${pill.category}-${idx}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg" style={{ fontSize: "9px", fontWeight: 600, background: bg, color: text, border: `1px solid ${border}` }}>
+                {Icon && <Icon className="w-2.5 h-2.5" />}
+                {pill.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex items-center gap-2 mt-3">
-        <button className="flex-1 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all flex items-center justify-center gap-1.5" style={{ fontSize: "11px", fontWeight: 700 }}>
-          <MessageCircle className="w-3 h-3" /> Invite to Group
+        <button
+          onClick={handleInviteClick}
+          disabled={!canInvite || invited || busy}
+          title={!canInvite ? inviteReason : undefined}
+          className={`flex-1 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+            invited
+              ? "bg-[#4ADE80]/10 text-[#4ADE80] cursor-default"
+              : !canInvite || busy
+              ? "bg-[#1B2D45]/[0.06] text-[#1B2D45]/35 cursor-not-allowed"
+              : "bg-[#FF6B35] text-white hover:bg-[#e55e2e]"
+          }`}
+          style={{ fontSize: "11px", fontWeight: 700 }}
+        >
+          {invited ? (
+            <><Check className="w-3 h-3" /> Invited</>
+          ) : busy ? (
+            <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+          ) : (
+            <><MessageCircle className="w-3 h-3" /> Invite to Group</>
+          )}
         </button>
-        <button className="py-2 px-3 rounded-xl text-[#1B2D45]/55 hover:text-[#1B2D45] transition-all border border-black/[0.08] bg-[#FCFAF7]" style={{ fontSize: "11px", fontWeight: 600 }}>View</button>
+        <button
+          onClick={onView}
+          className="py-2 px-3 rounded-xl text-[#1B2D45]/55 hover:text-[#1B2D45] transition-all border border-black/[0.08] bg-[#FCFAF7]"
+          style={{ fontSize: "11px", fontWeight: 600 }}
+        >
+          View
+        </button>
       </div>
     </motion.div>
   );
@@ -536,6 +669,7 @@ function clearRoommateProfile() {
 
 export default function RoommatesPage() {
   const isMobile = useIsMobile();
+  const router = useRouter();
   const { user } = useAuthStore();
   const isLandlord = user?.role === "landlord";
   const [hydrated, setHydrated] = useState(false);
@@ -552,12 +686,35 @@ export default function RoommatesPage() {
   const [tenantSkipKeys, setTenantSkipKeys] = useState<string[]>([]);
   const [tenantGender, setTenantGender] = useState<string | null>(null);
   const [tenantValues, setTenantValues] = useState<Record<string, string>>({});
-  const visibleGroups = useMemo(() => (hydrated ? (apiGroups !== null ? [] : getVisibleRoommateGroups()) : []), [hydrated, apiGroups]);
+  const [myGroup, setMyGroup] = useState<GroupDetailResponse | null>(null);
+  const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
+  const [viewingProfile, setViewingProfile] = useState<LifestyleProfile | null>(null);
+
+  const visibleGroups = useMemo(() => {
+    if (!hydrated) return [];
+    if (apiGroups !== null) return apiGroups;
+    return getVisibleRoommateGroups();
+  }, [hydrated, apiGroups]);
   const claimState = useMemo(() => (hydrated ? getLandlordClaimState() : null), [hydrated]);
 
   // Hydrate: try API quiz profile first, fall back to localStorage
   useEffect(() => {
     async function init() {
+      if (user && isLandlord) {
+        setStarted(true);
+        setHasProfile(true);
+        setSetupDone(true);
+        setMyMode("solo");
+        setTab("groups");
+        try {
+          const groups = await api.roommates.browseGroups();
+          if (groups && groups.length > 0) {
+            setApiGroups(groups.map(mapApiGroupToLocal));
+          }
+        } catch { /* show empty state */ }
+        setHydrated(true);
+        return;
+      }
       if (user) {
         try {
           const profile = await api.roommates.getMyQuiz();
@@ -608,27 +765,45 @@ export default function RoommatesPage() {
               const groups = await api.roommates.browseGroups();
               if (groups && groups.length > 0) {
                 // Convert API groups to local RoommateGroup format for display
-                setApiGroups(groups as unknown as RoommateGroup[]);
+                setApiGroups(groups.map(mapApiGroupToLocal));
               }
             } catch { /* use mock */ }
 
             try {
               const individuals = await api.roommates.browseIndividuals();
               if (individuals && individuals.length > 0) {
-                setApiIndividuals(individuals.map((p) => ({
-                  id: String(p.user_id),
-                  firstName: p.first_name,
-                  initial: p.last_initial,
-                  year: p.year || "",
-                  program: p.program || "",
-                  budget: [0, 0] as [number, number],
-                  moveIn: p.roommate_timing || "",
-                  leaseLength: "",
-                  bio: p.bio || "",
-                  tags: {},
-                  compatibility: p.compatibility_score,
-                  avatar: p.profile_photo_url || undefined,
-                })));
+                setApiIndividuals(individuals.map((p) => {
+                  const cardCategoryTags: Array<{ category: string; label: string }> = [];
+                  const candidates: Array<[string, string | null | undefined]> = [
+                    ["sleep_schedule", p.sleep_schedule],
+                    ["cleanliness", p.cleanliness],
+                    ["noise_level", p.noise_level],
+                    ["smoking", p.smoking],
+                    ["pets", p.pets],
+                  ];
+                  for (const [category, value] of candidates) {
+                    if (value) cardCategoryTags.push({ category, label: shortLabelFor(category, value) });
+                    if (cardCategoryTags.length >= 4) break;
+                  }
+
+                  return {
+                    id: String(p.user_id),
+                    firstName: p.first_name,
+                    initial: p.last_initial,
+                    year: p.year || "",
+                    program: p.program || "",
+                    budget: [0, 0] as [number, number],
+                    moveIn: p.roommate_timing || "",
+                    leaseLength: "",
+                    bio: p.bio || "",
+                    tags: {},
+                    compatibility: p.compatibility_score ?? undefined,
+                    avatar: p.profile_photo_url || undefined,
+                    budgetLabel: p.budget_range ? BUDGET_LABEL[p.budget_range] : undefined,
+                    moveInLabel: p.roommate_timing ? TIMING_LABEL[p.roommate_timing] : undefined,
+                    cardCategoryTags,
+                  };
+                }));
               }
             } catch { /* use mock */ }
 
@@ -667,6 +842,47 @@ export default function RoommatesPage() {
     }
     init();
   }, [user]);
+
+  // Resolve whether the current user owns a group (precondition for sending invites)
+  useEffect(() => {
+    if (!user || isLandlord) {
+      setMyGroup(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const g = await api.roommates.getMyGroup();
+        if (!cancelled) setMyGroup(g);
+      } catch {
+        if (!cancelled) setMyGroup(null); // 404 = no group
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, isLandlord]);
+
+  const inviteCapability = useMemo(() => {
+    if (isLandlord) return { canInvite: false, reason: "Landlords can't invite roommates" };
+    if (!user) return { canInvite: false, reason: "Sign in to invite" };
+    if (!myGroup) return { canInvite: false, reason: "Create a group first to invite people" };
+    if (myGroup.spots_remaining <= 0) return { canInvite: false, reason: "Your group is full" };
+    return { canInvite: true as const };
+  }, [isLandlord, user, myGroup]);
+
+  const handleInviteIndividual = async (userId: number) => {
+    try {
+      await api.roommates.sendInvite({ invited_user_id: userId });
+      setInvitedIds((prev) => {
+        const next = new Set(prev);
+        next.add(userId);
+        return next;
+      });
+      toast.success("Invite sent");
+    } catch (err) {
+      const msg = err instanceof Error && err.message ? err.message : "Couldn't send invite";
+      toast.error(msg);
+    }
+  };
 
   const handleQuizComplete = useCallback(async (tags: Record<string, string>, budget: [number, number], moveIn: string, genderHousing: string) => {
     setMyTags(tags);
@@ -731,6 +947,9 @@ export default function RoommatesPage() {
     const defaultTab = mode === "solo" ? "groups" : "individuals";
     setTab(defaultTab as "groups" | "individuals");
     saveProfile({ tags: myTags, budget: myBudget, moveIn: "", genderHousing: "", mode, defaultTab: defaultTab as "groups" | "individuals" });
+    if (mode === "with-friends") {
+      router.push(`/roommates/groups/new?have=${have}&need=${need}`);
+    }
   };
 
   const handleResetProfile = () => {
@@ -875,8 +1094,8 @@ export default function RoommatesPage() {
     );
   }
 
-  if (!hasProfile) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><ProfileQuiz onComplete={handleQuizComplete} skipKeys={tenantSkipKeys} skipGenderHousing={!!tenantGender} /></div></div>;
-  if (!setupDone) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><GettingStarted onSelect={handleSetupSelect} allowGroupCreation={!isLandlord} /></div></div>;
+  if (!hasProfile && !isLandlord) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><ProfileQuiz onComplete={handleQuizComplete} skipKeys={tenantSkipKeys} skipGenderHousing={!!tenantGender} /></div></div>;
+  if (!setupDone && !isLandlord) return <div className="min-h-screen bg-[#FAF8F4]"><div className="max-w-[700px] mx-auto px-4 py-8 md:py-12"><GettingStarted onSelect={handleSetupSelect} allowGroupCreation={!isLandlord} /></div></div>;
 
   /* ── Browse page ── */
   return (
@@ -898,18 +1117,27 @@ export default function RoommatesPage() {
           )}
         </div>
 
-        {/* Edit profile bar */}
-        <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-white border border-black/[0.06]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
-          <Shield className="w-3.5 h-3.5 text-[#2EC4B6] shrink-0" />
-          <span className="text-[#1B2D45]/55 flex-1" style={{ fontSize: "11px" }}>Your roommate profile is active</span>
-          <button onClick={handleResetProfile} className="text-[#FF6B35] hover:underline shrink-0" style={{ fontSize: "11px", fontWeight: 600 }}>✏️ Redo Quiz</button>
-        </div>
+        {/* Status bar — student vs landlord */}
+        {!isLandlord ? (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-white border border-black/[0.06]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
+            <Shield className="w-3.5 h-3.5 text-[#2EC4B6] shrink-0" />
+            <span className="text-[#1B2D45]/55 flex-1" style={{ fontSize: "11px" }}>Your roommate profile is active</span>
+            <button onClick={handleResetProfile} className="text-[#FF6B35] hover:underline shrink-0" style={{ fontSize: "11px", fontWeight: 600 }}>✏️ Redo Quiz</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-xl bg-white border border-black/[0.06]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
+            <Users className="w-3.5 h-3.5 text-[#1B2D45]/40 shrink-0" />
+            <span className="text-[#1B2D45]/55 flex-1" style={{ fontSize: "11px" }}>Browsing as a landlord — view-only mode</span>
+          </div>
+        )}
 
         <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-black/[0.08]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
               <button onClick={() => setTab("groups")} className={`px-4 py-2 rounded-lg transition-all ${tab === "groups" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><Users className="w-3.5 h-3.5 inline mr-1.5" />Groups</button>
-              <button onClick={() => setTab("individuals")} className={`px-4 py-2 rounded-lg transition-all ${tab === "individuals" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><User className="w-3.5 h-3.5 inline mr-1.5" />Individuals</button>
+              {!isLandlord && (
+                <button onClick={() => setTab("individuals")} className={`px-4 py-2 rounded-lg transition-all ${tab === "individuals" ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:text-[#1B2D45]"}`} style={{ fontSize: "12px", fontWeight: 600 }}><User className="w-3.5 h-3.5 inline mr-1.5" />Individuals</button>
+              )}
             </div>
             <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 border border-black/[0.06]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
               <span className="text-[#1B2D45]/42" style={{ fontSize: "11px", fontWeight: 700 }}>
@@ -927,25 +1155,59 @@ export default function RoommatesPage() {
               {groupsWithCompat.length === 0 ? (
                 <div className="bg-white rounded-2xl p-10 text-center" style={{ border: "2.5px dashed rgba(27,45,69,0.12)" }}>
                   <Users className="w-10 h-10 text-[#1B2D45]/10 mx-auto mb-2" />
-                  <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No groups match this filter</h3>
-                  <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>Try another filter or create your own group.</p>
+                  <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>
+                    {isLandlord ? "No active groups right now" : "No groups match this filter"}
+                  </h3>
+                  <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>
+                    {isLandlord ? "Check back soon — students post here when they're filling rooms." : "Try another filter or create your own group."}
+                  </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {groupsWithCompat.map((g, i) => <DossierGroupCard key={g.id} group={g} compatibility={hasProfile ? g._compat : undefined} index={i} claimState={claimState} />)}
+                  {groupsWithCompat.map((g, i) => <DossierGroupCard key={g.id} group={g} compatibility={hasProfile && !isLandlord ? g._compat : undefined} index={i} claimState={claimState} />)}
                 </div>
               )}
             </motion.div>
           )}
-          {tab === "individuals" && (
+          {tab === "individuals" && !isLandlord && (
             <motion.div key="individuals" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {individualsWithCompat.map((p) => <IndividualCard key={p.id} profile={p} />)}
+                {individualsWithCompat.map((p) => {
+                  const numId = parseInt(p.id, 10);
+                  return (
+                    <IndividualCard
+                      key={p.id}
+                      profile={p}
+                      canInvite={inviteCapability.canInvite}
+                      inviteReason={inviteCapability.reason}
+                      invited={!isNaN(numId) && invitedIds.has(numId)}
+                      onInvite={() => !isNaN(numId) ? handleInviteIndividual(numId) : Promise.resolve()}
+                      onView={() => setViewingProfile(p)}
+                    />
+                  );
+                })}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {viewingProfile && (
+        <IndividualDetailModal
+          profile={viewingProfile}
+          canInvite={inviteCapability.canInvite}
+          inviteReason={inviteCapability.reason}
+          invited={(() => {
+            const n = parseInt(viewingProfile.id, 10);
+            return !isNaN(n) && invitedIds.has(n);
+          })()}
+          onInvite={() => {
+            const n = parseInt(viewingProfile.id, 10);
+            return !isNaN(n) ? handleInviteIndividual(n) : Promise.resolve();
+          }}
+          onClose={() => setViewingProfile(null)}
+        />
+      )}
     </div>
   );
 }

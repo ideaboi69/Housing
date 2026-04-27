@@ -1024,8 +1024,10 @@ export interface GroupCardResponse {
   has_place: boolean;
   address?: string;
   is_verified: boolean;
+  is_visible: boolean;
+  group_photo_url?: string | null;
   members: GroupMemberResponse[];
-  compatibility_score: number;
+  compatibility_score: number | null;
   created_at: string;
 }
 
@@ -1069,8 +1071,22 @@ export interface IndividualCardResponse {
   budget_range?: string;
   roommate_timing?: string;
   lifestyle_tags: string[];
-  compatibility_score: number;
+  compatibility_score: number | null;
   profile_photo_url?: string;
+  sleep_schedule?: string | null;
+  cleanliness?: string | null;
+  noise_level?: string | null;
+  smoking?: string | null;
+  pets?: string | null;
+}
+
+export interface IndividualDetailResponse extends IndividualCardResponse {
+  guests?: string | null;
+  study_habits?: string | null;
+  kitchen_use?: string | null;
+  gender_housing_pref?: string | null;
+  search_type?: string | null;
+  compatibility_breakdown?: Record<string, string> | null;
 }
 
 export interface InviteCreate {

@@ -19,8 +19,25 @@ const navItems = [
 ];
 
 /* ── Avatar helper ── */
-function UserAvatar({ firstName, lastName, size = 34 }: { firstName: string; lastName: string; size?: number }) {
+function UserAvatar({
+  firstName,
+  lastName,
+  photoUrl,
+  size = 34,
+}: { firstName: string; lastName: string; photoUrl?: string | null; size?: number }) {
   const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={`${firstName} ${lastName}`}
+        className="rounded-full object-cover shrink-0"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
   return (
     <div
       className="rounded-full flex items-center justify-center text-white shrink-0"
@@ -46,6 +63,7 @@ export function Navbar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [myGroupHref, setMyGroupHref] = useState<string>("/roommates");
 
   const isLandlord = user?.role === "landlord";
   const landlordTab = searchParams.get("tab");
@@ -72,6 +90,27 @@ export function Navbar() {
     const interval = setInterval(fetchUnread, 15000);
     return () => clearInterval(interval);
   }, [fetchUnread]);
+
+  // Resolve the "My Group" link target → user's owned group, fallback to /roommates
+  useEffect(() => {
+    if (!user || isLandlord) {
+      setMyGroupHref("/roommates");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const myGroup = await api.roommates.getMyGroup();
+        if (!cancelled && myGroup?.id != null) {
+          setMyGroupHref(`/roommates/groups/${myGroup.id}`);
+        }
+      } catch {
+        // No group (404) or auth issue — keep default /roommates
+        if (!cancelled) setMyGroupHref("/roommates");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, isLandlord]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -144,7 +183,7 @@ export function Navbar() {
         { label: "Marketplace Messages", href: "/marketplace/messages", icon: ShoppingBag },
         { label: "Saved Listings", href: "/saved", icon: Bookmark },
         { label: "Your Listings", href: "/marketplace/my", icon: ShoppingBag },
-        { label: "My Group", href: "/roommates", icon: Heart },
+        { label: "My Group", href: myGroupHref, icon: Heart },
         { label: "Settings", href: "/settings", icon: Settings },
       ];
 
@@ -222,7 +261,7 @@ export function Navbar() {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-[#1B2D45]/[0.04] transition-all"
               >
-                <UserAvatar firstName={user.first_name} lastName={user.last_name} />
+                <UserAvatar firstName={user.first_name} lastName={user.last_name} photoUrl={user.profile_photo_url} />
                 <span
                   className="text-[#1B2D45]/80 max-w-[120px] truncate"
                   style={{ fontSize: "13px", fontWeight: 600 }}
@@ -243,7 +282,7 @@ export function Navbar() {
                   {/* User info header */}
                   <div className="px-4 pt-4 pb-3 border-b border-black/[0.04]">
                     <div className="flex items-center gap-3">
-                      <UserAvatar firstName={user.first_name} lastName={user.last_name} size={40} />
+                      <UserAvatar firstName={user.first_name} lastName={user.last_name} photoUrl={user.profile_photo_url} size={40} />
                       <div className="min-w-0 flex-1">
                         <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
                           {user.first_name} {user.last_name}
@@ -348,7 +387,7 @@ export function Navbar() {
             {/* User info on mobile */}
             {user && (
               <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-[#FAF8F4] rounded-xl">
-                <UserAvatar firstName={user.first_name} lastName={user.last_name} size={36} />
+                <UserAvatar firstName={user.first_name} lastName={user.last_name} photoUrl={user.profile_photo_url} size={36} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
                     {user.first_name} {user.last_name}

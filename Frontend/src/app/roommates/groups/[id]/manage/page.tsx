@@ -17,67 +17,54 @@ import {
   TAG_SHORT_LABELS, MOCK_PROFILES, getRoommateGroupById, removeStoredRoommateGroup, upsertStoredRoommateGroup,
   MOVE_IN_OPTIONS, GENDER_HOUSING_OPTIONS,
 } from "@/components/roommates/roommate-data";
-
-/* ── Mock requests ── */
-const MOCK_REQUESTS: GroupRequest[] = [
-  {
-    id: "req1", groupId: "g1", userId: "r5",
-    profile: MOCK_PROFILES[4],
-    message: "Hey! I saw this on a friend's story. I'm a 3rd year EnvSci student, super clean and easygoing. Would love to chat!",
-    status: "pending", createdAt: "2026-02-28",
-  },
-  {
-    id: "req2", groupId: "g1", userId: "r7",
-    profile: MOCK_PROFILES[7],
-    message: "Hi! I'm looking for a quiet place to live. I'm in the lab most days so barely home. Mochi sounds adorable btw!",
-    status: "pending", createdAt: "2026-03-01",
-  },
-];
-
+import type { RoommateRequestResponse } from "@/types";
+import { PhotoCropper } from "@/components/PhotoCropper";
 /* ── Components ── */
 
-function RequestCard({
+function ApiRequestCard({
   request, onAccept, onReject,
-}: { request: GroupRequest; onAccept: () => void; onReject: () => void }) {
-  const tags = Object.entries(request.profile.tags).slice(0, 4).map(([_, v]) => TAG_SHORT_LABELS[v] || v);
-  const budget = request.profile.budget;
-  const budgetLabel = budget[1] >= 2000 ? `$${budget[0]}+` : `$${budget[0]}–$${budget[1]}`;
+}: { request: RoommateRequestResponse; onAccept: () => void; onReject: () => void }) {
+  const [busy, setBusy] = useState<"accept" | "reject" | null>(null);
+  const handleAccept = async () => { setBusy("accept"); try { await onAccept(); } finally { setBusy(null); } };
+  const handleReject = async () => { setBusy("reject"); try { await onReject(); } finally { setBusy(null); } };
+  const scoreColor = request.compatibility_score >= 80 ? "#4ADE80" : request.compatibility_score >= 60 ? "#FFB627" : "#FF6B35";
 
   return (
     <div className="bg-white rounded-xl border border-black/[0.04] overflow-hidden" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
       <div className="p-4">
         <div className="flex items-start gap-3 mb-2">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0">
-            <span style={{ fontSize: "14px", fontWeight: 800, color: "#FF6B35" }}>{request.profile.firstName[0]}</span>
+            <span style={{ fontSize: "14px", fontWeight: 800, color: "#FF6B35" }}>{request.user_name[0]}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{request.profile.firstName} {request.profile.initial}</h4>
-            <p className="text-[#1B2D45]/35" style={{ fontSize: "11px" }}>{request.profile.year} · {request.profile.program}</p>
+            <h4 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{request.user_name}</h4>
+            <p className="text-[#1B2D45]/35" style={{ fontSize: "11px" }}>{new Date(request.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
           </div>
-          <div className="flex items-center gap-1 text-[#1B2D45]/20" style={{ fontSize: "10px" }}>
-            <Clock className="w-3 h-3" /> {new Date(request.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          <span className="rounded-md px-2 py-0.5 shrink-0" style={{ fontSize: "10px", fontWeight: 700, color: scoreColor, background: `${scoreColor}14` }}>
+            {request.compatibility_score}% match
+          </span>
+        </div>
+
+        {request.message && (
+          <div className="bg-[#FAF8F4] rounded-lg px-3 py-2.5 mb-3">
+            <p className="text-[#1B2D45]/60" style={{ fontSize: "12px", lineHeight: 1.5 }}>{request.message}</p>
           </div>
-        </div>
+        )}
 
-        {/* Message */}
-        <div className="bg-[#FAF8F4] rounded-lg px-3 py-2.5 mb-3">
-          <p className="text-[#1B2D45]/60" style={{ fontSize: "12px", lineHeight: 1.5 }}>{request.message}</p>
-        </div>
+        {request.lifestyle_tags && request.lifestyle_tags.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-3">
+            {Array.from(new Set(request.lifestyle_tags)).slice(0, 5).map((t) => (
+              <span key={t} className="px-2 py-0.5 rounded bg-[#FF6B35]/[0.06] text-[#FF6B35]/60" style={{ fontSize: "9px", fontWeight: 500 }}>{t}</span>
+            ))}
+          </div>
+        )}
 
-        {/* Tags */}
-        <div className="flex items-center gap-1.5 flex-wrap mb-3">
-          <span className="px-2 py-0.5 rounded bg-[#1B2D45]/[0.04] text-[#1B2D45]/40" style={{ fontSize: "9px", fontWeight: 600 }}>{budgetLabel}/mo</span>
-          <span className="px-2 py-0.5 rounded bg-[#1B2D45]/[0.04] text-[#1B2D45]/40" style={{ fontSize: "9px", fontWeight: 600 }}>{request.profile.moveIn}</span>
-          {tags.map((t) => <span key={t} className="px-2 py-0.5 rounded bg-[#FF6B35]/[0.06] text-[#FF6B35]/60" style={{ fontSize: "9px", fontWeight: 500 }}>{t}</span>)}
-        </div>
-
-        {/* Actions */}
         <div className="flex items-center gap-2">
-          <button onClick={onAccept} className="flex-1 py-2 rounded-lg bg-[#4ADE80] text-white hover:bg-[#3cc46f] transition-all flex items-center justify-center gap-1.5" style={{ fontSize: "12px", fontWeight: 700 }}>
-            <Check className="w-3.5 h-3.5" /> Accept
+          <button onClick={handleAccept} disabled={!!busy} className="flex-1 py-2 rounded-lg bg-[#4ADE80] text-white hover:bg-[#3cc46f] transition-all flex items-center justify-center gap-1.5 disabled:opacity-50" style={{ fontSize: "12px", fontWeight: 700 }}>
+            <Check className="w-3.5 h-3.5" /> {busy === "accept" ? "Accepting..." : "Accept"}
           </button>
-          <button onClick={onReject} className="flex-1 py-2 rounded-lg border border-black/[0.06] text-[#1B2D45]/40 hover:text-[#E71D36] hover:border-[#E71D36]/20 transition-all flex items-center justify-center gap-1.5" style={{ fontSize: "12px", fontWeight: 600 }}>
-            <X className="w-3.5 h-3.5" /> Decline
+          <button onClick={handleReject} disabled={!!busy} className="flex-1 py-2 rounded-lg border border-black/[0.06] text-[#1B2D45]/40 hover:text-[#E71D36] hover:border-[#E71D36]/20 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50" style={{ fontSize: "12px", fontWeight: 600 }}>
+            <X className="w-3.5 h-3.5" /> {busy === "reject" ? "..." : "Decline"}
           </button>
         </div>
       </div>
@@ -88,8 +75,12 @@ function RequestCard({
 function MemberRow({ member, isOwner, onRemove }: { member: LifestyleProfile; isOwner: boolean; onRemove?: () => void }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-black/[0.04]">
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0">
-        <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden">
+        {member.avatar ? (
+          <img src={member.avatar} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -115,11 +106,14 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
   const { user } = useAuthStore();
 
   const [group, setGroup] = useState<RoommateGroup | null | undefined>(undefined);
+  const [ownerUserId, setOwnerUserId] = useState<number | null>(null);
   const [tab, setTab] = useState<"requests" | "members" | "settings">("requests");
-  const [requests, setRequests] = useState(MOCK_REQUESTS.filter((r) => r.groupId === id || id === "g1"));
+  const [requests, setRequests] = useState<RoommateRequestResponse[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [landlordCopied, setLandlordCopied] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "error">("idle");
 
   // Editable fields
   const [editing, setEditing] = useState(false);
@@ -127,10 +121,60 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
   const [editDesc, setEditDesc] = useState("");
   const [editVisible, setEditVisible] = useState(true);
   const [editGroupImage, setEditGroupImage] = useState<string | null>(null);
+  const [editGroupFile, setEditGroupFile] = useState<File | null>(null);
+  const [pendingGroupPhotoFile, setPendingGroupPhotoFile] = useState<File | null>(null);
 
   useEffect(() => {
-    // TODO: GET /api/groups/{id} — for now use mock + stored local groups
-    setGroup(getRoommateGroupById(id) ?? null);
+    async function fetchGroup() {
+      const numId = parseInt(id, 10);
+      if (!isNaN(numId)) {
+        try {
+          const apiGroup = await api.roommates.getGroup(numId);
+          setOwnerUserId(apiGroup.owner_id);
+          setGroup({
+            id: String(apiGroup.id),
+            name: apiGroup.name,
+            createdBy: String(apiGroup.owner_id),
+            members: apiGroup.members.map((m) => ({
+              id: String(m.user_id),
+              firstName: m.first_name,
+              initial: m.last_initial,
+              year: "",
+              program: "",
+              budget: [0, 0] as [number, number],
+              moveIn: "",
+              leaseLength: "",
+              bio: "",
+              tags: {},
+              avatar: m.profile_photo_url || undefined,
+            })),
+            groupSize: apiGroup.total_capacity,
+            spotsNeeded: apiGroup.spots_remaining,
+            budgetMin: Number(apiGroup.rent_per_person) || 0,
+            budgetMax: Number(apiGroup.rent_per_person) || 0,
+            preferredArea: null,
+            targetListingId: null,
+            targetListingTitle: null,
+            description: apiGroup.description || "",
+            inviteCode: "",
+            isVisible: apiGroup.is_visible,
+            genderPreference: apiGroup.gender_preference || null,
+            moveIn: apiGroup.move_in_timing || "",
+            createdAt: apiGroup.created_at,
+            housing: apiGroup.has_place ? {
+              status: apiGroup.is_verified ? "linked" : "pending",
+              selfReportedAddress: apiGroup.address || undefined,
+              selfReportedRent: Number(apiGroup.rent_per_person) || undefined,
+              selfReportedUtilitiesIncluded: apiGroup.utilities_included,
+            } : undefined,
+            groupImage: apiGroup.group_photo_url || undefined,
+          } as RoommateGroup);
+          return;
+        } catch { /* fall through to mock */ }
+      }
+      setGroup(getRoommateGroupById(id) ?? null);
+    }
+    fetchGroup();
   }, [id]);
 
   useEffect(() => {
@@ -140,6 +184,29 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     setEditVisible(group.isVisible);
     setEditGroupImage(group.groupImage || null);
   }, [group]);
+
+  // Compute ownership against the actual API owner id
+  const userId = typeof user?.id === "number" ? user.id : Number(user?.id);
+  const isOwner = !!user && ownerUserId !== null && userId === ownerUserId;
+
+  // Load real pending requests once we know the user owns this group
+  useEffect(() => {
+    if (!isOwner) return;
+    let cancelled = false;
+    async function loadRequests() {
+      setRequestsLoading(true);
+      try {
+        const reqs = await api.roommates.getReceivedRequests();
+        if (!cancelled) setRequests(reqs);
+      } catch {
+        if (!cancelled) setRequests([]);
+      } finally {
+        if (!cancelled) setRequestsLoading(false);
+      }
+    }
+    loadRequests();
+    return () => { cancelled = true; };
+  }, [isOwner]);
 
   if (group === undefined) {
     return (
@@ -160,11 +227,6 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const isOwner = Boolean(user) && (
-    group.createdBy === `user:${user?.id}` ||
-    group.createdBy === `${user?.id}-member-1`
-  );
-
   if (!isOwner) {
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-4">
@@ -184,7 +246,9 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
 
   const filled = group.groupSize - group.spotsNeeded;
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/roommates/groups/join/${group.inviteCode}` : "";
-  const pendingCount = requests.filter((r) => r.status === "pending").length;
+  const pendingRequests = requests.filter((r) => r.status === "pending");
+  const resolvedRequests = requests.filter((r) => r.status !== "pending");
+  const pendingCount = pendingRequests.length;
 
   const handleCopy = () => { navigator.clipboard.writeText(shareUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   const handleLandlordCopy = () => {
@@ -194,20 +258,47 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     setTimeout(() => setLandlordCopied(false), 2000);
   };
 
-  const handleAccept = async (reqId: string) => {
+  const refreshGroup = async () => {
+    const numId = parseInt(id, 10);
+    if (isNaN(numId)) return;
     try {
-      const numId = parseInt(reqId, 10);
-      if (!isNaN(numId)) await api.roommates.acceptRequest(numId);
-    } catch { /* API failed — update locally */ }
-    setRequests((prev) => prev.map((r) => r.id === reqId ? { ...r, status: "accepted" as const } : r));
+      const apiGroup = await api.roommates.getGroup(numId);
+      setGroup((g) => g ? {
+        ...g,
+        members: apiGroup.members.map((m) => ({
+          id: String(m.user_id),
+          firstName: m.first_name,
+          initial: m.last_initial,
+          year: "",
+          program: "",
+          budget: [0, 0] as [number, number],
+          moveIn: "",
+          leaseLength: "",
+          bio: "",
+          tags: {},
+        })),
+        spotsNeeded: apiGroup.spots_remaining,
+      } : g);
+    } catch { /* ignore */ }
   };
 
-  const handleReject = async (reqId: string) => {
+  const handleAccept = async (reqId: number) => {
     try {
-      const numId = parseInt(reqId, 10);
-      if (!isNaN(numId)) await api.roommates.declineRequest(numId);
-    } catch { /* API failed — update locally */ }
-    setRequests((prev) => prev.map((r) => r.id === reqId ? { ...r, status: "rejected" as const } : r));
+      await api.roommates.acceptRequest(reqId);
+      setRequests((prev) => prev.map((r) => r.id === reqId ? { ...r, status: "accepted" as const } : r));
+      await refreshGroup();
+    } catch (err) {
+      console.error("Failed to accept request", err);
+    }
+  };
+
+  const handleReject = async (reqId: number) => {
+    try {
+      await api.roommates.declineRequest(reqId);
+      setRequests((prev) => prev.map((r) => r.id === reqId ? { ...r, status: "declined" as const } : r));
+    } catch (err) {
+      console.error("Failed to decline request", err);
+    }
   };
 
   const handleRemoveMember = async (memberId: string) => {
@@ -216,22 +307,67 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
       const memberNumId = parseInt(memberId, 10);
       if (!isNaN(groupNumId) && !isNaN(memberNumId)) {
         await api.roommates.removeMember(groupNumId, memberNumId);
+        await refreshGroup();
       }
-    } catch { /* API failed */ }
+    } catch (err) {
+      console.error("Failed to remove member", err);
+    }
   };
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
+    if (!group) return;
+    setSaveStatus("saving");
+    const numId = parseInt(group.id, 10);
+    const trimmedName = editName.trim() || group.name;
+    const trimmedDesc = editDesc.trim() || group.description;
+
+    let persistedPhotoUrl: string | undefined = group.groupImage;
+
+    try {
+      // Save name + description via PATCH
+      if (!isNaN(numId) && (trimmedName !== group.name || trimmedDesc !== group.description)) {
+        await api.roommates.updateGroup(numId, {
+          name: trimmedName,
+          description: trimmedDesc,
+        });
+      }
+
+      // Visibility lives on its own endpoint — toggle if changed
+      if (!isNaN(numId) && editVisible !== group.isVisible) {
+        await api.roommates.setGroupVisibility(numId, editVisible);
+      }
+
+      // Photo — three cases: new file selected, photo cleared, or unchanged
+      if (!isNaN(numId)) {
+        if (editGroupFile) {
+          // New upload: pushes to Cloudinary via backend, returns persistent URL
+          const { group_photo_url } = await api.roommates.uploadGroupPhoto(numId, editGroupFile);
+          persistedPhotoUrl = group_photo_url;
+          setEditGroupFile(null);
+          setEditGroupImage(group_photo_url);
+        } else if (!editGroupImage && group.groupImage) {
+          // User removed the existing photo — delete on backend
+          await api.roommates.deleteGroupPhoto(numId);
+          persistedPhotoUrl = undefined;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to save group", err);
+      setSaveStatus("error");
+      return;
+    }
+
     const nextGroup: RoommateGroup = {
       ...group,
-      name: editName.trim() || group.name,
-      description: editDesc.trim() || group.description,
+      name: trimmedName,
+      description: trimmedDesc,
       isVisible: editVisible,
-      groupImage: editGroupImage || undefined,
+      groupImage: persistedPhotoUrl,
     };
-
     upsertStoredRoommateGroup(nextGroup);
     setGroup(nextGroup);
     setEditing(false);
+    setSaveStatus("idle");
   };
 
   const handleDelete = async () => {
@@ -243,12 +379,11 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     router.push("/roommates");
   };
 
-  const pendingRequests = requests.filter((r) => r.status === "pending");
-  const resolvedRequests = requests.filter((r) => r.status !== "pending");
   const heroImage = editGroupImage || group.groupImage || group.housing?.linkedListingImage || group.housing?.selfReportedPhotos?.[0] || null;
   const saveDisabled =
     editName.trim().length < 2 ||
     editDesc.trim().length < 10 ||
+    saveStatus === "saving" ||
     (
       editName.trim() === group.name &&
       editDesc.trim() === group.description &&
@@ -331,16 +466,20 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                         {group.description}
                       </p>
                       <div className="mt-4 flex items-center">
-                        {group.members.slice(0, 4).map((member, index) => (
+                      {group.members.slice(0, 4).map((member, index) => (
                           <motion.div
                             key={member.id}
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.08 + index * 0.04, duration: 0.25 }}
-                            className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[linear-gradient(135deg,#FFE3D3_0%,#FFF7F0_100%)] text-[#FF6B35]"
+                            className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[linear-gradient(135deg,#FFE3D3_0%,#FFF7F0_100%)] text-[#FF6B35] overflow-hidden"
                             style={{ fontSize: "13px", fontWeight: 800, marginLeft: index === 0 ? 0 : -10 }}
                           >
-                            {member.firstName[0]}
+                            {member.avatar ? (
+                              <img src={member.avatar} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              member.firstName[0]
+                            )}
                           </motion.div>
                         ))}
                         {group.spotsNeeded > 0 && (
@@ -448,7 +587,12 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
           {/* ── Requests Tab ── */}
           {tab === "requests" && (
             <motion.div key="requests" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-              {pendingRequests.length === 0 ? (
+              {requestsLoading ? (
+                <div className="bg-white rounded-[28px] border border-dashed border-black/[0.08] p-10 text-center" style={{ boxShadow: "0 14px 36px rgba(15, 23, 42, 0.04)" }}>
+                  <div className="w-6 h-6 border-2 border-[#FF6B35]/20 border-t-[#FF6B35] rounded-full animate-spin mx-auto mb-2" />
+                  <p className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>Loading requests...</p>
+                </div>
+              ) : pendingRequests.length === 0 ? (
                 <div className="bg-white rounded-[28px] border border-dashed border-black/[0.08] p-10 text-center" style={{ boxShadow: "0 14px 36px rgba(15, 23, 42, 0.04)" }}>
                   <UserPlus className="w-8 h-8 text-[#1B2D45]/10 mx-auto mb-2" />
                   <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>No pending requests</h3>
@@ -458,7 +602,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                 <div className="space-y-3">
                   <h3 className="text-[#1B2D45]/40" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>PENDING ({pendingRequests.length})</h3>
                   {pendingRequests.map((req) => (
-                    <RequestCard key={req.id} request={req} onAccept={() => handleAccept(req.id)} onReject={() => handleReject(req.id)} />
+                    <ApiRequestCard key={req.id} request={req} onAccept={() => handleAccept(req.id)} onReject={() => handleReject(req.id)} />
                   ))}
                 </div>
               )}
@@ -470,9 +614,9 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                     {resolvedRequests.map((req) => (
                       <div key={req.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/50 border border-black/[0.02]">
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#FF6B35]/10 to-[#FFB627]/10 flex items-center justify-center shrink-0">
-                          <span style={{ fontSize: "10px", fontWeight: 700, color: "#FF6B35" }}>{req.profile.firstName[0]}</span>
+                          <span style={{ fontSize: "10px", fontWeight: 700, color: "#FF6B35" }}>{req.user_name[0]}</span>
                         </div>
-                        <span className="text-[#1B2D45]/40 flex-1" style={{ fontSize: "12px" }}>{req.profile.firstName} {req.profile.initial}</span>
+                        <span className="text-[#1B2D45]/40 flex-1" style={{ fontSize: "12px" }}>{req.user_name}</span>
                         <span className={`px-2 py-0.5 rounded ${req.status === "accepted" ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#1B2D45]/[0.04] text-[#1B2D45]/25"}`} style={{ fontSize: "9px", fontWeight: 700 }}>{req.status}</span>
                       </div>
                     ))}
@@ -520,7 +664,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                           <img src={editGroupImage} alt="" className="h-full w-full object-cover" />
                           <button
                             type="button"
-                            onClick={() => setEditGroupImage(null)}
+                            onClick={() => { setEditGroupImage(null); setEditGroupFile(null); }}
                             className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/45 transition-colors hover:bg-black/65"
                           >
                             <X className="h-4 w-4 text-white" />
@@ -542,11 +686,8 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (ev) => setEditGroupImage(ev.target?.result as string);
-                              reader.readAsDataURL(file);
-                            }
+                            if (file) setPendingGroupPhotoFile(file);
+                            e.currentTarget.value = "";
                           }}
                         />
                       )}
@@ -597,7 +738,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div className="mt-4 flex items-center justify-between gap-3 rounded-[18px] bg-[#FCFBF8] px-4 py-3">
                   <div className="text-[#1B2D45]/38" style={{ fontSize: "11px", lineHeight: 1.6 }}>
-                    {editing ? "Review your edits, then save to update the live group." : "Use Edit fields first if you want to change the group photo, text, or visibility."}
+                    {saveStatus === "error" ? <span className="text-[#E71D36]">Save failed — try again.</span> : editing ? "Review your edits, then save to update the live group." : "Use Edit fields first if you want to change the group photo, text, or visibility."}
                   </div>
                   <button
                     onClick={handleSaveSettings}
@@ -605,7 +746,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                     className={`shrink-0 rounded-full px-4 py-2.5 text-white transition-all ${!editing || saveDisabled ? "bg-[#1B2D45]/12 cursor-not-allowed" : "bg-[#FF6B35] hover:bg-[#e55e2e]"}`}
                     style={{ fontSize: "12px", fontWeight: 700, boxShadow: !editing || saveDisabled ? "none" : "0 10px 26px rgba(255,107,53,0.22)" }}
                   >
-                    Save changes
+                    {saveStatus === "saving" ? "Saving..." : "Save changes"}
                   </button>
                 </div>
               </div>
@@ -628,11 +769,25 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                 )}
               </div>
             </motion.div>
-          )}
+          )}          
             </AnimatePresence>
           </div>
         </div>
       </div>
+
+      {pendingGroupPhotoFile && (
+        <PhotoCropper
+          file={pendingGroupPhotoFile}
+          onCancel={() => setPendingGroupPhotoFile(null)}
+          onConfirm={(croppedFile) => {
+            setPendingGroupPhotoFile(null);
+            setEditGroupFile(croppedFile);
+            const reader = new FileReader();
+            reader.onload = (ev) => setEditGroupImage(ev.target?.result as string);
+            reader.readAsDataURL(croppedFile);
+          }}
+        />
+      )}
     </div>
   );
 }

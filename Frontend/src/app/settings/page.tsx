@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { PhotoCropper } from "@/components/PhotoCropper";
 
 /* ═══════════════════════════════════════════════════════
    TYPES
@@ -125,6 +126,7 @@ function ProfileTab() {
   const [saving, setSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoRemoving, setPhotoRemoving] = useState(false);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
 
   const profilePhotoUrl = user?.profile_photo_url || null;
 
@@ -221,7 +223,7 @@ function ProfileTab() {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) void handlePhotoUpload(file);
+                  if (file) setPendingPhotoFile(file);
                   e.currentTarget.value = "";
                 }}
               />
@@ -243,7 +245,7 @@ function ProfileTab() {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) void handlePhotoUpload(file);
+                    if (file) setPendingPhotoFile(file);
                     e.currentTarget.value = "";
                   }}
                 />
@@ -268,6 +270,17 @@ function ProfileTab() {
           </div>
         </div>
       </SectionCard>
+
+      {pendingPhotoFile && (
+        <PhotoCropper
+          file={pendingPhotoFile}
+          onCancel={() => setPendingPhotoFile(null)}
+          onConfirm={async (croppedFile) => {
+            setPendingPhotoFile(null);
+            await handlePhotoUpload(croppedFile);
+          }}
+        />
+      )}
 
       <SectionCard title="Personal Information" description="This info is used across cribb">
         <div className="space-y-4">
@@ -439,7 +452,7 @@ function RoommateTab() {
       });
 
       if (visible !== initialVisible) {
-        await api.roommates.toggleVisibility();
+        await api.roommates.toggleVisibility(visible);
         setInitialVisible(visible);
       }
 

@@ -17,6 +17,9 @@ export interface LifestyleProfile {
   gender?: string;
   avatar?: string;
   isEarlyAdopter?: boolean;
+  budgetLabel?: string;
+  moveInLabel?: string;
+ cardCategoryTags?: Array<{ category: string; label: string }>;
 }
 
 export interface GroupHousing {
