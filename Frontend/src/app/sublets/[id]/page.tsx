@@ -5,7 +5,6 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { ReportModal } from "@/components/ui/ReportModal";
 import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
-import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
 import { TenantProfilePrompt } from "@/components/ui/TenantProfilePrompt";
 import { getScoreColor } from "@/lib/utils";
 import { getAmenityChecklist } from "@/lib/amenities";
@@ -60,9 +59,17 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
       + (sublet.has_laundry ? 2 : 0)
       + (sublet.has_parking ? 1 : 0)
   );
+  const termSummary = sublet.terms;
+  const linkedListingId = (sublet as SubletResponse & { listing_id?: number | null }).listing_id ?? undefined;
+  const isEntirePlace = Boolean(termSummary?.entire_place);
+  const hasRoommatesStaying = Boolean(termSummary?.roommates_staying);
+  const isPrivateRoom = Boolean(termSummary?.private_room) || sublet.room_type === "private";
+  const bedsAvailable = isEntirePlace ? sublet.total_rooms : isPrivateRoom || hasRoommatesStaying ? 1 : sublet.total_rooms;
+  const roommatesStaying = hasRoommatesStaying ? Math.max(0, sublet.total_rooms - bedsAvailable) : null;
 
   return {
     id: String(sublet.id),
+    listing_id: linkedListingId,
     title: sublet.title,
     street: sublet.address.split(",")[0] ?? sublet.address,
     address: sublet.address,
@@ -79,11 +86,11 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
     subletStart: sublet.sublet_start_date,
     subletEnd: sublet.sublet_end_date,
     neighborhood: distance <= 0.7 ? "Campus" : distance <= 1.5 ? "Near Campus" : "Guelph",
-    negotiablePrice: sublet.utilities_included,
-    flexibleDates: false,
-    roommatesStaying: sublet.total_rooms > 1 ? sublet.total_rooms - 1 : null,
-    roommateDesc: sublet.total_rooms > 1 ? `${sublet.total_rooms - 1} roommate${sublet.total_rooms - 1 > 1 ? "s" : ""} staying` : null,
-    bedsAvailable: 1,
+    negotiablePrice: Boolean(termSummary?.negotiable_price),
+    flexibleDates: Boolean(termSummary?.flexible_dates),
+    roommatesStaying,
+    roommateDesc: roommatesStaying ? `${roommatesStaying} roommate${roommatesStaying > 1 ? "s" : ""} staying` : null,
+    bedsAvailable,
     bedsTotal: sublet.total_rooms,
     bathrooms: sublet.bathrooms,
     propertyType: sublet.room_type,
@@ -93,7 +100,7 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
     genderPreference: sublet.gender_preference || "any",
     views: sublet.view_count,
     saves: 0,
-    images: sublet.images.map((img) => img.image_url),
+    images: (sublet.images || []).map((img) => img.image_url),
     createdAt: sublet.created_at,
     is_furnished: sublet.is_furnished,
     has_parking: sublet.has_parking,
@@ -183,8 +190,8 @@ function ReviewCard({ review, index }: { review: ReviewResponse; index: number }
 export default function SubletDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const mockSublet = getMockSublet(id) ?? null;
-  const [sublet, setSublet] = useState(mockSublet);
+  const mockSublet = getMockSublet(id);
+  const [sublet, setSublet] = useState<SubletDetail | null>(mockSublet ?? null);
   const [loading, setLoading] = useState(!mockSublet && /^\d+$/.test(id));
 
   const [saved, setSaved] = useState(false);  // fallback for sublets without listing_id
@@ -199,26 +206,34 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
 
   const user = useAuthStore((s) => s.user);
 
+  // Mock IDs (s1, s2, ...) render synchronously above. Numeric IDs hydrate from the
+  // backend — safe now that GET /api/sublets/{id} is N+1-free and responds quickly.
   useEffect(() => {
-    let cancelled = false;
-
-    if (mockSublet || !/^\d+$/.test(id)) {
+    if (mockSublet) {
+      setSublet(mockSublet);
       setLoading(false);
-      return () => {
-        cancelled = true;
-      };
+      return;
     }
 
+    if (!/^\d+$/.test(id)) {
+      setSublet(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSublet(null);
     setLoading(true);
     api.sublets.getById(Number(id))
       .then((res) => {
-        if (!cancelled) setSublet(mapApiSubletToDetail(res));
+        if (cancelled) return;
+        setSublet(mapApiSubletToDetail(res));
+        setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setSublet(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        setSublet(null);
+        setLoading(false);
       });
 
     return () => {
@@ -249,7 +264,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   }, [hasListingId, sublet, storeToggle, saved, router]);
 
   // TODO: fetch real reviews for the property once backend links sublets to properties
-  const [reviews, setReviews] = useState<ReviewResponse[]>(mockSublet ? getMockReviews(1) : []);
+  const [reviews, setReviews] = useState<ReviewResponse[]>(sublet ? getMockReviews(1) : []);
   useEffect(() => {
     if (sublet && reviews.length === 0) {
       setReviews(getMockReviews(1));
@@ -305,7 +320,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
       router.push(`/login?next=${encodeURIComponent(`/sublets/${id}`)}`);
       return;
     }
-    if (!hasTenantProfile === false) {
+    if (hasTenantProfile === false) {
       setShowTenantPrompt(true);
       return;
     }
@@ -645,34 +660,28 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 />
               </div>
 
-              {/* Contact Card */}
-              {hasListingId ? (
-                <LandlordContactCard
-                  landlordId={sublet.listing_id!}
-                  landlordName={sublet.posterName}
-                  landlordVerified={false}
-                />
-              ) : (
-                <div className="mt-4 bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-4"
-                  style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2EC4B6]/20 to-[#4ADE80]/20 flex items-center justify-center">
-                      <span className="text-[#2EC4B6]" style={{ fontSize: "16px", fontWeight: 800 }}>
-                        {sublet.posterName.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.posterName}</p>
-                      <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{sublet.posterType}</p>
-                    </div>
+              {/* Contact Card
+                  Sublet responses do not currently expose a real landlord public-profile id,
+                  so we show the poster summary card here instead of misusing listing_id. */}
+              <div className="mt-4 bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-4"
+                style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2EC4B6]/20 to-[#4ADE80]/20 flex items-center justify-center">
+                    <span className="text-[#2EC4B6]" style={{ fontSize: "16px", fontWeight: 800 }}>
+                      {sublet.posterName.charAt(0)}
+                    </span>
                   </div>
-                  {sublet.posterIsStudent && sublet.posterYear && sublet.posterProgram && (
-                    <p className="text-[#1B2D45]/30 mt-3 pt-3 border-t border-[#1B2D45]/[0.04]" style={{ fontSize: "11px" }}>
-                      🎓 {sublet.posterYear} year · {sublet.posterProgram}
-                    </p>
-                  )}
+                  <div>
+                    <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.posterName}</p>
+                    <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{sublet.posterType}</p>
+                  </div>
                 </div>
-              )}
+                {sublet.posterIsStudent && sublet.posterYear && sublet.posterProgram && (
+                  <p className="text-[#1B2D45]/30 mt-3 pt-3 border-t border-[#1B2D45]/[0.04]" style={{ fontSize: "11px" }}>
+                    🎓 {sublet.posterYear} year · {sublet.posterProgram}
+                  </p>
+                )}
+              </div>
             </div>
           </motion.div>
         </div>

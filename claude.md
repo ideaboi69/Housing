@@ -431,3 +431,94 @@ CORS is set to `allow_origins=[settings.FRONTEND_URL]` with `allow_credentials=T
 - **DB enums use UPPERCASE names** (STUDENT, DRAFT, PENDING) — SQLAlchemy default. Do NOT use `values_callable` wrapper.
 - **`create_all()` doesn't add columns** to existing tables — always use ALTER TABLE for migrations.
 - **LandlordInvite** stores enum values as lowercase strings in VARCHAR columns (not DB Enum type). Convert back with `PropertyType(invite.property_type)` on claim.
+
+# Cribb — Project Context for Claude Code
+
+Cribb is a student-first housing platform built for University of Guelph students.
+This file is loaded automatically every session. Read it before making changes.
+
+## Repo layout
+
+This is a monorepo with two top-level folders:
+
+- `Frontend/` — Next.js (App Router) + React + TypeScript + Tailwind CSS + Framer Motion + Mapbox GL JS
+- `Backend/` — FastAPI + SQLAlchemy + PostgreSQL (Neon) + APScheduler + WebSockets, hosted on Render
+
+External services: Resend (email), Cloudinary + Amazon S3 (media), Anthropic (AI features).
+
+## Roles
+
+- **David** (you, the user) — owns frontend and product direction.
+- **OJ** — owns backend. Backend changes are sent to him as structured fix lists, not edited live.
+
+**Important:** Do not assume the backend can be changed in this session. If a frontend bug requires backend work, do not modify `Backend/` — instead, append a clear, structured entry to a section called "Backend fixes for OJ" in your final response, with: file path, what's wrong, what's needed, and why.
+
+## Frontend conventions (read these before editing)
+
+### Standard amenities
+`src/lib/amenities.ts` is the single source of truth. 14 boolean fields shared across listings and sublets. Both detail pages use `getAmenityChecklist()`. Do not duplicate this list anywhere else — extend it here if a new amenity is needed (and flag it as a backend column add for OJ).
+
+### Mock data pattern (critical)
+Detail pages use **synchronous mock data only**. No `useEffect`, no API calls, no async fetching on detail pages. This was a deliberate fix because backend calls were hanging and leaving pages blank.
+
+Files:
+- `src/lib/mock-data.ts` — listings (with amenities + health score IDs)
+- `src/lib/mock-sublets.ts` — sublets
+
+If a page is showing blank or stuck loading, the first thing to check is whether someone added a `useEffect` + fetch — remove it and use the mock data pattern instead.
+
+### Detail pages
+- Reviews are **stars-only** — no comment text. This is for legal reasons. Do not add comment fields, ever.
+- Health score breakdown appears on both listing detail and sublet detail.
+- Sticky sidebar contains a map placeholder.
+- Sublet cards link to `/sublets/[id]`.
+
+### Routing
+- `/app/the-bubble` is the live community hub (~1,047 lines).
+- `/app/demand-board` exists but is a **dead placeholder** — Demand Board was scrapped. Don't build features into it.
+
+### Types
+`src/types/index.ts` holds extended types including amenity fields. Keep it in sync with `amenities.ts`.
+
+## Brand & content guardrails (these are hard rules)
+
+- **Never name competing platforms** in any user-facing copy or content: no "Cannon", no "apartments.com", no "realtor.ca", etc.
+- **Cannon is NOT positioned as a competitor.** It's student-first and co-owned by the CSA and Guelph Campus Co-op. Do not write copy that frames Cribb as "vs Cannon."
+- **Roommate matching = friends finding housing together**, not stranger-matching. Copy should reflect this.
+- **Cribb does not handle leases.** Do not write copy or build features that imply lease management.
+
+## Brand tokens
+
+- Typography: **Inter** (Bold/800 for headings)
+- Colors:
+  - Primary orange `#FF6B35`
+  - Dark navy `#1B2D45`
+  - Cream `#FAF8F4`
+  - Green `#4ADE80`
+  - Amber `#FFB627`
+  - Teal `#2EC4B6`
+
+## Cribb Score (hybrid scoring)
+
+Starts at launch as **100% property score** (price, location, amenities, listing completeness) because there are zero reviews. As reviews accumulate, weighting shifts toward tenant reviews. The scoring logic must work correctly with zero reviews on day one — don't introduce divide-by-zero or "no data" empty states.
+
+## Working style
+
+- Ship first, refine on browser review. Iterate fast.
+- When in doubt about a frontend pattern, match what's already in `src/lib/` and existing detail pages rather than inventing a new approach.
+- For non-trivial changes, briefly explain the plan before editing files.
+- After making changes, run `npm run build` (or `tsc --noEmit`) to catch type errors before declaring done.
+
+## Common commands
+
+Frontend (run from `Frontend/`):
+- `npm run dev` — local dev server
+- `npm run build` — production build (good for catching type errors)
+- `npm run lint`
+
+Backend (David doesn't run this; OJ does — but for reference, from `Backend/`):
+- `uvicorn main:app --reload`
+
+## When starting a session
+
+If the user says "let's fix bugs," ask them to either list the bugs or point to the affected pages/files before opening files. Don't go scanning the whole repo unprompted.

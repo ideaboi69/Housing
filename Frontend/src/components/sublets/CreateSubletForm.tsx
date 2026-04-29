@@ -246,6 +246,8 @@ export function CreateSubletForm({
         description: form.description.trim() || null,
       });
 
+      let liveSublet = response;
+
       let coverImage = "/demo/listings/house.jpg";
       if (photos.length > 0) {
         try {
@@ -258,8 +260,20 @@ export function CreateSubletForm({
         }
       }
 
-      const availableMonths = MONTHS.map((_, i) => i >= selectedRange[0] && i <= selectedRange[1]);
-      const flexibleDates = (selectedRange[1] - selectedRange[0]) >= 2;
+      try {
+        liveSublet = await api.sublets.publish(response.id);
+      } catch (publishError) {
+        console.error("Failed to publish sublet after create", publishError);
+        toast.dismiss(loadingToast);
+        toast.error("Your sublet was saved as a draft. Open My Sublets to publish it.");
+        router.push("/sublets/my");
+        return;
+      }
+
+      const startMonth = new Date(`${liveSublet.sublet_start_date}T00:00:00`).getMonth();
+      const endMonth = new Date(`${liveSublet.sublet_end_date}T00:00:00`).getMonth();
+      const availableMonths = MONTHS.map((_, i) => i >= startMonth && i <= endMonth);
+      const flexibleDates = Boolean(liveSublet.terms?.flexible_dates);
       const scoreBase = 72
         + (distance <= 0.7 ? 12 : distance <= 1.5 ? 7 : 2)
         + (form.is_furnished ? 4 : 0)
@@ -270,9 +284,9 @@ export function CreateSubletForm({
       const roommates = Math.max(0, rooms - bedsAvailable);
 
       const createdListing: SubletListing = {
-        id: String(response.id),
-        title: response.title,
-        street: response.address.split(",")[0],
+        id: String(liveSublet.id),
+        title: liveSublet.title,
+        street: liveSublet.address.split(",")[0],
         coverImage,
         subletPrice: rent,
         originalPrice: Math.round(rent * 1.22),
@@ -301,7 +315,7 @@ export function CreateSubletForm({
         ].filter(Boolean) as string[],
         views: 0,
         saves: 0,
-        rotation: response.id % 2 === 0 ? 1.2 : -1.2,
+        rotation: liveSublet.id % 2 === 0 ? 1.2 : -1.2,
       };
 
       onCreated?.(createdListing);
@@ -314,7 +328,7 @@ export function CreateSubletForm({
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem("cribb-created-sublet", JSON.stringify(createdListing));
         }
-        router.push(`/sublets?created=${response.id}`);
+        router.push(`/sublets?created=${liveSublet.id}`);
       }
     } catch (error) {
       console.error("Failed to create sublet", error);

@@ -116,25 +116,14 @@ export function Navbar() {
     return () => clearInterval(interval);
   }, [fetchUnread]);
 
-  // Resolve the "My Group" link target → user's owned group, fallback to /roommates
+  // Keep "My Group" on a resolver route so we avoid eager 404s for students
+  // who simply don't have an active group yet.
   useEffect(() => {
     if (!user || isLandlord) {
       setMyGroupHref("/roommates");
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        const myGroup = await api.roommates.getMyGroup();
-        if (!cancelled && myGroup?.id != null) {
-          setMyGroupHref(`/roommates/groups/${myGroup.id}`);
-        }
-      } catch {
-        // No group (404) or auth issue — keep default /roommates
-        if (!cancelled) setMyGroupHref("/roommates");
-      }
-    })();
-    return () => { cancelled = true; };
+    setMyGroupHref("/roommates/my-group");
   }, [user, isLandlord]);
 
   // Close dropdown on outside click

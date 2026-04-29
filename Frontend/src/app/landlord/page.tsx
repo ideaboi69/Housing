@@ -2,13 +2,13 @@
 
 import { Suspense, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { clearLandlordClaim, getLandlordClaimCode, getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse } from "@/types";
 import {
-  Plus, Building2, Eye, TrendingUp, Shield, ShieldCheck,
+  Plus, Building2, Eye, EyeOff, TrendingUp, Shield, ShieldCheck,
   ChevronRight, Home, Phone, Mail, Pencil, Check, X,
   MessageCircle, Settings, LayoutDashboard, Send,
   ToggleLeft, ToggleRight, Calendar, Loader2,
@@ -1527,16 +1527,29 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
           <div className="space-y-3 mt-3">
             <div>
               <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>Current password</label>
-              <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className={inputCls} style={{ fontSize: "13px" }} />
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className={`${inputCls} pr-10`} style={{ fontSize: "13px" }} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B2D45]/30 hover:text-[#1B2D45]/55 transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>New password</label>
-              <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Min 8 characters" className={inputCls} style={{ fontSize: "13px" }} />
+              <input type={showPassword ? "text" : "password"} value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Min 8 characters" className={inputCls} style={{ fontSize: "13px" }} />
             </div>
             <div>
               <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>Confirm new password</label>
-              <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className={inputCls} style={{ fontSize: "13px" }} />
+              <input type={showPassword ? "text" : "password"} value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className={inputCls} style={{ fontSize: "13px" }} />
             </div>
+            <p className="text-[#1B2D45]/30" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+              Strong passwords usually include an uppercase letter, a number, and a symbol.
+            </p>
             {pwError && <div className="text-[#E71D36] flex items-center gap-1.5" style={{ fontSize: "12px" }}><AlertCircle className="w-3.5 h-3.5" /> {pwError}</div>}
             <div className="flex items-center gap-2">
               <button onClick={() => { setShowPassword(false); setPwError(""); setCurrentPw(""); setNewPw(""); setConfirmPw(""); }}
@@ -1730,6 +1743,7 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
 
 function LandlordDashboardContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuthStore();
   const [tab, setTab] = useState<Tab>(() => getTabFromQuery(searchParams.get("tab")));
@@ -1789,7 +1803,12 @@ function LandlordDashboardContent() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) { router.replace("/landlord/login"); return; }
+    if (!user) {
+      const query = searchParams.toString();
+      const nextTarget = `${pathname}${query ? `?${query}` : ""}`;
+      router.replace(`/landlord/login?next=${encodeURIComponent(nextTarget)}`);
+      return;
+    }
     if (user.role !== "landlord") { router.replace("/"); return; }
     const landlordUser = user;
 
@@ -1856,7 +1875,7 @@ function LandlordDashboardContent() {
     }
 
     load();
-  }, [user, authLoading, refreshConversationState, router]);
+  }, [user, authLoading, pathname, refreshConversationState, router, searchParams]);
 
   if (!user || authLoading || isLoading) {
     return (

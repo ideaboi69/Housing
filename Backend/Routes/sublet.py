@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 from typing import Optional
 from datetime import date
@@ -115,7 +115,10 @@ def get_all_sublets(
     available_until: Optional[date] = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Sublet).filter(Sublet.status == SubletStatus.ACTIVE)
+    query = db.query(Sublet).options(
+        joinedload(Sublet.images),
+        joinedload(Sublet.user),
+    ).filter(Sublet.status == SubletStatus.ACTIVE)
 
     if min_rent is not None:
         query = query.filter(Sublet.rent_per_month >= min_rent)
@@ -143,25 +146,37 @@ def get_all_sublets(
 # Get current user's sublets
 @sublet_router.get("/my/listings", response_model=list[SubletListResponse])
 def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
-    sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
+    sublets = db.query(Sublet).options(
+        joinedload(Sublet.images),
+        joinedload(Sublet.user),
+    ).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
 
     return [build_sublet_list_response(sublet) for sublet in sublets]
 
 # Get current user's draft sublet listing
 @sublet_router.get("/drafts/my", response_model=list[SubletListResponse])
 def get_my_draft_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
-    sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id, Sublet.status == SubletStatus.DRAFT).order_by(Sublet.created_at.desc()).all()
+    sublets = db.query(Sublet).options(
+        joinedload(Sublet.images),
+        joinedload(Sublet.user),
+    ).filter(Sublet.user_id == current_user.id, Sublet.status == SubletStatus.DRAFT).order_by(Sublet.created_at.desc()).all()
 
     return [build_sublet_list_response(s) for s in sublets]
 
 # Get a single sublet by ID
 @sublet_router.get("/{sublet_id}", response_model=SubletResponse)
 def get_sublet(sublet_id: int, db: Session = Depends(get_db)):
-    sublet = db.query(Sublet).filter(Sublet.id == sublet_id).first()
+    sublet = db.query(Sublet).options(
+        joinedload(Sublet.images),
+        joinedload(Sublet.user),
+    ).filter(Sublet.id == sublet_id).first()
     if not sublet:
         raise HTTPException(status_code=404, detail="Sublet not found")
 
-    sublet.view_count += 1
+    db.query(Sublet).filter(Sublet.id == sublet_id).update(
+        {Sublet.view_count: Sublet.view_count + 1},
+        synchronize_session=False,
+    )
     db.commit()
 
     return build_sublet_response(sublet)

@@ -1,6 +1,8 @@
+import { mockSubletDetails } from "@/lib/mock-sublets";
+import type { SubletListResponse } from "@/types";
+
 /* ════════════════════════════════════════════════════════
    Sublet Types, Mock Data & Helpers
-   Extracted from sublets/page.tsx for maintainability.
    ════════════════════════════════════════════════════════ */
 
 export interface SubletListing {
@@ -34,74 +36,94 @@ export interface SubletListing {
 
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export const subletListings: SubletListing[] = [
-  {
-    id: "s1", listing_id: 1001, title: "Furnished Room in 4BR House", street: "78 College Ave W",
-    coverImage: "/demo/listings/townhouse.jpg",
-    subletPrice: 550, originalPrice: 720, healthScore: 91, verified: true,
-    posterType: "4th year, Engineering", posterIsStudent: true,
-    availableMonths: [false, false, false, false, true, true, true, false, false, false, false, false], neighborhood: "Campus",
-    furnished: true, negotiablePrice: true, flexibleDates: false,
-    roommatesStaying: 2, roommateDesc: "2 upper-year science students staying for summer",
-    bedsAvailable: 1, bedsTotal: 4, distance: "0.3 km", walkTime: "4 min",
-    amenities: ["Utilities Incl.", "Laundry", "Backyard"], views: 89, saves: 14, rotation: -2.2,
-  },
-  {
-    id: "s2", listing_id: 1002, title: "Entire 2BR Apartment", street: "155 Gordon St",
-    coverImage: "/demo/listings/apartment.jpg",
-    subletPrice: 1100, originalPrice: 1400, healthScore: 86, verified: true,
-    posterType: "Property Manager", posterIsStudent: false,
-    availableMonths: [false, false, false, false, true, true, true, true, false, false, false, false], neighborhood: "Stone Road",
-    furnished: true, negotiablePrice: true, flexibleDates: false,
-    roommatesStaying: null, roommateDesc: null,
-    bedsAvailable: 2, bedsTotal: 2, distance: "1.2 km", walkTime: "14 min",
-    amenities: ["Parking", "Dishwasher", "A/C"], views: 203, saves: 31, rotation: 1.5,
-  },
-  {
-    id: "s3", listing_id: 1003, title: "Private Room near Campus", street: "42 Suffolk St W",
-    coverImage: "/demo/listings/studio.jpg",
-    subletPrice: 480, originalPrice: 680, healthScore: 68, verified: false,
-    posterType: "3rd year, Arts", posterIsStudent: true,
-    availableMonths: [false, false, false, false, true, true, true, false, false, false, false, false], neighborhood: "Campus",
-    furnished: false, negotiablePrice: false, flexibleDates: false,
-    roommatesStaying: 1, roommateDesc: "1 grad student staying for research term",
-    bedsAvailable: 1, bedsTotal: 3, distance: "0.5 km", walkTime: "6 min",
-    amenities: ["Laundry", "WiFi"], views: 47, saves: 5, rotation: -0.8,
-  },
-  {
-    id: "s4", listing_id: 1004, title: "Studio Apartment Downtown", street: "88 Macdonell St",
-    coverImage: "/demo/listings/house.jpg",
-    subletPrice: 700, originalPrice: 950, healthScore: 82, verified: true,
-    posterType: "Landlord", posterIsStudent: false,
-    availableMonths: [false, false, false, false, false, true, true, true, false, false, false, false], neighborhood: "Downtown",
-    furnished: false, negotiablePrice: false, flexibleDates: true,
-    roommatesStaying: null, roommateDesc: null,
-    bedsAvailable: 1, bedsTotal: 1, distance: "1.8 km", walkTime: "22 min",
-    amenities: ["A/C", "Gym", "Utilities Incl."], views: 134, saves: 22, rotation: 2.1,
-  },
-  {
-    id: "s5", listing_id: 1005, title: "Room in Townhouse", street: "31 Grange St",
-    coverImage: "/demo/listings/townhouse.jpg",
-    subletPrice: 450, originalPrice: 640, healthScore: 64, verified: false,
-    posterType: "2nd year, Business", posterIsStudent: true,
-    availableMonths: [false, false, false, false, true, true, false, false, false, false, false, false], neighborhood: "South End",
-    furnished: true, negotiablePrice: false, flexibleDates: true,
-    roommatesStaying: 2, roommateDesc: "2 upper-year kinesiology students staying",
-    bedsAvailable: 1, bedsTotal: 4, distance: "2.1 km", walkTime: "26 min",
-    amenities: ["Parking", "Backyard"], views: 28, saves: 3, rotation: -1.4,
-  },
-  {
-    id: "s6", listing_id: 1006, title: "Master Bedroom in 5BR House", street: "62 Dean Ave",
-    coverImage: "/demo/listings/house.jpg",
-    subletPrice: 500, originalPrice: 600, healthScore: 88, verified: true,
-    posterType: "4th year, CompSci", posterIsStudent: true,
-    availableMonths: [false, false, false, false, true, true, true, true, false, false, false, false], neighborhood: "Campus",
-    furnished: true, negotiablePrice: true, flexibleDates: true,
-    roommatesStaying: 3, roommateDesc: "3 engineering students staying for internships",
-    bedsAvailable: 1, bedsTotal: 5, distance: "0.4 km", walkTime: "5 min",
-    amenities: ["Utilities Incl.", "Laundry", "WiFi", "Backyard"], views: 156, saves: 27, rotation: 0.6,
-  },
-];
+export function isMockSubletId(id: string): boolean {
+  return /^s\d+$/i.test(id);
+}
+
+function expandMockAvailability(availableMonths: boolean[]): boolean[] {
+  const fullYear = Array.from({ length: 12 }, () => false);
+  const mockStartMonthIndex = 4; // May
+  availableMonths.forEach((available, index) => {
+    fullYear[mockStartMonthIndex + index] = available;
+  });
+  return fullYear;
+}
+
+function inferSubletOccupancy(options: {
+  bedsTotal: number;
+  roomType?: string | null;
+  entirePlace?: boolean | null;
+  privateRoom?: boolean | null;
+  roommatesStaying?: boolean | null;
+}) {
+  const { bedsTotal, roomType, entirePlace, privateRoom, roommatesStaying } = options;
+
+  if (entirePlace) {
+    return {
+      bedsAvailable: bedsTotal,
+      roommatesStaying: null as number | null,
+      roommateDesc: null as string | null,
+    };
+  }
+
+  const hasRoommatesStaying = Boolean(roommatesStaying);
+  const inferredBedsAvailable = privateRoom || roomType === "private" || hasRoommatesStaying ? 1 : bedsTotal;
+  const inferredRoommatesStaying = hasRoommatesStaying ? Math.max(0, bedsTotal - inferredBedsAvailable) : null;
+
+  return {
+    bedsAvailable: inferredBedsAvailable,
+    roommatesStaying: inferredRoommatesStaying,
+    roommateDesc:
+      inferredRoommatesStaying && inferredRoommatesStaying > 0
+        ? "Roommates staying during the sublet term"
+        : null,
+  };
+}
+
+function mapMockDetailToListing(
+  detail: (typeof mockSubletDetails)[number],
+  index: number
+): SubletListing {
+  return {
+    id: detail.id,
+    listing_id: detail.listing_id,
+    title: detail.title,
+    street: detail.street,
+    coverImage: detail.images[0] || "/demo/listings/house.jpg",
+    subletPrice: detail.subletPrice,
+    originalPrice: detail.originalPrice,
+    healthScore: detail.healthScore,
+    verified: detail.verified,
+    posterType: detail.posterType,
+    posterIsStudent: detail.posterIsStudent,
+    availableMonths: expandMockAvailability(detail.availableMonths),
+    neighborhood: detail.neighborhood,
+    furnished: detail.is_furnished,
+    negotiablePrice: detail.negotiablePrice,
+    flexibleDates: detail.flexibleDates,
+    roommatesStaying: detail.roommatesStaying,
+    roommateDesc: detail.roommateDesc,
+    bedsAvailable: detail.bedsAvailable,
+    bedsTotal: detail.bedsTotal,
+    distance: `${detail.distanceKm.toFixed(1)} km`,
+    walkTime: `${detail.walkTime} min`,
+    amenities: [
+      detail.utilities_included ? "Utilities Incl." : null,
+      detail.has_laundry ? "Laundry" : null,
+      detail.has_parking ? "Parking" : null,
+      detail.has_wifi ? "WiFi" : null,
+      detail.has_dishwasher ? "Dishwasher" : null,
+      detail.has_air_conditioning ? "A/C" : null,
+      detail.has_gym ? "Gym" : null,
+      detail.has_backyard ? "Backyard" : null,
+    ].filter(Boolean) as string[],
+    views: detail.views,
+    saves: detail.saves,
+    rotation: [-2.2, 1.5, -0.8, 2.1, -1.4, 0.6][index] ?? (index % 2 === 0 ? -1.2 : 1.2),
+  };
+}
+
+export const subletListings: SubletListing[] = mockSubletDetails.map(mapMockDetailToListing);
 
 export function getScoreLabel(score: number) {
   if (score >= 85) return "Great Match";
@@ -165,6 +187,13 @@ export function mapApiSubletToListing(sublet: SubletListResponse): SubletListing
   const walkTime = Number(sublet.walk_time_minutes ?? 0);
   const bedsTotal = Number(sublet.total_rooms ?? 1);
   const terms = sublet.terms;
+  const occupancy = inferSubletOccupancy({
+    bedsTotal,
+    roomType: sublet.room_type,
+    entirePlace: terms?.entire_place,
+    privateRoom: terms?.private_room,
+    roommatesStaying: terms?.roommates_staying,
+  });
 
   const amenities = [
     sublet.is_furnished ? "Furnished" : null,
@@ -208,9 +237,9 @@ export function mapApiSubletToListing(sublet: SubletListResponse): SubletListing
     furnished: Boolean(sublet.is_furnished),
     negotiablePrice: Boolean(terms?.negotiable_price),
     flexibleDates: Boolean(terms?.flexible_dates),
-    roommatesStaying: terms?.roommates_staying ? Math.max(0, bedsTotal - 1) : null,
-    roommateDesc: terms?.roommates_staying ? "Roommates staying during the sublet term" : null,
-    bedsAvailable: terms?.entire_place ? bedsTotal : 1,
+    roommatesStaying: occupancy.roommatesStaying,
+    roommateDesc: occupancy.roommateDesc,
+    bedsAvailable: occupancy.bedsAvailable,
     bedsTotal,
     distance: `${distance.toFixed(1)} km`,
     walkTime: `${walkTime} min`,
@@ -220,4 +249,3 @@ export function mapApiSubletToListing(sublet: SubletListResponse): SubletListing
     rotation: Number(sublet.id) % 2 === 0 ? 1.2 : -1.2,
   };
 }
-import type { SubletListResponse } from "@/types";
