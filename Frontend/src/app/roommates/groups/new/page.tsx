@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -66,7 +66,7 @@ const GROUP_SHOWCASE = [
   },
 ] as const;
 
-export default function CreateGroupPage() {
+function CreateGroupContent() {
   const { user } = useAuthStore();
   const searchParams = useSearchParams();
 
@@ -873,5 +873,12 @@ export default function CreateGroupPage() {
         </div>
       </div>
     </div>
+  );
+}
+export default function CreateGroupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAF8F4]" />}>
+      <CreateGroupContent />
+    </Suspense>
   );
 }
