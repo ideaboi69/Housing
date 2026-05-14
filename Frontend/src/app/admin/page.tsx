@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, use, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard, Users, Building2, Home, Flag, PenLine, FileText,
@@ -834,7 +834,7 @@ function MarketplaceTab({ items, onRefresh }: { items: MarketplaceItemListRespon
    Main Dashboard Page
    ════════════════════════════════════════════════════════ */
 
-export default function AdminDashboard() {
+function AdminContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>(() => getTabFromQuery(searchParams.get("tab")));
@@ -998,5 +998,12 @@ export default function AdminDashboard() {
         </AnimatePresence>
       </main>
     </div>
+  );
+}
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAF8F4]" />}>
+      <AdminContent />
+    </Suspense>
   );
 }
