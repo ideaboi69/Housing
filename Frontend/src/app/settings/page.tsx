@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   User, Lock, Bell, Users, Shield, ChevronRight,
@@ -828,7 +828,7 @@ function AccountTab() {
    MAIN SETTINGS PAGE
    ═══════════════════════════════════════════════════════ */
 
-export default function SettingsPage() {
+function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const getTabFromQuery = (value: string | null): SettingsTab => {
@@ -931,5 +931,13 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAF8F4]" />}>
+      <SettingsContent />
+    </Suspense>
   );
 }

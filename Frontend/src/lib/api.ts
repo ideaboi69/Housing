@@ -1066,7 +1066,7 @@ export const marketplace = {
 
   // Conversations
   startConversation: (data: { item_id: number; content: string }) =>
-    request<MarketplaceMessageResponse>("/api/marketplace/conversations/start", {
+    request<MarketplaceMessageResponse>("/api/marketplace/conversations", {
       method: "POST",
       body: JSON.stringify(data),
     }),
