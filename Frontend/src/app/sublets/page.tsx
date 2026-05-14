@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
 import {
   Heart, Check, ChevronRight, X, ArrowRight, ChevronDown, Plus,
   Sparkles, ExternalLink, Minus, MapPin, DollarSign, Clock, ShieldCheck,
@@ -1907,7 +1907,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
    Main Page
    ════════════════════════════════════════════════════════ */
 
-export default function SubletsPage() {
+function SubletsContent() {
   const isMobile = useIsMobile();
   const user = useAuthStore((s) => s.user);
   const searchParams = useSearchParams();
@@ -2208,5 +2208,12 @@ export default function SubletsPage() {
         listings={pinnedListings}
       />
     </div>
+  );
+}
+export default function SubletsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FAF8F4]" />}>
+      <SubletsContent />
+    </Suspense>
   );
 }
