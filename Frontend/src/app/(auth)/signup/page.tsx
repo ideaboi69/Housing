@@ -3,7 +3,6 @@
 import { AuthBackground } from "@/components/ui/AuthBackground";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { AuthBackLink } from "@/components/ui/AuthBackLink";
@@ -67,8 +66,7 @@ function PasswordChecklist({ password }: { password: string }) {
 }
 
 export default function SignupPage() {
-  const router = useRouter();
-  const { register, isLoading, error, clearError } = useAuthStore();
+  const { user, register, isLoading, error, clearError } = useAuthStore();
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -101,12 +99,8 @@ export default function SignupPage() {
     if (!allPasswordRulesPassed) return;
 
     try {
-      const res = await register(form);
-      if (res && typeof res === "object" && "access_token" in res) {
-        router.push("/browse");
-      } else {
-        setShowVerification(true);
-      }
+      await register(form);
+      setShowVerification(true);
     } catch {
       // Error handled by store
     }
@@ -380,7 +374,7 @@ export default function SignupPage() {
                           What happens next
                         </div>
                         <p className="mt-1 text-[#1B2D45]/45" style={{ fontSize: "11px", lineHeight: 1.55 }}>
-                          After verifying, you can log in and start saving listings, comparing picks, and browsing the rest of the platform.
+                          After verifying, you can finish your student profile and start saving listings, comparing picks, and browsing the rest of the platform.
                         </p>
                       </div>
                     </div>
@@ -388,11 +382,11 @@ export default function SignupPage() {
 
                   <div className="mt-6 space-y-3">
                     <Link
-                      href="/login"
+                      href={user ? "/onboarding/complete-profile" : "/login"}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF6B35] py-3.5 text-white hover:bg-[#e55e2e] transition-all"
                       style={{ fontSize: "14px", fontWeight: 800, boxShadow: "0 10px 28px rgba(255,107,53,0.28)" }}
                     >
-                      I&apos;ve verified
+                      {user ? "Continue" : "I've verified"}
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                     <button

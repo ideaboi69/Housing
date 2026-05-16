@@ -202,6 +202,26 @@ export const auth = {
       body: JSON.stringify(data),
     }),
 
+  verifyEmail: (token: string) =>
+    request<TokenResponse | { message: string }>(
+      `/api/users/verify-email?token=${encodeURIComponent(token)}`
+    ),
+
+  resendVerification: async (email: string) => {
+    const res = await fetch(`${API_URL}/api/users/resend-verification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ email }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Request failed" }));
+      throw new ApiError(res.status, body.detail || "Request failed");
+    }
+
+    return res.json() as Promise<{ message: string }>;
+  },
+
   getMe: () => request<UserResponse>("/api/users/me"),
 
   getDashboard: () => request<UserDashboardResponse>("/api/users/me/dashboard"),

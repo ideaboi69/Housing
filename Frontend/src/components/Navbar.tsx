@@ -62,7 +62,7 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { user, logout } = useAuthStore();
+  const { user, logout, loadUser } = useAuthStore();
   const {
     writer,
     writerToken,
@@ -71,10 +71,22 @@ export function Navbar() {
   } = useWriterStore();
   const [unreadCount, setUnreadCount] = useState(0);
   const [myGroupHref, setMyGroupHref] = useState<string>("/roommates");
+  const [authHydrated, setAuthHydrated] = useState(false);
 
   useEffect(() => {
-    loadWriter();
-  }, [loadWriter]);
+    let cancelled = false;
+
+    Promise.all([
+      loadUser(),
+      Promise.resolve(loadWriter()),
+    ]).finally(() => {
+      if (!cancelled) setAuthHydrated(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadUser, loadWriter]);
 
   const writerSessionActive = !user && Boolean(writerToken && writer);
   const displayUser = user ?? (writerSessionActive
@@ -144,12 +156,38 @@ export function Navbar() {
   }, [pathname]);
 
   // Hide navbar on auth pages and admin — must be after all hooks
-  const hideNavPaths = ["/login", "/signup", "/forgot-password", "/reset-password", "/landlord/login", "/landlord/signup", "/landlord/onboarding", "/writers/login", "/writers/signup", "/admin"];
+  const hideNavPaths = [
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+    "/verify-email",
+    "/onboarding",
+    "/landlord/login",
+    "/landlord/signup",
+    "/landlord/onboarding",
+    "/writers/login",
+    "/writers/signup",
+    "/admin",
+  ];
   if (hideNavPaths.some((p) => pathname.startsWith(p))) {
     return null;
   }
 
   // Minimal navbar on landing page — just logo + auth buttons
+  if (pathname === "/" && !authHydrated) {
+    return (
+      <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
+        <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[64px] md:h-[72px]">
+          <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.04em" }}>
+            cribb
+          </Link>
+          <div className="h-10 w-24 rounded-xl bg-[#1B2D45]/[0.04]" />
+        </div>
+      </nav>
+    );
+  }
+
   if (pathname === "/" && !displayUser) {
     return (
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
@@ -254,7 +292,9 @@ export function Navbar() {
 
         {/* Right side – desktop */}
         <div className="hidden md:flex items-center gap-2">
-          {displayUser ? (
+          {!authHydrated ? (
+            <div className="h-9 w-28 rounded-xl bg-[#1B2D45]/[0.04]" />
+          ) : displayUser ? (
             <>
               {/* Message icon */}
               {!writerSessionActive && (
@@ -477,7 +517,9 @@ export function Navbar() {
 
             {/* Auth actions */}
             <div className="flex items-center gap-2 pt-3 pb-1 px-2 border-t border-black/5 mt-2">
-              {displayUser ? (
+              {!authHydrated ? (
+                <div className="h-10 w-full rounded-xl bg-[#1B2D45]/[0.04]" />
+              ) : displayUser ? (
                 <button
                   onClick={() => {
                     if (writerSessionActive) {

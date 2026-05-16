@@ -131,6 +131,15 @@ function ProfileTab() {
 
   const profilePhotoUrl = user?.profile_photo_url || null;
 
+  useEffect(() => {
+    if (!user) return;
+    setFirstName(user.first_name || "");
+    setLastName(user.last_name || "");
+    setProgram(user.program || "");
+    setYear(user.year || "");
+    setBio(user.bio || "");
+  }, [user]);
+
   const handleSave = async () => {
     setSaving(true);
     try {

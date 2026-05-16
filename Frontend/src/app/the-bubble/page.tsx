@@ -772,7 +772,7 @@ function HeroSection({ isWriter, writerPending, canContribute, onApply, isMobile
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onApply}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#1B2D45] text-white"
                 style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 4px 16px rgba(27,45,69,0.22)" }}>
-                <Pencil className="w-4 h-4" /> Open Writer Dashboard
+                <Pencil className="w-4 h-4" /> Create Post
               </motion.button>
             ) : (
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={onApply}
@@ -943,7 +943,7 @@ export default function TheBubblePage() {
 
   const handleWriterAction = useCallback(() => {
     if (isWriter) {
-      router.push("/writer");
+      setShowPostModal(true);
       return;
     }
     if (user?.role === "student") {
@@ -1067,7 +1067,7 @@ export default function TheBubblePage() {
           whileHover={{ scale: 1.02 }}
           className="bg-white rounded-2xl border border-[#FF6B35]/15 overflow-hidden cursor-pointer"
           style={{ boxShadow: "0 2px 12px rgba(255,107,53,0.08)", background: "linear-gradient(135deg, #FFFAF7 0%, #FFFFFF 100%)" }}
-          onClick={() => router.push("/writer")}
+          onClick={() => setShowPostModal(true)}
         >
           <div className={compact ? "p-4" : "p-5"}>
             <div className="flex items-center gap-3">
@@ -1079,9 +1079,9 @@ export default function TheBubblePage() {
                 <Pencil className="w-5 h-5 text-[#FF6B35]" />
               </motion.div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "14px", fontWeight: 700 }}>Open writer dashboard</h4>
+                <h4 className="text-[#1B2D45]" style={{ fontSize: compact ? "12px" : "14px", fontWeight: 700 }}>Create a Bubble post</h4>
                 <p className="text-[#5C6B7A]" style={{ fontSize: compact ? "10px" : "11px", lineHeight: 1.4 }}>
-                  Open your writer dashboard to publish posts and manage Bubble content
+                  Publish with your approved student writer access
                 </p>
               </div>
               <motion.div animate={{ x: [0, 3, 0] }} transition={{ duration: 1.5, repeat: Infinity }} className="shrink-0">
