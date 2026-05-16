@@ -150,7 +150,6 @@ class SubletResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class SubletListResponse(BaseModel):
     id: int
     title: str
@@ -181,5 +180,53 @@ class SubletListResponse(BaseModel):
     terms: SubletTerms
     created_at: datetime
 
+    class Config:
+        from_attributes = True
+
+class SubletMessageCreate(BaseModel):
+    content: str
+ 
+class StartSubletConversation(BaseModel):
+    sublet_id: int
+    content: str
+ 
+# Sublet Messages
+class SubletMessageResponse(BaseModel):
+    id: int
+    conversation_id: int
+    sender_id: int
+    content: str
+    is_read: bool
+    created_at: datetime
+ 
+    class Config:
+        from_attributes = True
+ 
+class SubletConversationResponse(BaseModel):
+    id: int
+    sublet_id: int
+    sublet_title: str
+    poster_id: int
+    poster_name: str
+    inquirer_id: int
+    inquirer_name: str
+    last_message: Optional[SubletMessageResponse] = None
+    unread_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+ 
+    class Config:
+        from_attributes = True
+ 
+class SubletConversationDetailResponse(BaseModel):
+    id: int
+    sublet_id: int
+    sublet_title: str
+    poster_id: int
+    poster_name: str
+    inquirer_id: int
+    inquirer_name: str
+    messages: list[SubletMessageResponse]
+ 
     class Config:
         from_attributes = True

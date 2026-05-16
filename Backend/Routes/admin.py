@@ -399,6 +399,10 @@ def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(requ
             target_path = f"/browse/{f.listing_id}"
         elif f.review_id:
             flag_type = "review"
+            if f.review:
+                listing = db.query(Listing).filter(Listing.property_id == f.review.property_id).first()
+                if listing:
+                    target_path = f"/browse/{listing.id}"
         elif f.marketplace_item_id:
             flag_type = "marketplace_item"
             target_path = f"/marketplace/{f.marketplace_item_id}"

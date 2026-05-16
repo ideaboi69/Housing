@@ -386,7 +386,8 @@ class Sublet(Base):
     viewing_availabilities = relationship("ViewingAvailability", back_populates="sublet", cascade="all, delete-orphan")
     viewing_slots = relationship("ViewingSlot", back_populates="sublet", cascade="all, delete-orphan")
     viewing_bookings = relationship("ViewingBooking", back_populates="sublet", cascade="all, delete-orphan")
-
+    conversations = relationship("SubletConversation", back_populates="sublet", cascade="all, delete-orphan")
+    
     @property
     def posted_by(self):
         if self.user:
@@ -571,6 +572,38 @@ class MarketplaceMessage(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     conversation = relationship("MarketplaceConversation", back_populates="messages")
+    sender = relationship("User")
+
+class SubletConversation(Base):
+    __tablename__ = "sublet_conversations"
+
+    id = Column(Integer, primary_key=True)
+    sublet_id = Column(Integer, ForeignKey("sublets.id", ondelete="CASCADE"), nullable=False)
+    poster_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    inquirer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    sublet = relationship("Sublet", back_populates="conversations")
+    poster = relationship("User", foreign_keys=[poster_id])
+    inquirer = relationship("User", foreign_keys=[inquirer_id])
+    messages = relationship("SubletMessage", back_populates="conversation", order_by="SubletMessage.created_at", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("sublet_id", "inquirer_id", name="uq_sublet_conversation"),
+    )
+
+class SubletMessage(Base):
+    __tablename__ = "sublet_messages"
+
+    id = Column(Integer, primary_key=True)
+    conversation_id = Column(Integer, ForeignKey("sublet_conversations.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    content = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    conversation = relationship("SubletConversation", back_populates="messages")
     sender = relationship("User")
 
 class UserHousingPreferences(Base):
@@ -780,7 +813,6 @@ class ViewingAvailability(Base):
         UniqueConstraint("sublet_id", "date", name="uq_viewing_availability_sublet_date"),
     )
 
-
 class ViewingSlot(Base):
     """Individual 1hr slot generated from availability."""
     __tablename__ = "viewing_slots"
@@ -804,7 +836,6 @@ class ViewingSlot(Base):
         Index("ix_viewing_slots_listing_date", "listing_id", "date"),
         Index("ix_viewing_slots_status", "status"),
     )
-
 
 class ViewingBooking(Base):
     """Student books a specific slot."""

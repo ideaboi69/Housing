@@ -7,6 +7,7 @@ from Schemas.marketplaceSchema import *
 from Utils.security import get_current_student
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.email import send_message_notification
+from Utils.websocket import connection_manager
 
 marketplace_router = APIRouter()
 
@@ -232,7 +233,7 @@ def delete_item(item_id: int, db: Session = Depends(get_db), current_user: User 
 # MESSAGES
 # ──────────────────────────────────────────────
 # Start conversation
-@marketplace_router.post("/conversations", response_model=MarketplaceMessageResponse, status_code=status.HTTP_201_CREATED)
+@marketplace_router.post("/conversations/start", response_model=MarketplaceMessageResponse, status_code=status.HTTP_201_CREATED)
 def start_marketplace_conversation(payload: StartMarketplaceConversation, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     item = db.query(MarketplaceItem).filter(MarketplaceItem.id == payload.item_id).first()
     if not item:
@@ -277,7 +278,15 @@ def start_marketplace_conversation(payload: StartMarketplaceConversation, backgr
         sender_name=f"{current_user.first_name} {current_user.last_name}",
         message_preview=payload.content,
         conversation_id=conversation.id,
-        listing_title=item.title,
+        property_title=item.title,
+    )
+
+    # Notify the seller in real time
+    background_tasks.add_task(
+        connection_manager.send_to_user,
+        "student",
+        item.seller_id,
+        {"type": "new_message", "conversation_id": conversation.id, "scope": "marketplace"},
     )
 
     return MarketplaceMessageResponse.model_validate(message)
@@ -315,7 +324,15 @@ def send_marketplace_message(conversation_id: int, payload: MarketplaceMessageCr
         sender_name=f"{current_user.first_name} {current_user.last_name}",
         message_preview=payload.content,
         conversation_id=conversation.id,
-        listing_title=item.title,
+        property_title=item.title,
+    )
+
+    # Notify the other party in real time
+    background_tasks.add_task(
+        connection_manager.send_to_user,
+        "student",
+        other_user_id,
+        {"type": "new_message", "conversation_id": conversation.id, "scope": "marketplace"},
     )
 
     return MarketplaceMessageResponse.model_validate(message)

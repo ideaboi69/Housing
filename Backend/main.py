@@ -25,6 +25,8 @@ from Routes.ai import ai_router
 from dataclasses import dataclass
 from apscheduler.schedulers.background import BackgroundScheduler
 from Utils.scheduler import send_viewing_reminders
+from Utils.websocket import connection_manager
+from Utils.security import decode_access_token
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from Utils.rate_limit import limiter 
@@ -88,6 +90,28 @@ app.include_router(roommate_router, prefix="/api/roommates", tags=["Roommates"])
 app.include_router(viewing_router, prefix="/api/viewings", tags=["Viewings"])
 app.include_router(landlord_invite_router, prefix="/api/roommates", tags=["Landlord Invites"])
 app.include_router(ai_router, prefix="/api/ai", tags=["AI"])
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    try:
+        payload = decode_access_token(token)
+    except Exception:
+        await websocket.close(code=1008)
+        return
+ 
+    user_id = payload.get("user_id")
+    role = payload.get("role")
+    if not user_id or not role:
+        await websocket.close(code=1008)
+        return
+ 
+    await connection_manager.connect(websocket, role, user_id)
+    try:
+        while True:
+            # We don't process incoming WS messages from clients; this just keeps the socket open
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        connection_manager.disconnect(websocket, role, user_id)
 
 # Email scheduler
 scheduler = BackgroundScheduler()

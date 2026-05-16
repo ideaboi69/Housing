@@ -7,6 +7,7 @@ from Schemas.convoSchema import ConversationDetailResponse, StartConversation, M
 from Utils.security import get_current_user, get_current_student
 from helpers import require_landlord
 from Utils.email import send_message_notification
+from Utils.websocket import connection_manager
 
 message_router = APIRouter()
 
@@ -66,7 +67,15 @@ def start_conversation(payload: StartConversation, background_tasks: BackgroundT
         sender_name=f"{current_user.first_name} {current_user.last_name}",
         message_preview=payload.content,
         conversation_id=conversation.id,
-        listing_title=property.title,
+        property_title=property.title,
+    )
+
+    # Push real-time notification to the landlord (frontend will refetch)
+    background_tasks.add_task(
+        connection_manager.send_to_user,
+        "landlord",
+        landlord.id,
+        {"type": "new_message", "conversation_id": conversation.id, "scope": "listing"},
     )
 
     return conversation
@@ -108,9 +117,16 @@ def send_message( conversation_id: int, payload: MessageCreate, background_tasks
             to_email=landlord.email,
             recipient_name=landlord.first_name,
             sender_name=f"{current_user.first_name} {current_user.last_name}",
-            message_content=payload.content,
-            listing_title=property.title,
+            message_preview=payload.content,
+            property_title=property.title,
             conversation_id=conversation.id,
+        )
+        # Notify landlord in real time
+        background_tasks.add_task(
+            connection_manager.send_to_user,
+            "landlord",
+            conversation.landlord_id,
+            {"type": "new_message", "conversation_id": conversation.id, "scope": "listing"},
         )
     else:
         user = db.query(User).filter(User.id == conversation.user_id).first()
@@ -119,9 +135,16 @@ def send_message( conversation_id: int, payload: MessageCreate, background_tasks
             to_email=user.email,
             recipient_name=user.first_name,
             sender_name=f"{current_user.first_name} {current_user.last_name}",
-            message_content=payload.content,
-            listing_title=property.title,
+            message_preview=payload.content,
+            property_title=property.title,
             conversation_id=conversation.id,
+        )
+        # Notify student in real time
+        background_tasks.add_task(
+            connection_manager.send_to_user,
+            "student",
+            conversation.user_id,
+            {"type": "new_message", "conversation_id": conversation.id, "scope": "listing"},
         )
 
     return message
@@ -156,7 +179,15 @@ def landlord_reply(conversation_id: int, payload: MessageCreate, background_task
         sender_name=f"{landlord.first_name} {landlord.last_name}",
         message_preview=payload.content,
         conversation_id=conversation.id,
-        listing_title=property.title,
+        property_title=property.title,
+    )
+
+    # Notify student in real time
+    background_tasks.add_task(
+        connection_manager.send_to_user,
+        "student",
+        conversation.user_id,
+        {"type": "new_message", "conversation_id": conversation.id, "scope": "listing"},
     )
 
     return message

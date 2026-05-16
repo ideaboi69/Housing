@@ -1,13 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, BackgroundTasks, File, Query
-from sqlalchemy.orm import Session, joinedload
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, BackgroundTasks
+from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from typing import Optional
 from datetime import date
-from tables import Sublet, SubletImage,SubletConversation, SubletMessage, User, get_db
-from Schemas.subletSchema import *
+from tables import Sublet, SubletImage, SubletConversation, SubletMessage, User, get_db
+from Schemas.subletSchema import (
+    SubletCreate, SubletUpdate, SubletResponse, SubletListResponse, SubletImageResponse, SubletStatus, RoomType,
+    SubletMessageCreate, StartSubletConversation, SubletMessageResponse, SubletConversationResponse, SubletConversationDetailResponse,
+)
 from Schemas.listingSchema import GenderPreference
-from Utils.security import get_current_student
-from helpers import build_sublet_list_response, build_sublet_response
+from Utils.security import get_current_user, get_current_student
+from helpers import build_sublet_list_response, build_sublet_response, upload_to_s3
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.email import send_message_notification
 from Utils.websocket import connection_manager
@@ -57,7 +60,6 @@ def create_sublet(payload: SubletCreate, db: Session = Depends(get_db), current_
         sublet_end_date=payload.sublet_end_date,
         move_in_date=payload.move_in_date,
         gender_preference=payload.gender_preference,
-        status=SubletStatus.ACTIVE,
         description=payload.description,
     )
     db.add(sublet)
@@ -118,10 +120,7 @@ def get_all_sublets(
     available_until: Optional[date] = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Sublet).options(
-        joinedload(Sublet.images),
-        joinedload(Sublet.user),
-    ).filter(Sublet.status == SubletStatus.ACTIVE)
+    query = db.query(Sublet).filter(Sublet.status == SubletStatus.ACTIVE)
 
     if min_rent is not None:
         query = query.filter(Sublet.rent_per_month >= min_rent)
@@ -149,20 +148,14 @@ def get_all_sublets(
 # Get current user's sublets
 @sublet_router.get("/my/listings", response_model=list[SubletListResponse])
 def get_my_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
-    sublets = db.query(Sublet).options(
-        joinedload(Sublet.images),
-        joinedload(Sublet.user),
-    ).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
+    sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id).order_by(Sublet.created_at.desc()).all()
 
     return [build_sublet_list_response(sublet) for sublet in sublets]
 
 # Get current user's draft sublet listing
 @sublet_router.get("/drafts/my", response_model=list[SubletListResponse])
 def get_my_draft_sublets(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
-    sublets = db.query(Sublet).options(
-        joinedload(Sublet.images),
-        joinedload(Sublet.user),
-    ).filter(Sublet.user_id == current_user.id, Sublet.status == SubletStatus.DRAFT).order_by(Sublet.created_at.desc()).all()
+    sublets = db.query(Sublet).filter(Sublet.user_id == current_user.id, Sublet.status == SubletStatus.DRAFT).order_by(Sublet.created_at.desc()).all()
 
     return [build_sublet_list_response(s) for s in sublets]
 
@@ -369,17 +362,11 @@ def get_sublet_unread_count(db: Session = Depends(get_db), current_user: User = 
 # Get a single sublet by ID
 @sublet_router.get("/{sublet_id}", response_model=SubletResponse)
 def get_sublet(sublet_id: int, db: Session = Depends(get_db)):
-    sublet = db.query(Sublet).options(
-        joinedload(Sublet.images),
-        joinedload(Sublet.user),
-    ).filter(Sublet.id == sublet_id).first()
+    sublet = db.query(Sublet).filter(Sublet.id == sublet_id).first()
     if not sublet:
         raise HTTPException(status_code=404, detail="Sublet not found")
 
-    db.query(Sublet).filter(Sublet.id == sublet_id).update(
-        {Sublet.view_count: Sublet.view_count + 1},
-        synchronize_session=False,
-    )
+    sublet.view_count += 1
     db.commit()
 
     return build_sublet_response(sublet)

@@ -4,11 +4,7 @@ from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, ViewingAvailability, ViewingBooking
 from dotenv import load_dotenv
 from sqlalchemy import text, func as sql_func
-from tables import get_db, User, Landlord, Property, Review, LandlordDocuments, Admin, Writer, Conversation, Message, RoommateProfile, RoommateGroup, Post, Sublet
-from tables import MarketplaceItem, MarketplaceImage, MarketplaceConversation, MarketplaceMessage
-from tables import SubletImage, ViewingSlot, ViewingBooking, ViewingAvailability
-from tables import RoommateGroupMember, RoommateInvite, RoommateRequest
-from tables import UserHousingPreferences, NotificationPreferences
+from tables import *
 from Schemas.userSchema import UserRole
 from Schemas.landlordSchema import LandlordVerification
 from Utils.security import get_current_user, decode_access_token
@@ -185,9 +181,13 @@ def cascade_delete_user(user: User, db: Session):
         db.query(MarketplaceMessage).filter(MarketplaceMessage.conversation_id.in_(buyer_convo_ids)).delete(synchronize_session=False)
         db.query(MarketplaceConversation).filter(MarketplaceConversation.buyer_id == user_id).delete(synchronize_session=False)
 
-    # 2. Sublets: viewing bookings → viewing slots → viewing availabilities → images → sublets
+    # 2. Sublets: conversations + messages → viewing bookings → viewing slots → viewing availabilities → images → sublets
     sublet_ids = [s.id for s in db.query(Sublet.id).filter(Sublet.user_id == user_id).all()]
     if sublet_ids:
+        sublet_convo_ids = [c.id for c in db.query(SubletConversation.id).filter(SubletConversation.sublet_id.in_(sublet_ids)).all()]
+        if sublet_convo_ids:
+            db.query(SubletMessage).filter(SubletMessage.conversation_id.in_(sublet_convo_ids)).delete(synchronize_session=False)
+        db.query(SubletConversation).filter(SubletConversation.sublet_id.in_(sublet_ids)).delete(synchronize_session=False)
         db.query(ViewingBooking).filter(ViewingBooking.sublet_id.in_(sublet_ids)).delete(synchronize_session=False)
         slot_ids = [s.id for s in db.query(ViewingSlot.id).filter(ViewingSlot.sublet_id.in_(sublet_ids)).all()]
         if slot_ids:
@@ -197,6 +197,11 @@ def cascade_delete_user(user: User, db: Session):
         db.query(SubletImage).filter(SubletImage.sublet_id.in_(sublet_ids)).delete(synchronize_session=False)
         db.query(Sublet).filter(Sublet.user_id == user_id).delete(synchronize_session=False)
 
+    # Also clean up sublet conversations where user is the inquirer (on someone else's sublet)
+    inquirer_convo_ids = [c.id for c in db.query(SubletConversation.id).filter(SubletConversation.inquirer_id == user_id).all()]
+    if inquirer_convo_ids:
+        db.query(SubletMessage).filter(SubletMessage.conversation_id.in_(inquirer_convo_ids)).delete(synchronize_session=False)
+        db.query(SubletConversation).filter(SubletConversation.inquirer_id == user_id).delete(synchronize_session=False)
     # 3. Posts: set user_id to NULL (posts use ondelete="SET NULL")
     db.query(Post).filter(Post.user_id == user_id).update({"user_id": None}, synchronize_session=False)
 
