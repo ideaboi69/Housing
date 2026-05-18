@@ -53,8 +53,61 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
   const [viewerDashboard, setViewerDashboard] = useState<{ is_in_group: boolean; group_id: number | null; group_name: string | null } | null>(null);
 
   useEffect(() => {
-    // TODO: GET /api/groups/join/{code}
-    setGroup(getRoommateGroupByInviteCode(code) ?? null);
+    let cancelled = false;
+    async function load() {
+      try {
+        const preview = await api.roommates.getGroupByCode(code);
+        if (cancelled) return;
+        // Map the API response into the existing RoommateGroup shape the page expects
+        const mapped: RoommateGroup = {
+          id: String(preview.id),
+          name: preview.name,
+          createdBy: "",
+          members: preview.members.map((m) => ({
+            id: String(m.user_id),
+            firstName: m.first_name,
+            initial: m.last_initial,
+            year: "",
+            program: "",
+            budget: [0, 0],
+            moveIn: "",
+            leaseLength: "",
+            bio: "",
+            tags: {},
+            avatar: m.profile_photo_url || undefined,
+          })),
+          groupSize: preview.total_capacity,
+          spotsNeeded: preview.spots_remaining,
+          budgetMin: Number(preview.rent_per_person) || 0,
+          budgetMax: Number(preview.rent_per_person) || 0,
+          preferredArea: null,
+          targetListingId: null,
+          targetListingTitle: null,
+          description: preview.description || "",
+          inviteCode: code,
+          isVisible: true,
+          genderPreference: preview.gender_preference || null,
+          moveIn: preview.move_in_timing || "",
+          createdAt: preview.created_at,
+          housing: preview.has_place
+            ? {
+                status: preview.is_verified ? "linked" : "pending",
+                selfReportedAddress: preview.address || undefined,
+                selfReportedRent: Number(preview.rent_per_person) || undefined,
+                selfReportedUtilitiesIncluded: preview.utilities_included,
+              }
+            : undefined,
+          groupImage: preview.group_photo_url || undefined,
+        };
+        setGroup(mapped);
+      } catch {
+        if (!cancelled) setGroup(null);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [code]);
 
   useEffect(() => {
@@ -167,10 +220,7 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
     setSending(true);
     setRequestError("");
     try {
-      const numId = parseInt(group.id, 10);
-      if (!isNaN(numId)) {
-        await api.roommates.sendRequest({ group_id: numId, message: requestMessage || undefined });
-      }
+      await api.roommates.requestJoinByCode(code, requestMessage || undefined);
       setExistingRequestStatus("pending");
       setSent(true);
     } catch (err) {

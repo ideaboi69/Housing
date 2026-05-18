@@ -56,6 +56,8 @@ import type {
   InviteResponse,
   RoommateRequestCreate,
   RoommateRequestResponse,
+  GroupPreviewByCodeResponse,
+  LandlordInviteResponse,
   // Viewings
   ViewingAvailabilityResponse,
   ViewingAvailabilityCreate,
@@ -77,6 +79,8 @@ import type {
   MarketplaceConversationResponse,
   MarketplaceConversationDetailResponse,
   MarketplaceMessageResponse,
+  //landlord-invite
+  LandlordInvitePreview,
 } from "@/types";
 
 // ── Base ────────────────────────────────────────────────
@@ -800,6 +804,23 @@ export const roommates = {
   getGroup: (groupId: number) =>
     request<GroupDetailResponse>(`/api/roommates/groups/${groupId}`),
 
+  getLandlordInvite: (groupId: number) =>
+    request<LandlordInviteResponse>(`/api/roommates/groups/${groupId}/landlord-invite`),
+
+  getGroupByCode: (code: string) =>
+    request<GroupPreviewByCodeResponse>(`/api/roommates/groups/by-code/${code}`),
+
+  requestJoinByCode: (code: string, message?: string) =>
+    request<RoommateRequestResponse>(`/api/roommates/groups/by-code/${code}/request`, {
+      method: "POST",
+      body: JSON.stringify({ message: message || null }),
+    }),
+
+  // Rotate the invite code (owner only)
+  rotateInviteCode: (groupId: number) =>
+    request<GroupDetailResponse>(`/api/roommates/groups/${groupId}/rotate-invite-code`, {
+      method: "POST",
+    }),
   uploadGroupPhoto: async (groupId: number, file: File) => {
     const token = getToken();
     const formData = new FormData();
@@ -1107,6 +1128,18 @@ export const marketplace = {
     request<{ unread_count: number }>("/api/marketplace/unread-count"),
 };
 
+// Landlord Invites
+export const landlordInvites = {
+  preview: (token: string) =>
+    request<LandlordInvitePreview>(`/api/roommates/landlord-invites/${token}`),
+
+  claim: (token: string) =>
+    request<{ message: string; property_id: number; listing_id: number; group_id: number }>(
+      `/api/roommates/landlord-invites/${token}/claim`,
+      { method: "POST" }
+    ),
+};
+
 // ── Export all as a single API object ───────────────────
 
 export const api = {
@@ -1126,6 +1159,7 @@ export const api = {
   viewings,
   admin,
   marketplace,
+  landlordInvites,
 };
 
 export { ApiError };

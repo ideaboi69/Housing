@@ -123,6 +123,10 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
   const [editGroupImage, setEditGroupImage] = useState<string | null>(null);
   const [editGroupFile, setEditGroupFile] = useState<File | null>(null);
   const [pendingGroupPhotoFile, setPendingGroupPhotoFile] = useState<File | null>(null);
+  const [editAddress, setEditAddress] = useState("");
+  const [editHasPlace, setEditHasPlace] = useState(false);
+  const [editRent, setEditRent] = useState("");
+  const [editUtilities, setEditUtilities] = useState(false);
 
   useEffect(() => {
     async function fetchGroup() {
@@ -131,6 +135,15 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
         try {
           const apiGroup = await api.roommates.getGroup(numId);
           setOwnerUserId(apiGroup.owner_id);
+
+          // Fetch the landlord invite (if one exists) for this group
+          let landlordInviteUrl: string | undefined;
+          try {
+            const invite = await api.roommates.getLandlordInvite(apiGroup.id);
+            landlordInviteUrl = `${window.location.origin}/landlord/claim/${invite.token}`;
+          } catch {
+            // No invite yet — fine, it'll show the helpful message
+          }
           setGroup({
             id: String(apiGroup.id),
             name: apiGroup.name,
@@ -156,7 +169,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
             targetListingId: null,
             targetListingTitle: null,
             description: apiGroup.description || "",
-            inviteCode: "",
+            inviteCode: apiGroup.invite_code || "",
             isVisible: apiGroup.is_visible,
             genderPreference: apiGroup.gender_preference || null,
             moveIn: apiGroup.move_in_timing || "",
@@ -166,6 +179,7 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
               selfReportedAddress: apiGroup.address || undefined,
               selfReportedRent: Number(apiGroup.rent_per_person) || undefined,
               selfReportedUtilitiesIncluded: apiGroup.utilities_included,
+              landlordInviteUrl,
             } : undefined,
             groupImage: apiGroup.group_photo_url || undefined,
           } as RoommateGroup);
@@ -178,12 +192,16 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
   }, [id]);
 
   useEffect(() => {
-    if (!group) return;
-    setEditName(group.name);
-    setEditDesc(group.description);
-    setEditVisible(group.isVisible);
-    setEditGroupImage(group.groupImage || null);
-  }, [group]);
+  if (!group) return;
+  setEditName(group.name);
+  setEditDesc(group.description);
+  setEditVisible(group.isVisible);
+  setEditGroupImage(group.groupImage || null);
+  setEditAddress(group.housing?.selfReportedAddress || "");
+  setEditHasPlace(!!group.housing);
+  setEditRent(group.housing?.selfReportedRent ? String(group.housing.selfReportedRent) : "");
+  setEditUtilities(!!group.housing?.selfReportedUtilitiesIncluded);
+}, [group]);
 
   // Compute ownership against the actual API owner id
   const userId = typeof user?.id === "number" ? user.id : Number(user?.id);
@@ -324,11 +342,20 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     let persistedPhotoUrl: string | undefined = group.groupImage;
 
     try {
-      // Save name + description via PATCH
-      if (!isNaN(numId) && (trimmedName !== group.name || trimmedDesc !== group.description)) {
+      const placeChanged =
+        editHasPlace !== !!group.housing ||
+        editAddress !== (group.housing?.selfReportedAddress || "") ||
+        editRent !== (group.housing?.selfReportedRent ? String(group.housing.selfReportedRent) : "") ||
+        editUtilities !== !!group.housing?.selfReportedUtilitiesIncluded;
+
+      if (!isNaN(numId) && (trimmedName !== group.name || trimmedDesc !== group.description || placeChanged)) {
         await api.roommates.updateGroup(numId, {
           name: trimmedName,
           description: trimmedDesc,
+          has_place: editHasPlace,
+          address: editHasPlace ? (editAddress.trim() || undefined) : undefined,
+          rent_per_person: editRent ? Number(editRent) : undefined,
+          utilities_included: editUtilities,
         });
       }
 
@@ -363,9 +390,30 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
       description: trimmedDesc,
       isVisible: editVisible,
       groupImage: persistedPhotoUrl,
+      housing: editHasPlace
+        ? {
+            status: "pending",
+            selfReportedAddress: editAddress.trim() || undefined,
+            selfReportedRent: editRent ? Number(editRent) : undefined,
+            selfReportedUtilitiesIncluded: editUtilities,
+            // landlordInviteUrl gets filled by the refetch below
+          }
+        : undefined,
     };
     upsertStoredRoommateGroup(nextGroup);
     setGroup(nextGroup);
+    if (editHasPlace && !isNaN(numId)) {
+      try {
+        const invite = await api.roommates.getLandlordInvite(numId);
+        const inviteUrl = invite.invite_url;
+        setGroup((prev) => prev ? {
+          ...prev,
+          housing: prev.housing ? { ...prev.housing, landlordInviteUrl: inviteUrl } : prev.housing,
+        } : prev);
+      } catch {
+
+      }
+    }
     setEditing(false);
     setSaveStatus("idle");
   };
@@ -380,15 +428,23 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
   };
 
   const heroImage = editGroupImage || group.groupImage || group.housing?.linkedListingImage || group.housing?.selfReportedPhotos?.[0] || null;
+  const placeUnchanged =
+  editHasPlace === !!group.housing &&
+  editAddress === (group.housing?.selfReportedAddress || "") &&
+  editRent === (group.housing?.selfReportedRent ? String(group.housing.selfReportedRent) : "") &&
+  editUtilities === !!group.housing?.selfReportedUtilitiesIncluded;
+
   const saveDisabled =
     editName.trim().length < 2 ||
     editDesc.trim().length < 10 ||
     saveStatus === "saving" ||
+    (editHasPlace && editAddress.trim().length < 5) ||
     (
       editName.trim() === group.name &&
       editDesc.trim() === group.description &&
       editVisible === group.isVisible &&
-      (editGroupImage || "") === (group.groupImage || "")
+      (editGroupImage || "") === (group.groupImage || "") &&
+      placeUnchanged
     );
 
   return (
@@ -517,10 +573,18 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                     </div>
                     <div className="mt-2 flex items-center gap-2">
                       <div className="min-w-0 flex-1 truncate text-[#2EC4B6]/72" style={{ fontSize: "12px", fontWeight: 600 }}>
-                        {group.housing?.landlordInviteUrl || "Generated when landlord verification is needed."}
+                        {group.housing?.landlordInviteUrl
+                          ? group.housing.landlordInviteUrl
+                          : group.housing?.status === "linked"
+                          ? "Listing already linked — no landlord verification needed."
+                          : "Add your home address in group settings to invite your landlord."}
                       </div>
                       {group.housing?.landlordInviteUrl && (
-                        <button onClick={handleLandlordCopy} className="shrink-0 rounded-full bg-[#2EC4B6] px-3 py-1.5 text-white transition-all hover:bg-[#28b0a3]" style={{ fontSize: "10px", fontWeight: 700 }}>
+                        <button
+                          onClick={handleLandlordCopy}
+                          className="shrink-0 rounded-full bg-[#2EC4B6] px-3 py-1.5 text-white transition-all hover:bg-[#28b0a3]"
+                          style={{ fontSize: "10px", fontWeight: 700 }}
+                        >
                           {landlordCopied ? "Copied" : "Copy"}
                         </button>
                       )}
@@ -717,11 +781,90 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                         disabled={!editing}
                         className="w-full min-h-[128px] resize-none rounded-[18px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3 text-[#1B2D45] outline-none transition-all focus:border-[#FF6B35]/24 focus:bg-white disabled:cursor-not-allowed disabled:text-[#1B2D45]/55"
                         style={{ fontSize: "13px", lineHeight: 1.65 }}
-                      />
+                        />
+                        </div>
+    
+                        {/* Place info */}
+                        <div className="space-y-3 pt-2 border-t border-black/[0.05]">
+                          <div>
+                            <label className="text-[#1B2D45]/38 block mb-1.5" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                              Place Status
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => editing && setEditHasPlace(false)}
+                                disabled={!editing}
+                                className={`text-left px-3 py-2.5 rounded-[14px] border transition-all ${!editHasPlace ? "border-[#FF6B35]/20 bg-[#FF6B35]/[0.06]" : "border-black/[0.05] bg-[#FCFBF8]"} ${editing ? "hover:border-[#FF6B35]/20" : "cursor-not-allowed opacity-80"}`}
+                              >
+                                <div style={{ fontSize: "12px", fontWeight: !editHasPlace ? 600 : 400, color: !editHasPlace ? "#FF6B35" : "#1B2D45" }}>Still searching</div>
+                                <div className="text-[#1B2D45]/30 mt-0.5" style={{ fontSize: "10px" }}>No place yet</div>
+                              </button>
+                              <button
+                                onClick={() => editing && setEditHasPlace(true)}
+                                disabled={!editing}
+                                className={`text-left px-3 py-2.5 rounded-[14px] border transition-all ${editHasPlace ? "border-[#FF6B35]/20 bg-[#FF6B35]/[0.06]" : "border-black/[0.05] bg-[#FCFBF8]"} ${editing ? "hover:border-[#FF6B35]/20" : "cursor-not-allowed opacity-80"}`}
+                              >
+                                <div style={{ fontSize: "12px", fontWeight: editHasPlace ? 600 : 400, color: editHasPlace ? "#FF6B35" : "#1B2D45" }}>We have a place</div>
+                                <div className="text-[#1B2D45]/30 mt-0.5" style={{ fontSize: "10px" }}>Address & rent below</div>
+                              </button>
+                            </div>
+                          </div>
+    
+                          {editHasPlace && (
+                            <>
+                              <div>
+                                <label className="text-[#1B2D45]/38 block mb-1.5" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                                  Home Address
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editAddress}
+                                  onChange={(e) => setEditAddress(e.target.value)}
+                                  disabled={!editing}
+                                  placeholder="e.g. 19 Kathleen St, Guelph, ON"
+                                  className="w-full rounded-[18px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3 text-[#1B2D45] outline-none transition-all focus:border-[#FF6B35]/24 focus:bg-white disabled:cursor-not-allowed disabled:text-[#1B2D45]/55"
+                                  style={{ fontSize: "13px" }}
+                                />
+                                <p className="text-[#1B2D45]/28 mt-1.5" style={{ fontSize: "10px" }}>
+                                  Saving this generates a landlord invite link automatically.
+                                </p>
+                              </div>
+    
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-[#1B2D45]/38 block mb-1.5" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                                    Rent / Person
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={editRent}
+                                    onChange={(e) => setEditRent(e.target.value)}
+                                    disabled={!editing}
+                                    placeholder="650"
+                                    className="w-full rounded-[18px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3 text-[#1B2D45] outline-none transition-all focus:border-[#FF6B35]/24 focus:bg-white disabled:cursor-not-allowed disabled:text-[#1B2D45]/55"
+                                    style={{ fontSize: "13px" }}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[#1B2D45]/38 block mb-1.5" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                                    Utilities
+                                  </label>
+                                  <button
+                                    onClick={() => editing && setEditUtilities(!editUtilities)}
+                                    disabled={!editing}
+                                    className={`w-full text-left px-4 py-3 rounded-[18px] border transition-all ${editUtilities ? "border-[#FF6B35]/20 bg-[#FF6B35]/[0.06]" : "border-black/[0.05] bg-[#FCFBF8]"} ${editing ? "hover:border-[#FF6B35]/20" : "cursor-not-allowed opacity-80"}`}
+                                    style={{ fontSize: "13px", fontWeight: editUtilities ? 600 : 400, color: editUtilities ? "#FF6B35" : "#1B2D45" }}
+                                  >
+                                    {editUtilities ? "Included" : "Not included"}
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
               {/* Visibility */}
               <div className="bg-white rounded-[28px] border border-black/[0.05] p-5 sm:p-6" style={{ boxShadow: "0 14px 36px rgba(15, 23, 42, 0.04)" }}>

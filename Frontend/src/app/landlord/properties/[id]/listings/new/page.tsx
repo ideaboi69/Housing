@@ -1,14 +1,13 @@
 "use client";
 
 import { Suspense, useState, useEffect, use } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
-import { getLandlordClaimCode, setLandlordClaimCode, setLandlordClaimState } from "@/lib/landlord-claim";
 import { LeaseType, GenderPreference } from "@/types";
 import type { PropertyResponse } from "@/types";
-import { ArrowLeft, DollarSign, Calendar, Users, Check, Home, Loader2 } from "lucide-react";
+import { ArrowLeft, DollarSign, Calendar, Users, Check, Home, Loader2, Image as ImageIcon, X, Upload } from "lucide-react";
 
 const leaseTypes = [
   { value: LeaseType.EIGHT_MONTH, label: "8-month", desc: "Sep – Apr", emoji: "📚" },
@@ -21,13 +20,13 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
   const { id } = use(params);
   const propertyId = Number(id);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const [property, setProperty] = useState<PropertyResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [loadingProperty, setLoadingProperty] = useState(true);
-  const [claimCode, setClaimCode] = useState("");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   const [form, setForm] = useState({
     rent_per_room: "",
@@ -39,17 +38,6 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     sublet_end_date: "",
     gender_preference: GenderPreference.ANY,
   });
-
-  useEffect(() => {
-    const queryClaim = searchParams.get("claim")?.trim() ?? "";
-    if (queryClaim) {
-      setClaimCode(queryClaim);
-      setLandlordClaimCode(queryClaim);
-      return;
-    }
-
-    setClaimCode(getLandlordClaimCode());
-  }, [searchParams]);
 
   useEffect(() => {
     async function loadProperty() {
@@ -78,10 +66,69 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     }));
   }
 
+  function handleImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+    const totalCount = imageFiles.length + fileArray.length;
+
+    if (totalCount > 10) {
+      setError("Maximum 10 images per listing");
+      return;
+    }
+
+    setError("");
+    setImageFiles((prev) => [...prev, ...fileArray]);
+
+    // Generate previews
+    fileArray.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const result = ev.target?.result;
+        if (typeof result === "string") {
+          setImagePreviews((prev) => [...prev, result]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input so re-selecting the same file works
+    e.target.value = "";
+  }
+
+  function removeImage(index: number) {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadImagesToListing(listingId: number) {
+    const token = localStorage.getItem("cribb_token");
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const formData = new FormData();
+    imageFiles.forEach((f) => formData.append("files", f));
+
+    const res = await fetch(`${API_URL}/api/listings/${listingId}/images`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Image upload failed" }));
+      throw new Error(body.detail || "Image upload failed");
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.rent_per_room || !form.move_in_date) {
       setError("Rent and move-in date are required");
+      return;
+    }
+
+    if (imageFiles.length < 1) {
+      setError("At least 1 image is required");
       return;
     }
 
@@ -102,27 +149,23 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
       };
 
       const createdListing = await api.listings.create(payload);
-      if (claimCode) {
-        setLandlordClaimCode(claimCode);
-        setLandlordClaimState({
-          claim_code: claimCode,
-          status: "listing_created",
-          updated_at: new Date().toISOString(),
-          property_id: propertyId,
-          property_title: property?.title,
-          property_address: property?.address,
-          listing_id: createdListing.id,
-          listing_rent_per_room: createdListing.rent_per_room,
-        });
+
+      // Upload images. If this fails, leave the listing as DRAFT so the user
+      // can retry from the property page — no data loss.
+      try {
+        await uploadImagesToListing(createdListing.id);
+      } catch (imgErr) {
+        setError(
+          (imgErr instanceof Error ? imgErr.message : "Image upload failed") +
+          " — your listing was saved as a draft. You can add images from the property page."
+        );
+        setIsSubmitting(false);
+        return;
       }
 
-      // Compute Cribb Score
+      // Compute Cribb Score (optional)
       try {
-        const allListings = await api.listings.browse({ skip: 0, limit: 100 });
-        const newListing = allListings.find(l => l.property_id === propertyId);
-        if (newListing) {
-          await api.healthScores.compute(newListing.id);
-        }
+        await api.healthScores.compute(createdListing.id);
       } catch { /* score computation is optional */ }
 
       router.push("/landlord");
@@ -163,41 +206,12 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
           </div>
         )}
 
-        {claimCode && (
-          <div className="mb-6 rounded-xl border border-[#2EC4B6]/15 bg-[#2EC4B6]/[0.04] px-4 py-4">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[#2EC4B6]/10 flex items-center justify-center shrink-0">
-                <Home className="w-5 h-5 text-[#2EC4B6]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Claimed home listing setup</span>
-                  <span className="px-2 py-0.5 rounded-md bg-white border border-[#2EC4B6]/10 text-[#2EC4B6]" style={{ fontSize: "9px", fontWeight: 700 }}>
-                    Claim {claimCode}
-                  </span>
-                </div>
-                <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px", lineHeight: 1.5 }}>
-                  This listing is being created as part of a roommate-group property verification flow. Use the real rent, lease, and availability details for the claimed home.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Pricing */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
               <DollarSign className="w-4 h-4 text-[#FF6B35]" /> Pricing
             </h2>
-
-            {claimCode && (
-              <div className="rounded-xl bg-[#1B2D45]/[0.04] px-4 py-3">
-                <p className="text-[#1B2D45]/55" style={{ fontSize: "11px", lineHeight: 1.5 }}>
-                  Once this listing is published, the dashboard can continue the claimed-home verification flow tied to <strong>{claimCode}</strong>.
-                </p>
-              </div>
-            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -358,6 +372,69 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
             </div>
           )}
 
+          {/* Photos */}
+          <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
+            <div>
+              <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
+                <ImageIcon className="w-4 h-4 text-[#FF6B35]" /> Photos <span className="text-[#E71D36]" style={{ fontWeight: 500 }}>*</span>
+              </h2>
+              <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px" }}>
+                At least 1 photo required. Listings with 3–5 photos perform best.
+              </p>
+            </div>
+
+            {/* Previews */}
+            {imagePreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {imagePreviews.map((src, idx) => (
+                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-[#f3f3f5] group">
+                    <img src={src} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-sm transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <X className="w-3.5 h-3.5 text-[#1B2D45]" />
+                    </button>
+                    {idx === 0 && (
+                      <span className="absolute bottom-1 left-1 px-2 py-0.5 rounded bg-black/60 text-white" style={{ fontSize: "10px", fontWeight: 600 }}>
+                        Cover
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* File picker */}
+            {imageFiles.length < 10 && (
+              <label
+                htmlFor="listing-photos"
+                className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-lg border-2 border-dashed border-[#1B2D45]/15 hover:border-[#FF6B35]/40 hover:bg-[#FF6B35]/[0.02] cursor-pointer transition-all"
+              >
+                <Upload className="w-5 h-5 text-[#1B2D45]/40" />
+                <span className="text-[#1B2D45]/60" style={{ fontSize: "13px", fontWeight: 600 }}>
+                  {imageFiles.length === 0 ? "Add photos" : `Add more (${imageFiles.length}/10)`}
+                </span>
+                <span className="text-[#1B2D45]/30" style={{ fontSize: "11px" }}>JPEG, PNG, WebP — up to 10</span>
+                <input
+                  id="listing-photos"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+              </label>
+            )}
+
+            {imageFiles.length >= 3 && imageFiles.length <= 5 && (
+              <p className="text-[#4ADE80]" style={{ fontSize: "11px", fontWeight: 600 }}>
+                ✓ Great — you&apos;re in the sweet spot for visibility.
+              </p>
+            )}
+          </div>
+
           <div className="flex items-center gap-3 pt-2">
             <Link
               href="/landlord"
@@ -368,7 +445,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
             </Link>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || imageFiles.length < 1}
               className="flex-1 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
               style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
             >
@@ -378,7 +455,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                   Publishing...
                 </>
               ) : (
-                claimCode ? "Publish Claimed Listing →" : "Publish Listing →"
+                "Publish Listing →"
               )}
             </button>
           </div>

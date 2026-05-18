@@ -88,6 +88,7 @@ function CreateGroupContent() {
   const [utilitiesIncluded, setUtilitiesIncluded] = useState(false);
   const [moveIn, setMoveIn] = useState("Fall 2026");
   const [address, setAddress] = useState("");
+  const [hasPlace, setHasPlace] = useState(false);
   const [gender, setGender] = useState("No preference");
   const [description, setDescription] = useState("");
   const [groupImage, setGroupImage] = useState<string | null>(null);
@@ -108,7 +109,11 @@ function CreateGroupContent() {
   const canContinue = () => {
     if (step === 0) return name.trim().length >= 2;
     if (step === 1) return haveCount > 0 && groupSize > haveCount;
-    if (step === 2) return !!moveIn && address.trim().length >= 8 && rentPerPerson > 0;
+    if (step === 2) {
+      if (!moveIn) return false;
+      if (hasPlace) return address.trim().length >= 8 && rentPerPerson > 0;
+      return true; // Still searching — only move-in required
+    }
     if (step === 3) return description.trim().length >= 10;
     return true;
   };
@@ -175,7 +180,7 @@ function CreateGroupContent() {
   }, []);
 
   const buildLandlordSignupUrl = (code: string) => {
-    const base = typeof window !== "undefined" ? window.location.origin : "https://cribb.ca";
+    const base = typeof window !== "undefined" ? window.location.origin : "https://findyourcribb.ca";
     return `${base}/landlord/signup?claim=${encodeURIComponent(code)}`;
   };
 
@@ -188,9 +193,6 @@ function CreateGroupContent() {
   const handleCreate = async () => {
     if (!user) return;
     if (existingGroup) return;
-
-    const code = name.replace(/[^a-zA-Z]/g, "").slice(0, 4).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
-    const landlordUrl = buildLandlordSignupUrl(code);
 
     // Try API first
     try {
@@ -215,9 +217,12 @@ function CreateGroupContent() {
         utilities_included: utilitiesIncluded,
         move_in_timing: moveInToEnum(moveIn),
         gender_preference: genderToEnum(gender),
-        has_place: address.trim().length > 0,
+        has_place: hasPlace,
         address: address.trim() || undefined,
       });
+
+      const code = apiGroup.invite_code || "";
+      const landlordUrl = buildLandlordSignupUrl(code);
 
       const members = Array.from({ length: haveCount }, (_, index) => buildMember(index));
       const createdGroup: RoommateGroup = {
@@ -409,18 +414,9 @@ function CreateGroupContent() {
 
             {/* Landlord invite link */}
             <div className="bg-white rounded-xl border border-[#2EC4B6]/10 p-4 mb-4" style={{ boxShadow: "0 2px 12px rgba(46,196,182,0.05)" }}>
-              <label className="text-[#2EC4B6] block mb-2 text-left" style={{ fontSize: "11px", fontWeight: 700 }}>Landlord verification link</label>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#FAF8F4] border border-[#2EC4B6]/10">
-                  <Link2 className="w-3.5 h-3.5 text-[#2EC4B6]/40 shrink-0" />
-                  <span className="text-[#2EC4B6]/60 truncate" style={{ fontSize: "12px", fontWeight: 500 }}>{landlordInviteUrl}</span>
-                </div>
-                <button onClick={handleLandlordCopy} className="px-4 py-2.5 rounded-lg bg-[#2EC4B6] text-white hover:bg-[#28b0a3] transition-all flex items-center gap-1.5 shrink-0" style={{ fontSize: "12px", fontWeight: 600 }}>
-                  {landlordCopied ? <><Check className="w-3.5 h-3.5" /> Copied!</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
-                </button>
-              </div>
-              <p className="text-[#1B2D45]/25 mt-2 text-left" style={{ fontSize: "10px" }}>
-                Send this to your landlord so they can sign up and attach the home to Cribb.
+              <label className="text-[#2EC4B6] block mb-2 text-left" style={{ fontSize: "11px", fontWeight: 700 }}>Landlord verification</label>
+              <p className="text-[#1B2D45]/55 text-left" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                Find your landlord verification link in your group's manage page.&apos;s <strong>Manage</strong> page. Send it to your landlord so they can claim the listing.
               </p>
             </div>
 
@@ -768,74 +764,109 @@ function CreateGroupContent() {
 
           {/* Step 3: Availability details */}
           {step === 2 && (
-            <div>
-              <h2 className="text-[#1B2D45] mb-5" style={{ fontSize: "22px", fontWeight: 800 }}>Availability details</h2>
+                <div>
+                  <h2 className="text-[#1B2D45] mb-5" style={{ fontSize: "22px", fontWeight: 800 }}>Availability details</h2>
 
-              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Rent (per person/month)</label>
-              <input
-                type="number"
-                min={0}
-                value={rentPerPerson}
-                onChange={(e) => setRentPerPerson(Number(e.target.value))}
-                className="w-full rounded-[20px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3.5 outline-none transition-all focus:border-[#FF6B35]/30 focus:bg-white mb-5"
-                style={{ fontSize: "14px" }}
-                placeholder="e.g. 725"
-              />
+                  <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Move-in timing</label>
+                  <div className="grid grid-cols-2 gap-2 mb-5">
+                    {MOVE_IN_OPTIONS.map((m) => {
+                      const sel = moveIn === m;
+                      return <button key={m} onClick={() => setMoveIn(m)} className={`px-3 py-2.5 rounded-[18px] border transition-all ${sel ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] bg-[#FCFBF8] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:bg-white"}`} style={{ fontSize: "13px", fontWeight: sel ? 600 : 400 }}>{m}</button>;
+                    })}
+                  </div>
 
-              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Utilities</label>
-              <div className="grid grid-cols-2 gap-2 mb-5">
-                <button
-                  type="button"
-                  onClick={() => setUtilitiesIncluded(true)}
-                  className={`px-3 py-2.5 rounded-[18px] border transition-all ${utilitiesIncluded ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] bg-[#FCFBF8] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:bg-white"}`}
-                  style={{ fontSize: "13px", fontWeight: utilitiesIncluded ? 600 : 400 }}
-                >
-                  Included
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUtilitiesIncluded(false)}
-                  className={`px-3 py-2.5 rounded-[18px] border transition-all ${!utilitiesIncluded ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] bg-[#FCFBF8] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:bg-white"}`}
-                  style={{ fontSize: "13px", fontWeight: !utilitiesIncluded ? 600 : 400 }}
-                >
-                  Extra
-                </button>
-              </div>
+                  <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Gender preference</label>
+                  <div className="space-y-2 mb-5">
+                    {GENDER_HOUSING_OPTIONS.map((opt) => {
+                      const sel = gender === opt;
+                      return <button key={opt} onClick={() => setGender(opt)} className={`w-full text-left px-4 py-3 rounded-[18px] border transition-all ${sel ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08]" : "border-black/[0.06] hover:border-[#FF6B35]/20 bg-[#FCFBF8] hover:bg-white"}`} style={{ fontSize: "13px", fontWeight: sel ? 600 : 400, color: sel ? "#FF6B35" : "#1B2D45" }}>{opt}</button>;
+                    })}
+                  </div>
 
-              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Move-in timing</label>
-              <div className="grid grid-cols-2 gap-2 mb-5">
-                {MOVE_IN_OPTIONS.map((m) => {
-                  const sel = moveIn === m;
-                  return <button key={m} onClick={() => setMoveIn(m)} className={`px-3 py-2.5 rounded-[18px] border transition-all ${sel ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] bg-[#FCFBF8] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:bg-white"}`} style={{ fontSize: "13px", fontWeight: sel ? 600 : 400 }}>{m}</button>;
-                })}
-              </div>
+                  {/* Place status toggle */}
+                  <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Do you have a place yet?</label>
+                  <div className="grid grid-cols-2 gap-2 mb-5">
+                    <button
+                      type="button"
+                      onClick={() => setHasPlace(false)}
+                      className={`text-left px-3 py-3 rounded-[18px] border transition-all ${!hasPlace ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08]" : "border-black/[0.06] bg-[#FCFBF8] hover:border-[#FF6B35]/20 hover:bg-white"}`}
+                    >
+                      <div style={{ fontSize: "13px", fontWeight: !hasPlace ? 600 : 400, color: !hasPlace ? "#FF6B35" : "#1B2D45" }}>Still searching</div>
+                      <div className="text-[#1B2D45]/30 mt-0.5" style={{ fontSize: "10px" }}>No address yet</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setHasPlace(true)}
+                      className={`text-left px-3 py-3 rounded-[18px] border transition-all ${hasPlace ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08]" : "border-black/[0.06] bg-[#FCFBF8] hover:border-[#FF6B35]/20 hover:bg-white"}`}
+                    >
+                      <div style={{ fontSize: "13px", fontWeight: hasPlace ? 600 : 400, color: hasPlace ? "#FF6B35" : "#1B2D45" }}>We have a place</div>
+                      <div className="text-[#1B2D45]/30 mt-0.5" style={{ fontSize: "10px" }}>Address & rent below</div>
+                    </button>
+                  </div>
 
-              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Home address</label>
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="e.g. 12 Wilson St, Guelph, ON"
-                className="w-full rounded-[20px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3.5 outline-none transition-all focus:border-[#FF6B35]/30 focus:bg-white mb-5"
-                style={{ fontSize: "14px" }}
-              />
+                  {/* Rent + utilities + address only show when has_place=true */}
+                  {hasPlace && (
+                    <>
+                      <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Rent (per person/month)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={rentPerPerson}
+                        onChange={(e) => setRentPerPerson(Number(e.target.value))}
+                        className="w-full rounded-[20px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3.5 outline-none transition-all focus:border-[#FF6B35]/30 focus:bg-white mb-5"
+                        style={{ fontSize: "14px" }}
+                        placeholder="e.g. 725"
+                      />
 
-              <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Gender preference</label>
-              <div className="space-y-2">
-                {GENDER_HOUSING_OPTIONS.map((opt) => {
-                  const sel = gender === opt;
-                  return <button key={opt} onClick={() => setGender(opt)} className={`w-full text-left px-4 py-3 rounded-[18px] border transition-all ${sel ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08]" : "border-black/[0.06] hover:border-[#FF6B35]/20 bg-[#FCFBF8] hover:bg-white"}`} style={{ fontSize: "13px", fontWeight: sel ? 600 : 400, color: sel ? "#FF6B35" : "#1B2D45" }}>{opt}</button>;
-                })}
-              </div>
+                      <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Utilities</label>
+                      <div className="grid grid-cols-2 gap-2 mb-5">
+                        <button
+                          type="button"
+                          onClick={() => setUtilitiesIncluded(true)}
+                          className={`px-3 py-2.5 rounded-[18px] border transition-all ${utilitiesIncluded ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] bg-[#FCFBF8] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:bg-white"}`}
+                          style={{ fontSize: "13px", fontWeight: utilitiesIncluded ? 600 : 400 }}
+                        >
+                          Included
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUtilitiesIncluded(false)}
+                          className={`px-3 py-2.5 rounded-[18px] border transition-all ${!utilitiesIncluded ? "border-[#FF6B35]/24 bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] bg-[#FCFBF8] text-[#1B2D45]/50 hover:border-[#FF6B35]/20 hover:bg-white"}`}
+                          style={{ fontSize: "13px", fontWeight: !utilitiesIncluded ? 600 : 400 }}
+                        >
+                          Extra
+                        </button>
+                      </div>
 
-              <div className="mt-5 rounded-[20px] px-4 py-3 bg-[#2EC4B6]/[0.04] border border-[#2EC4B6]/10">
-                <div className="text-[#2EC4B6]" style={{ fontSize: "12px", fontWeight: 700 }}>Landlord verification link is generated automatically</div>
-                <div className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>
-                  After you post, you&apos;ll get a second link to send your landlord so they can attach the home to Cribb.
+                      <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Home address</label>
+                      <input
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="e.g. 12 Wilson St, Guelph, ON"
+                        className="w-full rounded-[20px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3.5 outline-none transition-all focus:border-[#FF6B35]/30 focus:bg-white"
+                        style={{ fontSize: "14px" }}
+                      />
+
+                      <div className="mt-5 rounded-[20px] px-4 py-3 bg-[#2EC4B6]/[0.04] border border-[#2EC4B6]/10">
+                        <div className="text-[#2EC4B6]" style={{ fontSize: "12px", fontWeight: 700 }}>Landlord verification link is generated automatically</div>
+                        <div className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                          After you post, you&apos;ll get a second link to send your landlord so they can attach the home to Cribb.
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {!hasPlace && (
+                    <div className="rounded-[20px] px-4 py-3 bg-[#FF6B35]/[0.04] border border-[#FF6B35]/10">
+                      <div className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 700 }}>You can add your place later</div>
+                      <div className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                        Once you find a home, edit your group settings to add the address — and we&apos;ll generate the landlord invite link automatically.
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-          )}
+              )}
 
           {/* Step 4: Description */}
           {step === 3 && (

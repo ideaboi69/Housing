@@ -14,6 +14,13 @@ export function AuthHydrator() {
   const loadWriter = useWriterStore((s) => s.loadWriter);
 
   useEffect(() => {
+    try {
+      localStorage.removeItem("cribb_landlord_claim_code");
+      localStorage.removeItem("cribb_landlord_claim_state");
+    } catch {}
+  }, []);
+  
+  useEffect(() => {
     loadUser();
   }, [loadUser]);
 

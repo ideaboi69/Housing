@@ -203,7 +203,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
             targetListingId: null,
             targetListingTitle: null,
             description: apiGroup.description || "",
-            inviteCode: "",
+            inviteCode: apiGroup.invite_code || "",
             isVisible: apiGroup.is_visible,
             genderPreference: apiGroup.gender_preference || null,
             moveIn: apiGroup.move_in_timing || "",

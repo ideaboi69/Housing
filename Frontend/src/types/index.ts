@@ -1033,6 +1033,7 @@ export interface GroupCardResponse {
   address?: string;
   is_verified: boolean;
   is_visible: boolean;
+  invite_code?: string;
   group_photo_url?: string | null;
   members: GroupMemberResponse[];
   compatibility_score: number | null;
@@ -1298,4 +1299,77 @@ export interface MarketplaceConversationDetailResponse {
   seller_id: number;
   seller_name: string;
   messages: MarketplaceMessageResponse[];
+}
+
+export interface GroupPreviewByCodeResponse {
+  id: number;
+  name: string;
+  description?: string;
+  current_size: number;
+  total_capacity: number;
+  spots_remaining: number;
+  rent_per_person?: number;
+  utilities_included: boolean;
+  move_in_timing?: string;
+  gender_preference?: string;
+  has_place: boolean;
+  address?: string;
+  is_verified: boolean;
+  group_photo_url?: string | null;
+  members: GroupMemberResponse[];
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface LandlordInviteResponse {
+  id: number;
+  group_id: number;
+  group_name: string;
+  token: string;
+  invite_url: string;
+  status: string;
+  address: string;
+  postal_code?: string;
+  property_type?: string;
+  total_rooms?: number;
+  bathrooms?: number;
+  is_furnished: boolean;
+  has_parking: boolean;
+  has_laundry: boolean;
+  utilities_included: boolean;
+  estimated_utility_cost?: number;
+  distance_to_campus_km?: number;
+  nearest_bus_route?: string;
+  rent_per_room?: number;
+  rent_total?: number;
+  lease_type?: string;
+  move_in_date?: string;
+  gender_preference?: string;
+  created_at: string;
+}
+
+export interface LandlordInvitePreview {
+  id: number;
+  group_name: string;
+  group_description?: string | null;
+  group_size: number;
+  address: string;
+  postal_code?: string | null;
+  property_type?: string | null;
+  total_rooms?: number | null;
+  bathrooms?: number | null;
+  is_furnished: boolean;
+  has_parking: boolean;
+  has_laundry: boolean;
+  utilities_included: boolean;
+  estimated_utility_cost?: number | null;
+  distance_to_campus_km?: number | null;
+  nearest_bus_route?: string | null;
+  rent_per_room?: number | null;
+  rent_total?: number | null;
+  lease_type?: string | null;
+  move_in_date?: string | null;
+  gender_preference?: string | null;
+  status: string;
+  created_at: string;
 }
