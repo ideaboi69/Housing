@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, Boolean, Numeric, Date, TIMESTAMP, func, DECIMAL, Enum, text, CheckConstraint, UniqueConstraint, Index, Time
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, backref
 from datetime import datetime, time 
 from Schemas.userSchema import UserRole, StudentYear, LeaseTermPreference
 from Schemas.landlordSchema import DocumentType, IDType, LandlordVerification
@@ -688,6 +688,7 @@ class RoommateGroup(Base):
     id = Column(Integer, primary_key=True)
     owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(255), nullable=False)
+    invite_code = Column(String(32), unique=True, nullable=False, index=True)
     description = Column(Text, nullable=True)
     current_size = Column(Integer, nullable=False) 
     spots_needed = Column(Integer, nullable=False)
@@ -907,7 +908,7 @@ class LandlordInvite(Base):
  
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
  
-    group = relationship("RoommateGroup", backref="landlord_invite")
+    group = relationship("RoommateGroup", backref=backref("landlord_invite", cascade="all, delete-orphan", uselist=False))
     creator = relationship("User", foreign_keys=[created_by])
 
 class PostVote(Base):

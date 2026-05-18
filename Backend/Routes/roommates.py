@@ -6,9 +6,9 @@ from tables import *
 from Schemas.roommateSchema import *
 from helpers import *
 from Utils.security import get_current_student
-from Utils.roommate import build_group_card, build_group_detail, build_invite_response, build_listing_detail, build_request_response
+from Utils.roommate import build_group_card, build_group_detail, build_invite_response, build_listing_detail, build_request_response, generate_invite_code
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
-
+import secrets
 roommate_router = APIRouter()
 
 REQUIRED_FIELDS = ["first_name", "last_name", "program", "year"]
@@ -156,9 +156,18 @@ def create_group(payload: GroupCreate, db: Session = Depends(get_db), current_us
     if existing:
         raise HTTPException(status_code=409, detail="You already have an active group")
 
+    # Generate a unique invite code (retry on collision, max 5 tries)
+    for _ in range(5):
+        code = generate_invite_code()
+        if not db.query(RoommateGroup).filter(RoommateGroup.invite_code == code).first():
+            break
+    else:
+        raise HTTPException(status_code=500, detail="Could not generate unique invite code")
+
     group = RoommateGroup(
         owner_id=current_user.id,
         name=payload.name,
+        invite_code=code,
         description=payload.description,
         current_size=payload.current_size,
         spots_needed=payload.spots_needed,
@@ -179,6 +188,21 @@ def create_group(payload: GroupCreate, db: Session = Depends(get_db), current_us
         role=GroupMemberRole.OWNER,
     )
     db.add(owner_member)
+
+    # Auto-create a landlord invite ONLY when the group has a place lined up
+    if payload.has_place and payload.address:
+        token = secrets.token_urlsafe(32)
+        landlord_invite = LandlordInvite(
+            group_id=group.id,
+            created_by=current_user.id,
+            token=token,
+            group_slug=slugify_group_name(payload.name),
+            address=payload.address,
+            utilities_included=payload.utilities_included or False,
+            rent_per_room=payload.rent_per_person,
+        )
+        db.add(landlord_invite)
+
     db.commit()
     db.refresh(group)
 
@@ -199,6 +223,139 @@ def update_group(group_id: int, payload: GroupUpdate, db: Session = Depends(get_
 
     for field, value in update_data.items():
         setattr(group, field, value)
+
+    print(f"[update_group] has_place={group.has_place}, address={group.address!r}")
+
+    if group.has_place and group.address:
+        existing_invite = db.query(LandlordInvite).filter(LandlordInvite.group_id == group.id, LandlordInvite.status == "pending").first()
+
+        if existing_invite:
+            existing_invite.address = group.address
+            existing_invite.utilities_included = group.utilities_included or False
+            existing_invite.rent_per_room = group.rent_per_person
+        else:
+            token = secrets.token_urlsafe(32)
+            new_invite = LandlordInvite(
+                group_id=group.id,
+                created_by=current_user.id,
+                token=token,
+                group_slug=slugify_group_name(group.name),
+                address=group.address,
+                utilities_included=group.utilities_included or False,
+                rent_per_room=group.rent_per_person,
+            )
+            db.add(new_invite)
+
+    db.commit()
+    db.refresh(group)
+
+    return build_group_detail(group, db)
+
+# Join by code — public preview (no auth)
+@roommate_router.get("/groups/by-code/{code}", response_model=GroupPreviewByCodeResponse)
+def get_group_by_code(code: str, db: Session = Depends(get_db)):
+    group = db.query(RoommateGroup).filter(RoommateGroup.invite_code == code).first()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    members = []
+    for m in group.members:
+        if not m.is_active:
+            continue
+        user = db.query(User).filter(User.id == m.user_id).first()
+        if not user:
+            continue
+        members.append(GroupMemberResponse(
+            user_id=user.id,
+            first_name=user.first_name,
+            last_initial=user.last_name[0] + "." if user.last_name else "",
+            role=m.role.value,
+            profile_photo_url=user.profile_photo_url,
+            joined_at=m.joined_at,
+        ))
+
+    return GroupPreviewByCodeResponse(
+        id=group.id,
+        name=group.name,
+        description=group.description,
+        current_size=group.current_size,
+        total_capacity=group.total_capacity,
+        spots_remaining=group.spots_remaining,
+        rent_per_person=group.rent_per_person,
+        utilities_included=group.utilities_included,
+        move_in_timing=group.move_in_timing,
+        gender_preference=group.gender_preference,
+        has_place=group.has_place,
+        address=group.address,
+        is_verified=group.is_verified,
+        group_photo_url=group.group_photo_url,
+        members=members,
+        is_active=group.is_active,
+        created_at=group.created_at,
+    )
+
+# Join by code — student sends a request
+@roommate_router.post("/groups/by-code/{code}/request", response_model=RequestResponse, status_code=status.HTTP_201_CREATED)
+def request_join_by_code(code: str, payload: JoinByCodeRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id, RoommateProfile.quiz_completed == True).first()
+
+    if not profile:
+        raise HTTPException(status_code=403, detail="Complete the quiz first")
+
+    group = db.query(RoommateGroup).filter(RoommateGroup.invite_code == code, RoommateGroup.is_active == True).first()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    if group.owner_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You can't request to join your own group")
+
+    if group.spots_remaining <= 0:
+        raise HTTPException(status_code=400, detail="Group is full")
+
+    # Block if user is already in another group
+    own_group = db.query(RoommateGroup).filter(RoommateGroup.owner_id == current_user.id, RoommateGroup.is_active == True).first()
+    other_membership = db.query(RoommateGroupMember).filter(RoommateGroupMember.user_id == current_user.id, RoommateGroupMember.is_active == True, RoommateGroupMember.group_id != group.id).first()
+
+    if own_group or other_membership:
+        raise HTTPException(status_code=400, detail="You're already in a group. Leave it first to request another.")
+
+    existing = db.query(RoommateRequest).filter(RoommateRequest.group_id == group.id, RoommateRequest.user_id == current_user.id).first()
+
+    if existing:
+        if existing.status == RequestStatus.PENDING:
+            raise HTTPException(status_code=409, detail="Already requested")
+        if existing.status == RequestStatus.ACCEPTED:
+            raise HTTPException(status_code=409, detail="Already a member of this group")
+        raise HTTPException(status_code=409, detail="Your previous request to this group was declined")
+
+    req = RoommateRequest(
+        group_id=group.id,
+        user_id=current_user.id,
+        message=payload.message,
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+
+    return build_request_response(req, db)
+
+# Rotate the invite code (owner only)
+@roommate_router.post("/groups/{group_id}/rotate-invite-code", response_model=GroupDetailResponse)
+def rotate_invite_code(group_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    group = db.query(RoommateGroup).filter(RoommateGroup.id == group_id, RoommateGroup.owner_id == current_user.id).first()
+
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found or not yours")
+
+    for _ in range(5):
+        code = generate_invite_code()
+        if not db.query(RoommateGroup).filter(RoommateGroup.invite_code == code).first():
+            group.invite_code = code
+            break
+    else:
+        raise HTTPException(status_code=500, detail="Could not generate unique invite code")
 
     db.commit()
     db.refresh(group)
@@ -547,11 +704,14 @@ def send_invite(payload: InviteCreate, db: Session = Depends(get_db), current_us
     existing = db.query(RoommateInvite).filter(
         RoommateInvite.group_id == group.id,
         RoommateInvite.invited_user_id == payload.invited_user_id,
-        RoommateInvite.status == InviteStatus.PENDING,
     ).first()
 
     if existing:
-        raise HTTPException(status_code=409, detail="Already invited")
+        if existing.status == InviteStatus.PENDING:
+            raise HTTPException(status_code=409, detail="Already invited")
+        if existing.status == InviteStatus.ACCEPTED:
+            raise HTTPException(status_code=409, detail="Already a member of this group")
+        raise HTTPException(status_code=409, detail="This person previously declined. They can request to join themselves.")
 
     is_member = db.query(RoommateGroupMember).filter(
         RoommateGroupMember.group_id == group.id,
@@ -677,11 +837,14 @@ def send_request(payload: RequestCreate, db: Session = Depends(get_db), current_
     existing = db.query(RoommateRequest).filter(
         RoommateRequest.group_id == payload.group_id,
         RoommateRequest.user_id == current_user.id,
-        RoommateRequest.status == RequestStatus.PENDING,
     ).first()
 
     if existing:
-        raise HTTPException(status_code=409, detail="Already requested")
+        if existing.status == RequestStatus.PENDING:
+            raise HTTPException(status_code=409, detail="Already requested")
+        if existing.status == RequestStatus.ACCEPTED:
+            raise HTTPException(status_code=409, detail="Already a member of this group")
+        raise HTTPException(status_code=409, detail="Your previous request to this group was declined")
 
     request = RoommateRequest(
         group_id=payload.group_id,

@@ -205,6 +205,7 @@ class GroupCardResponse(BaseModel):
     has_place: bool
     address: Optional[str] = None
     is_verified: bool
+    invite_code: Optional[str] = None
     is_visible: bool = True
     group_photo_url: Optional[str] = None
     members: list[GroupMemberResponse] = []
@@ -259,15 +260,41 @@ class RequestResponse(BaseModel):
         from_attributes = True
 
 class ProfileCompletionCheck(BaseModel):
-    """What the frontend uses to decide whether to show the completion popup."""
     is_complete: bool
     fields: dict  # pre-filled values + nulls for missing
     missing_fields: list[str]
 
 class ProfileCompletionSubmit(BaseModel):
-    """User fills in missing fields from the popup."""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     program: Optional[str] = None
     year: Optional[str] = None
     bio: Optional[str] = None
+    
+# ──────────────────────────────────────────────
+# JOINING BY CODE
+# ──────────────────────────────────────────────
+class GroupPreviewByCodeResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    current_size: int
+    total_capacity: int
+    spots_remaining: int
+    rent_per_person: Optional[Decimal] = None
+    utilities_included: bool
+    move_in_timing: Optional[RoommateTiming] = None
+    gender_preference: Optional[GenderHousingPref] = None
+    has_place: bool
+    address: Optional[str] = None
+    is_verified: bool
+    group_photo_url: Optional[str] = None
+    members: list[GroupMemberResponse] = []
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class JoinByCodeRequest(BaseModel):
+    message: Optional[str] = None

@@ -105,12 +105,12 @@ class PropertyResponse(BaseModel):
     wheelchair_accessible: bool
     pet_policy: PetPolicy
     smoking_policy: SmokingPolicy
-    estimated_utility_cost: Decimal
-    distance_to_campus_km: Decimal
+    estimated_utility_cost: Optional[Decimal] = None
+    distance_to_campus_km: Optional[Decimal] = None
     walk_time_minutes:int
     drive_time_minutes: int
     bus_time_minutes: int
-    nearest_bus_route: str
+    nearest_bus_route: Optional[str] = None
     amenities: SpaceAmenities
     policies: ListingPolicies
     created_at: datetime

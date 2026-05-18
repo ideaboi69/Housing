@@ -60,7 +60,7 @@ def create_landlord_invite(group_id: int, payload: LandlordInviteCreate, db: Ses
     db.commit()
     db.refresh(invite)
  
-    invite_url = f"{settings.FRONTEND_URL}/{group_slug}/landlord-invite/{token}"
+    invite_url = f"{settings.FRONTEND_URL}/landlord-claim/{token}"
  
     return LandlordInviteResponse(
         id=invite.id,
@@ -100,7 +100,7 @@ def get_landlord_invite(group_id: int, db: Session = Depends(get_db), current_us
     if not invite:
         raise HTTPException(status_code=404, detail="No active invite for this group")
  
-    invite_url = f"{settings.FRONTEND_URL}/{invite.group_slug}/landlord-invite/{invite.token}"
+    invite_url = f"{settings.FRONTEND_URL}/landlord-claim/{invite.token}"
  
     return LandlordInviteResponse(
         id=invite.id,

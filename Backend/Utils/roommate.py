@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from Schemas.roommateSchema import *
 from helpers import *
 from tables import *
-
+import secrets
 def build_group_card(group: RoommateGroup, db: Session, viewer_profile: RoommateProfile = None) -> GroupCardResponse:
     members = []
     for m in group.members:
@@ -36,6 +36,7 @@ def build_group_card(group: RoommateGroup, db: Session, viewer_profile: Roommate
         address=group.address,
         is_verified=group.is_verified,
         is_visible=group.is_visible,
+        invite_code=group.invite_code,
         members=members,
         group_photo_url=group.group_photo_url,
         compatibility_score=score,
@@ -89,3 +90,7 @@ def build_request_response(req: RoommateRequest, db: Session) -> RequestResponse
         compatibility_score=score,
         created_at=req.created_at,
     )
+
+# Generate student-invite link 
+def generate_invite_code() -> str:
+    return secrets.token_urlsafe(8)[:10]
