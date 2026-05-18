@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Users, Shield, ShieldCheck, ChevronLeft, ChevronRight, MessageCircle, Link2, Copy, Check, MapPin, Home, Calendar, DollarSign, Sparkles, Send, Settings, Search, Share2, Camera, ExternalLink, X, UserCheck, LogOut } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
-import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import {
   type LifestyleProfile, type RoommateGroup, type GroupHousing,
   TAG_SHORT_LABELS, computeGroupCompatibility,
@@ -151,7 +150,6 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
   const [group, setGroup] = useState<RoommateGroup | null | undefined>(undefined);
   const [memberUserIds, setMemberUserIds] = useState<Set<number>>(new Set());
   const [ownerUserId, setOwnerUserId] = useState<number | null>(null);
-  const [claimState, setClaimState] = useState<LandlordClaimState | null>(null);
   const [requestSent, setRequestSent] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -169,7 +167,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
 
   // Viewer's group affiliation (for "already in a group" gate)
   const [viewerDashboard, setViewerDashboard] = useState<{ is_in_group: boolean; group_id: number | null; group_name: string | null } | null>(null);
-
+  
   useEffect(() => {
     async function fetchGroup() {
       const numId = parseInt(id, 10);
@@ -209,7 +207,10 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
             moveIn: apiGroup.move_in_timing || "",
             createdAt: apiGroup.created_at,
             housing: apiGroup.has_place ? {
-              status: apiGroup.is_verified ? "linked" : "pending",
+              status: apiGroup.listing_id ? "linked" : "pending",
+              linkedListingId: apiGroup.listing_id ?? undefined,
+              linkedListingTitle: apiGroup.listing_title ?? undefined,
+              linkedListingAddress: apiGroup.listing_address ?? undefined,
               selfReportedAddress: apiGroup.address || undefined,
               selfReportedRent: Number(apiGroup.rent_per_person) || undefined,
               selfReportedUtilitiesIncluded: apiGroup.utilities_included,
@@ -223,10 +224,6 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     }
     fetchGroup();
   }, [id]);
-
-  useEffect(() => {
-    setClaimState(getLandlordClaimState());
-  }, []);
 
   const userId = typeof user?.id === "number" ? user.id : Number(user?.id);
   const isOwner = !!user && !isLandlord && ownerUserId !== null && userId === ownerUserId;
@@ -333,12 +330,6 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     : group.housing?.status === "pending"
       ? group.housing.selfReportedUtilitiesIncluded
       : undefined;
-  const matchingClaim = claimState?.claim_code === group.inviteCode ? claimState : null;
-  const pendingHeadline = matchingClaim?.status === "listing_created"
-    ? "Landlord published the listing"
-    : matchingClaim?.status === "property_created"
-      ? "Landlord added the property details"
-      : "Current availability awaiting landlord verification";
   const heroImage =
     (group as RoommateGroup & { groupImage?: string }).groupImage ||
     group.housing?.linkedListingImage ||
@@ -578,7 +569,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="rounded-xl overflow-hidden" style={{ border: "2.5px solid rgba(255,182,39,0.2)", boxShadow: "0 2px 12px rgba(255,182,39,0.06)" }}>
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-[#FFB627]/[0.06]">
                     <span style={{ fontSize: "10px" }}>⏳</span>
-                    <span className="text-[#FFB627]" style={{ fontSize: "10px", fontWeight: 700 }}>{pendingHeadline}</span>
+                    <span className="text-[#FFB627]" style={{ fontSize: "10px", fontWeight: 700 }}>Current awaiting landlord verification</span>
                   </div>
                   <div className="p-4 bg-white">
                     {/* Optional photos */}
@@ -613,48 +604,6 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                     <p className="text-[#1B2D45]/25 mt-2.5" style={{ fontSize: "10px", lineHeight: 1.4 }}>
                       The group already has this place lined up. Amenities, Cribb Score, and full details will appear once the landlord verifies it on Cribb.
                     </p>
-
-                    {matchingClaim && (
-                      <div
-                        className="mt-3 rounded-xl px-3 py-3"
-                        style={{
-                          background: matchingClaim.status === "listing_created" ? "rgba(74,222,128,0.06)" : "rgba(46,196,182,0.05)",
-                          border: `1.5px solid ${matchingClaim.status === "listing_created" ? "rgba(74,222,128,0.18)" : "rgba(46,196,182,0.18)"}`,
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          {matchingClaim.status === "listing_created" ? (
-                            <Check className="w-3.5 h-3.5 text-[#4ADE80]" />
-                          ) : (
-                            <Home className="w-3.5 h-3.5 text-[#2EC4B6]" />
-                          )}
-                          <span
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: 700,
-                              color: matchingClaim.status === "listing_created" ? "#4ADE80" : "#2EC4B6",
-                            }}
-                          >
-                            {matchingClaim.status === "listing_created" ? "Frontend progress: listing published" : "Frontend progress: property added"}
-                          </span>
-                        </div>
-                        <p className="text-[#1B2D45]/35 mt-1.5" style={{ fontSize: "10px", lineHeight: 1.45 }}>
-                          {matchingClaim.status === "listing_created"
-                            ? "The landlord has already created the property and published the listing on Cribb. The final backend step still needs to attach it to this group."
-                            : "The landlord has started the verification flow and added the property details. The listing is the next step."}
-                        </p>
-                        {matchingClaim.property_address && (
-                          <div className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontWeight: 600 }}>
-                            Property: {matchingClaim.property_address}
-                          </div>
-                        )}
-                        {matchingClaim.status === "listing_created" && matchingClaim.listing_rent_per_room && (
-                          <div className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "10px", fontWeight: 600 }}>
-                            Listing rent: ${matchingClaim.listing_rent_per_room}/room
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     {/* Landlord invite link */}
                     {group.housing.landlordInviteUrl && (

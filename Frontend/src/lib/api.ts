@@ -12,6 +12,8 @@ import type {
   ListingDetailResponse,
   ListingResponse,
   ListingCreate,
+  ListingRoomCreate,
+  ListingRoomResponse,
   ListingUpdate,
   ListingFilters,
   PropertyResponse,
@@ -381,6 +383,25 @@ export const listings = {
     request<ListingResponse>(`/api/listings/${id}/sublet`, {
       method: "PATCH",
       body: JSON.stringify(data),
+    }),
+
+  addRoom: (listingId: number, data: ListingRoomCreate) =>
+    request<ListingRoomResponse>(`/api/listings/${listingId}/rooms`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // Update a single room (rent, label, availability)
+  updateRoom: (listingId: number, roomId: number, data: Partial<ListingRoomCreate> & { is_available?: boolean }) =>
+    request<ListingRoomResponse>(`/api/listings/${listingId}/rooms/${roomId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  // Delete a room
+  deleteRoom: (listingId: number, roomId: number) =>
+    request<null>(`/api/listings/${listingId}/rooms/${roomId}`, {
+      method: "DELETE",
     }),
 };
 

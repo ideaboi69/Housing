@@ -164,7 +164,7 @@ function ListingRailCard({
   onTogglePin: (id: number) => void;
 }) {
   const score = healthScores[listing.id] ?? 0;
-  const image = getListingImages(listing.id)[0];
+  const image = listing.images?.[0]?.image_url || getListingImages(listing.id)[0];
   const proximity = getProximityLabel(listing.walk_time_minutes);
 
   return (

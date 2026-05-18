@@ -56,8 +56,29 @@ function AnimatedBar({ score, color }: { score: number; color: string }) {
 
 /* ── Image Gallery ─────────────────────────────── */
 
+/* ── Image Gallery ─────────────────────────────── */
+
 function ImageGallery({ images }: { images: string[] }) {
   const [current, setCurrent] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // Keyboard nav for lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxOpen(false);
+      if (e.key === "ArrowLeft") setCurrent((c) => (c - 1 + images.length) % images.length);
+      if (e.key === "ArrowRight") setCurrent((c) => (c + 1) % images.length);
+    };
+    window.addEventListener("keydown", onKey);
+    // Lock body scroll while open
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [lightboxOpen, images.length]);
 
   if (images.length === 0) {
     return (
@@ -68,40 +89,145 @@ function ImageGallery({ images }: { images: string[] }) {
   }
 
   return (
-    <div className="relative rounded-xl overflow-hidden group">
-      <div className="h-[300px] md:h-[420px] relative">
-        <AnimatePresence mode="wait">
-          <motion.img key={current} src={images[current]} alt={`Photo ${current + 1}`}
-            className="w-full h-full object-cover"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }} />
-        </AnimatePresence>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
+    <>
+      <div className="relative rounded-xl overflow-hidden group">
+        <div
+          className="h-[300px] md:h-[420px] relative cursor-zoom-in"
+          onClick={() => setLightboxOpen(true)}
+        >
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={current}
+              src={images[current]}
+              alt={`Photo ${current + 1}`}
+              className="w-full h-full object-cover"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            />
+          </AnimatePresence>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
+
+          {/* Hint */}
+          <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm text-white px-2.5 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+            style={{ fontSize: "10px", fontWeight: 600 }}>
+            Click to expand
+          </div>
+        </div>
+
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); setCurrent((current - 1 + images.length) % images.length); }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-[#1B2D45]/70 opacity-0 group-hover:opacity-100 hover:bg-white transition-all shadow-md z-10">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setCurrent((current + 1) % images.length); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-[#1B2D45]/70 opacity-0 group-hover:opacity-100 hover:bg-white transition-all shadow-md z-10">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
+              {images.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); setCurrent(i); }}
+                  className={`rounded-full transition-all ${i === current ? "w-6 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50 hover:bg-white/70"}`}
+                />
+              ))}
+            </div>
+            <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm text-white px-2.5 py-1 rounded-full pointer-events-none"
+              style={{ fontSize: "11px", fontWeight: 600 }}>
+              {current + 1} / {images.length}
+            </div>
+          </>
+        )}
       </div>
 
-      {images.length > 1 && (
-        <>
-          <button onClick={() => setCurrent((current - 1 + images.length) % images.length)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-[#1B2D45]/70 opacity-0 group-hover:opacity-100 hover:bg-white transition-all shadow-md">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button onClick={() => setCurrent((current + 1) % images.length)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-[#1B2D45]/70 opacity-0 group-hover:opacity-100 hover:bg-white transition-all shadow-md">
-            <ChevronRight className="w-4 h-4" />
-          </button>
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-            {images.map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)}
-                className={`rounded-full transition-all ${i === current ? "w-6 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/50 hover:bg-white/70"}`} />
-            ))}
-          </div>
-          <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-sm text-white px-2.5 py-1 rounded-full"
-            style={{ fontSize: "11px", fontWeight: 600 }}>
-            {current + 1} / {images.length}
-          </div>
-        </>
-      )}
-    </div>
+      {/* Lightbox overlay */}
+      <AnimatePresence>
+        {lightboxOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center"
+            style={{ backgroundColor: "rgba(0,0,0,0.92)" }}
+            onClick={(e) => { if (e.target === e.currentTarget) setLightboxOpen(false); }}
+          >
+            {/* Close */}
+            <button
+              onClick={() => setLightboxOpen(false)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-all z-[210]"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Counter */}
+            {images.length > 1 && (
+              <div className="absolute top-4 left-4 bg-white/10 backdrop-blur-sm text-white px-3 py-1.5 rounded-full z-[210]"
+                style={{ fontSize: "12px", fontWeight: 600 }}>
+                {current + 1} / {images.length}
+              </div>
+            )}
+
+            {/* Image */}
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={current}
+                src={images[current]}
+                alt={`Photo ${current + 1}`}
+                className="max-w-[92vw] max-h-[88vh] object-contain rounded-lg shadow-2xl"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.18 }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </AnimatePresence>
+
+            {/* Prev / Next */}
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCurrent((current - 1 + images.length) % images.length); }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-all z-[210]"
+                  aria-label="Previous"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCurrent((current + 1) % images.length); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-all z-[210]"
+                  aria-label="Next"
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
+            )}
+
+            {/* Thumbnail strip */}
+            {images.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 max-w-[90vw] overflow-x-auto px-4 py-2 z-[210]">
+                {images.map((src, i) => (
+                  <button
+                    key={i}
+                    onClick={(e) => { e.stopPropagation(); setCurrent(i); }}
+                    className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden transition-all ${i === current ? "ring-2 ring-white" : "opacity-50 hover:opacity-100"
+                      }`}
+                  >
+                    <img src={src} alt={`Thumb ${i + 1}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -218,7 +344,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           } catch {
             setReviews(getMockReviews(data.property_id));
           }
-          setImages(getListingImages(listingId));
+          const realImages = data.images?.map(img => img.image_url) || [];
+          setImages(realImages.length > 0 ? realImages : getListingImages(listingId));
+
         } else {
           throw new Error("Empty response");
         }
@@ -620,14 +748,44 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>
               <div className="flex items-baseline gap-1">
                 <span className="text-[#FF6B35]" style={{ fontSize: "32px", fontWeight: 800 }}>
-                  {formatPrice(Number(listing.rent_per_room))}
+                  {listing.per_room_pricing
+                      ? `From ${formatPrice(Number(listing.rent_min))}`
+                      : formatPrice(Number(listing.rent_per_room))}
                 </span>
                 <span className="text-[#1B2D45]/30" style={{ fontSize: "14px" }}>/room/mo</span>
               </div>
               <div className="text-[#1B2D45]/40 mt-0.5" style={{ fontSize: "12px" }}>
-                {formatPrice(Number(listing.rent_total))} total rent
+                {listing.per_room_pricing
+                    ? `${formatPrice(Number(listing.rent_min))}–${formatPrice(Number(listing.rent_max))}/room · ${formatPrice(Number(listing.rent_total))} total`
+                    : `${formatPrice(Number(listing.rent_total))} total rent`}
               </div>
 
+              {/* Rooms */}
+              {listing.per_room_pricing && listing.rooms && listing.rooms.length > 0 && (
+                <div className="bg-white rounded-2xl border border-black/[0.06] p-5">
+                  <h3 className="text-[#1B2D45] mb-3" style={{ fontSize: "14px", fontWeight: 700 }}>Rooms in this house</h3>
+                  <div className="space-y-2">
+                    {listing.rooms.map((room) => (
+                      <div key={room.id} className="flex items-center justify-between py-2 border-b border-black/[0.04] last:border-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>
+                            {room.label || `Room ${room.display_order + 1}`}
+                          </span>
+                          {!room.is_available && (
+                            <span className="px-2 py-0.5 rounded-full bg-[#E71D36]/[0.08] text-[#E71D36]" style={{ fontSize: "10px", fontWeight: 700 }}>
+                              Taken
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                          {formatPrice(Number(room.rent))}/mo
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            
               {/* Verified badge */}
               {listing.landlord_verified && (
                 <motion.div className="relative flex items-center gap-1.5 mt-4 bg-[#4ADE80]/10 text-[#4ADE80] px-3 py-1.5 rounded-lg overflow-hidden"

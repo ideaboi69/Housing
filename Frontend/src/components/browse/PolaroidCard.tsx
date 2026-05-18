@@ -103,8 +103,8 @@ export function PolaroidCard({
   /* ── Social proof counts ────────────────────────── */
   const viewCount = listing.view_count ?? 0;
   const saveCount = listing.save_count ?? 0;
-  const coverImage = getListingImages(listing.id)[0];
-
+  const coverImage = listing.images?.[0]?.image_url || getListingImages(listing.id)[0];
+  
   return (
     <motion.div
       className="relative group"
@@ -247,7 +247,9 @@ export function PolaroidCard({
                     className="text-[#FF6B35]"
                     style={{ fontSize: "21px", fontWeight: 800 }}
                   >
-                    {formatPrice(Number(listing.rent_per_room))}
+                    {listing.per_room_pricing
+                      ? `From ${formatPrice(Number(listing.rent_min || listing.rent_per_room))}`
+                      : formatPrice(Number(listing.rent_per_room))}
                   </span>
                   <span
                     className="text-[#1B2D45]/30"
@@ -372,7 +374,9 @@ export function PolaroidCard({
                     className="text-[#FF6B35]"
                     style={{ fontSize: "22px", fontWeight: 800 }}
                   >
-                    {formatPrice(Number(listing.rent_per_room))}
+                    {listing.per_room_pricing
+                      ? `From ${formatPrice(Number(listing.rent_min || listing.rent_per_room))}`
+                      : formatPrice(Number(listing.rent_per_room))}
                   </span>
                   <span
                     className="text-[#1B2D45]/30"

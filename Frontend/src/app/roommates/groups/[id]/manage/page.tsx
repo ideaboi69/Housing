@@ -175,11 +175,14 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
             moveIn: apiGroup.move_in_timing || "",
             createdAt: apiGroup.created_at,
             housing: apiGroup.has_place ? {
-              status: apiGroup.is_verified ? "linked" : "pending",
+              status: apiGroup.listing_id ? "linked" : "pending",
+              linkedListingId: apiGroup.listing_id ?? undefined,
+              linkedListingTitle: apiGroup.listing_title ?? undefined,
+              linkedListingAddress: apiGroup.listing_address ?? undefined,
               selfReportedAddress: apiGroup.address || undefined,
               selfReportedRent: Number(apiGroup.rent_per_person) || undefined,
               selfReportedUtilitiesIncluded: apiGroup.utilities_included,
-              landlordInviteUrl,
+              landlordInviteUrl: apiGroup.listing_id ? undefined : landlordInviteUrl,
             } : undefined,
             groupImage: apiGroup.group_photo_url || undefined,
           } as RoommateGroup);
@@ -568,27 +571,48 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                   </div>
 
                   <div className="rounded-[18px] border border-[#2EC4B6]/12 bg-[#F5FCFB] px-4 py-3">
-                    <div className="text-[#2EC4B6]" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                      Landlord verification
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="min-w-0 flex-1 truncate text-[#2EC4B6]/72" style={{ fontSize: "12px", fontWeight: 600 }}>
-                        {group.housing?.landlordInviteUrl
-                          ? group.housing.landlordInviteUrl
-                          : group.housing?.status === "linked"
-                          ? "Listing already linked — no landlord verification needed."
-                          : "Add your home address in group settings to invite your landlord."}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-[#2EC4B6]" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                        Landlord verification
                       </div>
-                      {group.housing?.landlordInviteUrl && (
-                        <button
-                          onClick={handleLandlordCopy}
-                          className="shrink-0 rounded-full bg-[#2EC4B6] px-3 py-1.5 text-white transition-all hover:bg-[#28b0a3]"
-                          style={{ fontSize: "10px", fontWeight: 700 }}
-                        >
-                          {landlordCopied ? "Copied" : "Copy"}
-                        </button>
+                      {group.housing?.status === "linked" && (
+                        <span className="px-2 py-0.5 rounded-full bg-[#2EC4B6] text-white" style={{ fontSize: "9px", fontWeight: 800, letterSpacing: "0.04em" }}>
+                          ✓ CLAIMED
+                        </span>
                       )}
                     </div>
+
+                    {group.housing?.status === "linked" && group.housing.linkedListingId ? (
+                      <Link
+                        href={`/browse/${group.housing.linkedListingId}`}
+                        className="block rounded-lg bg-white border border-[#2EC4B6]/15 px-3 py-2.5 hover:border-[#2EC4B6]/30 hover:bg-[#2EC4B6]/[0.02] transition-all"
+                      >
+                        <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                          {group.housing.linkedListingTitle || "Linked listing"}
+                        </div>
+                        {group.housing.linkedListingAddress && (
+                          <div className="text-[#1B2D45]/45 mt-0.5" style={{ fontSize: "11px" }}>
+                            {group.housing.linkedListingAddress}
+                          </div>
+                        )}
+                        <div className="text-[#2EC4B6] mt-1.5" style={{ fontSize: "10px", fontWeight: 700 }}>
+                          View listing →
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1 truncate text-[#2EC4B6]/72" style={{ fontSize: "12px", fontWeight: 600 }}>
+                          {group.housing?.landlordInviteUrl
+                            ? group.housing.landlordInviteUrl
+                            : "Add your home address in group settings to invite your landlord."}
+                        </div>
+                        {group.housing?.landlordInviteUrl && (
+                          <button onClick={handleLandlordCopy} className="shrink-0 rounded-full bg-[#2EC4B6] px-3 py-1.5 text-white transition-all hover:bg-[#28b0a3]" style={{ fontSize: "10px", fontWeight: 700 }}>
+                            {landlordCopied ? "Copied" : "Copy"}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

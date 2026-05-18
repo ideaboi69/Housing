@@ -11,6 +11,7 @@ import {
   ArrowLeft, Plus, Eye, Trash2, Edit3, Home, Calendar, DollarSign,
   MapPin, Loader2, AlertTriangle, Check, X, Image as ImageIcon,
 } from "lucide-react";
+import { EditPropertyModal } from "@/components/landlord/EditPropertyModal";
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -24,7 +25,8 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const [deleting, setDeleting] = useState<number | null>(null);
   const [deletingProperty, setDeletingProperty] = useState(false);
   const [confirmDeleteProperty, setConfirmDeleteProperty] = useState(false);
-
+  const [editing, setEditing] = useState(false);
+  
   useEffect(() => {
     async function load() {
       try {
@@ -126,6 +128,13 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               >
                 <Plus className="w-3.5 h-3.5" /> Add Listing
               </Link>
+              <button
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/[0.06] text-[#1B2D45]/55 hover:text-[#1B2D45] hover:border-[#1B2D45]/20 transition-all"
+                style={{ fontSize: "12px", fontWeight: 600 }}
+              >
+                <Edit3 className="w-3.5 h-3.5" /> Edit property
+              </button>
             </div>
           </div>
 
@@ -319,6 +328,13 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
       </div>
+      {editing && property && (
+        <EditPropertyModal
+          property={property}
+          onClose={() => setEditing(false)}
+          onSaved={(updated) => setProperty(updated)}
+        />
+      )}
     </div>
   );
 }

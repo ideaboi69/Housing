@@ -26,7 +26,7 @@ function PickCard({
   healthScore: number | null;
   onRemove: () => void;
 }) {
-  const thumbnail = getListingImages(listing.id)[0];
+  const thumbnail = listing.images?.[0]?.image_url || getListingImages(listing.id)[0];
   return (
     <motion.div
       layout

@@ -289,6 +289,10 @@ export interface ListingResponse {
   property_id: number;
   rent_per_room: number;
   rent_total: number;
+  rent_min: number;
+  rent_max: number;
+  per_room_pricing: boolean;
+  rooms: ListingRoomResponse[];
   lease_type: string;
   move_in_date: string;
   is_sublet: boolean;
@@ -308,10 +312,28 @@ export interface ListingImageResponse {
   display_order: number;
 }
 
+export interface ListingRoomResponse {
+  id: number;
+  label?: string | null;
+  rent: number;
+  is_available: boolean;
+  display_order: number;
+}
+
+export interface ListingRoomCreate {
+  label?: string | null;
+  rent: number;
+  display_order: number;
+}
+
 export interface ListingDetailResponse {
   id: number;
   rent_per_room: number;
   rent_total: number;
+  rent_min: number;
+  rent_max: number;
+  per_room_pricing: boolean;
+  rooms: ListingRoomResponse[];
   lease_type: string;
   move_in_date: string;
   is_sublet: boolean;
@@ -368,8 +390,10 @@ export interface ListingDetailResponse {
 
 export interface ListingCreate {
   property_id: number;
-  rent_per_room: number;
-  rent_total: number;
+  rent_per_room?: number;
+  rent_total?: number;
+  per_room_pricing: boolean;
+  rooms?: ListingRoomCreate[];
   lease_type: LeaseType;
   move_in_date: string;
   is_sublet?: boolean;
@@ -1034,6 +1058,9 @@ export interface GroupCardResponse {
   is_verified: boolean;
   is_visible: boolean;
   invite_code?: string;
+  listing_id?: number | null;
+  listing_title?: string | null;
+  listing_address?: string | null;
   group_photo_url?: string | null;
   members: GroupMemberResponse[];
   compatibility_score: number | null;

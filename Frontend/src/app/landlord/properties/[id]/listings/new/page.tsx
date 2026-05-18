@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
-import { LeaseType, GenderPreference } from "@/types";
+import { LeaseType, GenderPreference, ListingCreate } from "@/types";
 import type { PropertyResponse } from "@/types";
 import { ArrowLeft, DollarSign, Calendar, Users, Check, Home, Loader2, Image as ImageIcon, X, Upload } from "lucide-react";
 
@@ -37,7 +37,10 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     sublet_start_date: "",
     sublet_end_date: "",
     gender_preference: GenderPreference.ANY,
+    
   });
+  const [perRoomPricing, setPerRoomPricing] = useState(false);
+  const [rooms, setRooms] = useState<{ label: string; rent: string }[]>([]);
 
   useEffect(() => {
     async function loadProperty() {
@@ -53,8 +56,26 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     loadProperty();
   }, [propertyId]);
 
+  useEffect(() => {
+    if (!property) return;
+    // Initialize one row per property room when entering per-room mode (or property changes)
+    setRooms((prev) => {
+      const need = property.total_rooms;
+      if (prev.length === need) return prev;
+      const next = Array.from({ length: need }, (_, i) => ({
+        label: prev[i]?.label || (i === 0 ? "Master Bedroom" : `Room ${i + 1}`),
+        rent: prev[i]?.rent || "",
+      }));
+      return next;
+    });
+  }, [property]);
+
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function updateRoom(index: number, field: "label" | "rent", value: string) {
+    setRooms((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
   }
 
   // Auto-calculate total rent
@@ -122,8 +143,23 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.rent_per_room || !form.move_in_date) {
-      setError("Rent and move-in date are required");
+
+    // Validate based on pricing mode
+    if (perRoomPricing) {
+      const allFilled = rooms.every((r) => r.rent && Number(r.rent) > 0);
+      if (!allFilled) {
+        setError("Set a rent for every room");
+        return;
+      }
+    } else {
+      if (!form.rent_per_room) {
+        setError("Rent per room is required");
+        return;
+      }
+    }
+
+    if (!form.move_in_date) {
+      setError("Move-in date is required");
       return;
     }
 
@@ -136,10 +172,9 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     setError("");
 
     try {
-      const payload = {
+      const payload: ListingCreate = {
         property_id: propertyId,
-        rent_per_room: Number(form.rent_per_room),
-        rent_total: Number(form.rent_total || form.rent_per_room),
+        per_room_pricing: perRoomPricing,
         lease_type: form.lease_type,
         move_in_date: form.move_in_date,
         is_sublet: form.is_sublet,
@@ -147,6 +182,17 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
         sublet_end_date: form.is_sublet && form.sublet_end_date ? form.sublet_end_date : undefined,
         gender_preference: form.gender_preference !== GenderPreference.ANY ? form.gender_preference : undefined,
       };
+
+      if (perRoomPricing) {
+        payload.rooms = rooms.map((r, i) => ({
+          label: r.label || `Room ${i + 1}`,
+          rent: Number(r.rent),
+          display_order: i,
+        }));
+      } else {
+        payload.rent_per_room = Number(form.rent_per_room);
+        payload.rent_total = Number(form.rent_total || form.rent_per_room);
+      }
 
       const createdListing = await api.listings.create(payload);
 
@@ -209,47 +255,102 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Pricing */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
-            <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-              <DollarSign className="w-4 h-4 text-[#FF6B35]" /> Pricing
-            </h2>
+            <div className="flex items-start justify-between gap-4">
+              <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
+                <DollarSign className="w-4 h-4 text-[#FF6B35]" /> Pricing
+              </h2>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={perRoomPricing}
+                  onChange={(e) => setPerRoomPricing(e.target.checked)}
+                  className="w-4 h-4 accent-[#FF6B35]"
+                />
+                <span className="text-[#1B2D45]/70" style={{ fontSize: "12px", fontWeight: 500 }}>
+                  Different price per room
+                </span>
+              </label>
+            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Rent per room / month</label>
-                <div className="relative mt-1.5">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "14px" }}>$</span>
-                  <input
-                    type="number"
-                    value={form.rent_per_room}
-                    onChange={(e) => updateRentPerRoom(e.target.value)}
-                    placeholder="650"
-                    required
-                    className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
-                    style={{ fontSize: "14px" }}
-                  />
+            {!perRoomPricing ? (
+              <>
+                <p className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>
+                  Same rent for every room. Check the box above if rooms have different prices.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Rent per room / month</label>
+                    <div className="relative mt-1.5">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "14px" }}>$</span>
+                      <input
+                        type="number"
+                        value={form.rent_per_room}
+                        onChange={(e) => updateRentPerRoom(e.target.value)}
+                        placeholder="650"
+                        className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                        style={{ fontSize: "14px" }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Total rent / month</label>
+                    <div className="relative mt-1.5">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "14px" }}>$</span>
+                      <input
+                        type="number"
+                        value={form.rent_total}
+                        onChange={(e) => update("rent_total", e.target.value)}
+                        placeholder="2600"
+                        className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                        style={{ fontSize: "14px" }}
+                      />
+                    </div>
+                    {property && form.rent_per_room && (
+                      <div className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px" }}>
+                        Auto-calculated: ${Number(form.rent_per_room) * property.total_rooms} for {property.total_rooms} rooms
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Total rent / month</label>
-                <div className="relative mt-1.5">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "14px" }}>$</span>
-                  <input
-                    type="number"
-                    value={form.rent_total}
-                    onChange={(e) => update("rent_total", e.target.value)}
-                    placeholder="2600"
-                    required
-                    className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
-                    style={{ fontSize: "14px" }}
-                  />
+              </>
+            ) : (
+              <>
+                <p className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>
+                  Set a price for each of the {property?.total_rooms ?? 0} room{(property?.total_rooms ?? 0) === 1 ? "" : "s"}. The master bedroom is usually a bit more.
+                </p>
+                <div className="space-y-2">
+                  {rooms.map((room, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_140px] gap-3">
+                      <input
+                        type="text"
+                        value={room.label}
+                        onChange={(e) => updateRoom(i, "label", e.target.value)}
+                        placeholder={i === 0 ? "Master Bedroom" : `Room ${i + 1}`}
+                        className="px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                        style={{ fontSize: "13px" }}
+                      />
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "14px" }}>$</span>
+                        <input
+                          type="number"
+                          value={room.rent}
+                          onChange={(e) => updateRoom(i, "rent", e.target.value)}
+                          placeholder="650"
+                          className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                          style={{ fontSize: "13px" }}
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {property && form.rent_per_room && (
-                  <div className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "11px" }}>
-                    Auto-calculated: ${Number(form.rent_per_room) * property.total_rooms} for {property.total_rooms} rooms
+                {rooms.length > 0 && rooms.every((r) => r.rent && Number(r.rent) > 0) && (
+                  <div className="text-[#1B2D45]/40 pt-1 border-t border-black/[0.04]" style={{ fontSize: "11px" }}>
+                    Total: ${rooms.reduce((sum, r) => sum + Number(r.rent || 0), 0).toLocaleString()}/month
+                    {" — "}from ${Math.min(...rooms.map((r) => Number(r.rent))).toLocaleString()}/room
                   </div>
                 )}
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Lease Details */}
