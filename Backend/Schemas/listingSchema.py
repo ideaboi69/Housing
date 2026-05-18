@@ -25,16 +25,29 @@ class ListingStatus(str, enum.Enum):
     EXPIRED = "expired"
 
 # Request
+class ListingRoomCreate(BaseModel):
+    label: Optional[str] = None
+    rent: Decimal
+    display_order: int = 0
+
 class ListingCreate(BaseModel):
     property_id: int
-    rent_per_room: Decimal
-    rent_total: Decimal
+    rent_per_room: Optional[Decimal] = None 
+    rent_total: Optional[Decimal] = None 
+    per_room_pricing: bool = False
+    rooms: Optional[list[ListingRoomCreate]] = None
     lease_type: LeaseType
     move_in_date: date
     is_sublet: bool = False
     sublet_start_date: Optional[date] = None
     sublet_end_date: Optional[date] = None
-    gender_preference: Optional[GenderPreference] = None 
+    gender_preference: Optional[GenderPreference] = None
+
+class ListingRoomUpdate(BaseModel):
+    label: Optional[str] = None
+    rent: Optional[Decimal] = None
+    is_available: Optional[bool] = None
+    display_order: Optional[int] = None
 
 class ListingUpdate(BaseModel):
     rent_per_room: Optional[Decimal] = None
@@ -61,11 +74,25 @@ class ListingImageResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class ListingRoomResponse(BaseModel):
+    id: int
+    label: Optional[str] = None
+    rent: Decimal
+    is_available: bool
+    display_order: int
+
+    class Config:
+        from_attributes = True
+
 class ListingResponse(BaseModel):
     id: int
     property_id: int
     rent_per_room: Decimal
     rent_total: Decimal
+    rent_min: Decimal
+    rent_max: Decimal
+    per_room_pricing: bool
+    rooms: list[ListingRoomResponse] = []
     lease_type: str
     move_in_date: date
     is_sublet: bool
@@ -86,6 +113,10 @@ class ListingDetailResponse(BaseModel):
     id: int
     rent_per_room: Decimal
     rent_total: Decimal
+    rent_min: Decimal
+    rent_max: Decimal
+    per_room_pricing: bool
+    rooms: list[ListingRoomResponse] = []
     lease_type: str
     move_in_date: date
     is_sublet: bool

@@ -178,6 +178,7 @@ class Listing(Base):
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
     rent_per_room = Column(Numeric(8, 2), nullable=False)
     rent_total = Column(Numeric(8, 2), nullable=False)
+    per_room_pricing = Column(Boolean, default=False, nullable=False)
     lease_type = Column(Enum(LeaseType), nullable=False)
     move_in_date = Column(Date, nullable=False)
     is_sublet = Column(Boolean, default=False, nullable=False)
@@ -191,6 +192,7 @@ class Listing(Base):
 
     property = relationship("Property", back_populates="listings")
     images = relationship("ListingImage", back_populates="listing", cascade="all, delete-orphan")
+    rooms = relationship("ListingRoom", back_populates="listing", cascade="all, delete-orphan", order_by="ListingRoom.display_order")
     health_score = relationship("HousingHealthScore", back_populates="listing", uselist=False)
     saved_by = relationship("SavedListing", back_populates="listing")
     flags = relationship("Flag", back_populates="listing")
@@ -216,6 +218,24 @@ class ListingImage(Base):
     display_order = Column(Integer, default=0, nullable=False)
 
     listing = relationship("Listing", back_populates="images")
+
+class ListingRoom(Base):
+    __tablename__ = "listing_rooms"
+
+    id = Column(Integer, primary_key=True)
+    listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
+    label = Column(String(80), nullable=True)
+    rent = Column(Numeric(8, 2), nullable=False)
+    is_available = Column(Boolean, default=True, nullable=False)
+    display_order = Column(Integer, default=0, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    listing = relationship("Listing", back_populates="rooms")
+
+    __table_args__ = (
+        Index("ix_listing_rooms_listing", "listing_id"),
+        Index("ix_listing_rooms_rent", "rent"),
+    )
 
 class Review(Base):
     __tablename__ = "reviews"

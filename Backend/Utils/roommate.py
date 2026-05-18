@@ -4,6 +4,23 @@ from Schemas.roommateSchema import *
 from helpers import *
 from tables import *
 import secrets
+
+def get_linked_listing_info(group: "RoommateGroup", db: Session):
+    """Returns (title, address) for the group's linked listing, or (None, None) if not linked."""
+    if not group.listing_id:
+        return None, None
+
+    from tables import Listing, Property
+    result = db.query(Listing, Property).join(
+        Property, Listing.property_id == Property.id
+    ).filter(Listing.id == group.listing_id).first()
+
+    if not result:
+        return None, None
+
+    _, prop = result
+    return prop.title, prop.address
+
 def build_group_card(group: RoommateGroup, db: Session, viewer_profile: RoommateProfile = None) -> GroupCardResponse:
     members = []
     for m in group.members:
@@ -21,6 +38,8 @@ def build_group_card(group: RoommateGroup, db: Session, viewer_profile: Roommate
 
     score = calculate_group_compatibility(viewer_profile, group, db) if viewer_profile else None
 
+    listing_title, listing_address = get_linked_listing_info(group, db)
+
     return GroupCardResponse(
         id=group.id,
         name=group.name,
@@ -36,6 +55,9 @@ def build_group_card(group: RoommateGroup, db: Session, viewer_profile: Roommate
         address=group.address,
         is_verified=group.is_verified,
         is_visible=group.is_visible,
+        listing_id=group.listing_id,
+        listing_title=listing_title,
+        listing_address=listing_address,
         invite_code=group.invite_code,
         members=members,
         group_photo_url=group.group_photo_url,
@@ -46,6 +68,8 @@ def build_group_card(group: RoommateGroup, db: Session, viewer_profile: Roommate
 
 def build_group_detail(group: RoommateGroup, db: Session) -> GroupDetailResponse:
     card = build_group_card(group, db)
+    listing_title, listing_address = get_linked_listing_info(group, db)
+
     return GroupDetailResponse(
         **card.model_dump(),
         owner_id=group.owner_id,

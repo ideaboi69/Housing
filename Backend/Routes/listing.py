@@ -3,11 +3,11 @@ from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
 from sqlalchemy.orm import Session
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation
-from Schemas.listingSchema import ListingCreate, ListingUpdate, ListingResponse, ListingDetailResponse, SubletConvert, ListingStatus, ListingImageResponse
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation, ListingRoom
+from Schemas.listingSchema import *
 from Schemas.propertySchema import PropertyType
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
-from helpers import get_landlord_for_user, require_landlord, build_listing_detail, get_listing_owned_by
+from helpers import get_landlord_for_user, require_landlord, build_listing_detail, get_listing_owned_by, build_listing_response
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
@@ -18,19 +18,43 @@ listing_router = APIRouter()
 def create_listing(payload: ListingCreate, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
     landlord = get_landlord_for_user(current_user, db)
     if not landlord.identity_verified:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You must be verified before creating listings")
-    
-    # verify the landlord owns the property
+        raise HTTPException(status_code=403, detail="You must be verified before creating listings")
+
     prop = db.query(Property).filter(Property.id == payload.property_id).first()
     if not prop:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+        raise HTTPException(status_code=404, detail="Property not found")
     if prop.landlord_id != landlord.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not own this property")
+        raise HTTPException(status_code=403, detail="You do not own this property")
+
+    # Resolve rooms based on pricing mode
+    if payload.per_room_pricing:
+        if not payload.rooms or len(payload.rooms) == 0:
+            raise HTTPException(status_code=400, detail="rooms required when per_room_pricing is true")
+        if len(payload.rooms) != prop.total_rooms:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Expected {prop.total_rooms} rooms (matching property), got {len(payload.rooms)}"
+            )
+        room_specs = payload.rooms
+    else:
+        if not payload.rent_per_room:
+            raise HTTPException(status_code=400, detail="rent_per_room required when per_room_pricing is false")
+        # Build N rooms at the flat rate
+        room_specs = [
+            ListingRoomCreate(label=f"Room {i+1}", rent=payload.rent_per_room, display_order=i)
+            for i in range(prop.total_rooms)
+        ]
+
+    # Compute derived rent fields
+    rents = [r.rent for r in room_specs]
+    rent_min = min(rents)
+    rent_total = sum(rents)
 
     listing = Listing(
         property_id=payload.property_id,
-        rent_per_room=payload.rent_per_room,
-        rent_total=payload.rent_total,
+        rent_per_room=rent_min,
+        rent_total=rent_total,
+        per_room_pricing=payload.per_room_pricing,
         lease_type=payload.lease_type,
         move_in_date=payload.move_in_date,
         is_sublet=payload.is_sublet,
@@ -40,10 +64,21 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
         status=ListingStatus.ACTIVE,
     )
     db.add(listing)
+    db.flush()
+
+    for spec in room_specs:
+        room = ListingRoom(
+            listing_id=listing.id,
+            label=spec.label,
+            rent=spec.rent,
+            display_order=spec.display_order,
+        )
+        db.add(room)
+
     db.commit()
     db.refresh(listing)
 
-    return ListingResponse.model_validate(listing)
+    return build_listing_response(listing)
 
 @listing_router.post("/{listing_id}/images", status_code=status.HTTP_201_CREATED)
 async def upload_listing_images(listing_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
@@ -205,7 +240,7 @@ def publish_listing(listing_id: int, db: Session = Depends(get_db),landlord: Lan
     db.commit()
     db.refresh(listing)
 
-    return ListingResponse.model_validate(listing)
+    return build_listing_response(listing)
 
 @listing_router.patch("/{listing_id}/unpublish", response_model=ListingResponse)
 def unpublish_listing(listing_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
@@ -224,7 +259,7 @@ def unpublish_listing(listing_id: int, db: Session = Depends(get_db), landlord: 
     db.commit()
     db.refresh(listing)
 
-    return ListingResponse.model_validate(listing)
+    return build_listing_response(listing)
 
 # Get Single Listings (public, increments view count)
 @listing_router.get("/{listing_id}", response_model=ListingDetailResponse)
@@ -265,7 +300,7 @@ def update_listing(
     db.commit()
     db.refresh(listing)
 
-    return ListingResponse.model_validate(listing)
+    return build_listing_response(listing)
 
 # Convert to sublet (landlord only)
 @listing_router.patch("/{listing_id}/sublet", response_model=ListingResponse)
@@ -287,7 +322,7 @@ def convert_to_sublet(
     db.commit()
     db.refresh(listing)
 
-    return ListingResponse.model_validate(listing)
+    return build_listing_response(listing)
 
 # Delete Listing (landlord only, must own it)
 @listing_router.delete("/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -333,4 +368,77 @@ def delete_a_listing_image(listing_id: int, image_id: int, db: Session = Depends
 
     delete_image_from_cloudinary(image.image_url)
     db.delete(image)
+    db.commit()
+
+# Dynamic room pricing
+@listing_router.patch("/{listing_id}/rooms/{room_id}", response_model=ListingRoomResponse)
+def update_listing_room(listing_id: int, room_id: int, payload: ListingRoomUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_for_user(current_user, db)
+    listing = get_listing_owned_by(listing_id, landlord, db)
+
+    room = db.query(ListingRoom).filter(ListingRoom.id == room_id, ListingRoom.listing_id == listing.id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(room, key, value)
+
+    db.flush()
+
+    # Recompute derived rent fields on the listing
+    rents = [r.rent for r in listing.rooms]
+    if rents:
+        listing.rent_per_room = min(rents)
+        listing.rent_total = sum(rents)
+
+    db.commit()
+    db.refresh(room)
+    return ListingRoomResponse.model_validate(room)
+
+
+@listing_router.post("/{listing_id}/rooms", response_model=ListingRoomResponse, status_code=status.HTTP_201_CREATED)
+def add_listing_room(listing_id: int, payload: ListingRoomCreate, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_for_user(current_user, db)
+    listing = get_listing_owned_by(listing_id, landlord, db)
+
+    room = ListingRoom(
+        listing_id=listing.id,
+        label=payload.label,
+        rent=payload.rent,
+        display_order=payload.display_order,
+    )
+    db.add(room)
+    db.flush()
+
+    # Recompute derived fields
+    all_rooms = [r for r in listing.rooms] + [room]
+    rents = [r.rent for r in all_rooms]
+    listing.rent_per_room = min(rents)
+    listing.rent_total = sum(rents)
+
+    db.commit()
+    db.refresh(room)
+    return ListingRoomResponse.model_validate(room)
+
+
+@listing_router.delete("/{listing_id}/rooms/{room_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_listing_room(listing_id: int, room_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_for_user(current_user, db)
+    listing = get_listing_owned_by(listing_id, landlord, db)
+
+    room = db.query(ListingRoom).filter(ListingRoom.id == room_id, ListingRoom.listing_id == listing.id).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+
+    if len(listing.rooms) <= 1:
+        raise HTTPException(status_code=400, detail="Listing must have at least one room")
+
+    db.delete(room)
+    db.flush()
+
+    remaining_rents = [r.rent for r in listing.rooms if r.id != room_id]
+    listing.rent_per_room = min(remaining_rents)
+    listing.rent_total = sum(remaining_rents)
+
     db.commit()

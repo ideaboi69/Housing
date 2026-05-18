@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Depends, status, APIRouter, UploadFile, File, Form
+from fastapi import HTTPException, Depends, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, ViewingAvailability, ViewingBooking
@@ -6,11 +6,10 @@ from dotenv import load_dotenv
 from sqlalchemy import text, func as sql_func
 from tables import *
 from Schemas.userSchema import UserRole
-from Schemas.landlordSchema import LandlordVerification
 from Utils.security import get_current_user, decode_access_token
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from Schemas.featureSchema import AmenityValue, ListingPolicies, ListingTerms, PetPolicy, SmokingPolicy, SpaceAmenities, SubletTerms
-from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse
+from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse, ListingRoomResponse, ListingResponse
 from Schemas.propertySchema import PropertyResponse
 from Schemas.subletSchema import SubletListResponse, SubletResponse, SubletImageResponse
 from Utils.cloudinary import delete_image_from_cloudinary
@@ -22,7 +21,6 @@ from datetime import timedelta
 import uuid 
 import boto3
 import os
-import resend
 import re
 import uuid
 
@@ -528,10 +526,16 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         else (listing.gender_preference.value if listing.gender_preference else None)
     )
 
+    rent_min, rent_max, rent_total = compute_listing_rent_stats(listing.rooms)
+
     return ListingDetailResponse(
         id=listing.id,
         rent_per_room=listing.rent_per_room,
         rent_total=listing.rent_total,
+        rent_min=rent_min,
+        rent_max=rent_max,
+        per_room_pricing=listing.per_room_pricing,
+        rooms=[ListingRoomResponse.model_validate(r) for r in listing.rooms],
         lease_type=lease_type,
         move_in_date=listing.move_in_date,
         is_sublet=listing.is_sublet,
@@ -598,6 +602,31 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         landlord_id=landlord.id,
         landlord_name=f"{landlord.first_name} {landlord.last_name}",
         landlord_verified=landlord.identity_verified,
+    )
+
+def build_listing_response(listing: Listing) -> ListingResponse:
+    """Build the basic listing response (no property/landlord context)."""
+    rent_min, rent_max, rent_total = compute_listing_rent_stats(listing.rooms)
+    return ListingResponse(
+        id=listing.id,
+        property_id=listing.property_id,
+        rent_per_room=rent_min,
+        rent_total=rent_total,
+        rent_min=rent_min,
+        rent_max=rent_max,
+        per_room_pricing=listing.per_room_pricing,
+        rooms=[ListingRoomResponse.model_validate(r) for r in listing.rooms],
+        lease_type=listing.lease_type if isinstance(listing.lease_type, str) else listing.lease_type.value,
+        move_in_date=listing.move_in_date,
+        is_sublet=listing.is_sublet,
+        sublet_start_date=listing.sublet_start_date,
+        sublet_end_date=listing.sublet_end_date,
+        gender_preference=listing.gender_preference if isinstance(listing.gender_preference, str) else (listing.gender_preference.value if listing.gender_preference else None),
+        status=listing.status if isinstance(listing.status, str) else listing.status.value,
+        view_count=listing.view_count,
+        images=[ListingImageResponse.model_validate(img) for img in listing.images],
+        created_at=listing.created_at,
+        updated_at=listing.updated_at,
     )
 
 # Review Helpers
@@ -831,6 +860,12 @@ def compute_and_save(listing_id: int, db: Session) -> HousingHealthScore:
         db.refresh(health_score)
         return health_score
  
+def compute_listing_rent_stats(rooms):
+    """Returns (rent_min, rent_max, rent_total). Defaults to 0 if no rooms."""
+    if not rooms:
+        return Decimal("0"), Decimal("0"), Decimal("0")
+    rents = [r.rent for r in rooms]
+    return min(rents), max(rents), sum(rents)
 
 # Upload to S3 helpers (Landlord)
 

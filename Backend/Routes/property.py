@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation
 from Schemas.propertySchema import PropertyCreate, PropertyUpdate, PropertyResponse
+from Schemas.listingSchema import ListingStatus
 from Utils.cloudinary import delete_image_from_cloudinary
 from helpers import build_property_response, require_landlord, get_landlord_for_user, get_property_owned_by
 
@@ -78,6 +79,19 @@ def update_property(property_id: int, payload: PropertyUpdate, db: Session = Dep
     prop = get_property_owned_by(property_id, landlord.id, db)
 
     update_data = payload.model_dump(exclude_unset=True)
+
+    # Block total_rooms changes if active or rented listings exist
+    if "total_rooms" in update_data and update_data["total_rooms"] != prop.total_rooms:
+        active_listings = db.query(Listing).filter(
+            Listing.property_id == prop.id,
+            Listing.status.in_([ListingStatus.ACTIVE, ListingStatus.RENTED])
+        ).count()
+        if active_listings > 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot change room count while you have active or rented listings. Edit individual listings to add/remove rooms instead."
+            )
+
     for field, value in update_data.items():
         if hasattr(value, "value"):
             value = value.value

@@ -207,6 +207,9 @@ class GroupCardResponse(BaseModel):
     is_verified: bool
     invite_code: Optional[str] = None
     is_visible: bool = True
+    listing_id: Optional[int] = None
+    listing_title: Optional[str] = None
+    listing_address: Optional[str] = None
     group_photo_url: Optional[str] = None
     members: list[GroupMemberResponse] = []
     compatibility_score: Optional[int] = None
