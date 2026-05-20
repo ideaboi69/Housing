@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
-import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse } from "@/types";
+import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse, ListingDetailResponse } from "@/types";
 import {
   Plus, Building2, Eye, EyeOff, TrendingUp, Shield, ShieldCheck,
   ChevronRight, Home, Phone, Mail, Pencil, Check, X,
@@ -1737,20 +1737,13 @@ function LandlordDashboardContent() {
         // Enrich with listings
         const enriched: PropertyWithListings[] = await Promise.all(
           props.map(async (prop) => {
-            let listings: ListingResponse[] = [];
+            let listings: ListingDetailResponse[] = [];
             let healthScore: number | null = null;
             let totalViews = 0;
 
             try {
               const allListings = await api.listings.browse({ skip: 0, limit: 100 });
-              listings = allListings.filter((l) => l.property_id === prop.id).map((l) => ({
-                id: l.id, property_id: l.property_id, rent_per_room: l.rent_per_room,
-                rent_total: l.rent_total, lease_type: l.lease_type, move_in_date: l.move_in_date,
-                is_sublet: l.is_sublet, sublet_start_date: l.sublet_start_date,
-                sublet_end_date: l.sublet_end_date, gender_preference: l.gender_preference,
-                status: l.status, view_count: l.view_count, created_at: l.created_at,
-                updated_at: l.created_at,
-              }));
+              listings = allListings.filter((l) => l.property_id === prop.id);
               totalViews = listings.reduce((sum, l) => sum + l.view_count, 0);
 
               const active = listings.find(l => l.status === "active");

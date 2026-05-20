@@ -343,6 +343,7 @@ export interface ListingDetailResponse {
   status: string;
   view_count: number;
   created_at: string;
+  updated_at: string;
   // property info
   property_id: number;
   title: string;
