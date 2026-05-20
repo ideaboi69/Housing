@@ -762,6 +762,33 @@ class RoommateGroupMember(Base):
         UniqueConstraint("group_id", "user_id", name="uq_roommate_group_member"),
     )
 
+class GroupChatMessage(Base):
+    __tablename__ = "group_chat_messages"
+
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("roommate_groups.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    content = Column(Text, nullable=False)
+    is_pinned = Column(Boolean, default=False, nullable=False)
+    edited_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    group = relationship("RoommateGroup", backref="chat_messages")
+    sender = relationship("User", backref="sent_group_messages")
+
+    __table_args__ = (
+        Index("ix_group_chat_messages_group", "group_id", "created_at"),
+    )
+    
+class GroupChatReadState(Base):
+    __tablename__ = "group_chat_read_state"
+
+    group_id = Column(Integer, ForeignKey("roommate_groups.id", ondelete="CASCADE"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    last_read_message_id = Column(Integer, default=0, nullable=False)
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
 class RoommateInvite(Base):
     """Group owner invites an individual to join."""
     __tablename__ = "roommate_invites"
