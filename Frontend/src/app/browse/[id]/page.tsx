@@ -317,7 +317,8 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [reviewOpen, setReviewOpen] = useState(false);
   const [showTenantPrompt, setShowTenantPrompt] = useState(false);
   const [hasTenantProfile, setHasTenantProfile] = useState<boolean | null>(null);
-  const [pendingAction, setPendingAction] = useState<"contact" | "showing" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"contact" | "showing" | "quick-message" | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{ content: string; quickKey?: string } | null>(null);
   const tenantChecked = useRef(false);
 
   const user = useAuthStore((s) => s.user);
@@ -406,8 +407,29 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     if (pendingAction === "contact") {
       void openConversation(`Hi, I'm interested in "${listing?.title}". Is it still available?`);
     }
-    else if (pendingAction === "showing") setShowingOpen(true);
+    else if (pendingAction === "showing") {
+      setShowingOpen(true);
+    }
+    else if (pendingAction === "quick-message" && pendingMessage) {
+      void openConversation(pendingMessage.content, pendingMessage.quickKey);
+    }
     setPendingAction(null);
+    setPendingMessage(null);
+  };
+
+  const needsTenantProfilePrompt = async () => {
+    if (!user || user.role !== "student") return false;
+    if (hasTenantProfile === true) return false;
+    if (hasTenantProfile === false) return true;
+
+    try {
+      const status = await api.auth.getTenantStatus();
+      setHasTenantProfile(status.has_tenant_profile);
+      return !status.has_tenant_profile;
+    } catch {
+      setHasTenantProfile(true);
+      return false;
+    }
   };
 
   const openConversation = async (content: string, quickKey?: string) => {
@@ -446,7 +468,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
       return;
     }
-    if (!hasTenantProfile === false) {
+    if (await needsTenantProfilePrompt()) {
       setPendingAction("contact");
       setShowTenantPrompt(true);
       return;
@@ -454,12 +476,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     await openConversation(`Hi, I'm interested in "${listing?.title}". Is it still available?`);
   };
 
-  const handleBookShowing = () => {
+  const handleBookShowing = async () => {
     if (!user) {
       router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
       return;
     }
-    if (!hasTenantProfile === false) {
+    if (await needsTenantProfilePrompt()) {
       setPendingAction("showing");
       setShowTenantPrompt(true);
       return;
@@ -484,6 +506,21 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       content: `Hi, I'm interested in "${listing?.title}". Can you let me know what's included in the rent?`,
     },
   ] as const;
+
+  const handleQuickMessage = async (content: string, quickKey: string) => {
+    if (contactSending || contactSent) return;
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
+      return;
+    }
+    if (await needsTenantProfilePrompt()) {
+      setPendingAction("quick-message");
+      setPendingMessage({ content, quickKey });
+      setShowTenantPrompt(true);
+      return;
+    }
+    await openConversation(content, quickKey);
+  };
 
   if (isLoading) {
     return (
@@ -840,7 +877,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   {quickMessageOptions.map((option) => (
                     <button
                       key={option.key}
-                      onClick={() => void openConversation(option.content, option.key)}
+                      onClick={() => void handleQuickMessage(option.content, option.key)}
                       disabled={contactSending || contactSent}
                       className={`rounded-full border px-3 py-1.5 transition-all ${
                         activeQuickMessage === option.key
@@ -947,7 +984,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       {/* Tenant Profile Prompt */}
       <TenantProfilePrompt
         isOpen={showTenantPrompt}
-        onClose={() => { setShowTenantPrompt(false); setPendingAction(null); }}
+        onClose={() => { setShowTenantPrompt(false); setPendingAction(null); setPendingMessage(null); }}
         onComplete={handleTenantComplete}
       />
     </div>
