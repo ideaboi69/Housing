@@ -42,14 +42,28 @@ function formatDateRange(start: string, end: string) {
   return `${s.toLocaleDateString("en-CA", { month: "short", day: "numeric" })} – ${e.toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}`;
 }
 
+function safeNumber(value: unknown, fallback = 0): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function safeDateString(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? fallback : value;
+}
+
 function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
-  const startMonth = new Date(`${sublet.sublet_start_date}T00:00:00`).getMonth();
-  const endMonth = new Date(`${sublet.sublet_end_date}T00:00:00`).getMonth();
+  const startDate = safeDateString(sublet.sublet_start_date, new Date().toISOString().slice(0, 10));
+  const endDate = safeDateString(sublet.sublet_end_date, startDate);
+  const startMonth = new Date(`${startDate}T00:00:00`).getMonth();
+  const endMonth = new Date(`${endDate}T00:00:00`).getMonth();
   const visibleMonths = [4, 5, 6, 7, 8];
   const availableMonths = visibleMonths.map((month) => month >= startMonth && month <= endMonth);
-  const distance = Number(sublet.distance_to_campus_km);
-  const walk = Number(sublet.walk_time_minutes);
-  const price = Number(sublet.rent_per_month);
+  const distance = safeNumber(sublet.distance_to_campus_km, 1.5);
+  const walk = safeNumber(sublet.walk_time_minutes, 15);
+  const price = safeNumber(sublet.rent_per_month, 0);
+  const totalRooms = Math.max(1, safeNumber(sublet.total_rooms, 1));
   const score = Math.min(
     96,
     72
@@ -64,39 +78,41 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
   const isEntirePlace = Boolean(termSummary?.entire_place);
   const hasRoommatesStaying = Boolean(termSummary?.roommates_staying);
   const isPrivateRoom = Boolean(termSummary?.private_room) || sublet.room_type === "private";
-  const bedsAvailable = isEntirePlace ? sublet.total_rooms : isPrivateRoom || hasRoommatesStaying ? 1 : sublet.total_rooms;
-  const roommatesStaying = hasRoommatesStaying ? Math.max(0, sublet.total_rooms - bedsAvailable) : null;
+  const bedsAvailable = isEntirePlace ? totalRooms : isPrivateRoom || hasRoommatesStaying ? 1 : totalRooms;
+  const roommatesStaying = hasRoommatesStaying ? Math.max(0, totalRooms - bedsAvailable) : null;
+  const roomType = sublet.room_type || "private";
+  const address = sublet.address || "Guelph, ON";
 
   return {
     id: String(sublet.id),
     listing_id: linkedListingId,
-    title: sublet.title,
-    street: sublet.address.split(",")[0] ?? sublet.address,
-    address: sublet.address,
-    postalCode: sublet.postal_code,
+    title: sublet.title || "Student sublet",
+    street: address.split(",")[0] ?? address,
+    address,
+    postalCode: sublet.postal_code || "",
     description: sublet.description || "Posted directly through Cribb.",
     subletPrice: price,
-    originalPrice: Math.round(price * 1.22),
+    originalPrice: Math.max(price, Math.round(price * 1.22)),
     healthScore: score,
     verified: true,
     posterName: sublet.posted_by,
     posterType: "Student poster",
     posterIsStudent: true,
     availableMonths,
-    subletStart: sublet.sublet_start_date,
-    subletEnd: sublet.sublet_end_date,
+    subletStart: startDate,
+    subletEnd: endDate,
     neighborhood: distance <= 0.7 ? "Campus" : distance <= 1.5 ? "Near Campus" : "Guelph",
     negotiablePrice: Boolean(termSummary?.negotiable_price),
     flexibleDates: Boolean(termSummary?.flexible_dates),
     roommatesStaying,
     roommateDesc: roommatesStaying ? `${roommatesStaying} roommate${roommatesStaying > 1 ? "s" : ""} staying` : null,
     bedsAvailable,
-    bedsTotal: sublet.total_rooms,
-    bathrooms: sublet.bathrooms,
-    propertyType: sublet.room_type,
+    bedsTotal: totalRooms,
+    bathrooms: safeNumber(sublet.bathrooms, 1),
+    propertyType: roomType,
     distanceKm: distance,
     walkTime: walk,
-    busTime: sublet.bus_time_minutes || null,
+    busTime: safeNumber(sublet.bus_time_minutes, 0) || null,
     genderPreference: sublet.gender_preference || "any",
     views: sublet.view_count,
     saves: 0,
@@ -116,7 +132,7 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
     has_balcony: sublet.has_balcony,
     smoking_allowed: sublet.smoking_policy === "allowed" || sublet.smoking_policy === "outside_only",
     wheelchair_accessible: sublet.wheelchair_accessible,
-    estimated_utility_cost: Number(sublet.estimated_utility_cost),
+    estimated_utility_cost: safeNumber(sublet.estimated_utility_cost, 0),
     price_vs_market_score: score,
     landlord_reputation_score: score,
     maintenance_score: score,
@@ -162,24 +178,46 @@ function ImageGallery({ images }: { images: string[] }) {
 /* ── Star Rating (no comments) ─────────────────── */
 
 function ReviewCard({ review, index }: { review: ReviewResponse; index: number }) {
+  const [reportOpen, setReportOpen] = useState(false);
+
   return (
-    <motion.div className="bg-[#FAF8F4] rounded-xl p-4" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.08 }}>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>{new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}</p>
-        <div className={`px-2 py-0.5 rounded-full ${review.would_rent_again ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#E71D36]/10 text-[#E71D36]"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
-          {review.would_rent_again ? "Would rent again ✓" : "Would not rent again"}
-        </div>
-      </div>
-      <div className="grid grid-cols-4 gap-3">
-        {[{ label: "Response", val: review.responsiveness }, { label: "Maintenance", val: review.maintenance_speed }, { label: "Privacy", val: review.respect_privacy }, { label: "Fairness", val: review.fairness_of_charges }].map((r) => (
-          <div key={r.label} className="text-center">
-            <div className="text-[#1B2D45]/30" style={{ fontSize: "9px", fontWeight: 600 }}>{r.label}</div>
-            <div className="flex items-center justify-center gap-0.5 mt-1">{[1,2,3,4,5].map((s) => <span key={s} style={{ fontSize: "12px", color: s <= r.val ? "#FFB627" : "#1B2D45" + "15" }}>★</span>)}</div>
-            <div className="text-[#1B2D45]/50 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{r.val}/5</div>
+    <>
+      <motion.div className="bg-[#FAF8F4] rounded-xl p-4" initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * 0.08 }}>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <p className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>{new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}</p>
+          <div className="flex items-center gap-2">
+            <div className={`px-2 py-0.5 rounded-full ${review.would_rent_again ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#E71D36]/10 text-[#E71D36]"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
+              {review.would_rent_again ? "Would rent again ✓" : "Would not rent again"}
+            </div>
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[#1B2D45]/28 transition-colors hover:bg-[#E71D36]/[0.06] hover:text-[#E71D36]"
+              style={{ fontSize: "10px", fontWeight: 700 }}
+            >
+              <Flag className="h-3 w-3" />
+              Report
+            </button>
           </div>
-        ))}
-      </div>
-    </motion.div>
+        </div>
+        <div className="grid grid-cols-4 gap-3">
+          {[{ label: "Response", val: review.responsiveness }, { label: "Maintenance", val: review.maintenance_speed }, { label: "Privacy", val: review.respect_privacy }, { label: "Fairness", val: review.fairness_of_charges }].map((r) => (
+            <div key={r.label} className="text-center">
+              <div className="text-[#1B2D45]/30" style={{ fontSize: "9px", fontWeight: 600 }}>{r.label}</div>
+              <div className="flex items-center justify-center gap-0.5 mt-1">{[1,2,3,4,5].map((s) => <span key={s} style={{ fontSize: "12px", color: s <= r.val ? "#FFB627" : "#1B2D45" + "15" }}>★</span>)}</div>
+              <div className="text-[#1B2D45]/50 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{r.val}/5</div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+      <ReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        reviewId={review.id}
+        targetType="review"
+        targetTitle={`Review from ${new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}`}
+      />
+    </>
   );
 }
 
@@ -222,22 +260,35 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     }
 
     let cancelled = false;
+    let finished = false;
+    const timeoutId = window.setTimeout(() => {
+      if (finished || cancelled) return;
+      cancelled = true;
+      setSublet(null);
+      setLoading(false);
+    }, 10000);
+
     setSublet(null);
     setLoading(true);
     api.sublets.getById(Number(id))
       .then((res) => {
         if (cancelled) return;
+        finished = true;
+        window.clearTimeout(timeoutId);
         setSublet(mapApiSubletToDetail(res));
         setLoading(false);
       })
       .catch(() => {
         if (cancelled) return;
+        finished = true;
+        window.clearTimeout(timeoutId);
         setSublet(null);
         setLoading(false);
       });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
     };
   }, [id, mockSublet]);
 
@@ -289,22 +340,23 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     setMessageSending(true);
     setActiveQuickMessage(quickKey ?? null);
     try {
-      if (sublet?.listing_id) {
-        await api.messages.startConversation({
-          listing_id: sublet.listing_id,
+      const subletId = Number(sublet?.id);
+      if (subletId) {
+        const message = await api.sublets.startConversation({
+          sublet_id: subletId,
           content,
         });
         setMessageSent(true);
         if (quickKey) {
           toast.success("Opening your chat about this sublet...");
         }
-        setTimeout(() => router.push("/messages"), 1500);
+        setTimeout(() => router.push(`/messages?type=sublet&conversation=${message.conversation_id}`), 1500);
       } else {
         toast.error("Messaging isn’t available for this sublet yet.");
       }
     } catch (err) {
       if (err instanceof Error && "status" in err && (err as { status?: number }).status === 409) {
-        router.push("/messages");
+        router.push("/messages?type=sublet");
       } else {
         toast.error("We couldn’t open a conversation right now. Please try again.");
       }
@@ -372,8 +424,10 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const discount = Math.round(((sublet.originalPrice - sublet.subletPrice) / sublet.originalPrice) * 100);
-  const score = sublet.healthScore;
+  const discount = sublet.originalPrice > 0
+    ? Math.max(0, Math.round(((sublet.originalPrice - sublet.subletPrice) / sublet.originalPrice) * 100))
+    : 0;
+  const score = Number.isFinite(sublet.healthScore) ? sublet.healthScore : 0;
   const scoreColor = getScoreColor(score);
   const campusAccess = getProximityLabel(sublet.walkTime);
 
@@ -383,7 +437,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
-      <motion.div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6" variants={stagger} initial="hidden" animate="visible">
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6">
         <motion.div variants={fadeUp}>
           <Link href="/sublets" className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-5 group" style={{ fontSize: "13px", fontWeight: 500 }}>
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Sublets
@@ -441,7 +495,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
 
               {/* Quick facts */}
               <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                {[{ label: "Beds", value: `${sublet.bedsAvailable} of ${sublet.bedsTotal}`, icon: Bed }, { label: "Bath", value: `${sublet.bathrooms}`, icon: Bath }, { label: "Type", value: sublet.propertyType.charAt(0).toUpperCase() + sublet.propertyType.slice(1), icon: MapPin }, { label: "Area", value: sublet.neighborhood, icon: MapPin }].map((fact) => {
+                {[{ label: "Beds", value: `${sublet.bedsAvailable} of ${sublet.bedsTotal}`, icon: Bed }, { label: "Bath", value: `${sublet.bathrooms}`, icon: Bath }, { label: "Type", value: `${sublet.propertyType || "Private"}`.charAt(0).toUpperCase() + `${sublet.propertyType || "Private"}`.slice(1), icon: MapPin }, { label: "Area", value: sublet.neighborhood, icon: MapPin }].map((fact) => {
                   const Icon = fact.icon;
                   return <motion.div key={fact.label} variants={fadeUp} className="bg-[#FAF8F4] rounded-xl p-3"><div className="flex items-center gap-1.5"><Icon className="w-3 h-3 text-[#FF6B35]/50" /><span className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 600 }}>{fact.label}</span></div><div className="text-[#1B2D45] mt-1" style={{ fontSize: "13px", fontWeight: 700 }}>{fact.value}</div></motion.div>;
                 })}
@@ -685,7 +739,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
             </div>
           </motion.div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Report Modal */}
       <ReportModal

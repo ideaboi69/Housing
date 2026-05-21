@@ -203,7 +203,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
     try {
       const response = await api.marketplace.startConversation({ item_id: item.id, content: message });
       toast.success("Message sent to seller!");
-      router.push(`/marketplace/messages?conversation=${response.conversation_id}`);
+      router.push(`/messages?type=marketplace&conversation=${response.conversation_id}`);
     } catch {
       toast.success("Message sent!");
     } finally {

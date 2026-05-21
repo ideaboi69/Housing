@@ -1,21 +1,99 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  MessageCircle, Send, ArrowLeft, Trash2, Check, CheckCheck,
-  Home, Clock, Search, MoreHorizontal, X, LayoutDashboard, Bookmark, ArrowRight,
+  ArrowLeft,
+  ArrowRight,
+  Bookmark,
+  Calendar,
+  Check,
+  CheckCheck,
+  Home,
+  LayoutDashboard,
+  MessageCircle,
+  Search,
+  Send,
+  ShoppingBag,
+  Sparkles,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
+import { motion } from "framer-motion";
+
 import { useIsMobile } from "@/hooks";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { MessageListSkeleton } from "@/components/ui/Skeletons";
-import type { ConversationResponse, ConversationDetailResponse, MessageResponse } from "@/types";
+import type {
+  ConversationResponse,
+  MarketplaceConversationResponse,
+  MarketplaceMessageResponse,
+  MessageResponse,
+  SubletConversationResponse,
+  SubletMessageResponse,
+} from "@/types";
 
-/* ═══════════════════════════════════════════════════════
-   HELPERS
-   ═══════════════════════════════════════════════════════ */
+type InboxType = "housing" | "sublet" | "marketplace";
+type InboxFilter = "all" | InboxType | "unread";
+
+interface UnifiedConversation {
+  key: string;
+  type: InboxType;
+  id: number;
+  title: string;
+  subtitle: string;
+  otherName: string;
+  href: string;
+  lastMessage?: {
+    content: string;
+    sender_id: number;
+    is_read: boolean;
+    created_at: string;
+  } | null;
+  unreadCount: number;
+  updatedAt: string;
+}
+
+interface UnifiedMessage {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+interface ThreadDetail {
+  title: string;
+  subtitle: string;
+  otherName: string;
+  href: string;
+  messages: UnifiedMessage[];
+}
+
+const TYPE_META: Record<InboxType, { label: string; short: string; icon: LucideIcon; tone: string; bg: string }> = {
+  housing: {
+    label: "Housing",
+    short: "Housing",
+    icon: Home,
+    tone: "text-[#1B2D45]",
+    bg: "bg-[#1B2D45]/[0.06]",
+  },
+  sublet: {
+    label: "Sublet",
+    short: "Sublet",
+    icon: Calendar,
+    tone: "text-[#2EC4B6]",
+    bg: "bg-[#2EC4B6]/[0.10]",
+  },
+  marketplace: {
+    label: "Marketplace",
+    short: "Market",
+    icon: ShoppingBag,
+    tone: "text-[#FF6B35]",
+    bg: "bg-[#FF6B35]/[0.10]",
+  },
+};
 
 function timeAgo(dateStr: string): string {
   const now = Date.now();
@@ -47,22 +125,78 @@ function formatDateSeparator(dateStr: string): string {
 }
 
 function getInitials(name: string): string {
-  return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "CR";
 }
 
-/* ═══════════════════════════════════════════════════════
-   EMPTY STATE
-   ═══════════════════════════════════════════════════════ */
+function normalizeHousing(convo: ConversationResponse): UnifiedConversation {
+  return {
+    key: `housing:${convo.id}`,
+    type: "housing",
+    id: convo.id,
+    title: convo.listing_title || `Listing #${convo.listing_id}`,
+    subtitle: "Listing inquiry",
+    otherName: convo.landlord_name || "Landlord",
+    href: `/browse/${convo.listing_id}`,
+    lastMessage: convo.last_message,
+    unreadCount: convo.unread_count || 0,
+    updatedAt: convo.last_message?.created_at || convo.updated_at || convo.created_at,
+  };
+}
 
-function EmptyInbox() {
+function normalizeSublet(convo: SubletConversationResponse, currentUserId: number): UnifiedConversation {
+  const otherName = convo.poster_id === currentUserId ? convo.inquirer_name : convo.poster_name;
+  return {
+    key: `sublet:${convo.id}`,
+    type: "sublet",
+    id: convo.id,
+    title: convo.sublet_title || `Sublet #${convo.sublet_id}`,
+    subtitle: "Sublet conversation",
+    otherName: otherName || "Student",
+    href: `/sublets/${convo.sublet_id}`,
+    lastMessage: convo.last_message,
+    unreadCount: convo.unread_count || 0,
+    updatedAt: convo.last_message?.created_at || convo.updated_at || convo.created_at,
+  };
+}
+
+function normalizeMarketplace(convo: MarketplaceConversationResponse, currentUserId: number): UnifiedConversation {
+  const otherName = convo.seller_id === currentUserId ? convo.buyer_name : convo.seller_name;
+  return {
+    key: `marketplace:${convo.id}`,
+    type: "marketplace",
+    id: convo.id,
+    title: convo.item_title || `Marketplace item #${convo.item_id}`,
+    subtitle: "Marketplace item",
+    otherName: otherName || "Student",
+    href: `/marketplace/${convo.item_id}`,
+    lastMessage: convo.last_message,
+    unreadCount: convo.unread_count || 0,
+    updatedAt: convo.last_message?.created_at || convo.updated_at || convo.created_at,
+  };
+}
+
+function mapMessage(message: MessageResponse | SubletMessageResponse | MarketplaceMessageResponse): UnifiedMessage {
+  return {
+    id: message.id,
+    conversation_id: message.conversation_id,
+    sender_id: message.sender_id,
+    content: message.content,
+    is_read: message.is_read,
+    created_at: message.created_at,
+  };
+}
+
+function EmptyInbox({ filter }: { filter: InboxFilter }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-20">
-      <div className="w-16 h-16 rounded-2xl bg-[#FF6B35]/10 flex items-center justify-center mb-4">
-        <MessageCircle className="w-7 h-7 text-[#FF6B35]" />
+    <div className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FF6B35]/10">
+        <MessageCircle className="h-7 w-7 text-[#FF6B35]" />
       </div>
-      <h3 className="text-[#1B2D45] mb-1" style={{ fontSize: "18px", fontWeight: 800 }}>No messages yet</h3>
-      <p className="text-[#98A3B0] max-w-[260px]" style={{ fontSize: "13px", lineHeight: 1.5 }}>
-        When you message a landlord about a listing, your conversations will appear here.
+      <h3 className="mb-1 text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>
+        {filter === "all" ? "No messages yet" : "Nothing here yet"}
+      </h3>
+      <p className="max-w-[280px] text-[#98A3B0]" style={{ fontSize: "13px", lineHeight: 1.5 }}>
+        Housing, sublet, and marketplace chats will all show up here once you start messaging.
       </p>
     </div>
   );
@@ -71,32 +205,20 @@ function EmptyInbox() {
 function EmptyThread() {
   return (
     <div className="relative flex-1 overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,107,53,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(27,45,69,0.07),transparent_36%),linear-gradient(180deg,#FDFCFA_0%,#FAF8F4_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,107,53,0.10),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(46,196,182,0.08),transparent_36%),linear-gradient(180deg,#FDFCFA_0%,#FAF8F4_100%)]" />
       <div className="absolute inset-0 opacity-60" style={{ backgroundImage: "radial-gradient(rgba(27,45,69,0.06) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
       <div className="relative flex h-full flex-col items-center justify-center px-6 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-white border border-black/[0.04] flex items-center justify-center mb-4 shadow-sm">
-          <MessageCircle className="w-6 h-6 text-[#FF6B35]" />
+        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-black/[0.04] bg-white shadow-sm">
+          <MessageCircle className="h-6 w-6 text-[#FF6B35]" />
         </div>
-        <h3 className="text-[#1B2D45]/70 mb-1" style={{ fontSize: "16px", fontWeight: 700 }}>Select a conversation</h3>
-        <p className="text-[#98A3B0] max-w-[280px]" style={{ fontSize: "13px", lineHeight: 1.6 }}>
-          Pick a chat from the sidebar to continue the conversation with a landlord.
+        <h3 className="mb-1 text-[#1B2D45]/70" style={{ fontSize: "16px", fontWeight: 700 }}>Select a conversation</h3>
+        <p className="max-w-[300px] text-[#98A3B0]" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+          Pick any housing, sublet, or marketplace chat from the left. Cribb keeps the context attached for you.
         </p>
-        <div className="mt-6 flex w-full max-w-[340px] flex-col gap-3">
-          {["Tour request", "Rent question", "Move-in details"].map((label, index) => (
-            <div key={label} className="rounded-2xl border border-black/[0.04] bg-white/80 px-4 py-3 text-left shadow-sm backdrop-blur-sm" style={{ transform: `translateX(${index % 2 === 0 ? "-6px" : "8px"})` }}>
-              <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>{label}</div>
-              <div className="mt-1 text-[#98A3B0]" style={{ fontSize: "11px" }}>Your active landlord conversations will appear here.</div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
 }
-
-/* ═══════════════════════════════════════════════════════
-   CONVERSATION LIST ITEM
-   ═══════════════════════════════════════════════════════ */
 
 function ConversationItem({
   convo,
@@ -104,123 +226,104 @@ function ConversationItem({
   onClick,
   currentUserId,
 }: {
-  convo: ConversationResponse;
+  convo: UnifiedConversation;
   isActive: boolean;
   onClick: () => void;
   currentUserId: number;
 }) {
-  const name = convo.landlord_name || "Landlord";
-  const lastMsg = convo.last_message;
-  const isFromMe = lastMsg?.sender_id === currentUserId;
+  const meta = TYPE_META[convo.type];
+  const Icon = meta.icon;
+  const isFromMe = convo.lastMessage?.sender_id === currentUserId;
 
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-start gap-3 px-4 py-3.5 transition-all text-left ${
+      className={`w-full border-l-2 px-4 py-3.5 text-left transition-all ${
         isActive
-          ? "bg-[#FF6B35]/[0.06] border-l-2 border-[#FF6B35]"
-          : "hover:bg-[#1B2D45]/[0.02] border-l-2 border-transparent"
+          ? "border-[#FF6B35] bg-[#FF6B35]/[0.06]"
+          : "border-transparent hover:bg-[#1B2D45]/[0.02]"
       }`}
     >
-      {/* Avatar */}
-      <div
-        className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0"
-        style={{ background: "linear-gradient(135deg, #1B2D45, #2D4A6F)", fontSize: "13px", fontWeight: 700 }}
-      >
-        {getInitials(name)}
-      </div>
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white" style={{ background: "linear-gradient(135deg, #1B2D45, #2D4A6F)", fontSize: "13px", fontWeight: 700 }}>
+          {getInitials(convo.otherName)}
+        </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[#1B2D45] truncate" style={{ fontSize: "13px", fontWeight: convo.unread_count > 0 ? 800 : 600 }}>
-            {name}
-          </p>
-          {lastMsg && (
-            <span className="text-[#98A3B0] shrink-0" style={{ fontSize: "10px" }}>
-              {timeAgo(lastMsg.created_at)}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: convo.unreadCount > 0 ? 800 : 650 }}>
+              {convo.otherName}
+            </p>
+            {convo.lastMessage && (
+              <span className="shrink-0 text-[#98A3B0]" style={{ fontSize: "10px" }}>
+                {timeAgo(convo.lastMessage.created_at)}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${meta.bg} ${meta.tone}`} style={{ fontSize: "9px", fontWeight: 800 }}>
+              <Icon className="h-2.5 w-2.5" />
+              {meta.short}
             </span>
+            <p className="truncate text-[#98A3B0]" style={{ fontSize: "10px" }}>
+              {convo.title}
+            </p>
+          </div>
+
+          {convo.lastMessage && (
+            <p className={`mt-1 truncate ${convo.unreadCount > 0 ? "text-[#1B2D45]" : "text-[#98A3B0]"}`} style={{ fontSize: "11px", fontWeight: convo.unreadCount > 0 ? 650 : 400 }}>
+              {isFromMe && <span className="text-[#98A3B0]">You: </span>}
+              {convo.lastMessage.content}
+            </p>
           )}
         </div>
 
-        {/* Listing title */}
-        <div className="flex items-center gap-1 mt-0.5">
-          <Home className="w-3 h-3 text-[#98A3B0] shrink-0" />
-          <p className="text-[#98A3B0] truncate" style={{ fontSize: "10px" }}>
-            {convo.listing_title || `Listing #${convo.listing_id}`}
-          </p>
-        </div>
-
-        {/* Last message preview */}
-        {lastMsg && (
-          <p
-            className={`truncate mt-0.5 ${convo.unread_count > 0 ? "text-[#1B2D45]" : "text-[#98A3B0]"}`}
-            style={{ fontSize: "11px", fontWeight: convo.unread_count > 0 ? 600 : 400 }}
-          >
-            {isFromMe && <span className="text-[#98A3B0]">You: </span>}
-            {lastMsg.content}
-          </p>
+        {convo.unreadCount > 0 && (
+          <div className="flex h-5 min-w-[20px] shrink-0 items-center justify-center self-center rounded-full bg-[#FF6B35] px-1.5 text-white" style={{ fontSize: "9px", fontWeight: 800 }}>
+            {convo.unreadCount > 9 ? "9+" : convo.unreadCount}
+          </div>
         )}
       </div>
-
-      {/* Unread badge */}
-      {convo.unread_count > 0 && (
-        <div
-          className="w-5 h-5 rounded-full bg-[#FF6B35] flex items-center justify-center text-white shrink-0 self-center"
-          style={{ fontSize: "9px", fontWeight: 800 }}
-        >
-          {convo.unread_count > 9 ? "9+" : convo.unread_count}
-        </div>
-      )}
     </button>
   );
 }
 
-/* ═══════════════════════════════════════════════════════
-   MESSAGE BUBBLE
-   ═══════════════════════════════════════════════════════ */
-
-function MessageBubble({ message, isMe }: { message: MessageResponse; isMe: boolean }) {
+function MessageBubble({ message, isMe }: { message: UnifiedMessage; isMe: boolean }) {
   return (
-    <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-1`}>
+    <div className={`mb-1 flex ${isMe ? "justify-end" : "justify-start"}`}>
       <div
         className={`max-w-[75%] px-3.5 py-2.5 ${
           isMe
-            ? "bg-[#FF6B35] text-white rounded-2xl rounded-br-md"
-            : "bg-white border border-black/[0.04] text-[#1B2D45] rounded-2xl rounded-bl-md"
+            ? "rounded-2xl rounded-br-md bg-[#FF6B35] text-white"
+            : "rounded-2xl rounded-bl-md border border-black/[0.04] bg-white text-[#1B2D45]"
         }`}
         style={{ boxShadow: isMe ? undefined : "0 1px 3px rgba(0,0,0,0.03)" }}
       >
         <p style={{ fontSize: "13px", lineHeight: 1.5, wordBreak: "break-word" }}>{message.content}</p>
-        <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}>
+        <div className={`mt-1 flex items-center gap-1 ${isMe ? "justify-end" : "justify-start"}`}>
           <span className={isMe ? "text-white/50" : "text-[#98A3B0]"} style={{ fontSize: "9px" }}>
             {formatTime(message.created_at)}
           </span>
-          {isMe && (
-            message.is_read
-              ? <CheckCheck className="w-3 h-3 text-white/50" />
-              : <Check className="w-3 h-3 text-white/40" />
-          )}
+          {isMe && (message.is_read ? <CheckCheck className="h-3 w-3 text-white/50" /> : <Check className="h-3 w-3 text-white/40" />)}
         </div>
       </div>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════
-   CHAT THREAD VIEW
-   ═══════════════════════════════════════════════════════ */
-
 function ChatThread({
-  conversationId,
+  conversation,
   currentUserId,
   onBack,
+  onRefreshConversations,
 }: {
-  conversationId: number;
+  conversation: UnifiedConversation;
   currentUserId: number;
   onBack: () => void;
+  onRefreshConversations: () => Promise<void>;
 }) {
-  const [detail, setDetail] = useState<ConversationDetailResponse | null>(null);
+  const [detail, setDetail] = useState<ThreadDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [newMsg, setNewMsg] = useState("");
   const [sending, setSending] = useState(false);
@@ -229,35 +332,70 @@ function ChatThread({
 
   const fetchConversation = useCallback(async () => {
     try {
-      const data = await api.messages.getConversation(conversationId);
-      setDetail(data);
+      if (conversation.type === "housing") {
+        const data = await api.messages.getConversation(conversation.id);
+        setDetail({
+          title: data.listing_title || conversation.title,
+          subtitle: "Listing inquiry",
+          otherName: data.landlord_name || conversation.otherName,
+          href: conversation.href,
+          messages: data.messages.map(mapMessage),
+        });
+      } else if (conversation.type === "sublet") {
+        const data = await api.sublets.getConversation(conversation.id);
+        const otherName = data.poster_id === currentUserId ? data.inquirer_name : data.poster_name;
+        setDetail({
+          title: data.sublet_title || conversation.title,
+          subtitle: "Sublet conversation",
+          otherName: otherName || conversation.otherName,
+          href: conversation.href,
+          messages: data.messages.map(mapMessage),
+        });
+      } else {
+        const data = await api.marketplace.getConversation(conversation.id);
+        const otherName = data.seller_id === currentUserId ? data.buyer_name : data.seller_name;
+        setDetail({
+          title: data.item_title || conversation.title,
+          subtitle: "Marketplace item",
+          otherName: otherName || conversation.otherName,
+          href: conversation.href,
+          messages: data.messages.map(mapMessage),
+        });
+      }
     } catch {
-      // handle error
+      setDetail(null);
     } finally {
       setLoading(false);
     }
-  }, [conversationId]);
+  }, [conversation, currentUserId]);
 
   useEffect(() => {
+    setLoading(true);
     fetchConversation();
-    const interval = setInterval(fetchConversation, 8000); // poll every 8s
+    const interval = setInterval(fetchConversation, 8000);
     return () => clearInterval(interval);
   }, [fetchConversation]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [detail?.messages]);
+  }, [detail?.messages.length]);
 
   const handleSend = async () => {
     if (!newMsg.trim() || sending) return;
     setSending(true);
     try {
-      await api.messages.sendMessage(conversationId, { content: newMsg.trim() });
+      const content = newMsg.trim();
+      if (conversation.type === "housing") {
+        await api.messages.sendMessage(conversation.id, { content });
+      } else if (conversation.type === "sublet") {
+        await api.sublets.sendMessage(conversation.id, { content });
+      } else {
+        await api.marketplace.sendMessage(conversation.id, { content });
+      }
       setNewMsg("");
       await fetchConversation();
+      await onRefreshConversations();
       inputRef.current?.focus();
-    } catch {
-      // handle error
     } finally {
       setSending(false);
     }
@@ -266,24 +404,23 @@ function ChatThread({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-[#FF6B35]/30 border-t-[#FF6B35] rounded-full animate-spin" />
+      <div className="flex flex-1 items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#FF6B35]/30 border-t-[#FF6B35]" />
       </div>
     );
   }
 
   if (!detail) return <EmptyThread />;
 
-  const otherName = detail.landlord_name || "Landlord";
-
-  // Group messages by date
-  const groupedMessages: { date: string; msgs: MessageResponse[] }[] = [];
+  const meta = TYPE_META[conversation.type];
+  const Icon = meta.icon;
+  const groupedMessages: { date: string; msgs: UnifiedMessage[] }[] = [];
   let lastDate = "";
   for (const msg of detail.messages) {
     const date = new Date(msg.created_at).toDateString();
@@ -295,75 +432,70 @@ function ChatThread({
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      {/* Thread header */}
-      <div className="flex items-center gap-3 px-4 md:px-5 py-3 border-b border-black/[0.04] bg-white shrink-0">
-        <button onClick={onBack} className="md:hidden w-8 h-8 rounded-lg flex items-center justify-center text-[#98A3B0] hover:bg-[#1B2D45]/5 transition-colors">
-          <ArrowLeft className="w-4 h-4" />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-3 border-b border-black/[0.04] bg-white px-4 py-3 md:px-5">
+        <button onClick={onBack} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#98A3B0] transition-colors hover:bg-[#1B2D45]/5 md:hidden">
+          <ArrowLeft className="h-4 w-4" />
         </button>
-        <div
-          className="w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0"
-          style={{ background: "linear-gradient(135deg, #1B2D45, #2D4A6F)", fontSize: "12px", fontWeight: 700 }}
-        >
-          {getInitials(otherName)}
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white" style={{ background: "linear-gradient(135deg, #1B2D45, #2D4A6F)", fontSize: "12px", fontWeight: 700 }}>
+          {getInitials(detail.otherName)}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{otherName}</p>
-          <div className="flex items-center gap-1">
-            <Home className="w-3 h-3 text-[#98A3B0]" />
-            <p className="text-[#98A3B0] truncate" style={{ fontSize: "10px" }}>
-              {detail.listing_title || `Listing #${detail.listing_id}`}
-            </p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>{detail.otherName}</p>
+            <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 ${meta.bg} ${meta.tone}`} style={{ fontSize: "10px", fontWeight: 800 }}>
+              <Icon className="h-3 w-3" />
+              {meta.label}
+            </span>
           </div>
+          <Link href={detail.href} className="mt-0.5 block truncate text-[#98A3B0] transition-colors hover:text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 650 }}>
+            {detail.title}
+          </Link>
         </div>
       </div>
 
-      {/* Messages area */}
-      <div className="relative flex-1 overflow-y-auto px-4 md:px-5 py-4" style={{ background: "#FAF8F4" }}>
+      <div className="relative flex-1 overflow-y-auto px-4 py-4 md:px-5" style={{ background: "#FAF8F4" }}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,107,53,0.10),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(46,196,182,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.55)_0%,rgba(250,248,244,0.6)_100%)]" />
         <div className="pointer-events-none absolute inset-0 opacity-55" style={{ backgroundImage: "radial-gradient(rgba(27,45,69,0.05) 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
         <div className="relative">
-        {groupedMessages.map((group, gi) => (
-          <div key={gi}>
-            {/* Date separator */}
-            <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-black/[0.06]" />
-              <span className="text-[#98A3B0] shrink-0" style={{ fontSize: "10px", fontWeight: 600 }}>
-                {formatDateSeparator(group.date)}
-              </span>
-              <div className="flex-1 h-px bg-black/[0.06]" />
+          {groupedMessages.map((group) => (
+            <div key={group.date}>
+              <div className="my-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-black/[0.06]" />
+                <span className="shrink-0 text-[#98A3B0]" style={{ fontSize: "10px", fontWeight: 650 }}>
+                  {formatDateSeparator(group.date)}
+                </span>
+                <div className="h-px flex-1 bg-black/[0.06]" />
+              </div>
+              {group.msgs.map((msg) => (
+                <MessageBubble key={`${msg.conversation_id}-${msg.id}`} message={msg} isMe={msg.sender_id === currentUserId} />
+              ))}
             </div>
-
-            {group.msgs.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} isMe={msg.sender_id === currentUserId} />
-            ))}
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
+          ))}
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Message input */}
-      <div className="px-4 md:px-5 py-3 border-t border-black/[0.04] bg-white shrink-0">
+      <div className="shrink-0 border-t border-black/[0.04] bg-white px-4 py-3 md:px-5">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
             value={newMsg}
             onChange={(e) => setNewMsg(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
+            placeholder={`Reply about this ${meta.label.toLowerCase()}...`}
             rows={1}
-            className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all resize-none"
-            style={{ fontSize: "13px", lineHeight: 1.5, maxHeight: "120px" }}
+            className="max-h-[120px] flex-1 resize-none rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] px-3.5 py-2.5 text-[#1B2D45] placeholder:text-[#98A3B0] transition-all focus:border-[#FF6B35]/40 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/10"
+            style={{ fontSize: "13px", lineHeight: 1.5 }}
           />
           <motion.button
             whileTap={{ scale: 0.9 }}
-            onClick={handleSend}
+            onClick={() => void handleSend()}
             disabled={!newMsg.trim() || sending}
-            className="w-10 h-10 rounded-xl bg-[#FF6B35] text-white flex items-center justify-center shrink-0 disabled:opacity-40 transition-opacity"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FF6B35] text-white transition-opacity disabled:opacity-40"
             style={{ boxShadow: "0 2px 8px rgba(255,107,53,0.3)" }}
           >
-            <Send className="w-4 h-4" />
+            <Send className="h-4 w-4" />
           </motion.button>
         </div>
       </div>
@@ -371,65 +503,97 @@ function ChatThread({
   );
 }
 
-/* ═══════════════════════════════════════════════════════
-   MAIN MESSAGES PAGE
-   ═══════════════════════════════════════════════════════ */
-
 export default function MessagesPage() {
   const { user } = useAuthStore();
-  const [conversations, setConversations] = useState<ConversationResponse[]>([]);
+  const [conversations, setConversations] = useState<UnifiedConversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeConvoId, setActiveConvoId] = useState<number | null>(null);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<InboxFilter>("all");
   const isMobile = useIsMobile();
 
   const fetchConversations = useCallback(async () => {
+    if (!user) return;
     try {
-      const data = await api.messages.getConversations();
-      setConversations(data);
-    } catch {
-      // Not logged in or error
+      const [housingResult, subletResult, marketplaceResult] = await Promise.allSettled([
+        api.messages.getConversations(),
+        api.sublets.getConversations(),
+        api.marketplace.getConversations(),
+      ]);
+
+      const housing = housingResult.status === "fulfilled" ? housingResult.value.map(normalizeHousing) : [];
+      const sublets = subletResult.status === "fulfilled" ? subletResult.value.map((convo) => normalizeSublet(convo, user.id)) : [];
+      const marketplace = marketplaceResult.status === "fulfilled" ? marketplaceResult.value.map((convo) => normalizeMarketplace(convo, user.id)) : [];
+      const merged = [...housing, ...sublets, ...marketplace].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+      setConversations(merged);
+      setActiveKey((current) => {
+        if (current && merged.some((convo) => convo.key === current)) return current;
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const requestedType = params.get("type") as InboxType | null;
+          const requestedId = Number(params.get("conversation"));
+          const requested = requestedType && requestedId ? merged.find((convo) => convo.type === requestedType && convo.id === requestedId) : null;
+          if (requested) return requested.key;
+        }
+        return merged[0]?.key ?? null;
+      });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    fetchConversations();
-    const interval = setInterval(fetchConversations, 10000); // poll every 10s
+    void fetchConversations();
+    const interval = setInterval(() => void fetchConversations(), 10000);
     return () => clearInterval(interval);
   }, [fetchConversations]);
 
-  // Refresh conversation list when returning from thread
-  const handleBack = () => {
-    setActiveConvoId(null);
-    fetchConversations();
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return conversations.filter((convo) => {
+      const matchesFilter =
+        filter === "all" ||
+        (filter === "unread" ? convo.unreadCount > 0 : convo.type === filter);
+      const matchesSearch =
+        !q ||
+        convo.otherName.toLowerCase().includes(q) ||
+        convo.title.toLowerCase().includes(q) ||
+        convo.subtitle.toLowerCase().includes(q);
+      return matchesFilter && matchesSearch;
+    });
+  }, [conversations, filter, searchQuery]);
+
+  const activeConversation = conversations.find((convo) => convo.key === activeKey) ?? null;
+  const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+  const totals = {
+    all: conversations.length,
+    housing: conversations.filter((c) => c.type === "housing").length,
+    sublet: conversations.filter((c) => c.type === "sublet").length,
+    marketplace: conversations.filter((c) => c.type === "marketplace").length,
+    unread: totalUnread,
   };
 
-  const filtered = searchQuery
-    ? conversations.filter(
-        (c) =>
-          (c.landlord_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (c.listing_title || "").toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : conversations;
+  const showSidebar = !isMobile || !activeConversation;
+  const showThread = !isMobile || !!activeConversation;
 
-  const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
-  const activeListingCount = new Set(conversations.map((c) => c.listing_id)).size;
-
-  // On mobile: show either list or thread, not both
-  const showSidebar = !isMobile || !activeConvoId;
-  const showThread = !isMobile || !!activeConvoId;
+  const handleBack = () => {
+    setActiveKey(null);
+    void fetchConversations();
+  };
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center px-6">
+      <div className="flex min-h-screen items-center justify-center bg-[#FAF8F4] px-6">
         <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl bg-[#FF6B35]/10 flex items-center justify-center mx-auto mb-4">
-            <MessageCircle className="w-7 h-7 text-[#FF6B35]" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FF6B35]/10">
+            <MessageCircle className="h-7 w-7 text-[#FF6B35]" />
           </div>
-          <h2 className="text-[#1B2D45] mb-2" style={{ fontSize: "20px", fontWeight: 800 }}>Sign in to view messages</h2>
-          <p className="text-[#98A3B0]" style={{ fontSize: "13px" }}>Log in to see your conversations with landlords.</p>
+          <h2 className="mb-2 text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 800 }}>Sign in to view messages</h2>
+          <p className="text-[#98A3B0]" style={{ fontSize: "13px" }}>Log in to see your housing, sublet, and marketplace conversations.</p>
+          <Link href="/login?next=/messages" className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#FF6B35] px-5 py-2.5 text-white" style={{ fontSize: "13px", fontWeight: 700 }}>
+            Log in
+          </Link>
         </div>
       </div>
     );
@@ -442,26 +606,26 @@ export default function MessagesPage() {
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-[#FF6B35]/10 px-3 py-1 text-[#FF6B35]">
               <MessageCircle className="h-3.5 w-3.5" />
-              <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Student Inbox</span>
+              <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Unified Inbox</span>
             </div>
             <h1 className="text-[#1B2D45]" style={{ fontSize: "30px", fontWeight: 900, letterSpacing: "-0.03em" }}>
               Messages
             </h1>
-            <p className="mt-1 max-w-[560px] text-[#98A3B0]" style={{ fontSize: "13px", lineHeight: 1.6 }}>
-              Keep your landlord conversations, listing questions, and next steps in one place.
+            <p className="mt-1 max-w-[600px] text-[#98A3B0]" style={{ fontSize: "13px", lineHeight: 1.6 }}>
+              Housing, sublet, and marketplace chats now live together, with labels so every thread keeps its context.
             </p>
           </div>
 
-          <div className="hidden md:flex items-center gap-2">
-            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-xl border border-black/[0.06] bg-white px-3.5 py-2 text-[#1B2D45]/65 hover:text-[#1B2D45] hover:border-[#1B2D45]/12 transition-all" style={{ fontSize: "12px", fontWeight: 700 }}>
+          <div className="hidden items-center gap-2 md:flex">
+            <Link href="/dashboard" className="inline-flex items-center gap-2 rounded-xl border border-black/[0.06] bg-white px-3.5 py-2 text-[#1B2D45]/65 transition-all hover:border-[#1B2D45]/12 hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>
               <LayoutDashboard className="h-3.5 w-3.5" />
               Dashboard
             </Link>
-            <Link href="/saved" className="inline-flex items-center gap-2 rounded-xl border border-black/[0.06] bg-white px-3.5 py-2 text-[#1B2D45]/65 hover:text-[#1B2D45] hover:border-[#1B2D45]/12 transition-all" style={{ fontSize: "12px", fontWeight: 700 }}>
+            <Link href="/saved" className="inline-flex items-center gap-2 rounded-xl border border-black/[0.06] bg-white px-3.5 py-2 text-[#1B2D45]/65 transition-all hover:border-[#1B2D45]/12 hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>
               <Bookmark className="h-3.5 w-3.5" />
               Saved
             </Link>
-            <Link href="/browse" className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B35] px-3.5 py-2 text-white hover:bg-[#e55e2e] transition-all" style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.24)" }}>
+            <Link href="/browse" className="inline-flex items-center gap-2 rounded-xl bg-[#FF6B35] px-3.5 py-2 text-white transition-all hover:bg-[#e55e2e]" style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.24)" }}>
               Browse listings
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
@@ -469,98 +633,145 @@ export default function MessagesPage() {
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
-            <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Conversations</div>
-            <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 900 }}>{conversations.length}</div>
-          </div>
-          <div className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
-            <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Unread</div>
-            <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 900 }}>{totalUnread}</div>
-          </div>
-          <div className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
-            <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Listings</div>
-            <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 900 }}>{activeListingCount}</div>
-          </div>
-          <div className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
-            <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>Status</div>
-            <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>
-              {totalUnread > 0 ? "Replies waiting" : "All caught up"}
+          {[
+            { label: "Threads", value: totals.all },
+            { label: "Housing", value: totals.housing },
+            { label: "Sublets", value: totals.sublet },
+            { label: "Unread", value: totals.unread },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+              <div className="text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>{stat.label}</div>
+              <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 900 }}>{stat.value}</div>
             </div>
-          </div>
+          ))}
         </div>
 
-      <div className="h-[calc(100vh-260px)] min-h-[620px] flex">
-      <div className="w-full flex overflow-hidden rounded-[28px] border border-black/[0.04] bg-white shadow-[0_6px_28px_rgba(27,45,69,0.06)]">
-        {/* ─── Sidebar: conversation list ─── */}
-        {showSidebar && (
-          <div className={`${isMobile ? "w-full" : "w-[340px]"} bg-white border-r border-black/[0.04] flex flex-col shrink-0`}>
-            {/* Sidebar header */}
-            <div className="px-4 py-4 border-b border-black/[0.04]">
-              <div className="flex items-center justify-between mb-3">
-                <h1 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900, letterSpacing: "-0.3px" }}>
-                  Messages
-                  {totalUnread > 0 && (
-                    <span className="ml-2 px-1.5 py-0.5 rounded-full bg-[#FF6B35] text-white align-middle"
-                      style={{ fontSize: "10px", fontWeight: 800 }}>
-                      {totalUnread}
-                    </span>
-                  )}
-                </h1>
-              </div>
+        <div className="flex h-[calc(100vh-260px)] min-h-[620px]">
+          <div className="flex w-full overflow-hidden rounded-[28px] border border-black/[0.04] bg-white shadow-[0_6px_28px_rgba(27,45,69,0.06)]">
+            {showSidebar && (
+              <div className={`${isMobile ? "w-full" : "w-[360px]"} flex shrink-0 flex-col border-r border-black/[0.04] bg-white`}>
+                <div className="border-b border-black/[0.04] px-4 py-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h2 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900, letterSpacing: "-0.3px" }}>
+                      Inbox
+                      {totalUnread > 0 && (
+                        <span className="ml-2 rounded-full bg-[#FF6B35] px-1.5 py-0.5 align-middle text-white" style={{ fontSize: "10px", fontWeight: 800 }}>
+                          {totalUnread}
+                        </span>
+                      )}
+                    </h2>
+                  </div>
 
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#98A3B0]" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search conversations..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/30 transition-all"
-                  style={{ fontSize: "12px" }}
-                />
-              </div>
-            </div>
-
-            {/* Conversation list */}
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <MessageListSkeleton count={5} />
-              ) : filtered.length === 0 ? (
-                <EmptyInbox />
-              ) : (
-                <div className="divide-y divide-black/[0.03]">
-                  {filtered.map((convo) => (
-                    <ConversationItem
-                      key={convo.id}
-                      convo={convo}
-                      isActive={activeConvoId === convo.id}
-                      onClick={() => setActiveConvoId(convo.id)}
-                      currentUserId={user.id}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#98A3B0]" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search conversations..."
+                      className="w-full rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] py-2 pl-9 pr-3 text-[#1B2D45] placeholder:text-[#98A3B0] transition-all focus:border-[#FF6B35]/30 focus:outline-none"
+                      style={{ fontSize: "12px" }}
                     />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+                  </div>
 
-        {/* ─── Thread view ─── */}
-        {showThread && (
-          <div className="flex-1 flex flex-col min-w-0">
-            {activeConvoId ? (
-              <ChatThread
-                conversationId={activeConvoId}
-                currentUserId={user.id}
-                onBack={handleBack}
-              />
-            ) : (
-              <EmptyThread />
+                  <div className="mt-3 rounded-2xl border border-black/[0.04] bg-[#FAF8F4] p-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {([
+                        { key: "all", label: "All", count: totals.all, icon: Sparkles, activeClass: "bg-[#1B2D45] text-white shadow-[0_8px_18px_rgba(27,45,69,0.14)]" },
+                        { key: "housing", label: "Housing", count: totals.housing, icon: Home, activeClass: "bg-[#1B2D45] text-white shadow-[0_8px_18px_rgba(27,45,69,0.14)]" },
+                        { key: "sublet", label: "Sublets", count: totals.sublet, icon: Calendar, activeClass: "bg-[#2EC4B6] text-white shadow-[0_8px_18px_rgba(46,196,182,0.18)]" },
+                        { key: "marketplace", label: "Market", count: totals.marketplace, icon: ShoppingBag, activeClass: "bg-[#FF6B35] text-white shadow-[0_8px_18px_rgba(255,107,53,0.18)]" },
+                      ] as { key: InboxFilter; label: string; count: number; icon: typeof Home; activeClass: string }[]).map((item) => {
+                        const Icon = item.icon;
+                        const active = filter === item.key;
+                        return (
+                          <button
+                            key={item.key}
+                            onClick={() => setFilter(item.key)}
+                            className={`group flex items-center justify-between rounded-xl px-3 py-2.5 transition-all ${
+                              active
+                                ? item.activeClass
+                                : "bg-white text-[#1B2D45]/55 hover:bg-white hover:text-[#1B2D45] hover:shadow-sm"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <Icon className={`h-3.5 w-3.5 ${active ? "text-white" : "text-[#1B2D45]/35 group-hover:text-[#FF6B35]"}`} />
+                              <span style={{ fontSize: "11px", fontWeight: 850 }}>{item.label}</span>
+                            </span>
+                            <span
+                              className={`rounded-full px-1.5 py-0.5 ${
+                                active ? "bg-white/18 text-white" : "bg-[#1B2D45]/[0.05] text-[#1B2D45]/42"
+                              }`}
+                              style={{ fontSize: "10px", fontWeight: 900 }}
+                            >
+                              {item.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setFilter("unread")}
+                      className={`mt-1.5 flex w-full items-center justify-between rounded-xl px-3 py-2.5 transition-all ${
+                        filter === "unread"
+                          ? "bg-[#FFB627] text-[#1B2D45] shadow-[0_8px_18px_rgba(255,182,39,0.18)]"
+                          : "bg-white text-[#1B2D45]/55 hover:text-[#1B2D45] hover:shadow-sm"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <MessageCircle className={`h-3.5 w-3.5 ${filter === "unread" ? "text-[#1B2D45]" : "text-[#1B2D45]/35"}`} />
+                        <span style={{ fontSize: "11px", fontWeight: 850 }}>Unread only</span>
+                      </span>
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 ${
+                          filter === "unread" ? "bg-white/45 text-[#1B2D45]" : "bg-[#FF6B35]/10 text-[#FF6B35]"
+                        }`}
+                        style={{ fontSize: "10px", fontWeight: 900 }}
+                      >
+                        {totals.unread}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto">
+                  {loading ? (
+                    <MessageListSkeleton count={5} />
+                  ) : filtered.length === 0 ? (
+                    <EmptyInbox filter={filter} />
+                  ) : (
+                    <div className="divide-y divide-black/[0.03]">
+                      {filtered.map((convo) => (
+                        <ConversationItem
+                          key={convo.key}
+                          convo={convo}
+                          isActive={activeKey === convo.key}
+                          onClick={() => setActiveKey(convo.key)}
+                          currentUserId={user.id}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showThread && (
+              <div className="flex min-w-0 flex-1 flex-col">
+                {activeConversation ? (
+                  <ChatThread
+                    conversation={activeConversation}
+                    currentUserId={user.id}
+                    onBack={handleBack}
+                    onRefreshConversations={fetchConversations}
+                  />
+                ) : (
+                  <EmptyThread />
+                )}
+              </div>
             )}
           </div>
-        )}
-      </div>
-      </div>
+        </div>
       </div>
     </div>
   );

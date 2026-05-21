@@ -113,10 +113,22 @@ export function Navbar() {
   const fetchUnread = useCallback(async () => {
     if (!user) return;
     try {
-      const data = isLandlord
-        ? await api.messages.getLandlordUnreadCount()
-        : await api.messages.getUnreadCount();
-      setUnreadCount(data.unread_count);
+      if (isLandlord) {
+        const data = await api.messages.getLandlordUnreadCount();
+        setUnreadCount(data.unread_count);
+        return;
+      }
+
+      const [housing, sublet, marketplace] = await Promise.allSettled([
+        api.messages.getUnreadCount(),
+        api.sublets.getUnreadCount(),
+        api.marketplace.getUnreadCount(),
+      ]);
+      setUnreadCount(
+        (housing.status === "fulfilled" ? housing.value.unread_count : 0) +
+        (sublet.status === "fulfilled" ? sublet.value.unread_count : 0) +
+        (marketplace.status === "fulfilled" ? marketplace.value.unread_count : 0)
+      );
     } catch {
       // silently fail
     }
@@ -237,7 +249,6 @@ export function Navbar() {
     : [
         { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { label: "Messages", href: "/messages", icon: MessageCircle },
-        { label: "Marketplace Messages", href: "/marketplace/messages", icon: ShoppingBag },
         { label: "Saved Listings", href: "/saved", icon: Bookmark },
         { label: "Saved Items", href: "/marketplace/saved", icon: Heart },
         { label: "Marketplace Listings", href: "/marketplace/my", icon: ShoppingBag },
@@ -273,7 +284,15 @@ export function Navbar() {
               <Link
                 key={item.label}
                 href={item.path}
-                data-tour={item.label === "The Bubble" ? "the-bubble" : item.label === "Roommates" ? "roommates" : undefined}
+                data-tour={
+                  item.label === "The Bubble"
+                    ? "the-bubble"
+                    : item.label === "Roommates"
+                      ? "roommates"
+                      : item.label === "Marketplace"
+                        ? "marketplace"
+                        : undefined
+                }
                 className={`px-4 py-2 rounded-lg transition-all ${
                   isActive
                     ? "bg-[#FF6B35]/10 text-[#FF6B35]"

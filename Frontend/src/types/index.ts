@@ -639,11 +639,52 @@ export interface SubletListResponse {
   created_at: string;
 }
 
+export interface StartSubletConversation {
+  sublet_id: number;
+  content: string;
+}
+
+export interface SubletMessageResponse {
+  id: number;
+  conversation_id: number;
+  sender_id: number;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface SubletConversationResponse {
+  id: number;
+  sublet_id: number;
+  sublet_title: string;
+  poster_id: number;
+  poster_name: string;
+  inquirer_id: number;
+  inquirer_name: string;
+  last_message?: SubletMessageResponse | null;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubletConversationDetailResponse {
+  id: number;
+  sublet_id: number;
+  sublet_title: string;
+  poster_id: number;
+  poster_name: string;
+  inquirer_id: number;
+  inquirer_name: string;
+  messages: SubletMessageResponse[];
+}
+
 // ── Flag ───────────────────────────────────────────────
 
 export interface FlagCreate {
   listing_id?: number;
   review_id?: number;
+  marketplace_item_id?: number;
+  sublet_id?: number;
   reason: string;
 }
 
@@ -652,6 +693,8 @@ export interface FlagResponse {
   reporter_id: number;
   listing_id: number | null;
   review_id: number | null;
+  marketplace_item_id?: number | null;
+  sublet_id?: number | null;
   reason: string;
   status: string;
   created_at: string;

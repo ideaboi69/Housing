@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, X, ShieldCheck, Pin, LayoutGrid, MessageCircle, Users } from "lucide-react";
+import { ArrowRight, X, ShieldCheck, Pin, LayoutGrid, MessageCircle, Users, ShoppingBag } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useAuthStore } from "@/lib/auth-store";
 import { usePathname } from "next/navigation";
@@ -47,6 +47,13 @@ const TOUR_STEPS: TourStep[] = [
     description: "Take a 2-minute lifestyle quiz, get matched with compatible Guelph students, and browse groups with open spots. Your vibe, your people.",
     icon: <Users className="w-5 h-5" />,
     color: "#2EC4B6",
+  },
+  {
+    selector: "[data-tour='marketplace']",
+    title: "Marketplace",
+    description: "Buy and sell student essentials like furniture, storage, kitchen gear, and decor without leaving Cribb.",
+    icon: <ShoppingBag className="w-5 h-5" />,
+    color: "#FF8A1D",
   },
   {
     selector: "[data-tour='the-bubble']",

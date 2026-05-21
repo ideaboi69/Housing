@@ -23,8 +23,12 @@ import type {
   HealthScoreResponse,
   SavedListingDetailResponse,
   SubletCreate,
+  StartSubletConversation,
+  SubletConversationDetailResponse,
+  SubletConversationResponse,
   SubletImageResponse,
   SubletListResponse,
+  SubletMessageResponse,
   SubletResponse,
   FlagCreate,
   FlagResponse,
@@ -476,6 +480,27 @@ export const sublets = {
 
     return res.json() as Promise<SubletImageResponse[]>;
   },
+
+  startConversation: (data: StartSubletConversation) =>
+    request<SubletMessageResponse>("/api/sublets/conversations", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  sendMessage: (conversationId: number, data: { content: string }) =>
+    request<SubletMessageResponse>(`/api/sublets/conversations/${conversationId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  getConversations: () =>
+    request<SubletConversationResponse[]>("/api/sublets/conversations"),
+
+  getConversation: (conversationId: number) =>
+    request<SubletConversationDetailResponse>(`/api/sublets/conversations/${conversationId}`),
+
+  getUnreadCount: () =>
+    request<{ unread_count: number }>("/api/sublets/unread-count"),
 };
 
 // ── Properties ──────────────────────────────────────────

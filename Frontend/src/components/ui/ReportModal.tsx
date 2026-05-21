@@ -16,14 +16,38 @@ const REPORT_REASONS = [
   { value: "other", label: "Other", icon: "💬" },
 ];
 
+const REVIEW_REPORT_REASONS = [
+  { value: "fake_review", label: "Looks fake or misleading", icon: "🚨" },
+  { value: "wrong_property", label: "Seems to be for the wrong place", icon: "📍" },
+  { value: "spam", label: "Spam or low-quality content", icon: "📋" },
+  { value: "offensive_content", label: "Offensive or inappropriate content", icon: "⚠️" },
+  { value: "personal_info", label: "Shares private personal info", icon: "🔒" },
+  { value: "other", label: "Other", icon: "💬" },
+];
+
 interface ReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  listingId: number;
+  listingId?: number;
+  reviewId?: number;
+  marketplaceItemId?: number;
+  subletId?: number;
   listingTitle?: string;
+  targetTitle?: string;
+  targetType?: "listing" | "review" | "marketplace_item" | "sublet";
 }
 
-export function ReportModal({ isOpen, onClose, listingId, listingTitle }: ReportModalProps) {
+export function ReportModal({
+  isOpen,
+  onClose,
+  listingId,
+  reviewId,
+  marketplaceItemId,
+  subletId,
+  listingTitle,
+  targetTitle,
+  targetType = reviewId ? "review" : subletId ? "sublet" : marketplaceItemId ? "marketplace_item" : "listing",
+}: ReportModalProps) {
   const router = useRouter();
   const { user } = useAuthStore();
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
@@ -42,11 +66,17 @@ export function ReportModal({ isOpen, onClose, listingId, listingTitle }: Report
 
     const reason = selectedReason === "other" && customReason.trim()
       ? customReason.trim()
-      : REPORT_REASONS.find((r) => r.value === selectedReason)?.label ?? selectedReason;
+      : reasons.find((r) => r.value === selectedReason)?.label ?? selectedReason;
 
     setStatus("sending");
     try {
-      await api.flags.create({ listing_id: listingId, reason });
+      await api.flags.create({
+        listing_id: listingId,
+        review_id: reviewId,
+        marketplace_item_id: marketplaceItemId,
+        sublet_id: subletId,
+        reason,
+      });
       setStatus("sent");
       setTimeout(() => {
         onClose();
@@ -70,6 +100,17 @@ export function ReportModal({ isOpen, onClose, listingId, listingTitle }: Report
       }
     }
   };
+
+  const isReviewReport = targetType === "review";
+  const reasons = isReviewReport ? REVIEW_REPORT_REASONS : REPORT_REASONS;
+  const targetLabel = isReviewReport
+    ? "Review"
+    : targetType === "sublet"
+      ? "Sublet"
+      : targetType === "marketplace_item"
+        ? "Marketplace Item"
+        : "Listing";
+  const displayTitle = targetTitle ?? listingTitle;
 
   return (
     <AnimatePresence>
@@ -112,7 +153,7 @@ export function ReportModal({ isOpen, onClose, listingId, listingTitle }: Report
                 <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "13px" }}>
                   {status === "sent"
                     ? "Thanks for helping keep cribb safe. We'll review this shortly."
-                    : "You've already reported this listing. We're on it."}
+                    : `You've already reported this ${targetLabel.toLowerCase()}. We're on it.`}
                 </p>
               </div>
             ) : (
@@ -124,10 +165,10 @@ export function ReportModal({ isOpen, onClose, listingId, listingTitle }: Report
                       <Flag className="w-4 h-4 text-[#E71D36]" />
                     </div>
                     <div>
-                      <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>Report Listing</h3>
-                      {listingTitle && (
+                      <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>Report {targetLabel}</h3>
+                      {displayTitle && (
                         <p className="text-[#1B2D45]/40 truncate" style={{ fontSize: "11px", maxWidth: "220px" }}>
-                          {listingTitle}
+                          {displayTitle}
                         </p>
                       )}
                     </div>
@@ -143,9 +184,9 @@ export function ReportModal({ isOpen, onClose, listingId, listingTitle }: Report
                 {/* Reasons */}
                 <div className="p-5 space-y-1.5">
                   <p className="text-[#1B2D45]/50 mb-3" style={{ fontSize: "12px", fontWeight: 500 }}>
-                    Why are you reporting this listing?
+                    Why are you reporting this {targetLabel.toLowerCase()}?
                   </p>
-                  {REPORT_REASONS.map((reason) => (
+                  {reasons.map((reason) => (
                     <button
                       key={reason.value}
                       onClick={() => setSelectedReason(reason.value)}

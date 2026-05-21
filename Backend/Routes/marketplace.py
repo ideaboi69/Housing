@@ -233,6 +233,7 @@ def delete_item(item_id: int, db: Session = Depends(get_db), current_user: User 
 # MESSAGES
 # ──────────────────────────────────────────────
 # Start conversation
+@marketplace_router.post("/conversations", response_model=MarketplaceMessageResponse, status_code=status.HTTP_201_CREATED)
 @marketplace_router.post("/conversations/start", response_model=MarketplaceMessageResponse, status_code=status.HTTP_201_CREATED)
 def start_marketplace_conversation(payload: StartMarketplaceConversation, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     item = db.query(MarketplaceItem).filter(MarketplaceItem.id == payload.item_id).first()

@@ -234,39 +234,61 @@ function ImageGallery({ images }: { images: string[] }) {
 /* ── Review Card ───────────────────────────────── */
 
 function ReviewCard({ review, index }: { review: ReviewResponse; index: number }) {
+  const [reportOpen, setReportOpen] = useState(false);
+
   return (
-    <motion.div className="bg-[#FAF8F4] rounded-xl p-4"
-      initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }} transition={{ delay: index * 0.08 }}>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>
-          {new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}
-        </p>
-        <div className={`px-2 py-0.5 rounded-full ${review.would_rent_again ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#E71D36]/10 text-[#E71D36]"}`}
-          style={{ fontSize: "10px", fontWeight: 600 }}>
-          {review.would_rent_again ? "Would rent again ✓" : "Would not rent again"}
-        </div>
-      </div>
-      {/* Star ratings only — no comments for legal reasons */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: "Response", val: review.responsiveness },
-          { label: "Maintenance", val: review.maintenance_speed },
-          { label: "Privacy", val: review.respect_privacy },
-          { label: "Fairness", val: review.fairness_of_charges },
-        ].map((r) => (
-          <div key={r.label} className="text-center">
-            <div className="text-[#1B2D45]/30" style={{ fontSize: "9px", fontWeight: 600 }}>{r.label}</div>
-            <div className="flex items-center justify-center gap-0.5 mt-1">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <span key={star} style={{ fontSize: "12px", color: star <= r.val ? "#FFB627" : "#1B2D45" + "15" }}>★</span>
-              ))}
+    <>
+      <motion.div className="bg-[#FAF8F4] rounded-xl p-4"
+        initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }} transition={{ delay: index * 0.08 }}>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <p className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>
+            {new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}
+          </p>
+          <div className="flex items-center gap-2">
+            <div className={`px-2 py-0.5 rounded-full ${review.would_rent_again ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#E71D36]/10 text-[#E71D36]"}`}
+              style={{ fontSize: "10px", fontWeight: 600 }}>
+              {review.would_rent_again ? "Would rent again ✓" : "Would not rent again"}
             </div>
-            <div className="text-[#1B2D45]/50 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{r.val}/5</div>
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[#1B2D45]/28 transition-colors hover:bg-[#E71D36]/[0.06] hover:text-[#E71D36]"
+              style={{ fontSize: "10px", fontWeight: 700 }}
+            >
+              <Flag className="h-3 w-3" />
+              Report
+            </button>
           </div>
-        ))}
-      </div>
-    </motion.div>
+        </div>
+        {/* Star ratings only — no comments for legal reasons */}
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            { label: "Response", val: review.responsiveness },
+            { label: "Maintenance", val: review.maintenance_speed },
+            { label: "Privacy", val: review.respect_privacy },
+            { label: "Fairness", val: review.fairness_of_charges },
+          ].map((r) => (
+            <div key={r.label} className="text-center">
+              <div className="text-[#1B2D45]/30" style={{ fontSize: "9px", fontWeight: 600 }}>{r.label}</div>
+              <div className="flex items-center justify-center gap-0.5 mt-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span key={star} style={{ fontSize: "12px", color: star <= r.val ? "#FFB627" : "#1B2D45" + "15" }}>★</span>
+                ))}
+              </div>
+              <div className="text-[#1B2D45]/50 mt-0.5" style={{ fontSize: "11px", fontWeight: 700 }}>{r.val}/5</div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+      <ReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        reviewId={review.id}
+        targetType="review"
+        targetTitle={`Review from ${new Date(review.created_at).toLocaleDateString("en-CA", { month: "short", year: "numeric" })}`}
+      />
+    </>
   );
 }
 
@@ -397,7 +419,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     setContactSending(true);
     setActiveQuickMessage(quickKey ?? null);
     try {
-      await api.messages.startConversation({
+      const conversation = await api.messages.startConversation({
         listing_id: listingId,
         content,
       });
@@ -405,10 +427,10 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       if (quickKey) {
         toast.success("Opening your chat with the landlord...");
       }
-      setTimeout(() => router.push("/messages"), 1500);
+      setTimeout(() => router.push(`/messages?type=housing&conversation=${conversation.id}`), 1500);
     } catch (err) {
       if (err instanceof Error && "status" in err && (err as { status?: number }).status === 409) {
-        router.push("/messages");
+        router.push("/messages?type=housing");
       } else {
         toast.error("We couldn\u2019t open a conversation right now. Please try again.");
       }
