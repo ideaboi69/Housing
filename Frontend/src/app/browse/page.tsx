@@ -16,7 +16,6 @@ import { SearchAndFilters } from "@/components/browse/SearchAndFilters";
 import { FilterModal } from "@/components/browse/FilterModal";
 import { MyPicksTray } from "@/components/browse/MyPicksTray";
 import { CompareModal } from "@/components/browse/CompareModal";
-import { MobileBottomTabs } from "@/components/browse/MobileBottomTabs";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { mockListings, mockHealthScores } from "@/lib/mock-data";
@@ -413,7 +412,7 @@ export default function BrowsePage() {
       <AnimatePresence>
         {isMobile && pinnedIds.length > 0 && !showPicksSheet && (
           <motion.div
-            className="fixed bottom-[72px] right-4 z-30"
+            className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+16px)] right-4 z-30"
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
@@ -429,18 +428,6 @@ export default function BrowsePage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Mobile bottom tabs */}
-      {isMobile && (
-        <MobileBottomTabs
-          onMapTab={() => setViewMode("map")}
-          onSavedTab={() => setShowPicksSheet(true)}
-          picksCount={pinnedListings.length}
-        />
-      )}
-
-      {/* Bottom padding on mobile for the fixed tab bar */}
-      {isMobile && <div className="h-[56px]" />}
 
       {/* Compare Modal */}
       <CompareModal

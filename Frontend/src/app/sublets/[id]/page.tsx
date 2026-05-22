@@ -16,7 +16,7 @@ import { api } from "@/lib/api";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, MapPin, Heart, Check, ChevronLeft, ChevronRight,
+  ArrowLeft, MapPin, Heart, Check, X, ChevronLeft, ChevronRight,
   Bed, Bath, Calendar, MessageCircle, Share2, Flag, Tag, Users,
   GraduationCap, Zap, Star,
 } from "lucide-react";
@@ -33,6 +33,10 @@ const MONTHS = ["May", "Jun", "Jul", "Aug", "Sep"];
 
 const stagger = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.05 } } };
 const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 200, damping: 22 } } };
+
+function hasMessagingProfile(status: { has_tenant_profile: boolean; roommate_quiz_completed: boolean }) {
+  return status.has_tenant_profile || status.roommate_quiz_completed;
+}
 
 function getScoreLabel(score: number) { return score >= 85 ? "Great" : score >= 65 ? "Good" : "Caution"; }
 
@@ -236,6 +240,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   const [messageSending, setMessageSending] = useState(false);
   const [messageSent, setMessageSent] = useState(false);
   const [activeQuickMessage, setActiveQuickMessage] = useState<string | null>(null);
+  const [showMessageModal, setShowMessageModal] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [showTenantPrompt, setShowTenantPrompt] = useState(false);
@@ -322,14 +327,30 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     }
   }, [sublet, reviews.length]);
 
-  // Check if student has filled tenant profile
+  // Check if student has already answered roommate/tenant fit questions
   useEffect(() => {
     if (!user || user.role !== "student" || tenantChecked.current) return;
     tenantChecked.current = true;
     api.auth.getTenantStatus()
-      .then((res) => setHasTenantProfile(res.has_tenant_profile))
+      .then((res) => setHasTenantProfile(hasMessagingProfile(res)))
       .catch(() => setHasTenantProfile(true));
   }, [user]);
+
+  const needsTenantProfilePrompt = async () => {
+    if (!user || user.role !== "student") return false;
+    if (hasTenantProfile === true) return false;
+    if (hasTenantProfile === false) return true;
+
+    try {
+      const status = await api.auth.getTenantStatus();
+      const isComplete = hasMessagingProfile(status);
+      setHasTenantProfile(isComplete);
+      return !isComplete;
+    } catch {
+      setHasTenantProfile(true);
+      return false;
+    }
+  };
 
   const openSubletConversation = async (content: string, quickKey?: string) => {
     if (messageSending || messageSent) return;
@@ -347,6 +368,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
           content,
         });
         setMessageSent(true);
+        setShowMessageModal(false);
         if (quickKey) {
           toast.success("Opening your chat about this sublet...");
         }
@@ -372,17 +394,17 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
       router.push(`/login?next=${encodeURIComponent(`/sublets/${id}`)}`);
       return;
     }
-    if (hasTenantProfile === false) {
+    if (await needsTenantProfilePrompt()) {
       setShowTenantPrompt(true);
       return;
     }
-    await openSubletConversation(`Hi, I'm interested in "${sublet?.title}". Is it still available?`);
+    setShowMessageModal(true);
   };
 
   const handleTenantComplete = () => {
     setShowTenantPrompt(false);
     setHasTenantProfile(true);
-    void openSubletConversation(`Hi, I'm interested in "${sublet?.title}". Is it still available?`);
+    setShowMessageModal(true);
   };
 
   const quickMessageOptions = [
@@ -660,29 +682,6 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 {messageSent ? <><Check className="w-4 h-4" /> Message Sent</> : messageSending ? "Sending..." : <><MessageCircle className="w-4 h-4" /> Message {sublet.posterName}</>}
               </motion.button>
 
-              <div className="mt-3">
-                <div className="text-[#1B2D45]/30 mb-2" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em" }}>
-                  QUICK MESSAGE
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {quickMessageOptions.map((option) => (
-                    <button
-                      key={option.key}
-                      onClick={() => void openSubletConversation(option.content, option.key)}
-                      disabled={messageSending || messageSent}
-                      className={`rounded-full border px-3 py-1.5 transition-all ${
-                        activeQuickMessage === option.key
-                          ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
-                          : "border-black/[0.06] text-[#1B2D45]/45 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]"
-                      } disabled:opacity-50`}
-                      style={{ fontSize: "11px", fontWeight: 700 }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Save */}
               <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave}
                 disabled={storeToggling}
@@ -740,6 +739,88 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
           </motion.div>
         </div>
       </div>
+
+      {/* Message Poster Modal */}
+      <AnimatePresence>
+        {showMessageModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/40 flex items-end md:items-center justify-center"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowMessageModal(false); }}
+          >
+            <motion.div
+              initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
+              className="w-full max-w-[440px] bg-white rounded-t-2xl md:rounded-2xl overflow-hidden"
+              style={{ boxShadow: "0 -8px 40px rgba(0,0,0,0.15)" }}
+            >
+              <div className="px-5 py-4 border-b border-black/[0.06]">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>Message {sublet.posterName}</h3>
+                  <button onClick={() => setShowMessageModal(false)} className="w-7 h-7 rounded-full bg-black/[0.04] flex items-center justify-center text-[#1B2D45]/40 hover:text-[#1B2D45]">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-3 bg-[#FAF8F4] rounded-xl px-3 py-2.5">
+                  {sublet.images[0] && <img src={sublet.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[#1B2D45] truncate" style={{ fontSize: "13px", fontWeight: 600 }}>{sublet.title}</p>
+                    <p className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 800 }}>${sublet.subletPrice}/mo</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[#1B2D45]/40 mb-3" style={{ fontSize: "11px", fontWeight: 600 }}>Quick messages</p>
+                <div className="space-y-2">
+                  {quickMessageOptions.map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => void openSubletConversation(option.content, option.key)}
+                      disabled={messageSending}
+                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all disabled:opacity-50 ${
+                        activeQuickMessage === option.key
+                          ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.03] text-[#1B2D45]"
+                          : "border-black/[0.06] text-[#1B2D45]/70 hover:border-[#FF6B35]/30 hover:bg-[#FF6B35]/[0.03] hover:text-[#1B2D45]"
+                      }`}
+                      style={{ fontSize: "13px", fontWeight: 500 }}
+                    >
+                      {option.content}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-[#1B2D45]/40 mb-2" style={{ fontSize: "11px", fontWeight: 600 }}>Or write your own</p>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const input = (e.currentTarget.elements.namedItem("custom_msg") as HTMLInputElement);
+                      if (input.value.trim()) void openSubletConversation(input.value.trim());
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <input
+                      name="custom_msg"
+                      type="text"
+                      placeholder="Type a message..."
+                      className="flex-1 px-4 py-2.5 rounded-xl bg-[#FAF8F4] border border-black/[0.06] text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/30 focus:outline-none transition-all"
+                      style={{ fontSize: "13px" }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={messageSending}
+                      className="px-4 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-50 transition-all shrink-0"
+                      style={{ fontSize: "13px", fontWeight: 700 }}
+                    >
+                      {messageSending ? "Sending..." : "Send"}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Report Modal */}
       <ReportModal

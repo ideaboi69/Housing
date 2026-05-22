@@ -346,6 +346,19 @@ def get_sublet_conversation(conversation_id: int, db: Session = Depends(get_db),
         messages=[SubletMessageResponse.model_validate(m) for m in conversation.messages],
     )
 
+@sublet_router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_sublet_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    conversation = db.query(SubletConversation).filter(SubletConversation.id == conversation_id).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if conversation.poster_id != current_user.id and conversation.inquirer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    db.query(SubletMessage).filter(SubletMessage.conversation_id == conversation.id).delete()
+    db.delete(conversation)
+    db.commit()
+
 # Get total unread sublet messages for the current user
 @sublet_router.get("/unread-count")
 def get_sublet_unread_count(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):

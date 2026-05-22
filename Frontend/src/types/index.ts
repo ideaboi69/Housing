@@ -1077,6 +1077,32 @@ export interface ProfileCompletionSubmit {
   bio?: string;
 }
 
+export interface GroupChatMessageResponse {
+  id: number;
+  group_id: number;
+  sender_id: number;
+  sender_name: string;
+  sender_initial: string;
+  sender_photo_url?: string | null;
+  content: string;
+  is_pinned: boolean;
+  is_own: boolean;
+  is_deleted: boolean;
+  edited_at?: string | null;
+  created_at: string;
+}
+
+export interface GroupChatHistoryResponse {
+  messages: GroupChatMessageResponse[];
+  pinned: GroupChatMessageResponse[];
+  has_more: boolean;
+}
+
+export interface GroupChatUnreadResponse {
+  group_id: number;
+  unread_count: number;
+}
+
 export interface GroupMemberResponse {
   user_id: number;
   first_name: string;

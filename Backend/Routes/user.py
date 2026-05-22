@@ -341,7 +341,11 @@ def submit_tenant_profile(payload: TenantProfileCreate, db: Session = Depends(ge
     db.commit()
     db.refresh(profile)
  
-    return {"message": "Tenant profile saved", "has_tenant_profile": True}
+    return {
+        "message": "Tenant profile saved",
+        "has_tenant_profile": True,
+        "roommate_quiz_completed": profile.quiz_completed,
+    }
  
 # Check if student has filled tenant profile
 @user_router.get("/me/tenant-status")
@@ -349,10 +353,13 @@ def get_tenant_status(db: Session = Depends(get_db), current_user: User = Depend
     profile = db.query(RoommateProfile).filter(RoommateProfile.user_id == current_user.id).first()
  
     if not profile:
-        return {"has_tenant_profile": False}
+        return {"has_tenant_profile": False, "roommate_quiz_completed": False}
  
     has_tenant = all([profile.smoking, profile.pets, profile.gender_housing_pref, profile.cleanliness])
-    return {"has_tenant_profile": has_tenant}
+    return {
+        "has_tenant_profile": has_tenant,
+        "roommate_quiz_completed": profile.quiz_completed,
+    }
  
 # Tenant card (landlord taps student profile picture in chat)
 @user_router.get("/{user_id}/tenant-card", response_model=TenantCardResponse)

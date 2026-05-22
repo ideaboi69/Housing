@@ -52,6 +52,9 @@ import type {
   RoommateProfileResponse,
   ProfileCompletionCheck,
   ProfileCompletionSubmit,
+  GroupChatHistoryResponse,
+  GroupChatMessageResponse,
+  GroupChatUnreadResponse,
   GroupCardResponse,
   GroupDetailResponse,
   GroupCreate,
@@ -339,10 +342,10 @@ export const auth = {
 
   // Tenant Profile Pop-up
   getTenantStatus: () =>
-  request<{ has_tenant_profile: boolean }>("/api/users/me/tenant-status"),
+  request<{ has_tenant_profile: boolean; roommate_quiz_completed: boolean }>("/api/users/me/tenant-status"),
 
 submitTenantProfile: (data: { smoking: string; pets: string; gender_housing_pref: string; cleanliness: string }) =>
-  request<{ message: string; has_tenant_profile: boolean }>("/api/users/me/tenant-profile", {
+  request<{ message: string; has_tenant_profile: boolean; roommate_quiz_completed: boolean }>("/api/users/me/tenant-profile", {
     method: "POST",
     body: JSON.stringify(data),
   }),
@@ -498,6 +501,9 @@ export const sublets = {
 
   getConversation: (conversationId: number) =>
     request<SubletConversationDetailResponse>(`/api/sublets/conversations/${conversationId}`),
+
+  deleteConversation: (conversationId: number) =>
+    request<null>(`/api/sublets/conversations/${conversationId}`, { method: "DELETE" }),
 
   getUnreadCount: () =>
     request<{ unread_count: number }>("/api/sublets/unread-count"),
@@ -966,6 +972,27 @@ export const roommates = {
     request<null>(`/api/roommates/groups/${groupId}/leave`, {
       method: "DELETE",
     }),
+
+  // Group chat
+  getGroupChat: (groupId: number, params?: { before_id?: number; limit?: number }) =>
+    request<GroupChatHistoryResponse>(
+      `/api/roommates/groups/${groupId}/chat${toQueryString(params || {})}`
+    ),
+
+  sendGroupChatMessage: (groupId: number, content: string) =>
+    request<GroupChatMessageResponse>(`/api/roommates/groups/${groupId}/chat`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    }),
+
+  markGroupChatRead: (groupId: number, lastReadMessageId: number) =>
+    request<null>(`/api/roommates/groups/${groupId}/chat/read`, {
+      method: "POST",
+      body: JSON.stringify({ last_read_message_id: lastReadMessageId }),
+    }),
+
+  getGroupChatUnread: (groupId: number) =>
+    request<GroupChatUnreadResponse>(`/api/roommates/groups/${groupId}/chat/unread`),
 };
 
 // ── Viewings / Showings ────────────────────────────────
@@ -1169,6 +1196,9 @@ export const marketplace = {
 
   getConversation: (conversationId: number) =>
     request<MarketplaceConversationDetailResponse>(`/api/marketplace/conversations/${conversationId}`),
+
+  deleteConversation: (conversationId: number) =>
+    request<null>(`/api/marketplace/conversations/${conversationId}`, { method: "DELETE" }),
 
   getUnreadCount: () =>
     request<{ unread_count: number }>("/api/marketplace/unread-count"),

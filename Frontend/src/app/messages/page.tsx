@@ -16,6 +16,7 @@ import {
   Send,
   ShoppingBag,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
@@ -224,11 +225,13 @@ function ConversationItem({
   convo,
   isActive,
   onClick,
+  onDelete,
   currentUserId,
 }: {
   convo: UnifiedConversation;
   isActive: boolean;
   onClick: () => void;
+  onDelete: () => void;
   currentUserId: number;
 }) {
   const meta = TYPE_META[convo.type];
@@ -236,56 +239,68 @@ function ConversationItem({
   const isFromMe = convo.lastMessage?.sender_id === currentUserId;
 
   return (
-    <button
-      onClick={onClick}
-      className={`w-full border-l-2 px-4 py-3.5 text-left transition-all ${
+    <div
+      className={`group flex w-full items-stretch border-l-2 transition-all ${
         isActive
           ? "border-[#FF6B35] bg-[#FF6B35]/[0.06]"
           : "border-transparent hover:bg-[#1B2D45]/[0.02]"
       }`}
     >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white" style={{ background: "linear-gradient(135deg, #1B2D45, #2D4A6F)", fontSize: "13px", fontWeight: 700 }}>
-          {getInitials(convo.otherName)}
-        </div>
+      <button onClick={onClick} className="min-w-0 flex-1 px-4 py-3.5 text-left">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white" style={{ background: "linear-gradient(135deg, #1B2D45, #2D4A6F)", fontSize: "13px", fontWeight: 700 }}>
+            {getInitials(convo.otherName)}
+          </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: convo.unreadCount > 0 ? 800 : 650 }}>
-              {convo.otherName}
-            </p>
-            {convo.lastMessage && (
-              <span className="shrink-0 text-[#98A3B0]" style={{ fontSize: "10px" }}>
-                {timeAgo(convo.lastMessage.created_at)}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: convo.unreadCount > 0 ? 800 : 650 }}>
+                {convo.otherName}
+              </p>
+              {convo.lastMessage && (
+                <span className="shrink-0 text-[#98A3B0]" style={{ fontSize: "10px" }}>
+                  {timeAgo(convo.lastMessage.created_at)}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${meta.bg} ${meta.tone}`} style={{ fontSize: "9px", fontWeight: 800 }}>
+                <Icon className="h-2.5 w-2.5" />
+                {meta.short}
               </span>
+              <p className="truncate text-[#98A3B0]" style={{ fontSize: "10px" }}>
+                {convo.title}
+              </p>
+            </div>
+
+            {convo.lastMessage && (
+              <p className={`mt-1 truncate ${convo.unreadCount > 0 ? "text-[#1B2D45]" : "text-[#98A3B0]"}`} style={{ fontSize: "11px", fontWeight: convo.unreadCount > 0 ? 650 : 400 }}>
+                {isFromMe && <span className="text-[#98A3B0]">You: </span>}
+                {convo.lastMessage.content}
+              </p>
             )}
           </div>
 
-          <div className="mt-1 flex items-center gap-1.5">
-            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 ${meta.bg} ${meta.tone}`} style={{ fontSize: "9px", fontWeight: 800 }}>
-              <Icon className="h-2.5 w-2.5" />
-              {meta.short}
-            </span>
-            <p className="truncate text-[#98A3B0]" style={{ fontSize: "10px" }}>
-              {convo.title}
-            </p>
-          </div>
-
-          {convo.lastMessage && (
-            <p className={`mt-1 truncate ${convo.unreadCount > 0 ? "text-[#1B2D45]" : "text-[#98A3B0]"}`} style={{ fontSize: "11px", fontWeight: convo.unreadCount > 0 ? 650 : 400 }}>
-              {isFromMe && <span className="text-[#98A3B0]">You: </span>}
-              {convo.lastMessage.content}
-            </p>
+          {convo.unreadCount > 0 && (
+            <div className="flex h-5 min-w-[20px] shrink-0 items-center justify-center self-center rounded-full bg-[#FF6B35] px-1.5 text-white" style={{ fontSize: "9px", fontWeight: 800 }}>
+              {convo.unreadCount > 9 ? "9+" : convo.unreadCount}
+            </div>
           )}
         </div>
-
-        {convo.unreadCount > 0 && (
-          <div className="flex h-5 min-w-[20px] shrink-0 items-center justify-center self-center rounded-full bg-[#FF6B35] px-1.5 text-white" style={{ fontSize: "9px", fontWeight: 800 }}>
-            {convo.unreadCount > 9 ? "9+" : convo.unreadCount}
-          </div>
-        )}
-      </div>
-    </button>
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="flex w-11 shrink-0 items-center justify-center text-[#98A3B0] opacity-100 transition-all hover:bg-[#E71D36]/[0.05] hover:text-[#E71D36] md:opacity-0 md:group-hover:opacity-100"
+        aria-label={`Delete conversation with ${convo.otherName}`}
+        title="Delete conversation"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
   );
 }
 
@@ -582,6 +597,27 @@ export default function MessagesPage() {
     void fetchConversations();
   };
 
+  const handleDeleteConversation = async (conversation: UnifiedConversation) => {
+    const confirmed = window.confirm(`Delete this ${TYPE_META[conversation.type].label.toLowerCase()} conversation with ${conversation.otherName}?`);
+    if (!confirmed) return;
+
+    try {
+      if (conversation.type === "housing") {
+        await api.messages.deleteConversation(conversation.id);
+      } else if (conversation.type === "sublet") {
+        await api.sublets.deleteConversation(conversation.id);
+      } else {
+        await api.marketplace.deleteConversation(conversation.id);
+      }
+
+      setConversations((prev) => prev.filter((item) => item.key !== conversation.key));
+      setActiveKey((current) => current === conversation.key ? null : current);
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+      window.alert("Could not delete this conversation. Please try again.");
+    }
+  };
+
   if (!user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FAF8F4] px-6">
@@ -747,6 +783,7 @@ export default function MessagesPage() {
                           convo={convo}
                           isActive={activeKey === convo.key}
                           onClick={() => setActiveKey(convo.key)}
+                          onDelete={() => void handleDeleteConversation(convo)}
                           currentUserId={user.id}
                         />
                       ))}

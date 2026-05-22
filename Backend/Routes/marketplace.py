@@ -414,6 +414,19 @@ def get_marketplace_conversation(conversation_id: int, db: Session = Depends(get
         messages=[MarketplaceMessageResponse.model_validate(m) for m in conversation.messages],
     )
 
+@marketplace_router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_marketplace_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    conversation = db.query(MarketplaceConversation).filter(MarketplaceConversation.id == conversation_id).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if conversation.buyer_id != current_user.id and conversation.seller_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    db.query(MarketplaceMessage).filter(MarketplaceMessage.conversation_id == conversation.id).delete()
+    db.delete(conversation)
+    db.commit()
+
 # Get Unread Count
 @marketplace_router.get("/unread-count")
 def get_marketplace_unread_count(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { use } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,7 +12,7 @@ import {
   TAG_SHORT_LABELS, computeGroupCompatibility,
   getRoommateGroupById,
 } from "@/components/roommates/roommate-data";
-import type { RoommateRequestResponse } from "@/types";
+import type { GroupChatMessageResponse, RoommateRequestResponse } from "@/types";
 
 /* ── Helpers ── */
 
@@ -136,6 +135,146 @@ function LandlordCopyButton({ url }: { url: string }) {
     <button onClick={handleCopy} className="px-3 py-2 rounded-lg bg-[#2EC4B6] text-white hover:bg-[#28b0a3] transition-all flex items-center gap-1.5 shrink-0" style={{ fontSize: "10px", fontWeight: 600 }}>
       {copied ? <><Check className="w-3 h-3" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
     </button>
+  );
+}
+
+function GroupChatPanel({ groupId, groupName }: { groupId: number; groupName: string }) {
+  const [messages, setMessages] = useState<GroupChatMessageResponse[]>([]);
+  const [pinned, setPinned] = useState<GroupChatMessageResponse[]>([]);
+  const [draft, setDraft] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadChat() {
+      setLoading(true);
+      setError("");
+      try {
+        const history = await api.roommates.getGroupChat(groupId, { limit: 50 });
+        if (cancelled) return;
+        setMessages(history.messages);
+        setPinned(history.pinned);
+        const last = history.messages.at(-1);
+        if (last) void api.roommates.markGroupChatRead(groupId, last.id).catch(() => {});
+      } catch {
+        if (!cancelled) setError("Could not load group chat.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    loadChat();
+    return () => { cancelled = true; };
+  }, [groupId]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const last = messages.at(-1);
+    if (last) void api.roommates.markGroupChatRead(groupId, last.id).catch(() => {});
+  }, [groupId, messages]);
+
+  const handleSend = async () => {
+    const content = draft.trim();
+    if (!content || sending) return;
+    setSending(true);
+    setError("");
+    try {
+      const msg = await api.roommates.sendGroupChatMessage(groupId, content);
+      setMessages((prev) => [...prev, msg]);
+      setDraft("");
+    } catch {
+      setError("Could not send that message.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="mb-4 rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>Group chat</h2>
+          <p className="mt-0.5 text-[#1B2D45]/35" style={{ fontSize: "11px" }}>{groupName} members only</p>
+        </div>
+        <div className="rounded-full bg-[#FF6B35]/[0.08] p-2 text-[#FF6B35]">
+          <MessageCircle className="h-4 w-4" />
+        </div>
+      </div>
+
+      {pinned.length > 0 && (
+        <div className="mb-3 rounded-xl border border-[#FFB627]/20 bg-[#FFB627]/[0.06] px-3 py-2">
+          <p className="mb-1 text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 800 }}>PINNED</p>
+          <p className="text-[#1B2D45]/70" style={{ fontSize: "12px", lineHeight: 1.45 }}>{pinned[0].content}</p>
+        </div>
+      )}
+
+      <div className="h-[280px] overflow-y-auto rounded-xl bg-[#FAF8F4] p-3">
+        {loading ? (
+          <div className="flex h-full items-center justify-center text-[#1B2D45]/35" style={{ fontSize: "12px", fontWeight: 600 }}>Loading chat...</div>
+        ) : messages.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <MessageCircle className="mb-2 h-7 w-7 text-[#1B2D45]/10" />
+            <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>No messages yet</p>
+            <p className="mt-1 max-w-[260px] text-[#1B2D45]/35" style={{ fontSize: "11px", lineHeight: 1.5 }}>Use this space for roommate logistics, viewings, chores, and move-in details.</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {messages.map((message) => (
+              <div key={message.id} className={`flex ${message.is_own ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[82%] rounded-2xl px-3 py-2 ${message.is_own ? "rounded-br-md bg-[#FF6B35] text-white" : "rounded-bl-md bg-white text-[#1B2D45] border border-black/[0.04]"}`}>
+                  {!message.is_own && (
+                    <p className={message.is_own ? "text-white/70" : "text-[#1B2D45]/40"} style={{ fontSize: "10px", fontWeight: 800 }}>{message.sender_name}</p>
+                  )}
+                  <p style={{ fontSize: "12px", lineHeight: 1.5, wordBreak: "break-word" }}>
+                    {message.is_deleted ? "Message deleted" : message.content}
+                  </p>
+                  <div className={`mt-1 flex items-center justify-end gap-1 ${message.is_own ? "text-white/55" : "text-[#1B2D45]/30"}`} style={{ fontSize: "9px", fontWeight: 600 }}>
+                    {new Date(message.created_at).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" })}
+                    {message.edited_at && <span>edited</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div ref={endRef} />
+          </div>
+        )}
+      </div>
+
+      {error && <p className="mt-2 text-[#E71D36]" style={{ fontSize: "11px", fontWeight: 600 }}>{error}</p>}
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleSend();
+        }}
+        className="mt-3 flex items-end gap-2"
+      >
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void handleSend();
+            }
+          }}
+          maxLength={2000}
+          placeholder="Message your group..."
+          className="min-h-[44px] flex-1 resize-none rounded-xl border border-black/[0.06] bg-white px-3 py-2.5 text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/30 focus:outline-none"
+          style={{ fontSize: "13px", lineHeight: 1.4 }}
+        />
+        <button
+          type="submit"
+          disabled={sending || !draft.trim()}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FF6B35] text-white transition-all hover:bg-[#e55e2e] disabled:opacity-45"
+          aria-label="Send group message"
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </form>
+    </div>
   );
 }
 
@@ -340,6 +479,8 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     group.preferredArea,
     group.genderPreference && group.genderPreference !== "No preference" ? group.genderPreference : null,
   ].filter(Boolean).slice(0, 2);
+  const liveGroupId = Number.parseInt(group.id, 10);
+  const canUseGroupChat = isInsider && !Number.isNaN(liveGroupId);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -717,6 +858,10 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           )}
         </div>
+
+        {canUseGroupChat && (
+          <GroupChatPanel groupId={liveGroupId} groupName={group.name} />
+        )}
 
         {/* Member: Leave button */}
         {isMember && !isOwner && (
