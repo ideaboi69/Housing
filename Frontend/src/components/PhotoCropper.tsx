@@ -1,22 +1,51 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { X, Check, ZoomIn, ZoomOut } from "lucide-react";
 
 interface PhotoCropperProps {
-  /** The file the user just selected. */
   file: File;
-  /** Pixel size of the output square. Default 512. */
+  shape?: "circle" | "rect";
+  aspect?: number;
   outputSize?: number;
-  /** Called when the user confirms the crop. Returns a JPEG File. */
+  title?: string;
+  hint?: string;
+  confirmLabel?: string;
+  filename?: string;
   onConfirm: (cropped: File) => void;
-  /** Called when the user closes/cancels the modal. */
   onCancel: () => void;
 }
 
-const VIEWPORT_PX = 280; // on-screen size of the crop circle
+const VIEWPORT_MAX = 320;
 
-export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: PhotoCropperProps) {
+export function PhotoCropper({
+  file,
+  shape = "circle",
+  aspect = 1,
+  outputSize = 512,
+  title,
+  hint,
+  confirmLabel,
+  filename,
+  onConfirm,
+  onCancel,
+}: PhotoCropperProps) {
+  const { viewportW, viewportH } = useMemo(() => {
+    if (shape === "circle") return { viewportW: 280, viewportH: 280 };
+    if (aspect >= 1) {
+      return { viewportW: VIEWPORT_MAX, viewportH: Math.round(VIEWPORT_MAX / aspect) };
+    }
+    // Portrait: cap height
+    return { viewportW: Math.round(VIEWPORT_MAX * aspect), viewportH: VIEWPORT_MAX };
+  }, [shape, aspect]);
+
+  // Compute output dimensions.
+  const { outputW, outputH } = useMemo(() => {
+    if (shape === "circle") return { outputW: outputSize, outputH: outputSize };
+    return { outputW: outputSize, outputH: Math.round(outputSize / aspect) };
+  }, [shape, aspect, outputSize]);
+
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [imgEl, setImgEl] = useState<HTMLImageElement | null>(null);
   const [scale, setScale] = useState(1);
@@ -25,6 +54,10 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Track whether we're mounted on the client (portals need document)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   // Read the file → image element + auto-fit
   useEffect(() => {
     const url = URL.createObjectURL(file);
@@ -32,14 +65,13 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
 
     const img = new Image();
     img.onload = () => {
-      // Compute the minimum scale so the image always fully covers the viewport
-      const fit = Math.max(VIEWPORT_PX / img.naturalWidth, VIEWPORT_PX / img.naturalHeight);
+      // Minimum scale so the image always fully covers the viewport on both axes
+      const fit = Math.max(viewportW / img.naturalWidth, viewportH / img.naturalHeight);
       setMinScale(fit);
       setScale(fit);
-      // Center it
       setOffset({
-        x: (VIEWPORT_PX - img.naturalWidth * fit) / 2,
-        y: (VIEWPORT_PX - img.naturalHeight * fit) / 2,
+        x: (viewportW - img.naturalWidth * fit) / 2,
+        y: (viewportH - img.naturalHeight * fit) / 2,
       });
       setImgEl(img);
     };
@@ -48,7 +80,7 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
     return () => {
       URL.revokeObjectURL(url);
     };
-  }, [file]);
+  }, [file, viewportW, viewportH]);
 
   // Re-clamp the offset whenever scale changes so the image keeps covering the viewport
   const clampOffset = useCallback(
@@ -56,21 +88,20 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
       if (!imgEl) return next;
       const drawnW = imgEl.naturalWidth * currentScale;
       const drawnH = imgEl.naturalHeight * currentScale;
-      const minX = VIEWPORT_PX - drawnW;
-      const minY = VIEWPORT_PX - drawnH;
+      const minX = viewportW - drawnW;
+      const minY = viewportH - drawnH;
       return {
         x: Math.min(0, Math.max(minX, next.x)),
         y: Math.min(0, Math.max(minY, next.y)),
       };
     },
-    [imgEl]
+    [imgEl, viewportW, viewportH]
   );
 
   useEffect(() => {
     setOffset((prev) => clampOffset(prev, scale));
   }, [scale, clampOffset]);
 
-  // Pointer drag handlers — work for mouse and touch via Pointer Events
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = {
@@ -102,20 +133,20 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
     setBusy(true);
     try {
       const canvas = document.createElement("canvas");
-      canvas.width = outputSize;
-      canvas.height = outputSize;
+      canvas.width = outputW;
+      canvas.height = outputH;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Canvas not supported");
 
-      // Source rect on the natural-sized image that maps to the viewport square
+      // Source rect on the natural-sized image that maps to the viewport
       const sx = -offset.x / scale;
       const sy = -offset.y / scale;
-      const sw = VIEWPORT_PX / scale;
-      const sh = VIEWPORT_PX / scale;
+      const sw = viewportW / scale;
+      const sh = viewportH / scale;
 
       ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, outputSize, outputSize);
-      ctx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, outputSize, outputSize);
+      ctx.fillRect(0, 0, outputW, outputH);
+      ctx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, outputW, outputH);
 
       const blob: Blob = await new Promise((resolve, reject) => {
         canvas.toBlob(
@@ -125,7 +156,8 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
         );
       });
 
-      const cropped = new File([blob], "avatar.jpg", { type: "image/jpeg" });
+      const defaultName = shape === "circle" ? "avatar.jpg" : "image.jpg";
+      const cropped = new File([blob], filename || defaultName, { type: "image/jpeg" });
       onConfirm(cropped);
     } finally {
       setBusy(false);
@@ -133,13 +165,21 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
   };
 
   const maxScale = minScale * 4;
+  const isCircle = shape === "circle";
+  const defaultTitle = isCircle ? "Position your photo" : "Crop image";
+  const defaultHint = isCircle
+    ? "Drag to move, use the slider to zoom. The circle is what others will see."
+    : "Drag to move, use the slider to zoom. The frame is what others will see in the preview.";
+  const defaultConfirm = isCircle ? "Save photo" : "Save image";
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 backdrop-blur-sm px-4">
+  if (!mounted) return null;
+
+  const modal = (
+    <div className="fixed inset-0 z-[2001] flex items-center justify-center bg-black/55 backdrop-blur-sm px-4">
       <div className="w-full max-w-[380px] rounded-3xl bg-white p-5 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>
-            Position your photo
+            {title || defaultTitle}
           </h3>
           <button
             type="button"
@@ -151,13 +191,15 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
         </div>
 
         <p className="text-[#1B2D45]/45 mb-4" style={{ fontSize: "12px", lineHeight: 1.5 }}>
-          Drag to move, use the slider to zoom. The circle is what others will see.
+          {hint || defaultHint}
         </p>
 
         {/* Crop viewport */}
-        <div className="relative mx-auto" style={{ width: VIEWPORT_PX, height: VIEWPORT_PX }}>
+        <div className="relative mx-auto" style={{ width: viewportW, height: viewportH }}>
           <div
-            className="absolute inset-0 overflow-hidden rounded-full bg-[#FAF8F4] cursor-grab active:cursor-grabbing select-none touch-none"
+            className={`absolute inset-0 overflow-hidden bg-[#FAF8F4] cursor-grab active:cursor-grabbing select-none touch-none ${
+              isCircle ? "rounded-full" : "rounded-xl"
+            }`}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -182,7 +224,11 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
             )}
           </div>
           {/* Faint ring overlay so the user always sees the crop boundary */}
-          <div className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-white/70" />
+          <div
+            className={`pointer-events-none absolute inset-0 ring-2 ring-white/70 ${
+              isCircle ? "rounded-full" : "rounded-xl"
+            }`}
+          />
         </div>
 
         {/* Zoom slider */}
@@ -224,10 +270,12 @@ export function PhotoCropper({ file, outputSize = 512, onConfirm, onCancel }: Ph
             ) : (
               <Check className="w-3.5 h-3.5" />
             )}
-            Save photo
+            {confirmLabel || defaultConfirm}
           </button>
         </div>
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }

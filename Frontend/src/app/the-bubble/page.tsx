@@ -348,10 +348,17 @@ function PostCard({
           </div>
         )}
 
-        {/* Image */}
+        {/* Image — always shows the full image (no spotlight needed) */}
         {post.image && (
-          <div className="rounded-2xl overflow-hidden mb-3 -mx-1">
-            <img src={post.image} alt={post.title} className="w-full object-cover" style={{ aspectRatio: "16/9" }} />
+          <div
+            className="rounded-2xl overflow-hidden mb-3 -mx-1 bg-[#0F1923]/[0.04]"
+            style={{ aspectRatio: "16/9" }}
+          >
+            <img
+              src={post.image}
+              alt={post.title}
+              className="w-full h-full object-contain"
+            />
           </div>
         )}
 
@@ -470,6 +477,34 @@ function PostModal({ onClose, onPublished }: { onClose: () => void; onPublished?
   const [error, setError] = useState("");
   const isMobile = useIsMobile();
 
+  // Cover image state
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
+  // Build/cleanup preview URL whenever the file changes
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(coverFile);
+    setCoverPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [coverFile]);
+
+  const handleFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    // Reset the input so the same file can be re-picked
+    e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      setError("Please pick an image file.");
+      return;
+    }
+    setError("");
+    setCoverFile(f);
+  };
+
   const handleSubmit = async () => {
     if (!title || !selectedCategory || submitting) return;
     setSubmitting(true);
@@ -483,6 +518,16 @@ function PostModal({ onClose, onPublished }: { onClose: () => void; onPublished?
         event_date: eventDate || undefined,
         event_location: eventLocation || undefined,
       });
+
+      // Upload cropped cover image if the author provided one
+      if (coverFile) {
+        try {
+          await api.posts.uploadCoverImage(post.id, coverFile);
+        } catch {
+          // Upload failed — post will still publish, just without an image
+        }
+      }
+
       // Post is created as draft — publish it immediately
       try {
         await api.posts.publish(post.id);
@@ -560,10 +605,40 @@ function PostModal({ onClose, onPublished }: { onClose: () => void; onPublished?
           </AnimatePresence>
 
           {/* Image upload */}
-          <motion.div whileHover={{ borderColor: "rgba(255,107,53,0.3)" }} className="border-2 border-dashed border-[#E8E4DC] rounded-xl p-6 text-center cursor-pointer transition-colors">
-            <ImagePlus className="w-6 h-6 text-[#98A3B0] mx-auto mb-2" />
-            <p className="text-[#98A3B0]" style={{ fontSize: "12px", fontWeight: 500 }}>Drag & drop an image, or <span className="text-[#FF6B35]">browse</span></p>
-          </motion.div>
+          {coverPreview ? (
+            <div className="relative rounded-xl overflow-hidden border border-[#E8E4DC] bg-[#0F1923]/[0.04]">
+              <img
+                src={coverPreview}
+                alt="Cover preview"
+                className="w-full h-full object-contain"
+                style={{ aspectRatio: "16/9" }}
+              />
+              <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                <label className="cursor-pointer px-2.5 py-1.5 rounded-lg bg-white/90 hover:bg-white text-[#1B2D45] backdrop-blur-sm transition-colors" style={{ fontSize: "11px", fontWeight: 700 }}>
+                  Replace
+                  <input type="file" accept="image/*" className="hidden" onChange={handleFilePicked} />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setCoverFile(null)}
+                  className="w-8 h-8 rounded-lg bg-white/90 hover:bg-white text-[#E71D36] backdrop-blur-sm flex items-center justify-center transition-colors"
+                  aria-label="Remove image"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <label className="block">
+              <input type="file" accept="image/*" className="hidden" onChange={handleFilePicked} />
+              <motion.div whileHover={{ borderColor: "rgba(255,107,53,0.3)" }} className="border-2 border-dashed border-[#E8E4DC] rounded-xl p-6 text-center cursor-pointer transition-colors">
+                <ImagePlus className="w-6 h-6 text-[#98A3B0] mx-auto mb-2" />
+                <p className="text-[#98A3B0]" style={{ fontSize: "12px", fontWeight: 500 }}>
+                  Click to upload an image
+                </p>
+              </motion.div>
+            </label>
+          )}
         </div>
 
         <div className="px-5 py-4 border-t border-black/5 flex flex-col gap-2">
@@ -1011,21 +1086,24 @@ export default function TheBubblePage() {
 
   const filteredAndSorted = useMemo(() => {
     let posts = activeCategory === "all" ? [...feedPosts] : feedPosts.filter((p) => p.category === activeCategory);
-    if (sortMode === "trending") {
-      // hot score: upvotes weighted by recency
-      posts.sort((a, b) => {
+
+    // Sort comparator for the chosen mode
+    const compare = (a: Post, b: Post): number => {
+      if (sortMode === "trending") {
         const ageA = (now - a.postedAt) / HOUR;
         const ageB = (now - b.postedAt) / HOUR;
         const scoreA = a.upvotes / Math.pow(ageA + 2, 1.5);
         const scoreB = b.upvotes / Math.pow(ageB + 2, 1.5);
         return scoreB - scoreA;
-      });
-    } else if (sortMode === "new") {
-      posts.sort((a, b) => b.postedAt - a.postedAt);
-    } else {
-      posts.sort((a, b) => b.upvotes - a.upvotes);
-    }
-    return posts;
+      }
+      if (sortMode === "new") return b.postedAt - a.postedAt;
+      return b.upvotes - a.upvotes; // "top"
+    };
+
+    // Split into real posts (have sourcePostId) and mock posts, sort each, concat
+    const real = posts.filter((p) => p.sourcePostId !== undefined).sort(compare);
+    const mocks = posts.filter((p) => p.sourcePostId === undefined).sort(compare);
+    return [...real, ...mocks];
   }, [activeCategory, sortMode, feedPosts]);
 
   const handlePostClick = () => {
