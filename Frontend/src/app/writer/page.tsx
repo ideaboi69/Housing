@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Eye, FileText, PenLine, Trash2, MoreHorizontal, Plus,
   Clock, CheckCircle2, Archive, LogOut, AlertCircle, X,
-  Send, Shield, Loader2, ImagePlus,
+  Send, Shield, Loader2, ImagePlus, Camera, Save, User,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useWriterStore } from "@/lib/store";
 import { api, ApiError } from "@/lib/api";
-import type { PostListResponse, PostResponse, PostCategory } from "@/types";
+import type { PostListResponse, PostResponse, PostCategory, WriterResponse } from "@/types";
 
 /* ═══════════════════════════════════════════════════════
    HELPERS
@@ -319,6 +319,214 @@ function PostEditor({ post, onClose, onSaved }: {
 }
 
 /* ═══════════════════════════════════════════════════════
+   WRITER PROFILE MODAL
+   ═══════════════════════════════════════════════════════ */
+
+function WriterProfileEditor({
+  writer,
+  onClose,
+  onSaved,
+}: {
+  writer: WriterResponse;
+  onClose: () => void;
+  onSaved: (writer: WriterResponse) => void;
+}) {
+  const [firstName, setFirstName] = useState(writer.first_name);
+  const [lastName, setLastName] = useState(writer.last_name);
+  const [businessName, setBusinessName] = useState(writer.business_name);
+  const [businessType, setBusinessType] = useState(writer.business_type || "");
+  const [website, setWebsite] = useState(writer.website || "");
+  const [phone, setPhone] = useState(writer.phone || "");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState(writer.profile_photo_url || "");
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
+  const initials = `${firstName[0] || ""}${lastName[0] || ""}`.toUpperCase() || "W";
+
+  useEffect(() => {
+    return () => {
+      if (photoPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(photoPreview);
+      }
+    };
+  }, [photoPreview]);
+
+  const handlePhotoSelect = (file: File | null) => {
+    if (!file) return;
+    if (photoPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(photoPreview);
+    }
+    setPhotoFile(file);
+    setRemovePhoto(false);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleRemovePhoto = () => {
+    if (photoPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(photoPreview);
+    }
+    setPhotoFile(null);
+    setPhotoPreview("");
+    setRemovePhoto(Boolean(writer.profile_photo_url));
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+
+    setSaving(true);
+    setError("");
+
+    try {
+      let updated = await api.writers.updateProfile({
+        first_name: firstName,
+        last_name: lastName,
+        business_name: businessName,
+        business_type: businessType || null,
+        website: website || null,
+        phone: phone || null,
+      });
+
+      if (removePhoto && !photoFile) {
+        await api.writers.deleteProfilePhoto();
+        updated = { ...updated, profile_photo_url: null };
+      }
+
+      if (photoFile) {
+        const photo = await api.writers.uploadProfilePhoto(photoFile);
+        updated = { ...updated, profile_photo_url: photo.profile_photo_url };
+      }
+
+      onSaved(updated);
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Couldn't update writer profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.form
+        onSubmit={handleSave}
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl bg-white"
+        style={{ boxShadow: "0 24px 80px rgba(0,0,0,0.15)" }}
+      >
+        <div className="flex items-center justify-between border-b border-black/5 px-5 py-4">
+          <div>
+            <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>Writer Profile</h3>
+            <p className="text-[#98A3B0] mt-0.5" style={{ fontSize: "11px" }}>This is how your Bubble byline or business profile appears.</p>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#98A3B0] transition-colors hover:bg-[#1B2D45]/5">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
+          <div className="flex items-center gap-4 rounded-2xl border border-black/[0.04] bg-[#FAF8F4] p-4">
+            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[#1B2D45]/10">
+              {photoPreview ? (
+                <img src={photoPreview} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 900 }}>
+                  {initials}
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Profile photo</p>
+              <p className="mt-0.5 text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.45 }}>
+                Used on writer, business, and organization bylines.
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#1B2D45] px-3 py-2 text-white transition-colors hover:bg-[#152438]" style={{ fontSize: "12px", fontWeight: 700 }}>
+                  <Camera className="h-3.5 w-3.5" />
+                  Upload
+                  <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => handlePhotoSelect(event.target.files?.[0] ?? null)} />
+                </label>
+                {photoPreview && (
+                  <button type="button" onClick={handleRemovePhoto} className="rounded-xl border border-[#E71D36]/15 px-3 py-2 text-[#E71D36]/75 transition-colors hover:bg-[#E71D36]/5" style={{ fontSize: "12px", fontWeight: 700 }}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="writer-first-name" className="mb-1.5 block text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>First name</label>
+              <input id="writer-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+            </div>
+            <div>
+              <label htmlFor="writer-last-name" className="mb-1.5 block text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Last name</label>
+              <input id="writer-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} required className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="writer-business-name" className="mb-1.5 block text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Public writer / business name</label>
+            <input id="writer-business-name" value={businessName} onChange={(e) => setBusinessName(e.target.value)} required className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="writer-business-type" className="mb-1.5 block text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Writer / business type</label>
+              <input id="writer-business-type" value={businessType} onChange={(e) => setBusinessType(e.target.value)} placeholder="Campus writer, club, business, etc." className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+            </div>
+            <div>
+              <label htmlFor="writer-phone" className="mb-1.5 block text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Phone</label>
+              <input id="writer-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="writer-website" className="mb-1.5 block text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Website</label>
+            <input id="writer-website" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+          </div>
+
+          <div>
+            <label htmlFor="writer-email" className="mb-1.5 block text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</label>
+            <input id="writer-email" value={writer.email} disabled className={`${inputClass} opacity-70`} style={{ fontSize: "13px", fontWeight: 500 }} />
+            <p className="mt-1.5 text-[#98A3B0]" style={{ fontSize: "10px" }}>Email changes are handled by an admin for now.</p>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl bg-[#E71D36]/5 px-3 py-2.5 text-[#E71D36]" style={{ fontSize: "12px" }}>
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {error}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-black/5 px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded-xl border border-[#E8E4DC] px-4 py-2.5 text-[#5C6B7A] transition-all hover:bg-[#1B2D45]/[0.03]" style={{ fontSize: "13px", fontWeight: 600 }}>
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 rounded-xl bg-[#FF6B35] px-5 py-2.5 text-white transition-all hover:bg-[#e55e2e] disabled:opacity-50" style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {saving ? "Saving..." : "Save profile"}
+          </button>
+        </div>
+      </motion.form>
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
    POST ROW
    ═══════════════════════════════════════════════════════ */
 
@@ -434,12 +642,13 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
    ═══════════════════════════════════════════════════════ */
 
 function Dashboard() {
-  const { writer, logout } = useWriterStore();
+  const { writer, logout, updateWriter } = useWriterStore();
   const [posts, setPosts] = useState<PostListResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "draft" | "published" | "archived">("all");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PostResponse | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const fetchPosts = useCallback(async () => {
     try {
@@ -493,7 +702,7 @@ function Dashboard() {
       <div className="max-w-[960px] mx-auto px-4 md:px-6 py-6 md:py-8">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.5px" }}>
               Writer Dashboard
@@ -509,10 +718,18 @@ function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <motion.button whileTap={{ scale: 0.95 }} onClick={() => { setEditingPost(null); setEditorOpen(true); }}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#FF6B35] px-4 py-2.5 text-white transition-all hover:bg-[#e55e2e] sm:flex-none"
               style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}>
               <Plus className="w-4 h-4" /> New Post
             </motion.button>
+            <button
+              onClick={() => setProfileOpen(true)}
+              className="w-9 h-9 rounded-xl border border-[#E8E4DC] flex items-center justify-center text-[#98A3B0] hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all"
+              aria-label="Edit writer profile"
+              title="Edit writer profile"
+            >
+              <User className="w-4 h-4" />
+            </button>
             <button onClick={logout}
               className="w-9 h-9 rounded-xl border border-[#E8E4DC] flex items-center justify-center text-[#98A3B0] hover:text-[#E71D36] hover:border-[#E71D36]/20 transition-all">
               <LogOut className="w-4 h-4" />
@@ -585,6 +802,16 @@ function Dashboard() {
             post={editingPost}
             onClose={() => { setEditorOpen(false); setEditingPost(null); }}
             onSaved={fetchPosts}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {profileOpen && writer && (
+          <WriterProfileEditor
+            writer={writer}
+            onClose={() => setProfileOpen(false)}
+            onSaved={updateWriter}
           />
         )}
       </AnimatePresence>

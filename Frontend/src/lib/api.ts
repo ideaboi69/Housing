@@ -112,6 +112,11 @@ function getToken(): string | null {
   return localStorage.getItem("cribb_token") || localStorage.getItem("cribb_writer_token");
 }
 
+function getWriterToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("cribb_writer_token");
+}
+
 function setToken(token: string) {
   if (typeof window !== "undefined") {
     localStorage.setItem("cribb_token", token);
@@ -184,6 +189,35 @@ async function request<T>(
   }
 
   // Handle 204 No Content
+  if (res.status === 204) return null as T;
+
+  return res.json();
+}
+
+async function writerRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getWriterToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((options.headers as Record<string, string>) || {}),
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: "Request failed" }));
+    throw new ApiError(res.status, body.detail || "Request failed");
+  }
+
   if (res.status === 204) return null as T;
 
   return res.json();
@@ -656,6 +690,43 @@ export const writers = {
       body: formData.toString(),
     });
   },
+
+  updateProfile: (data: {
+    first_name?: string;
+    last_name?: string;
+    business_name?: string;
+    business_type?: string | null;
+    website?: string | null;
+    phone?: string | null;
+  }) =>
+    writerRequest<WriterResponse>("/api/writers/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  uploadProfilePhoto: async (file: File) => {
+    const token = getWriterToken();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`${API_URL}/api/writers/me/profile-photo`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new ApiError(res.status, body.detail || "Upload failed");
+    }
+
+    return res.json() as Promise<{ profile_photo_url: string }>;
+  },
+
+  deleteProfilePhoto: () =>
+    writerRequest<{ message: string }>("/api/writers/me/profile-photo", {
+      method: "DELETE",
+    }),
 };
 
 // ── Posts (The Bubble) ──────────────────────────────────

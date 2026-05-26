@@ -42,18 +42,18 @@ const TOUR_STEPS: TourStep[] = [
     color: "#1B2D45",
   },
   {
-    selector: "[data-tour='roommates']",
-    title: "Find Roommates",
-    description: "Take a 2-minute lifestyle quiz, get matched with compatible Guelph students, and browse groups with open spots. Your vibe, your people.",
-    icon: <Users className="w-5 h-5" />,
-    color: "#2EC4B6",
-  },
-  {
     selector: "[data-tour='marketplace']",
     title: "Marketplace",
     description: "Buy and sell student essentials like furniture, storage, kitchen gear, and decor without leaving Cribb.",
     icon: <ShoppingBag className="w-5 h-5" />,
     color: "#FF8A1D",
+  },
+  {
+    selector: "[data-tour='roommates']",
+    title: "Find Roommates",
+    description: "Take a 2-minute lifestyle quiz, get matched with compatible Guelph students, and browse groups with open spots. Your vibe, your people.",
+    icon: <Users className="w-5 h-5" />,
+    color: "#2EC4B6",
   },
   {
     selector: "[data-tour='the-bubble']",

@@ -778,6 +778,7 @@ export interface WriterResponse {
   website?: string;
   phone?: string;
   reason?: string;
+  profile_photo_url?: string | null;
   status: WriterStatus;
   created_at: string;
 }

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import get_db, Writer
-from Schemas.writerSchema import WriterRegister, WriterResponse, WriterTokenResponse, WriterStatus
+from Schemas.writerSchema import WriterRegister, WriterResponse, WriterTokenResponse, WriterStatus, WriterUpdate
 from Utils.security import hash_password, verify_password, create_access_token, validate_password, get_current_writer
 from Utils.rate_limit import limiter
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
@@ -82,6 +82,23 @@ def writer_login(request: Request, form_data: OAuth2PasswordRequestForm = Depend
         access_token=token,
         writer=WriterResponse.model_validate(writer),
     )
+
+@writer_router.patch("/me", response_model=WriterResponse)
+def update_writer_profile(payload: WriterUpdate, db: Session = Depends(get_db), current_writer: Writer = Depends(get_current_writer)):
+    updates = payload.model_dump(exclude_unset=True)
+
+    for field in ("first_name", "last_name", "business_name"):
+        if field in updates and (updates[field] is None or not str(updates[field]).strip()):
+            raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').title()} cannot be empty")
+
+    for field, value in updates.items():
+        if isinstance(value, str):
+            value = value.strip() or None
+        setattr(current_writer, field, value)
+
+    db.commit()
+    db.refresh(current_writer)
+    return WriterResponse.model_validate(current_writer)
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
  

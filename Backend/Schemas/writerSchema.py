@@ -23,6 +23,14 @@ class WriterRegister(BaseModel):
     phone: Optional[str] = None
     reason: str
 
+class WriterUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    business_name: Optional[str] = None
+    business_type: Optional[str] = None
+    website: Optional[str] = None
+    phone: Optional[str] = None
+
 # Response
 class WriterResponse(BaseModel):
     id: int
@@ -33,6 +41,7 @@ class WriterResponse(BaseModel):
     business_type: Optional[str] = None
     website: Optional[str] = None
     phone: Optional[str] = None
+    profile_photo_url: Optional[str] = None
     status: WriterStatus
     is_early_adopter: bool = False
     reason: Optional[str] = None

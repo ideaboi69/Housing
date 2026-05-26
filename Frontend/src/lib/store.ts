@@ -13,6 +13,7 @@ interface WriterAuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loadWriter: () => void;
+  updateWriter: (writer: WriterResponse) => void;
   clearError: () => void;
 }
 
@@ -62,6 +63,11 @@ export const useWriterStore = create<WriterAuthState>((set) => ({
       localStorage.removeItem("cribb_writer");
     }
     set({ writer: null, writerToken: null, isLoading: false });
+  },
+
+  updateWriter: (writer) => {
+    localStorage.setItem("cribb_writer", JSON.stringify(writer));
+    set({ writer });
   },
 
   clearError: () => set({ error: null }),
