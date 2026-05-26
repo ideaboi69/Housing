@@ -1,6 +1,13 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
+from enum import Enum as PyEnum
+
+# OG-badge enum
+class AccountType(str, PyEnum):
+    user = "user"
+    landlord = "landlord"
+    writer = "writer"
 
 # Request
 class AdminCreate(BaseModel):

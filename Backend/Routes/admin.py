@@ -2,13 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, 
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import *
-from Schemas.adminSchema import AdminCreate, AdminLogin, AdminResponse, AdminTokenResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse
-from Schemas.userSchema import UserRole
-from Schemas.landlordSchema import LandlordUpdate, LandlordResponse
+from Schemas.adminSchema import AdminCreate, AdminResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse, AccountType
 from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse
-from helpers import require_admin, cascade_delete_landlord
+from helpers import require_admin, cascade_delete_landlord, get_account_or_404
 from Utils.security import hash_password, create_access_token, verify_password, validate_password
 from Utils.cloudinary import delete_image_from_cloudinary
 from Utils.email import send_approval_email, send_rejection_email, send_revoked_email
@@ -129,12 +127,36 @@ def list_all_users(db: Session = Depends(get_db), admin: User = Depends(require_
     users = db.query(User).all()
     return [AdminUserResponse.model_validate(u) for u in users]
 
-# WRITE ENDPOINTS
+# Gotta put it here to prevent dynamic routing issues
 @admin_router.get("/users/pending-writers", response_model=list[AdminUserResponse])
 def list_pending_write_requests(db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     users = db.query(User).filter(User.write_access_requested == True,User.is_writable == False).all()
     return [AdminUserResponse.model_validate(u) for u in users]
 
+@admin_router.get("/users/{user_id}", response_model=AdminUserResponse)
+def get_user_by_id(user_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    return AdminUserResponse.model_validate(user)
+
+@admin_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    db.query(Review).filter(Review.student_id == user.id).delete()
+    db.query(SavedListing).filter(SavedListing.student_id == user.id).delete()
+    db.query(Flag).filter(Flag.reporter_id == user.id).delete()
+
+    db.delete(user)
+    db.commit()
+
+    return None
+
+# WRITE ENDPOINTS
 @admin_router.patch("/users/{user_id}/grant-write", status_code=status.HTTP_200_OK)
 def grant_write_access(user_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -200,56 +222,30 @@ def revoke_write_access(user_id: int, background_tasks: BackgroundTasks, db: Ses
 
     return {"message": f"Write access revoked for {user.first_name} {user.last_name}"}
 
-@admin_router.patch("/users/{user_id}/grant-og", status_code=status.HTTP_200_OK)
-def grant_og_badge(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
- 
-    if user.is_early_adopter:
-        raise HTTPException(status_code=400, detail="User already has OG badge")
- 
-    user.is_early_adopter = True
-    db.commit()
- 
-    return {"message": f"OG badge granted to {user.first_name} {user.last_name}"}
- 
-@admin_router.patch("/users/{user_id}/revoke-og", status_code=status.HTTP_200_OK)
-def revoke_og_badge(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
- 
-    if not user.is_early_adopter:
-        raise HTTPException(status_code=400, detail="User doesn't have OG badge")
- 
-    user.is_early_adopter = False
-    db.commit()
- 
-    return {"message": f"OG badge revoked for {user.first_name} {user.last_name}"}
+# OG-badge
+@admin_router.patch("/{account_type}/{account_id}/grant-og", status_code=status.HTTP_200_OK)
+def grant_og_badge(account_type: AccountType, account_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    account, label = get_account_or_404(account_type, account_id, db)
 
-@admin_router.get("/users/{user_id}", response_model=AdminUserResponse)
-def get_user_by_id(user_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if account.is_early_adopter:
+        raise HTTPException(status_code=400, detail=f"{label} already has OG badge")
 
-    return AdminUserResponse.model_validate(user)
-
-@admin_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    db.query(Review).filter(Review.student_id == user.id).delete()
-    db.query(SavedListing).filter(SavedListing.student_id == user.id).delete()
-    db.query(Flag).filter(Flag.reporter_id == user.id).delete()
-
-    db.delete(user)
+    account.is_early_adopter = True
     db.commit()
 
-    return None
+    return {"message": f"OG badge granted to {account.first_name} {account.last_name}"}
+
+@admin_router.patch("/{account_type}/{account_id}/revoke-og", status_code=status.HTTP_200_OK)
+def revoke_og_badge(account_type: AccountType, account_id: int, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    account, label = get_account_or_404(account_type, account_id, db)
+
+    if not account.is_early_adopter:
+        raise HTTPException(status_code=400, detail=f"{label} doesn't have OG badge")
+
+    account.is_early_adopter = False
+    db.commit()
+
+    return {"message": f"OG badge revoked for {account.first_name} {account.last_name}"}
 
 # LANDLORD ENDPOINTS
 @admin_router.get("/landlords", response_model=list[AdminLandlordResponse])

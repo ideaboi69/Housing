@@ -34,6 +34,8 @@ class WriterResponse(BaseModel):
     website: Optional[str] = None
     phone: Optional[str] = None
     status: WriterStatus
+    is_early_adopter: bool = False
+    reason: Optional[str] = None
     created_at: datetime
 
     class Config:

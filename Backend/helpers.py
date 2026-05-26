@@ -11,6 +11,7 @@ from fastapi import Depends, HTTPException, status
 from Schemas.featureSchema import AmenityValue, ListingPolicies, ListingTerms, PetPolicy, SmokingPolicy, SpaceAmenities, SubletTerms
 from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse, ListingRoomResponse, ListingResponse
 from Schemas.propertySchema import PropertyResponse
+from Schemas.adminSchema import AccountType
 from Schemas.subletSchema import SubletListResponse, SubletResponse, SubletImageResponse
 from Utils.cloudinary import delete_image_from_cloudinary
 from Schemas.roommateSchema import *
@@ -1157,3 +1158,23 @@ def build_listing_prompt_data(listing: Listing, prop: Property, landlord: Landlo
     ]
 
     return "\n".join(line for line in lines if line)
+
+# OG-badge helper 
+def get_account_or_404(account_type: AccountType, account_id: int, db: Session):
+    """Returns the account row + a human-readable label for messages."""
+    if account_type == AccountType.user:
+        row = db.query(User).filter(User.id == account_id).first()
+        label = "User"
+    elif account_type == AccountType.landlord:
+        row = db.query(Landlord).filter(Landlord.id == account_id).first()
+        label = "Landlord"
+    elif account_type == AccountType.writer:
+        row = db.query(Writer).filter(Writer.id == account_id).first()
+        label = "Writer"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid account type")
+
+    if not row:
+        raise HTTPException(status_code=404, detail=f"{label} not found")
+
+    return row, label

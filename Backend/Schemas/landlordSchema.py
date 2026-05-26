@@ -49,6 +49,7 @@ class LandlordResponse(BaseModel):
     no_of_property: PropertyRange
     company_name: Optional[str] = None
     identity_verified: bool
+    is_early_adopter: bool = False
 
     class Config:
         from_attributes = True
@@ -70,6 +71,7 @@ class LandlordPublicResponse(BaseModel):
     would_rent_again_pct: Optional[float] = None
     total_reviews: int = 0
     total_properties: int = 0
+    is_early_adopter: bool = False
 
 class LandlordPropertyResponse(BaseModel):
     id: int

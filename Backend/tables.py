@@ -66,7 +66,7 @@ class User(Base):
     roommate_requests_sent = relationship("RoommateRequest", back_populates="user")
     viewing_bookings = relationship("ViewingBooking", foreign_keys="[ViewingBooking.student_id]", back_populates="student")
     viewing_availabilities = relationship("ViewingAvailability", foreign_keys="[ViewingAvailability.owner_id]", back_populates="owner")
-    post_votes = relationship("PostVote", back_populates="user")
+    post_votes = relationship("PostVote", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     
     __table_args__ = (
         CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
@@ -82,6 +82,7 @@ class Landlord(Base):
     last_name = Column(String(100), nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.LANDLORD)
     identity_verified = Column(Boolean, default=False, nullable=False)
+    is_early_adopter = Column(Boolean, default=False, nullable=False)
     company_name = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=False)
     no_of_property = Column(Enum(PropertyRange), nullable=False)
@@ -453,6 +454,7 @@ class Writer(Base):
     phone = Column(String(20), nullable=True)
     reason = Column(Text, nullable=False)
     status = Column(Enum(WriterStatus), default=WriterStatus.PENDING, nullable=False)
+    is_early_adopter = Column(Boolean, default=False, nullable=False)
     profile_photo_url = Column(String(500), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -482,7 +484,7 @@ class Post(Base):
 
     user = relationship("User", back_populates="posts", foreign_keys=[user_id])
     writer = relationship("Writer", back_populates="posts", foreign_keys=[writer_id])
-    votes = relationship("PostVote", back_populates="post")
+    votes = relationship("PostVote", back_populates="post", cascade="all, delete-orphan", passive_deletes=True)
 
     __table_args__ = (
         CheckConstraint(
@@ -780,7 +782,7 @@ class GroupChatMessage(Base):
     __table_args__ = (
         Index("ix_group_chat_messages_group", "group_id", "created_at"),
     )
-    
+
 class GroupChatReadState(Base):
     __tablename__ = "group_chat_read_state"
 
