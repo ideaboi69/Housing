@@ -1153,8 +1153,10 @@ export const admin = {
   rejectWrite: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/reject-write`, { method: "PATCH" }),
   revokeWrite: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/revoke-write`, { method: "PATCH" }),
   getPendingWriters: () => request<AdminUserResponse[]>("/api/admin/users/pending-writers"),
-  grantOG: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/grant-og`, { method: "PATCH" }),
-  revokeOG: (id: number) => request<{ message: string }>(`/api/admin/users/${id}/revoke-og`, { method: "PATCH" }),
+  grantOG: (accountType: "user" | "landlord" | "writer", id: number) =>
+    request<{ message: string }>(`/api/admin/${accountType}/${id}/grant-og`, { method: "PATCH" }),
+  revokeOG: (accountType: "user" | "landlord" | "writer", id: number) =>
+    request<{ message: string }>(`/api/admin/${accountType}/${id}/revoke-og`, { method: "PATCH" }),
 
   // Landlords
   getLandlords: () => request<AdminLandlordResponse[]>("/api/admin/landlords"),

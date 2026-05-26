@@ -719,6 +719,7 @@ export interface LandlordResponse {
   identity_verified: boolean;
   company_name: string | null;
   phone: string | null;
+  is_early_adopter?: boolean;
 }
 
 export interface LandlordPublicResponse {
@@ -780,6 +781,7 @@ export interface WriterResponse {
   reason?: string;
   profile_photo_url?: string | null;
   status: WriterStatus;
+  is_early_adopter?: boolean;
   created_at: string;
 }
 
@@ -1264,6 +1266,7 @@ export interface AdminLandlordResponse {
   company_name?: string;
   phone?: string;
   identity_verified: boolean;
+  is_early_adopter?: boolean;
 }
 
 export interface AdminListingResponse {

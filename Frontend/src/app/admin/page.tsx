@@ -261,11 +261,11 @@ function UsersTab({ users, onRefresh }: { users: AdminUserResponse[]; onRefresh:
   const handleRevokeWrite = async (id: number) => {
     try { await api.admin.revokeWrite(id); toast.success("Write access revoked"); onRefresh(); } catch { toast.error("Failed"); }
   };
-  const handleGrantOG = async (id: number) => {
-    try { await api.admin.grantOG(id); toast.success("OG badge granted"); onRefresh(); } catch { toast.error("Failed"); }
+  const handleGrantOG = async (accountType: "user" | "landlord" | "writer", id: number) => {
+    try { await api.admin.grantOG(accountType, id); toast.success("OG badge granted"); onRefresh(); } catch { toast.error("Failed"); }
   };
-  const handleRevokeOG = async (id: number) => {
-    try { await api.admin.revokeOG(id); toast.success("OG badge revoked"); onRefresh(); } catch { toast.error("Failed"); }
+  const handleRevokeOG = async (accountType: "user" | "landlord" | "writer", id: number) => {
+    try { await api.admin.revokeOG(accountType, id); toast.success("OG badge revoked"); onRefresh(); } catch { toast.error("Failed"); }
   };
 
   return (
@@ -295,9 +295,9 @@ function UsersTab({ users, onRefresh }: { users: AdminUserResponse[]; onRefresh:
             <div className="flex items-center gap-1 shrink-0">
               {!u.email_verified && <ActionButton onClick={() => handleVerify(u.id)} icon={ShieldCheck} label="Verify" color="#4ADE80" />}
               {!u.is_early_adopter ? (
-                <ActionButton onClick={() => handleGrantOG(u.id)} icon={Star} label="Grant OG" color="#3B82F6" />
+                <ActionButton onClick={() => handleGrantOG("user", u.id)} icon={Star} label="Grant OG" color="#3B82F6" />
               ) : (
-                <ActionButton onClick={() => handleRevokeOG(u.id)} icon={Star} label="Revoke OG" color="#98A3B0" />
+                <ActionButton onClick={() => handleRevokeOG("user", u.id)} icon={Star} label="Revoke OG" color="#98A3B0" />
               )}
               {u.write_access_requested && !u.is_writable && (
                 <>
@@ -339,6 +339,12 @@ function LandlordsTab({ landlords, onRefresh }: { landlords: AdminLandlordRespon
     if (!confirm("Delete this landlord and all their properties/listings? This cannot be undone.")) return;
     try { await api.admin.deleteLandlord(id); toast.success("Landlord deleted"); onRefresh(); } catch { toast.error("Failed"); }
   };
+  const handleGrantOG = async (id: number) => {
+    try { await api.admin.grantOG("landlord", id); toast.success("OG badge granted"); onRefresh(); } catch { toast.error("Failed"); }
+  };
+  const handleRevokeOG = async (id: number) => {
+    try { await api.admin.revokeOG("landlord", id); toast.success("OG badge revoked"); onRefresh(); } catch { toast.error("Failed"); }
+  };
 
   return (
     <div>
@@ -354,6 +360,9 @@ function LandlordsTab({ landlords, onRefresh }: { landlords: AdminLandlordRespon
               <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
                 {l.first_name} {l.last_name}
                 {l.identity_verified ? <Badge label="Verified" color="#4ADE80" /> : <Badge label="Unverified" color="#FFB627" />}
+                {l.is_early_adopter && <span className="px-1.5 py-0.5 rounded text-white flex items-center gap-0.5" style={{ fontSize: "8px", fontWeight: 800, background: "linear-gradient(135deg, #3B82F6, #2563EB)", boxShadow: "0 1px 4px rgba(37,99,235,0.3)" }}>
+                  <Star className="w-2 h-2" fill="white" /> OG
+                </span>}
               </div>
               <div className="text-white/30" style={{ fontSize: "11px" }}>
                 {l.email}{l.company_name ? ` · ${l.company_name}` : ""}{l.phone ? ` · ${l.phone}` : ""}
@@ -364,6 +373,11 @@ function LandlordsTab({ landlords, onRefresh }: { landlords: AdminLandlordRespon
                 <ActionButton onClick={() => handleVerify(l.id)} icon={ShieldCheck} label="Verify" color="#4ADE80" />
               ) : (
                 <ActionButton onClick={() => handleUnverify(l.id)} icon={ShieldX} label="Unverify" color="#FFB627" />
+              )}
+              {!l.is_early_adopter ? (
+                <ActionButton onClick={() => handleGrantOG(l.id)} icon={Star} label="Grant OG" color="#3B82F6" />
+              ) : (
+                <ActionButton onClick={() => handleRevokeOG(l.id)} icon={Star} label="Revoke OG" color="#98A3B0" />
               )}
               <ActionButton onClick={() => handleDelete(l.id)} icon={Trash2} label="Delete" danger />
             </div>
@@ -537,6 +551,12 @@ function WritersTab({
   const handleRejectWrite = async (id: number) => {
     try { await api.admin.rejectWrite(id); toast.success("Write request rejected"); onRefresh(); } catch { toast.error("Failed"); }
   };
+  const handleGrantOG = async (id: number) => {
+    try { await api.admin.grantOG("writer", id); toast.success("OG badge granted"); onRefresh(); } catch { toast.error("Failed"); }
+  };
+  const handleRevokeOG = async (id: number) => {
+    try { await api.admin.revokeOG("writer", id); toast.success("OG badge revoked"); onRefresh(); } catch { toast.error("Failed"); }
+  };
 
   const statusColor = (s: string) => s === "approved" ? "#4ADE80" : s === "pending" ? "#FFB627" : s === "rejected" ? "#E71D36" : "#98A3B0";
 
@@ -613,6 +633,9 @@ function WritersTab({
                 <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
                   {w.business_name}
                   <Badge label={w.status} color={statusColor(w.status)} />
+                  {w.is_early_adopter && <span className="px-1.5 py-0.5 rounded text-white flex items-center gap-0.5" style={{ fontSize: "8px", fontWeight: 800, background: "linear-gradient(135deg, #3B82F6, #2563EB)", boxShadow: "0 1px 4px rgba(37,99,235,0.3)" }}>
+                    <Star className="w-2 h-2" fill="white" /> OG
+                  </span>}
                 </div>
                 <div className="text-white/30" style={{ fontSize: "11px" }}>
                   {w.first_name} {w.last_name} · {w.email}{w.website ? ` · ${w.website}` : ""}
@@ -626,7 +649,16 @@ function WritersTab({
                     <ActionButton onClick={() => handleReject(w.id)} icon={X} label="Reject" color="#E71D36" />
                   </>
                 )}
-                {w.status === "approved" && <ActionButton onClick={() => handleRevoke(w.id)} icon={Ban} label="Revoke" color="#FFB627" />}
+                {w.status === "approved" && (
+                  <>
+                    <ActionButton onClick={() => handleRevoke(w.id)} icon={Ban} label="Revoke" color="#FFB627" />
+                    {!w.is_early_adopter ? (
+                      <ActionButton onClick={() => handleGrantOG(w.id)} icon={Star} label="Grant OG" color="#3B82F6" />
+                    ) : (
+                      <ActionButton onClick={() => handleRevokeOG(w.id)} icon={Star} label="Revoke OG" color="#98A3B0" />
+                    )}
+                  </>
+                )}
                 <ActionButton onClick={() => handleDelete(w.id)} icon={Trash2} label="Delete" danger />
               </div>
             </div>
