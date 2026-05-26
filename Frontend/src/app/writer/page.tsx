@@ -7,7 +7,7 @@ import {
   Send, Shield, Loader2, ImagePlus, Camera, Save, User,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useWriterStore } from "@/lib/store";
 import { api, ApiError } from "@/lib/api";
 import type { PostListResponse, PostResponse, PostCategory, WriterResponse } from "@/types";
@@ -502,7 +502,7 @@ function WriterProfileEditor({
           <div>
             <label htmlFor="writer-email" className="mb-1.5 block text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</label>
             <input id="writer-email" value={writer.email} disabled className={`${inputClass} opacity-70`} style={{ fontSize: "13px", fontWeight: 500 }} />
-            <p className="mt-1.5 text-[#98A3B0]" style={{ fontSize: "10px" }}>Email changes are handled by an admin for now.</p>
+            <p className="mt-1.5 text-[#98A3B0]" style={{ fontSize: "10px" }}>Contact an admin for email changes.</p>
           </div>
 
           {error && (
@@ -643,6 +643,8 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
 
 function Dashboard() {
   const { writer, logout, updateWriter } = useWriterStore();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [posts, setPosts] = useState<PostListResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "draft" | "published" | "archived">("all");
@@ -662,6 +664,19 @@ function Dashboard() {
   }, []);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  useEffect(() => {
+    if (searchParams.get("profile") === "1") {
+      setProfileOpen(true);
+    }
+  }, [searchParams]);
+
+  const closeProfileEditor = useCallback(() => {
+    setProfileOpen(false);
+    if (searchParams.get("profile") === "1") {
+      router.replace("/writer");
+    }
+  }, [router, searchParams]);
 
   const filtered = filter === "all" ? posts : posts.filter((p) => p.status === filter);
   const totalViews = posts.reduce((sum, p) => sum + p.view_count, 0);
@@ -810,7 +825,7 @@ function Dashboard() {
         {profileOpen && writer && (
           <WriterProfileEditor
             writer={writer}
-            onClose={() => setProfileOpen(false)}
+            onClose={closeProfileEditor}
             onSaved={updateWriter}
           />
         )}

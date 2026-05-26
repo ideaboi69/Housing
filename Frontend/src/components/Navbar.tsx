@@ -97,6 +97,7 @@ export function Navbar() {
         last_name: writer!.last_name,
         role: "writer",
         email_verified: true,
+        profile_photo_url: writer!.profile_photo_url,
         created_at: writer!.created_at,
         updated_at: writer!.created_at,
       }
@@ -238,6 +239,7 @@ export function Navbar() {
   const dropdownLinks = writerSessionActive
     ? [
         { label: "Writer Dashboard", href: "/writer", icon: PenLine },
+        { label: "Profile", href: "/writer?profile=1", icon: User },
         { label: "The Bubble", href: "/the-bubble", icon: LayoutDashboard },
       ]
     : isLandlord
