@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { X, Upload, Image as ImageIcon, Loader2, Trash2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { X, Upload, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { api } from "@/lib/api";
 
 interface ListingImageUploadProps {
   listingId: number;
+  /** Optionally pre-populate. If omitted, the modal fetches its own images on open. */
   existingImages?: { id: number; image_url: string }[];
   onClose: () => void;
   onUploaded?: () => void;
@@ -13,11 +15,38 @@ interface ListingImageUploadProps {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export function ListingImageUpload({ listingId, existingImages = [], onClose, onUploaded }: ListingImageUploadProps) {
-  const [images, setImages] = useState(existingImages);
+export function ListingImageUpload({ listingId, existingImages, onClose, onUploaded }: ListingImageUploadProps) {
+  const [images, setImages] = useState(existingImages ?? []);
+  const [loadingExisting, setLoadingExisting] = useState(existingImages === undefined);
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Fetch existing images on mount if the caller didn't supply them
+  useEffect(() => {
+    if (existingImages !== undefined) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const listing = await api.listings.getById(listingId);
+        if (cancelled) return;
+        setImages(
+          (listing.images ?? []).map((img) => ({
+            id: img.id,
+            image_url: img.image_url,
+          }))
+        );
+      } catch {
+        if (!cancelled) setError("Couldn't load existing photos. You can still add new ones.");
+      } finally {
+        if (!cancelled) setLoadingExisting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [listingId, existingImages]);
 
   const handleUpload = async (files: FileList) => {
     if (images.length + files.length > 10) {
@@ -55,15 +84,24 @@ export function ListingImageUpload({ listingId, existingImages = [], onClose, on
   };
 
   const handleDelete = async (imageId: number) => {
+    setDeletingId(imageId);
+    setError("");
     try {
       const token = localStorage.getItem("cribb_token");
-      await fetch(`${API_URL}/api/listings/${listingId}/images/${imageId}`, {
+      const res = await fetch(`${API_URL}/api/listings/${listingId}/images/${imageId}`, {
         method: "DELETE",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: "Delete failed" }));
+        throw new Error(body.detail || "Delete failed");
+      }
       setImages((prev) => prev.filter((img) => img.id !== imageId));
-    } catch {
-      setError("Failed to delete image");
+      onUploaded?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete image");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -91,30 +129,51 @@ export function ListingImageUpload({ listingId, existingImages = [], onClose, on
 
         {/* Body */}
         <div className="px-5 py-4">
-          {/* Image grid */}
-          {images.length > 0 && (
+          {/* Loading state while fetching existing images */}
+          {loadingExisting ? (
             <div className="grid grid-cols-3 gap-2 mb-4">
-              {images.map((img, i) => (
-                <div key={img.id} className="relative aspect-[4/3] rounded-lg overflow-hidden group bg-[#FAF8F4]">
-                  <img
-                    src={img.image_url}
-                    alt={`Listing photo ${i + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    onClick={() => handleDelete(img.id)}
-                    className="absolute top-1 right-1 w-6 h-6 rounded-md bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#E71D36]"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                  {i === 0 && (
-                    <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/50 text-white" style={{ fontSize: "8px", fontWeight: 700 }}>
-                      Cover
-                    </div>
-                  )}
-                </div>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="aspect-[4/3] rounded-lg bg-[#FAF8F4] animate-pulse" />
               ))}
             </div>
+          ) : (
+            <>
+              {/* Image grid */}
+              {images.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {images.map((img, i) => {
+                    const isDeleting = deletingId === img.id;
+                    return (
+                      <div key={img.id} className="relative aspect-[4/3] rounded-lg overflow-hidden bg-[#FAF8F4]">
+                        <img
+                          src={img.image_url}
+                          alt={`Listing photo ${i + 1}`}
+                          className={`w-full h-full object-cover transition-opacity ${isDeleting ? "opacity-40" : ""}`}
+                        />
+                        {/* Always-visible delete button (top-right) */}
+                        <button
+                          onClick={() => handleDelete(img.id)}
+                          disabled={isDeleting}
+                          aria-label="Delete photo"
+                          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center backdrop-blur-sm hover:bg-[#E71D36] transition-colors disabled:opacity-50"
+                        >
+                          {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                        </button>
+                        {i === 0 && (
+                          <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white" style={{ fontSize: "8px", fontWeight: 700 }}>
+                            Cover
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mb-4 text-center py-6 rounded-xl bg-[#FAF8F4] text-[#1B2D45]/35" style={{ fontSize: "12px", fontWeight: 500 }}>
+                  No photos yet — add some below.
+                </div>
+              )}
+            </>
           )}
 
           {/* Upload area */}
