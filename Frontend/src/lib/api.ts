@@ -30,6 +30,7 @@ import type {
   SubletListResponse,
   SubletMessageResponse,
   SubletResponse,
+  SubletUpdate,
   FlagCreate,
   FlagResponse,
   LandlordFlagResponse,
@@ -472,6 +473,17 @@ export const sublets = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  
+  update: (id: number, data: SubletUpdate) =>
+    request<SubletResponse>(`/api/sublets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+ 
+  deleteImage: (subletId: number, imageId: number) =>
+    request<null>(`/api/sublets/${subletId}/images/${imageId}`, {
+      method: "DELETE",
+    }), 
 
   getMine: () =>
     request<SubletListResponse[]>("/api/sublets/my/listings"),

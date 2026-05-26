@@ -560,6 +560,10 @@ export interface SubletCreate {
   description?: string | null;
 }
 
+export type SubletUpdate = Partial<SubletCreate> & {
+  status?: SubletStatus;
+};
+
 export interface SubletResponse {
   id: number;
   user_id: number;

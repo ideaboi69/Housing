@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo, MOCK_ITEMS_WITH_ZONES } from "@/components/marketplace/marketplace-data";
+import { EditMarketplaceItemModal } from "@/components/marketplace/EditMarketplaceItemModal";
 import type { MarketplaceItemListResponse } from "@/types";
 import { toast } from "sonner";
 
@@ -18,12 +19,13 @@ import { toast } from "sonner";
    Listing Row
    ════════════════════════════════════════════════════════ */
 
-function ListingRow({ item, onMarkSold, onPublish, onUnpublish, onDelete }: {
+function ListingRow({ item, onMarkSold, onPublish, onUnpublish, onDelete, onEdit }: {
   item: MarketplaceItemListResponse;
   onMarkSold: () => void;
   onPublish: () => void;
   onUnpublish: () => void;
   onDelete: () => void;
+  onEdit: () => void;
 }) {
   const [showActions, setShowActions] = useState(false);
   const price = getPriceLabel(item.pricing_type, item.price);
@@ -83,8 +85,11 @@ function ListingRow({ item, onMarkSold, onPublish, onUnpublish, onDelete }: {
               </button>
             )}
             <Link href={`/marketplace/${item.id}`} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[#1B2D45]/40 hover:bg-[#1B2D45]/[0.04] transition-all" style={{ fontSize: "11px", fontWeight: 600 }}>
-              <Edit3 className="w-3.5 h-3.5" /> View
+              <Eye className="w-3.5 h-3.5" /> View
             </Link>
+            <button onClick={onEdit} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[#1B2D45]/70 hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45] transition-all" style={{ fontSize: "11px", fontWeight: 600 }}>
+              <Edit3 className="w-3.5 h-3.5" /> Edit
+            </button>
             <button onClick={onDelete} className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[#E71D36]/50 hover:bg-[#E71D36]/[0.06] hover:text-[#E71D36] transition-all" style={{ fontSize: "11px", fontWeight: 600 }}>
               <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
@@ -124,6 +129,9 @@ function ListingRow({ item, onMarkSold, onPublish, onUnpublish, onDelete }: {
                   <Upload className="w-3.5 h-3.5" /> Publish
                 </button>
               )}
+              <button onClick={() => { onEdit(); setShowActions(false); }} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[#1B2D45]/70 hover:bg-[#1B2D45]/[0.06]" style={{ fontSize: "11px", fontWeight: 600 }}>
+                <Edit3 className="w-3.5 h-3.5" /> Edit
+              </button>
               <button onClick={() => { onDelete(); setShowActions(false); }} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[#E71D36]/50 hover:bg-[#E71D36]/[0.06]" style={{ fontSize: "11px", fontWeight: 600 }}>
                 <Trash2 className="w-3.5 h-3.5" /> Delete
               </button>
@@ -148,6 +156,7 @@ export default function MyListingsPage() {
   const [items, setItems] = useState<MarketplaceItemListResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [useMock, setUseMock] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -358,12 +367,21 @@ export default function MyListingsPage() {
                   onPublish={() => handlePublish(item.id)}
                   onUnpublish={() => handleUnpublish(item.id)}
                   onDelete={() => handleDelete(item.id)}
+                  onEdit={() => setEditingId(item.id)}
                 />
               </motion.div>
             ))}
           </div>
         )}
       </div>
+
+      {editingId !== null && (
+        <EditMarketplaceItemModal
+          itemId={editingId}
+          onClose={() => setEditingId(null)}
+          onSaved={fetchItems}
+        />
+      )}
     </div>
   );
 }

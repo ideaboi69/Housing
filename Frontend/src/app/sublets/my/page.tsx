@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import {
   ChevronLeft,
   Clock,
+  Edit3,
   Eye,
   FileText,
   Home,
@@ -19,6 +20,7 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { SubletStatus, type SubletListResponse } from "@/types";
+import { EditSubletModal } from "@/components/sublets/EditSubletModal";
 
 type SubletTab = "active" | "drafts" | "other";
 
@@ -54,11 +56,13 @@ function SubletRow({
   onPublish,
   onUnpublish,
   onDelete,
+  onEdit,
 }: {
   item: SubletListResponse;
   onPublish: () => void;
   onUnpublish: () => void;
   onDelete: () => void;
+  onEdit: () => void;
 }) {
   const status = getStatusCopy(item.status);
   const price = new Intl.NumberFormat("en-CA", {
@@ -140,6 +144,14 @@ function SubletRow({
           >
             View
           </Link>
+          <button
+            onClick={onEdit}
+            className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-[#1B2D45]/70 hover:bg-[#1B2D45]/[0.04] hover:text-[#1B2D45] transition-all"
+            style={{ fontSize: "12px", fontWeight: 700 }}
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+            Edit
+          </button>
           {item.status === SubletStatus.DRAFT && (
             <button
               onClick={onPublish}
@@ -178,6 +190,7 @@ export default function MySubletsPage() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<SubletListResponse[]>([]);
   const [tab, setTab] = useState<SubletTab>("active");
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const fetchSublets = useCallback(async () => {
     setLoading(true);
@@ -422,12 +435,21 @@ export default function MySubletsPage() {
                   onPublish={() => handlePublish(item.id)}
                   onUnpublish={() => handleUnpublish(item.id)}
                   onDelete={() => handleDelete(item.id)}
+                  onEdit={() => setEditingId(item.id)}
                 />
               </motion.div>
             ))}
           </div>
         )}
       </div>
+
+      {editingId !== null && (
+        <EditSubletModal
+          subletId={editingId}
+          onClose={() => setEditingId(null)}
+          onSaved={fetchSublets}
+        />
+      )}
     </div>
   );
 }
