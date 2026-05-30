@@ -929,18 +929,24 @@ export default function RoommatesPage() {
         } catch { /* no profile at all */ }
       }
 
-      // Fallback to localStorage
-      const saved = loadProfile();
-      if (saved) {
-        setMyTags(saved.tags);
-        setMyBudget(saved.budget);
-        setMyMoveIn(saved.moveIn);
-        setMyGenderHousing(saved.genderHousing);
-        setMyMode(saved.mode ?? null);
-        setStarted(saved.started ?? true);
-        setHasProfile(true);
-        setSetupDone(saved.setupDone ?? !!saved.mode);
-        setTab(saved.defaultTab ?? (saved.mode === "with-friends" ? "individuals" : "groups"));
+      // For an authenticated student, the API is the source of truth.
+      // Stale localStorage from a previous session must NOT flip hasProfile = true,
+      // otherwise a brand-new user inherits the last user's saved tags.
+      // We do still pre-fill the quiz form fields from cache for a faster UX —
+      // but `hasProfile` only flips on real API confirmation above.
+      if (!user) {
+        const saved = loadProfile();
+        if (saved) {
+          setMyTags(saved.tags);
+          setMyBudget(saved.budget);
+          setMyMoveIn(saved.moveIn);
+          setMyGenderHousing(saved.genderHousing);
+          setMyMode(saved.mode ?? null);
+          setStarted(saved.started ?? true);
+          setHasProfile(true);
+          setSetupDone(saved.setupDone ?? !!saved.mode);
+          setTab(saved.defaultTab ?? (saved.mode === "with-friends" ? "individuals" : "groups"));
+        }
       }
       setHydrated(true);
     }
@@ -1014,31 +1020,58 @@ export default function RoommatesPage() {
       return "800_plus";
     };
 
-    const moveInToEnum = (value: string) => {
+    const moveInToEnum = (value: string): string | null => {
+      if (!value) return null;
       if (value.includes("Fall")) return "fall_2026";
       if (value.includes("Winter")) return "winter_2027";
       if (value.includes("Summer")) return "summer_2026";
-      return "flexible";
+      if (value.toLowerCase().includes("flexible")) return "flexible";
+      return null;
     };
 
-    const genderToEnum = (value: string) => {
+    const genderToEnum = (value: string): string | null => {
+      if (!value) return null;
       if (value.includes("Mixed")) return "mixed_gender";
       if (value.includes("Same")) return "same_gender";
-      return "no_preference";
+      if (value.toLowerCase().includes("no preference")) return "no_preference";
+      return null;
     };
 
+    // Resolve each quiz field — null = user hasn't actually answered it
+    // (tenantValues fall back is acceptable since those are real user answers
+    // from the 4-question tenant prompt)
+    const sleep_schedule = tagToEnum.sleep?.[tags.sleep] ?? null;
+    const cleanliness = tagToEnum.cleanliness?.[tags.cleanliness] ?? tenantValues.cleanliness ?? null;
+    const noise_level = tagToEnum.noise?.[tags.noise] ?? null;
+    const guests = tagToEnum.guests?.[tags.guests] ?? null;
+    const study_habits = tagToEnum.study?.[tags.study] ?? null;
+    const smoking = tagToEnum.smoking?.[tags.smoking] ?? tenantValues.smoking ?? null;
+    const pets = tagToEnum.pets?.[tags.pets] ?? tenantValues.pets ?? null;
+    const kitchen_use = tagToEnum.cooking?.[tags.cooking] ?? null;
+    const roommate_timing = moveInToEnum(moveIn);
+    const gender_housing_pref = genderHousing ? genderToEnum(genderHousing) : (tenantGender ?? null);
+
+    // If ANY required field is missing, return null — caller should NOT submit.
+    // This prevents the FE from inventing fake answers that flip quiz_completed = True.
+    if (
+      !sleep_schedule || !cleanliness || !noise_level || !guests || !study_habits ||
+      !smoking || !pets || !kitchen_use || !roommate_timing || !gender_housing_pref
+    ) {
+      return null;
+    }
+
     return {
-      sleep_schedule: tagToEnum.sleep?.[tags.sleep] || "flexible",
-      cleanliness: tagToEnum.cleanliness?.[tags.cleanliness] || tenantValues.cleanliness || "reasonably_clean",
-      noise_level: tagToEnum.noise?.[tags.noise] || "moderate",
-      guests: tagToEnum.guests?.[tags.guests] || "sometimes",
-      study_habits: tagToEnum.study?.[tags.study] || "mix",
-      smoking: tagToEnum.smoking?.[tags.smoking] || tenantValues.smoking || "no_smoking",
-      pets: tagToEnum.pets?.[tags.pets] || tenantValues.pets || "fine_with_pets",
-      kitchen_use: tagToEnum.cooking?.[tags.cooking] || "few_times_week",
+      sleep_schedule,
+      cleanliness,
+      noise_level,
+      guests,
+      study_habits,
+      smoking,
+      pets,
+      kitchen_use,
       budget_range: budgetToEnum(budget),
-      roommate_timing: moveInToEnum(moveIn),
-      gender_housing_pref: genderHousing ? genderToEnum(genderHousing) : (tenantGender || "no_preference"),
+      roommate_timing,
+      gender_housing_pref,
       search_type: searchType,
       ...(typeof roommatesNeeded === "number" ? { roommates_needed: roommatesNeeded } : {}),
     };
@@ -1059,13 +1092,17 @@ export default function RoommatesPage() {
       setupDone: false,
     });
 
-    // Try submitting to API
+    // Try submitting to API — but only when the user has actually answered
+    // every required quiz field. If anything is missing, buildRoommateQuizPayload
+    // returns null and we deliberately skip persistence; quiz_completed stays False
+    // in the DB until they finish for real.
     if (user) {
-      try {
-        await api.roommates.submitQuiz(
-          buildRoommateQuizPayload(tags, budget, moveIn, genderHousing, "on_my_own"),
-        );
-      } catch { /* API failed — quiz still works locally */ }
+      const payload = buildRoommateQuizPayload(tags, budget, moveIn, genderHousing, "on_my_own");
+      if (payload) {
+        try {
+          await api.roommates.submitQuiz(payload);
+        } catch { /* API failed — quiz still works locally */ }
+      }
     }
   }, [buildRoommateQuizPayload, user]);
 
@@ -1086,18 +1123,19 @@ export default function RoommatesPage() {
     });
 
     if (user) {
-      api.roommates.submitQuiz(
-        buildRoommateQuizPayload(
-          myTags,
-          myBudget,
-          myMoveIn,
-          myGenderHousing,
-          mode === "with-friends" ? "have_friends" : "on_my_own",
-          mode === "solo" ? need : undefined,
-        ),
-      ).catch(() => {
-        /* keep local flow usable if persistence fails */
-      });
+      const payload = buildRoommateQuizPayload(
+        myTags,
+        myBudget,
+        myMoveIn,
+        myGenderHousing,
+        mode === "with-friends" ? "have_friends" : "on_my_own",
+        mode === "solo" ? need : undefined,
+      );
+      if (payload) {
+        api.roommates.submitQuiz(payload).catch(() => {
+          /* keep local flow usable if persistence fails */
+        });
+      }
     }
 
     if (mode === "with-friends" && !isLandlord) {

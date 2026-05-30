@@ -116,6 +116,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: () => {
     localStorage.removeItem("cribb_token");
+    // Clear per-user client state so the next person who signs in on this browser
+    // doesn't inherit stale tags / groups from the previous user
+    localStorage.removeItem("cribb_roommate_profile");
+    localStorage.removeItem("cribb_roommate_groups");
     clearLandlordCache();
     useSavedStore.getState().clear();
     useMarketplaceSavedStore.getState().clear();
