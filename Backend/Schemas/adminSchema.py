@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from enum import Enum as PyEnum
 
 # OG-badge enum
@@ -90,3 +90,8 @@ class AdminStatsResponse(BaseModel):
     total_writers: int = 0
     total_roommate_groups: int = 0
     total_roommate_profiles: int = 0
+
+# Send emails to students who wanna sublet their lisitngs early
+class SubletOnboardingEmailRequest(BaseModel):
+    email: EmailStr
+    first_name: Optional[str] = None

@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, 
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import *
-from Schemas.adminSchema import AdminCreate, AdminResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse, AccountType
+from Schemas.adminSchema import AdminCreate, AdminResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse, AccountType, SubletOnboardingEmailRequest
 from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse
 from helpers import require_admin, cascade_delete_landlord, get_account_or_404
 from Utils.security import hash_password, create_access_token, verify_password, validate_password
 from Utils.cloudinary import delete_image_from_cloudinary
-from Utils.email import send_approval_email, send_rejection_email, send_revoked_email
+from Utils.email import send_approval_email, send_rejection_email, send_revoked_email, send_sublet_onboarding_email
 from Utils.rate_limit import limiter
 from config import settings
 
@@ -590,3 +590,14 @@ def list_all_roommate_groups(db: Session = Depends(get_db), admin: Admin = Depen
             "created_at": group.created_at,
         })
     return results
+
+
+# Send emails to students who wanna sublet their lisitngs early
+@admin_router.post("/send-sublet-onboarding-email", status_code=status.HTTP_200_OK)
+def send_sublet_onboarding_email_endpoint(payload: SubletOnboardingEmailRequest, background_tasks: BackgroundTasks, admin: Admin = Depends(require_admin)):
+    background_tasks.add_task(
+        send_sublet_onboarding_email,
+        to_email=payload.email,
+        first_name=payload.first_name,
+    )
+    return {"message": f"Onboarding email queued for {payload.email}"}

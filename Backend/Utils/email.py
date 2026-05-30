@@ -21,7 +21,7 @@ def send_verification_email(to_email: str, first_name: str, token: str):
 
                         <!-- Header -->
                         <tr>
-                            <td style="background-color: #18181b; padding: 32px 40px; text-align: center;">
+                            <td style="background-color: #F58259; padding: 32px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
                                     FindYourCribb
                                 </h1>
@@ -107,7 +107,7 @@ def send_password_reset_email(to_email: str, first_name: str, token: str):
 
                         <!-- Header -->
                         <tr>
-                            <td style="background-color: #18181b; padding: 32px 40px; text-align: center;">
+                            <td style="background-color: #F58259; padding: 32px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
                                     FindYourCribb
                                 </h1>
@@ -129,7 +129,7 @@ def send_password_reset_email(to_email: str, first_name: str, token: str):
                                     <tr>
                                         <td align="center" style="padding: 4px 0 24px;">
                                             <a href="{reset_url}"
-                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                               style="display: inline-block; background-color: #18181b93; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
                                                 Reset Password
                                             </a>
                                         </td>
@@ -204,7 +204,7 @@ def send_message_notification(
 
                         <!-- Header -->
                         <tr>
-                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                            <td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">
                                     FindYourCribb
                                 </h1>
@@ -237,7 +237,7 @@ def send_message_notification(
                                     <tr>
                                         <td align="center" style="padding: 8px 0 16px;">
                                             <a href="{conversation_url}"
-                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px;">
+                                               style="display: inline-block; background-color: #18181b77; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px;">
                                                 View Conversation
                                             </a>
                                         </td>
@@ -298,7 +298,7 @@ def send_approval_email(to_email: str, name: str, account_type: str):
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 
                         <tr>
-                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                            <td style="background-color: #F58259; padding: 24px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
                             </td>
                         </tr>
@@ -322,7 +322,7 @@ def send_approval_email(to_email: str, name: str, account_type: str):
                                     <tr>
                                         <td align="center" style="padding: 4px 0 24px;">
                                             <a href="{cta_url}"
-                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                               style="display: inline-block; background-color: #18181b77; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
                                                 {cta_text}
                                             </a>
                                         </td>
@@ -381,7 +381,7 @@ def send_rejection_email(to_email: str, name: str, account_type: str):
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 
                         <tr>
-                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                            <td style="background-color: #F58259; padding: 24px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
                             </td>
                         </tr>
@@ -409,7 +409,7 @@ def send_rejection_email(to_email: str, name: str, account_type: str):
                                     <tr>
                                         <td align="center" style="padding: 4px 0 24px;">
                                             <a href="mailto:support@findyourcribb.com"
-                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                               style="display: inline-block; background-color: #18181b77; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
                                                 Contact Support
                                             </a>
                                         </td>
@@ -468,7 +468,7 @@ def send_revoked_email(to_email: str, name: str, account_type: str):
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 
                         <tr>
-                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                            <td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
                             </td>
                         </tr>
@@ -496,7 +496,7 @@ def send_revoked_email(to_email: str, name: str, account_type: str):
                                     <tr>
                                         <td align="center" style="padding: 4px 0 24px;">
                                             <a href="mailto:support@findyourcribb.com"
-                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                               style="display: inline-block; background-color: #18181b77; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
                                                 Contact Support
                                             </a>
                                         </td>
@@ -555,7 +555,7 @@ def send_booking_confirmed_email(to_email: str, name: str, role: str, booking_de
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 
                         <tr>
-                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                            <td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
                             </td>
                         </tr>
@@ -649,7 +649,7 @@ def send_booking_cancelled_email(to_email: str, name: str, cancelled_by: str, bo
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 
                         <tr>
-                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                            <td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
                             </td>
                         </tr>
@@ -735,7 +735,7 @@ def send_booking_reminder_email(to_email: str, name: str, role: str, booking_det
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
 
                         <tr>
-                            <td style="background-color: #18181b; padding: 24px 40px; text-align: center;">
+                            <td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
                                 <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
                             </td>
                         </tr>
@@ -808,5 +808,115 @@ def send_booking_reminder_email(to_email: str, name: str, role: str, booking_det
         "reply_to": "support@findyourcribb.com",
         "to": [to_email],
         "subject": f"Reminder: Viewing Tomorrow — {booking_details['listing_title']}",
+        "html": html_content,
+    })
+
+def send_sublet_onboarding_email(to_email: str, first_name: str = None):
+    name = first_name if first_name else "there"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <!-- Header -->
+                        <tr>
+                            <td style="background-color: #f58259; padding: 32px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
+                                    FindYourCribb
+                                </h1>
+                            </td>
+                        </tr>
+
+                        <!-- Body -->
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #fef3c7; color: #92400e; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Early Access
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Hey {name}, you're in early.
+                                </h2>
+                                <p style="margin: 0 0 28px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    Thanks for agreeing to be one of our first sublet posters. Here's how to get your listing up in a few minutes.
+                                </p>
+
+                                <!-- Steps -->
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f9fafb; border-radius: 8px; margin-bottom: 28px;">
+                                    <tr>
+                                        <td style="padding: 20px 24px;">
+                                            <p style="margin: 0 0 12px; color: #18181b; font-size: 14px; font-weight: 600;">Quick steps:</p>
+                                            <p style="margin: 0 0 10px; color: #52525b; font-size: 14px; line-height: 1.6;">
+                                                <strong style="color: #f58259;">1.</strong> Go to <a href="https://findyourcribb.com" style="color: #f58259; text-decoration: none; font-weight: 600;">findyourcribb.com</a>
+                                            </p>
+                                            <p style="margin: 0 0 10px; color: #52525b; font-size: 14px; line-height: 1.6;">
+                                                <strong style="color: #f58259;">2.</strong> Click <strong>"Cribb Portal"</strong> (top right)
+                                            </p>
+                                            <p style="margin: 0 0 10px; color: #52525b; font-size: 14px; line-height: 1.6;">
+                                                <strong style="color: #f58259;">3.</strong> Enter your access code
+                                            </p>
+                                            <p style="margin: 0 0 10px; color: #52525b; font-size: 14px; line-height: 1.6;">
+                                                <strong style="color: #f58259;">4.</strong> Create your account &amp; verify your email
+                                            </p>
+                                            <p style="margin: 0; color: #52525b; font-size: 14px; line-height: 1.6;">
+                                                <strong style="color: #f58259;">5.</strong> Post your sublet
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <!-- Access code box -->
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 28px;">
+                                    <tr>
+                                        <td style="background-color: #2f282535; border: 1px dashed #e4e4e7; border-radius: 10px; padding: 20px 24px; text-align: center;">
+                                            <p style="margin: 0 0 4px; color: #a1a1aa; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px;">
+                                                Your access code
+                                            </p>
+                                            <p style="margin: 0; color: #18181b; font-size: 22px; font-weight: 700; letter-spacing: 1px;">
+                                                CribbUser2026
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <p style="margin: 0 0 28px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    Once we launch, your listing will be one of the first things students see when they're searching for housing. If you run into anything, just reply to this email.
+                                </p>
+
+                            </td>
+                        </tr>
+
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">
+                                    &copy; 2026 FindYourCribb. All rights reserved.
+                                </p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    return resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "to": [to_email],
+        "subject": "You're in early — here's how to post your sublet on Cribb",
         "html": html_content,
     })
