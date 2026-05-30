@@ -135,23 +135,6 @@ const POSTS: Post[] = [
     upvotes: 156, postedAt: now - 5 * HOUR,
   },
   {
-    id: "p4", author: "Fatima", initial: "F",
-    avatarGradient: "linear-gradient(135deg, #FFB627, #FF6B35)",
-    verified: true, timestamp: "8h ago", category: "event",
-    title: "Farmers Market is back starting this Saturday!",
-    body: "The Guelph Farmers Market downtown is back for the season. Every Saturday 7am-12pm. They have the best apple cider donuts and local honey. It gets packed by 9am so go early if you want the good stuff.",
-    eventDate: "Today", eventLocation: "Downtown Guelph", isHappeningToday: true,
-    upvotes: 134, postedAt: now - 8 * HOUR,
-  },
-  {
-    id: "p5", author: "Lena", initial: "L",
-    avatarGradient: "linear-gradient(135deg, #1B2D45, #5C6B7A)",
-    verified: true, timestamp: "1d ago", category: "news",
-    title: "UC renovations will close the south entrance all March",
-    body: "Just got an email from campus facilities. The University Centre south entrance is closed for renovations starting March 3rd through April. Use the north entrance near the courtyard. The Bullring cafe will still be open thankfully.",
-    upvotes: 72, postedAt: now - DAY,
-  },
-  {
     id: "p6", author: "Sam", initial: "S",
     avatarGradient: "linear-gradient(135deg, #FFB627, #e17055)",
     verified: true, timestamp: "1d ago", category: "lifestyle",

@@ -9,7 +9,6 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
 import { formatPrice, formatPropertyType, formatLeaseType } from "@/lib/utils";
 import { useSavedStore } from "@/lib/saved-store";
-import { getListingImages } from "@/lib/mock-data";
 import type { ListingDetailResponse } from "@/types";
 import { getProximityLabel } from "@/lib/proximity";
 
@@ -103,7 +102,7 @@ export function PolaroidCard({
   /* ── Social proof counts ────────────────────────── */
   const viewCount = listing.view_count ?? 0;
   const saveCount = listing.save_count ?? 0;
-  const coverImage = listing.images?.[0]?.image_url || getListingImages(listing.id)[0];
+  const coverImage = listing.images?.[0]?.image_url;
   
   return (
     <motion.div

@@ -14,9 +14,6 @@ import {
   formatPrice, formatLeaseType, formatPropertyType, formatDate, getScoreColor, getScoreLabel,
 } from "@/lib/utils";
 import { api } from "@/lib/api";
-import {
-  getMockListing, getMockHealthScore, getMockReviews, getListingImages,
-} from "@/lib/mock-data";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -27,7 +24,6 @@ import {
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { getAmenityChecklist } from "@/lib/amenities";
 import { CribbMap } from "@/components/ui/CribbMap";
-import { mockCoordinates } from "@/lib/mock-data";
 import { getProximityFromKm, getProximityLabel } from "@/lib/proximity";
 import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
 
@@ -343,7 +339,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     }
   }, [listingId, toggleSave, router]);
 
-  // Fetch listing — backend first, mock fallback
+  // Fetch listing from backend
   useEffect(() => {
     if (isInvalidId) {
       setError("Invalid listing ID");
@@ -353,43 +349,31 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
 
     async function load() {
       setIsLoading(true);
-      let usedMock = false;
       try {
         const data = await api.listings.getById(listingId);
         if (data && data.id) {
           setListing(data);
-          // Try real Cribb Score
+          // Cribb Score
           try {
             const hs = await api.healthScores.get(listingId);
             setHealthScore(hs);
           } catch {
-            setHealthScore(getMockHealthScore(listingId) || null);
+            setHealthScore(null);
           }
-          // Try real reviews
+          // Reviews
           try {
             const rv = await api.reviews.browse({ property_id: data.property_id });
             setReviews(rv);
           } catch {
-            setReviews(getMockReviews(data.property_id));
+            setReviews([]);
           }
           const realImages = data.images?.map(img => img.image_url) || [];
-          setImages(realImages.length > 0 ? realImages : getListingImages(listingId));
-
-        } else {
-          throw new Error("Empty response");
-        }
-      } catch {
-        // Backend unavailable or empty — use mock
-        usedMock = true;
-        const mock = getMockListing(listingId);
-        if (mock) {
-          setListing(mock);
-          setHealthScore(getMockHealthScore(listingId) || null);
-          setReviews(getMockReviews(mock.property_id));
-          setImages(getListingImages(listingId));
+          setImages(realImages);
         } else {
           setError("Listing not found");
         }
+      } catch {
+        setError("Listing not found");
       } finally {
         setIsLoading(false);
       }
@@ -923,8 +907,8 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             <div className="rounded-xl border border-black/[0.04] overflow-hidden bg-white/90 backdrop-blur-xl"
               style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
               <CribbMap
-                lat={listing.latitude != null ? Number(listing.latitude) : mockCoordinates[listing.id]?.lat}
-                lng={listing.longitude != null ? Number(listing.longitude) : mockCoordinates[listing.id]?.lng}
+                lat={listing.latitude != null ? Number(listing.latitude) : undefined}
+                lng={listing.longitude != null ? Number(listing.longitude) : undefined}
                 address={listing.address}
                 height="200px"
                 zoom={15}

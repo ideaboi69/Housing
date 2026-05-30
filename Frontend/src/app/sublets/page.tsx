@@ -106,10 +106,10 @@ function SubletHero({ onListClick, canList }: { onListClick: () => void; canList
 function InsightStats() {
   const isMobile = useIsMobile();
   const stats = [
-    { emoji: "☀️", bgColor: "rgba(255,107,53,0.12)", label: "Available now", value: "24 sublets" },
+    { emoji: "☀️", bgColor: "rgba(255,107,53,0.12)", label: "Available now", value: "0 sublets" },
     { emoji: "💰", bgColor: "rgba(46,196,182,0.12)", label: "Avg. savings", value: "28% off regular rent" },
-    { emoji: "🛋️", bgColor: "rgba(255,182,39,0.12)", label: "Furnished", value: "18 of 24" },
-    { emoji: "✓", bgColor: "rgba(46,196,182,0.12)", label: "Landlord approved", value: "16 verified" },
+    { emoji: "🛋️", bgColor: "rgba(255,182,39,0.12)", label: "Furnished", value: "0 of 0" },
+    { emoji: "✓", bgColor: "rgba(46,196,182,0.12)", label: "Landlord approved", value: "3 verified" },
   ];
 
   return (
@@ -1912,7 +1912,7 @@ function SubletsContent() {
   const user = useAuthStore((s) => s.user);
   const searchParams = useSearchParams();
   const [hydrated, setHydrated] = useState(false);
-  const [listings, setListings] = useState<SubletListing[]>(subletListings);
+  const [listings, setListings] = useState<SubletListing[]>([]);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState<[number, number]>([4, 6]); // May-Jul default (summer feel)
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
@@ -1957,7 +1957,7 @@ function SubletsContent() {
         const liveSublets = await api.sublets.browse();
         const normalized = liveSublets.map(mapApiSubletToListing);
         const seenIds = new Set(normalized.map((listing) => listing.id));
-        let merged = [...normalized, ...subletListings.filter((listing) => !seenIds.has(listing.id))];
+        let merged = [...normalized];
 
         if (createdSubletId) {
           const parsedCreatedSublet = parseStoredCreatedSublet();
@@ -1981,10 +1981,7 @@ function SubletsContent() {
       } catch {
         if (!cancelled) {
           const parsedCreatedSublet = parseStoredCreatedSublet();
-          const fallbackListings = parsedCreatedSublet
-            ? [parsedCreatedSublet, ...subletListings.filter((listing) => listing.id !== parsedCreatedSublet.id)]
-            : subletListings;
-
+          const fallbackListings = parsedCreatedSublet ? [parsedCreatedSublet] : [];
           if (parsedCreatedSublet && createdSubletHandledRef.current !== createdSubletId) {
             focusCreatedSublet(parsedCreatedSublet);
             createdSubletHandledRef.current = createdSubletId;

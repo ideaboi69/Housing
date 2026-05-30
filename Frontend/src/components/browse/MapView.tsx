@@ -5,7 +5,6 @@ import { Pin, ZoomIn, ZoomOut, Bed, Bath, Clock, MapPin, ChevronDown } from "luc
 import Link from "next/link";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { formatPrice, formatPropertyType } from "@/lib/utils";
-import { getListingImages, mockCoordinates } from "@/lib/mock-data";
 import { getProximityLabel } from "@/lib/proximity";
 import { buildStaticMapUrl, GUELPH_CENTER, projectLngLatToContainer } from "@/lib/mapbox";
 import {
@@ -164,7 +163,7 @@ function ListingRailCard({
   onTogglePin: (id: number) => void;
 }) {
   const score = healthScores[listing.id] ?? 0;
-  const image = listing.images?.[0]?.image_url || getListingImages(listing.id)[0];
+  const image = listing.images?.[0]?.image_url;
   const proximity = getProximityLabel(listing.walk_time_minutes);
 
   return (
@@ -324,10 +323,8 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
 
   const markerPoints = useMemo(() => {
     return sortedListings.map((listing) => {
-      const coords = listing.latitude != null && listing.longitude != null
-        ? { lat: Number(listing.latitude), lng: Number(listing.longitude) }
-        : mockCoordinates[listing.id];
-      if (!coords) return null;
+      if (listing.latitude == null || listing.longitude == null) return null;
+      const coords = { lat: Number(listing.latitude), lng: Number(listing.longitude) };
       const point = projectLngLatToContainer({
         lat: coords.lat,
         lng: coords.lng,

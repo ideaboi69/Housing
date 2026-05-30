@@ -4,7 +4,6 @@ import { X, ArrowRight, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { getScoreColor, formatPrice } from "@/lib/utils";
-import { getListingImages } from "@/lib/mock-data";
 import type { ListingDetailResponse } from "@/types";
 import Link from "next/link";
 
@@ -26,7 +25,7 @@ function PickCard({
   healthScore: number | null;
   onRemove: () => void;
 }) {
-  const thumbnail = listing.images?.[0]?.image_url || getListingImages(listing.id)[0];
+  const thumbnail = listing.images?.[0]?.image_url;
   return (
     <motion.div
       layout

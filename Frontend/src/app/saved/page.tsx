@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/lib/auth-store";
 import { useSavedStore } from "@/lib/saved-store";
 import { api } from "@/lib/api";
-import { mockListings } from "@/lib/mock-data";
 import { mockSubletDetails } from "@/lib/mock-sublets";
 import type { SavedListingDetailResponse } from "@/types";
 
@@ -20,52 +19,6 @@ function toSavedPageItem(item: SavedListingDetailResponse): SavedPageItem {
   return {
     ...item,
     href: item.is_sublet && item.sublet_id ? `/sublets/${item.sublet_id}` : `/browse/${item.listing_id}`,
-  };
-}
-
-/** Convert mock data into the SavedListingDetailResponse shape */
-function mockToSaved(listingId: number): SavedPageItem | null {
-  const sublet = mockSubletDetails.find((item) => item.listing_id === listingId);
-  if (sublet) {
-    return {
-      id: listingId,
-      listing_id: listingId,
-      saved_at: new Date().toISOString(),
-      rent_per_room: sublet.subletPrice,
-      rent_total: sublet.subletPrice * Math.max(sublet.bedsAvailable, 1),
-      lease_type: "sublet",
-      move_in_date: sublet.subletStart ?? null,
-      is_sublet: true,
-      status: "active",
-      title: sublet.title,
-      address: sublet.address,
-      property_type: sublet.propertyType,
-      is_furnished: sublet.is_furnished,
-      has_parking: sublet.has_parking,
-      distance_to_campus_km: sublet.distanceKm ?? null,
-      href: `/sublets/${sublet.id}`,
-    };
-  }
-
-  const l = mockListings.find((m) => m.id === listingId);
-  if (!l) return null;
-  return {
-    id: listingId,
-    listing_id: listingId,
-    saved_at: new Date().toISOString(),
-    rent_per_room: l.rent_per_room,
-    rent_total: l.rent_total,
-    lease_type: l.lease_type,
-    move_in_date: l.move_in_date ?? null,
-    is_sublet: l.is_sublet ?? false,
-    status: "active",
-    title: l.title,
-    address: l.address,
-    property_type: l.property_type,
-    is_furnished: l.is_furnished,
-    has_parking: l.has_parking,
-    distance_to_campus_km: l.distance_to_campus_km ?? null,
-    href: `/browse/${listingId}`,
   };
 }
 
@@ -105,8 +58,6 @@ export default function SavedListingsPage() {
     // Fallback: use Zustand savedIds + mock data
     const fallbackListings: SavedPageItem[] = [];
     savedIds.forEach((id) => {
-      const item = mockToSaved(id);
-      if (item) fallbackListings.push(item);
     });
     setListings(fallbackListings);
     setLoading(false);
@@ -117,8 +68,6 @@ export default function SavedListingsPage() {
     if (!loading && listings.length === 0 && savedIds.size > 0) {
       const fallbackListings: SavedPageItem[] = [];
       savedIds.forEach((id) => {
-        const item = mockToSaved(id);
-        if (item) fallbackListings.push(item);
       });
       if (fallbackListings.length > 0) {
         setListings(fallbackListings);

@@ -18,7 +18,6 @@ import { MyPicksTray } from "@/components/browse/MyPicksTray";
 import { CompareModal } from "@/components/browse/CompareModal";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { mockListings, mockHealthScores } from "@/lib/mock-data";
 import { BrowseGridSkeleton } from "@/components/ui/Skeletons";
 import type { ListingDetailResponse, ListingFilters } from "@/types";
 
@@ -113,7 +112,6 @@ function mergeBrowseListings(liveListings: ListingDetailResponse[]): ListingDeta
   };
 
   liveListings.forEach(addListing);
-  mockListings.forEach(addListing);
 
   return merged;
 }
@@ -123,10 +121,9 @@ export default function BrowsePage() {
   const { user } = useAuthStore();
   const [viewMode, setViewMode] = useState<ViewMode>("board");
   const [pinnedIds, setPinnedIds] = useState<number[]>([]);
-  const [listings, setListings] = useState<ListingDetailResponse[]>(mockListings);
-  const [healthScores, setHealthScores] = useState<Record<number, number>>(mockHealthScores);
+  const [listings, setListings] = useState<ListingDetailResponse[]>([]);
+  const [healthScores, setHealthScores] = useState<Record<number, number>>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [useMock, setUseMock] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<ListingFilters>({ status: "active", limit: 20 });
   const [searchQuery, setSearchQuery] = useState("");
@@ -138,15 +135,12 @@ export default function BrowsePage() {
     try {
       const data = await api.listings.browse(filterParams);
       if (!data || data.length === 0) {
-        setListings(mockListings);
-        setHealthScores(mockHealthScores);
-        setUseMock(true);
+        setListings([]);
+        setHealthScores({});
         return;
       }
-
-      const normalizedData = (data ?? []).map(normalizeBrowseListing);
-      setListings(mergeBrowseListings(normalizedData));
-      setUseMock(normalizedData.length < mockListings.length);
+      const normalizedData = data.map(normalizeBrowseListing);
+      setListings(normalizedData);
       const scoreResults = await Promise.allSettled(
         normalizedData.map((l) => api.healthScores.get(l.id))
       );
@@ -156,13 +150,10 @@ export default function BrowsePage() {
           scores[normalizedData[i].id] = result.value.overall_score;
         }
       });
-      setHealthScores(Object.keys(scores).length > 0 ? { ...mockHealthScores, ...scores } : mockHealthScores);
+      setHealthScores(scores);
     } catch {
-      setListings(mockListings);
-      setHealthScores(mockHealthScores);
-      setUseMock(true);
-      setIsLoading(false);
-      return;
+      setListings([]);
+      setHealthScores({});
     } finally {
       setIsLoading(false);
     }
@@ -247,7 +238,7 @@ export default function BrowsePage() {
             <p className="mt-1 md:mt-1.5 text-[#1B2D45]/45" style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 400 }}>
               <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{filteredListings.length} listings</span>{" "}
               available in Guelph
-              {useMock && <span className="ml-2 text-[#FF6B35]/60" style={{ fontSize: "11px" }}>(demo data)</span>}
+              {<span className="ml-2 text-[#FF6B35]/60" style={{ fontSize: "11px" }}>(demo data)</span>}
             </p>
           </div>
 
