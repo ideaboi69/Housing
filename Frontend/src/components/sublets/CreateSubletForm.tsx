@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Check, X } from "lucide-react";
+import { Check, X, GripVertical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -74,6 +74,8 @@ export function CreateSubletForm({
 }) {
   const isMobile = useIsMobile();
   const [photos, setPhotos] = useState<File[]>([]);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [form, setForm] = useState(INITIAL_SUBLET_FORM);
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -95,6 +97,51 @@ export function CreateSubletForm({
 
   function removePhoto(idx: number) {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  // Drag-and-drop reorder for local photos (no API — these aren't uploaded yet).
+  function handleDragStart(idx: number) {
+    return (e: React.DragEvent) => {
+      setDraggedIdx(idx);
+      e.dataTransfer.effectAllowed = "move";
+    };
+  }
+
+  function handleDragOver(idx: number) {
+    return (e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (idx !== dragOverIdx) setDragOverIdx(idx);
+    };
+  }
+
+  function handleDragLeave() {
+    setDragOverIdx(null);
+  }
+
+  function handleDrop(targetIdx: number) {
+    return (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOverIdx(null);
+
+      if (draggedIdx === null || draggedIdx === targetIdx) {
+        setDraggedIdx(null);
+        return;
+      }
+
+      setPhotos((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(draggedIdx, 1);
+        next.splice(targetIdx, 0, moved);
+        return next;
+      });
+      setDraggedIdx(null);
+    };
+  }
+
+  function handleDragEnd() {
+    setDraggedIdx(null);
+    setDragOverIdx(null);
   }
 
   const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-black/[0.06] text-[#1B2D45] placeholder:text-[#1B2D45]/30 focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
@@ -613,17 +660,42 @@ export function CreateSubletForm({
           <div className="mb-4">
             <label className={labelClass} style={labelStyle}>Photos (up to 5)</label>
             <div className="flex gap-2 flex-wrap">
-              {photos.map((file, i) => (
-                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-black/[0.06] group">
-                  <img src={URL.createObjectURL(file)} alt="" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => removePhoto(i)}
-                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              {photos.map((file, i) => {
+                const isDragging = draggedIdx === i;
+                const isDragTarget = dragOverIdx === i && draggedIdx !== i;
+                return (
+                  <div
+                    key={i}
+                    draggable
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onDragStart={handleDragStart(i)}
+                    onDragOver={handleDragOver(i)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop(i)}
+                    onDragEnd={handleDragEnd}
+                    className={`relative w-20 h-20 rounded-xl overflow-hidden border border-black/[0.06] group cursor-grab active:cursor-grabbing transition-all ${
+                      isDragging ? "opacity-30" : ""
+                    } ${isDragTarget ? "ring-2 ring-[#FF6B35] ring-offset-1" : ""}`}
                   >
-                    <span style={{ fontSize: "10px", fontWeight: 700 }}>✕</span>
-                  </button>
-                </div>
-              ))}
+                    <img src={URL.createObjectURL(file)} alt="" draggable={false} className="w-full h-full object-cover" />
+                    {/* Drag hint */}
+                    <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      <GripVertical className="w-3 h-3" />
+                    </div>
+                    <button
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span style={{ fontSize: "10px", fontWeight: 700 }}>✕</span>
+                    </button>
+                    {i === 0 && (
+                      <div className="absolute bottom-0.5 left-0.5 px-1 py-0.5 rounded bg-black/60 text-white" style={{ fontSize: "7px", fontWeight: 700 }}>
+                        Cover
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {photos.length < 5 && (
                 <label className="w-20 h-20 rounded-xl border-2 border-dashed border-black/[0.08] flex flex-col items-center justify-center cursor-pointer hover:border-[#FF6B35]/30 hover:bg-[#FF6B35]/[0.02] transition-all">
                   <span className="text-[#1B2D45]/20" style={{ fontSize: "20px" }}>+</span>

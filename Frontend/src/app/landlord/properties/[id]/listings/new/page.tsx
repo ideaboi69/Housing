@@ -7,7 +7,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { LeaseType, GenderPreference, ListingCreate } from "@/types";
 import type { PropertyResponse } from "@/types";
-import { ArrowLeft, DollarSign, Calendar, Users, Check, Home, Loader2, Image as ImageIcon, X, Upload } from "lucide-react";
+import { ArrowLeft, DollarSign, Calendar, Users, Check, Home, Loader2, Image as ImageIcon, X, Upload, GripVertical } from "lucide-react";
 
 const leaseTypes = [
   { value: LeaseType.EIGHT_MONTH, label: "8-month", desc: "Sep – Apr", emoji: "📚" },
@@ -27,6 +27,8 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
   const [loadingProperty, setLoadingProperty] = useState(true);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     rent_per_room: "",
@@ -121,6 +123,58 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
   function removeImage(index: number) {
     setImageFiles((prev) => prev.filter((_, i) => i !== index));
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Drag-and-drop reorder for local images (no API — uploaded together on submit in this order).
+  function handleDragStart(idx: number) {
+    return (e: React.DragEvent) => {
+      setDraggedIdx(idx);
+      e.dataTransfer.effectAllowed = "move";
+    };
+  }
+
+  function handleDragOver(idx: number) {
+    return (e: React.DragEvent) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (idx !== dragOverIdx) setDragOverIdx(idx);
+    };
+  }
+
+  function handleDragLeave() {
+    setDragOverIdx(null);
+  }
+
+  function handleDrop(targetIdx: number) {
+    return (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOverIdx(null);
+
+      if (draggedIdx === null || draggedIdx === targetIdx) {
+        setDraggedIdx(null);
+        return;
+      }
+
+      // Move both arrays in lockstep so previews stay matched to their files
+      setImageFiles((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(draggedIdx, 1);
+        next.splice(targetIdx, 0, moved);
+        return next;
+      });
+      setImagePreviews((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(draggedIdx, 1);
+        next.splice(targetIdx, 0, moved);
+        return next;
+      });
+      setDraggedIdx(null);
+    };
+  }
+
+  function handleDragEnd() {
+    setDraggedIdx(null);
+    setDragOverIdx(null);
   }
 
   async function uploadImagesToListing(listingId: number) {
@@ -487,23 +541,43 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
             {/* Previews */}
             {imagePreviews.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
-                {imagePreviews.map((src, idx) => (
-                  <div key={idx} className="relative aspect-square rounded-lg overflow-hidden bg-[#f3f3f5] group">
-                    <img src={src} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(idx)}
-                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-sm transition-all opacity-0 group-hover:opacity-100"
+                {imagePreviews.map((src, idx) => {
+                  const isDragging = draggedIdx === idx;
+                  const isDragTarget = dragOverIdx === idx && draggedIdx !== idx;
+                  return (
+                    <div
+                      key={idx}
+                      draggable
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onDragStart={handleDragStart(idx)}
+                      onDragOver={handleDragOver(idx)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop(idx)}
+                      onDragEnd={handleDragEnd}
+                      className={`relative aspect-square rounded-lg overflow-hidden bg-[#f3f3f5] group cursor-grab active:cursor-grabbing transition-all ${
+                        isDragging ? "opacity-30" : ""
+                      } ${isDragTarget ? "ring-2 ring-[#FF6B35] ring-offset-2" : ""}`}
                     >
-                      <X className="w-3.5 h-3.5 text-[#1B2D45]" />
-                    </button>
-                    {idx === 0 && (
-                      <span className="absolute bottom-1 left-1 px-2 py-0.5 rounded bg-black/60 text-white" style={{ fontSize: "10px", fontWeight: 600 }}>
-                        Cover
-                      </span>
-                    )}
-                  </div>
-                ))}
+                      <img src={src} alt={`Preview ${idx + 1}`} draggable={false} className="w-full h-full object-cover" />
+                      {/* Drag hint */}
+                      <div className="absolute top-1 left-1 w-6 h-6 rounded-full bg-black/55 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <GripVertical className="w-3.5 h-3.5" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeImage(idx)}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-sm transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <X className="w-3.5 h-3.5 text-[#1B2D45]" />
+                      </button>
+                      {idx === 0 && (
+                        <span className="absolute bottom-1 left-1 px-2 py-0.5 rounded bg-black/60 text-white" style={{ fontSize: "10px", fontWeight: 600 }}>
+                          Cover
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
