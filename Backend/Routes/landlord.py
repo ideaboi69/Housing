@@ -128,6 +128,12 @@ def view_my_landlord_profile(db: Session = Depends(get_db), current_user: User =
 def update_my_landlord_profile(payload: LandlordUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_landlord)):
     landlord = get_landlord_profile(current_user, db)
 
+    if payload.first_name is not None:
+        landlord.first_name = payload.first_name
+    if payload.last_name is not None:
+        landlord.last_name = payload.last_name
+    if payload.email is not None:
+        landlord.email = payload.email
     if payload.company_name is not None:
         landlord.company_name = payload.company_name
     if payload.phone is not None:
