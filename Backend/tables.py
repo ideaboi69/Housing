@@ -192,7 +192,7 @@ class Listing(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
     property = relationship("Property", back_populates="listings")
-    images = relationship("ListingImage", back_populates="listing", cascade="all, delete-orphan")
+    images = relationship("ListingImage", back_populates="listing", cascade="all, delete-orphan", order_by="ListingImage.display_order")
     rooms = relationship("ListingRoom", back_populates="listing", cascade="all, delete-orphan", order_by="ListingRoom.display_order")
     health_score = relationship("HousingHealthScore", back_populates="listing", uselist=False)
     saved_by = relationship("SavedListing", back_populates="listing")
@@ -402,7 +402,7 @@ class Sublet(Base):
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="sublets")
-    images = relationship("SubletImage", back_populates="sublet", cascade="all, delete-orphan")
+    images = relationship("SubletImage", back_populates="sublet", cascade="all, delete-orphan", order_by="SubletImage.display_order")
     flags = relationship("Flag", back_populates="sublet")
     viewing_availabilities = relationship("ViewingAvailability", back_populates="sublet", cascade="all, delete-orphan")
     viewing_slots = relationship("ViewingSlot", back_populates="sublet", cascade="all, delete-orphan")
@@ -436,6 +436,7 @@ class SubletImage(Base):
     sublet_id = Column(Integer, ForeignKey("sublets.id", ondelete="CASCADE"), nullable=False)
     image_url = Column(String(500), nullable=False)
     is_primary = Column(Boolean, default=False, nullable=False)
+    display_order = Column(Integer, default=0, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     sublet = relationship("Sublet", back_populates="images")

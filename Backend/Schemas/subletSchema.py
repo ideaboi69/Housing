@@ -96,10 +96,14 @@ class SubletImageResponse(BaseModel):
     id: int
     image_url: str
     is_primary: bool
-
+    display_order: int
+    
     class Config:
         from_attributes = True
 
+class SubletImageReorder(BaseModel):
+    image_ids: list[int]
+ 
 class SubletResponse(BaseModel):
     id: int
     user_id: int

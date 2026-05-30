@@ -73,6 +73,9 @@ class ListingImageResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+class ListingImageReorder(BaseModel):
+    image_ids: list[int]
 
 class ListingRoomResponse(BaseModel):
     id: int

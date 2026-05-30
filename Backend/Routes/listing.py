@@ -118,6 +118,31 @@ async def upload_listing_images(listing_id: int, files: list[UploadFile] = File(
 
     return [ListingImageResponse.model_validate(img) for img in images]
 
+# Reorder listing images
+@listing_router.patch("/{listing_id}/images/reorder", response_model=list[ListingImageResponse])
+def reorder_listing_images(listing_id: int, payload: ListingImageReorder, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_for_user(current_user, db)
+    listing = get_listing_owned_by(listing_id, landlord.id, db)
+ 
+    images = db.query(ListingImage).filter(ListingImage.listing_id == listing.id).all()
+    existing_ids = {img.id for img in images}
+    incoming_ids = set(payload.image_ids)
+ 
+    if existing_ids != incoming_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="image_ids must contain every image on this listing exactly once",
+        )
+ 
+    image_by_id = {img.id: img for img in images}
+    for new_order, image_id in enumerate(payload.image_ids):
+        image_by_id[image_id].display_order = new_order
+ 
+    db.commit()
+ 
+    ordered = sorted(images, key=lambda img: img.display_order)
+    return [ListingImageResponse.model_validate(img) for img in ordered]
+ 
 # Browse Listings (public, with filters)
 @listing_router.get("/", response_model=list[ListingDetailResponse])
 def list_listings(

@@ -879,7 +879,7 @@ def send_sublet_onboarding_email(to_email: str, first_name: str = None):
                                 <!-- Access code box -->
                                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 28px;">
                                     <tr>
-                                        <td style="background-color: #2f282535; border: 1px dashed #e4e4e7; border-radius: 10px; padding: 20px 24px; text-align: center;">
+                                        <td style="background-color: #2f282512; border: 1px dashed #e4e4e7; border-radius: 10px; padding: 20px 24px; text-align: center;">
                                             <p style="margin: 0 0 4px; color: #a1a1aa; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px;">
                                                 Your access code
                                             </p>
@@ -890,7 +890,21 @@ def send_sublet_onboarding_email(to_email: str, first_name: str = None):
                                     </tr>
                                 </table>
 
-                                <p style="margin: 0 0 28px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                <!-- Heads up note -->
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 28px;">
+                                    <tr>
+                                        <td style="background-color: #fff7ed; border-left: 3px solid #f58259; border-radius: 6px; padding: 16px 20px;">
+                                            <p style="margin: 0 0 6px; color: #18181b; font-size: 13px; font-weight: 600;">
+                                                Heads up!
+                                            </p>
+                                            <p style="margin: 0; color: #52525b; font-size: 13px; line-height: 1.6;">
+                                                You'll notice a few other sections on the site (Marketplace, Roommates, Bubble). Feel free to look around, but for now we'd appreciate it if you only posted your sublet. This will help us keep the early feed clean. Appreciate you 🙏🏽
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <p style="margin: 0 0 28px; color: #52525b; font-size: 14px; line-height: 1.6; text-align: center;">
                                     Once we launch, your listing will be one of the first things students see when they're searching for housing. If you run into anything, just reply to this email.
                                 </p>
 

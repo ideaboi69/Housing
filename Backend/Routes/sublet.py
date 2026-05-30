@@ -104,6 +104,35 @@ async def upload_sublet_images(sublet_id: int, files: list[UploadFile] = File(..
 
     return [SubletImageResponse.model_validate(img) for img in images]
 
+# Reorder sublet images — provide image IDs in the new desired order
+@sublet_router.patch("/{sublet_id}/images/reorder", response_model=list[SubletImageResponse])
+def reorder_sublet_images(sublet_id: int, payload: SubletImageReorder, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    sublet = db.query(Sublet).filter(Sublet.id == sublet_id, Sublet.user_id == current_user.id).first()
+    if not sublet:
+        raise HTTPException(status_code=404, detail="Sublet not found")
+ 
+    images = db.query(SubletImage).filter(SubletImage.sublet_id == sublet.id).all()
+    existing_ids = {img.id for img in images}
+    incoming_ids = set(payload.image_ids)
+ 
+    if existing_ids != incoming_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="image_ids must contain every image on this sublet exactly once",
+        )
+ 
+    image_by_id = {img.id: img for img in images}
+    for new_order, image_id in enumerate(payload.image_ids):
+        img = image_by_id[image_id]
+        img.display_order = new_order
+        img.is_primary = (new_order == 0)
+ 
+    db.commit()
+ 
+    ordered = sorted(images, key=lambda img: img.display_order)
+    return [SubletImageResponse.model_validate(img) for img in ordered]
+ 
+ 
 # Get all active sublets (public, with filters)
 @sublet_router.get("/", response_model=list[SubletListResponse])
 def get_all_sublets(
