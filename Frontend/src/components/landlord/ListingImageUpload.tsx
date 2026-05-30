@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { X, Upload, Loader2 } from "lucide-react";
+import { X, Upload, Loader2, GripVertical } from "lucide-react";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 
@@ -21,6 +21,8 @@ export function ListingImageUpload({ listingId, existingImages, onClose, onUploa
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Fetch existing images on mount if the caller didn't supply them
@@ -105,6 +107,58 @@ export function ListingImageUpload({ listingId, existingImages, onClose, onUploa
     }
   };
 
+  // Drag-and-drop reorder. Optimistic — revert on API failure.
+  const handleDragStart = (id: number) => (e: React.DragEvent) => {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (id: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (id !== dragOverId) setDragOverId(id);
+  };
+
+  const handleDragLeave = () => setDragOverId(null);
+
+  const handleDrop = (targetId: number) => async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverId(null);
+
+    if (draggedId === null || draggedId === targetId) {
+      setDraggedId(null);
+      return;
+    }
+
+    const fromIdx = images.findIndex((img) => img.id === draggedId);
+    const toIdx = images.findIndex((img) => img.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) {
+      setDraggedId(null);
+      return;
+    }
+
+    const previous = images;
+    const next = [...images];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setImages(next);
+    setDraggedId(null);
+
+    try {
+      await api.listings.reorderImages(listingId, next.map((img) => img.id));
+      onUploaded?.();
+    } catch (err) {
+      // Revert on failure
+      setImages(previous);
+      setError(err instanceof Error ? err.message : "Couldn't save new order");
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverId(null);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -143,13 +197,31 @@ export function ListingImageUpload({ listingId, existingImages, onClose, onUploa
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   {images.map((img, i) => {
                     const isDeleting = deletingId === img.id;
+                    const isDragging = draggedId === img.id;
+                    const isDragTarget = dragOverId === img.id && draggedId !== img.id;
                     return (
-                      <div key={img.id} className="relative aspect-[4/3] rounded-lg overflow-hidden bg-[#FAF8F4]">
+                      <div
+                        key={img.id}
+                        draggable={!isDeleting}
+                        onDragStart={handleDragStart(img.id)}
+                        onDragOver={handleDragOver(img.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop(img.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`group relative aspect-[4/3] rounded-lg overflow-hidden bg-[#FAF8F4] cursor-grab active:cursor-grabbing transition-all ${
+                          isDragging ? "opacity-30" : ""
+                        } ${isDragTarget ? "ring-2 ring-[#FF6B35] ring-offset-2" : ""}`}
+                      >
                         <img
                           src={img.image_url}
                           alt={`Listing photo ${i + 1}`}
+                          draggable={false}
                           className={`w-full h-full object-cover transition-opacity ${isDeleting ? "opacity-40" : ""}`}
                         />
+                        {/* Drag hint — visible on hover */}
+                        <div className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <GripVertical className="w-3.5 h-3.5" />
+                        </div>
                         {/* Always-visible delete button (top-right) */}
                         <button
                           onClick={() => handleDelete(img.id)}
@@ -216,7 +288,7 @@ export function ListingImageUpload({ listingId, existingImages, onClose, onUploa
           )}
 
           <p className="text-[#1B2D45]/20 mt-3 text-center" style={{ fontSize: "10px" }}>
-            First image will be used as the cover photo. Max 10 images per listing.
+            Drag photos to reorder · First image is the cover · Max 10 per listing
           </p>
         </div>
 

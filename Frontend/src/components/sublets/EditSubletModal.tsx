@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, Upload, Save } from "lucide-react";
+import { X, Loader2, Upload, Save, GripVertical } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
 import { toast } from "sonner";
@@ -56,6 +56,8 @@ export function EditSubletModal({ subletId, onClose, onSaved }: EditSubletModalP
   const [images, setImages] = useState<SubletImageResponse[]>([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -125,6 +127,57 @@ export function EditSubletModal({ subletId, onClose, onSaved }: EditSubletModalP
     } finally {
       setDeletingPhotoId(null);
     }
+  };
+
+  // Drag-and-drop reorder. Optimistic — revert on API failure.
+  const handleDragStart = (id: number) => (e: React.DragEvent) => {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (id: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (id !== dragOverId) setDragOverId(id);
+  };
+
+  const handleDragLeave = () => setDragOverId(null);
+
+  const handleDrop = (targetId: number) => async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverId(null);
+
+    if (draggedId === null || draggedId === targetId) {
+      setDraggedId(null);
+      return;
+    }
+
+    const fromIdx = images.findIndex((img) => img.id === draggedId);
+    const toIdx = images.findIndex((img) => img.id === targetId);
+    if (fromIdx === -1 || toIdx === -1) {
+      setDraggedId(null);
+      return;
+    }
+
+    const previous = images;
+    const next = [...images];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setImages(next);
+    setDraggedId(null);
+
+    try {
+      const updated = await api.sublets.reorderImages(subletId, next.map((img) => img.id));
+      setImages(updated);
+    } catch (err) {
+      setImages(previous);
+      toast.error(err instanceof ApiError ? err.detail : "Couldn't save new order");
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverId(null);
   };
 
   const handleSave = async () => {
@@ -206,13 +259,31 @@ export function EditSubletModal({ subletId, onClose, onSaved }: EditSubletModalP
                   <div className="grid grid-cols-4 gap-2 mb-3">
                     {images.map((img, i) => {
                       const isDeleting = deletingPhotoId === img.id;
+                      const isDragging = draggedId === img.id;
+                      const isDragTarget = dragOverId === img.id && draggedId !== img.id;
                       return (
-                        <div key={img.id} className="relative aspect-[4/3] rounded-lg overflow-hidden bg-[#FAF8F4]">
+                        <div
+                          key={img.id}
+                          draggable={!isDeleting}
+                          onDragStart={handleDragStart(img.id)}
+                          onDragOver={handleDragOver(img.id)}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop(img.id)}
+                          onDragEnd={handleDragEnd}
+                          className={`group relative aspect-[4/3] rounded-lg overflow-hidden bg-[#FAF8F4] cursor-grab active:cursor-grabbing transition-all ${
+                            isDragging ? "opacity-30" : ""
+                          } ${isDragTarget ? "ring-2 ring-[#FF6B35] ring-offset-2" : ""}`}
+                        >
                           <img
                             src={img.image_url}
                             alt={`Sublet ${i + 1}`}
+                            draggable={false}
                             className={`w-full h-full object-cover transition-opacity ${isDeleting ? "opacity-40" : ""}`}
                           />
+                          {/* Drag hint — visible on hover */}
+                          <div className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full bg-black/55 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            <GripVertical className="w-3.5 h-3.5" />
+                          </div>
                           <button
                             onClick={() => handleDeletePhoto(img.id)}
                             disabled={isDeleting}

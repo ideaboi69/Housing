@@ -11,6 +11,7 @@ import type {
   RoleSwitch,
   ListingDetailResponse,
   ListingResponse,
+  ListingImageResponse,
   ListingCreate,
   ListingRoomCreate,
   ListingRoomResponse,
@@ -445,7 +446,15 @@ export const listings = {
     request<null>(`/api/listings/${listingId}/rooms/${roomId}`, {
       method: "DELETE",
     }),
+
+  // Reorder images — pass image IDs in the new desired order
+  reorderImages: (listingId: number, imageIds: number[]) =>
+    request<ListingImageResponse[]>(`/api/listings/${listingId}/images/reorder`, {
+    method: "PATCH",
+    body: JSON.stringify({ image_ids: imageIds }),
+  }),
 };
+
 
 // ── Sublets ────────────────────────────────────────────
 
@@ -529,6 +538,12 @@ export const sublets = {
 
     return res.json() as Promise<SubletImageResponse[]>;
   },
+
+  reorderImages: (subletId: number, imageIds: number[]) =>
+    request<SubletImageResponse[]>(`/api/sublets/${subletId}/images/reorder`, {
+      method: "PATCH",
+      body: JSON.stringify({ image_ids: imageIds }),
+    }),
 
   startConversation: (data: StartSubletConversation) =>
     request<SubletMessageResponse>("/api/sublets/conversations", {

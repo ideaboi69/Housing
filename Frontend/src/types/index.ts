@@ -521,6 +521,7 @@ export interface SubletImageResponse {
   id: number;
   image_url: string;
   is_primary: boolean;
+  display_order: number;
 }
 
 export interface SubletCreate {
