@@ -42,6 +42,7 @@ class ListingPolicies(BaseModel):
 class ListingTerms(BaseModel):
     lease_type: Optional[str] = None
     move_in_date: Optional[date] = None
+    has_flexible_move_in: bool = False
     gender_preference: Optional[str] = None
 
 class SubletTerms(BaseModel):

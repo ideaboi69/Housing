@@ -15,7 +15,7 @@ export function SearchAndFilters({
   onSearchChange,
   onOpenFilters,
   activeFilterCount = 0,
-  placeholder = "Search by address, neighborhood...",
+  placeholder = "Search listings...",
 }: SearchAndFiltersProps) {
   const [searchQuery, setSearchQuery] = useState("");
 

@@ -70,6 +70,7 @@ export interface ListingPolicies {
 export interface ListingTermsSummary {
   lease_type?: string | null;
   move_in_date?: string | null;
+  has_flexible_move_in?: boolean;
   gender_preference?: string | null;
 }
 
@@ -294,7 +295,8 @@ export interface ListingResponse {
   per_room_pricing: boolean;
   rooms: ListingRoomResponse[];
   lease_type: string;
-  move_in_date: string;
+  move_in_date: string | null;
+  has_flexible_move_in?: boolean;
   is_sublet: boolean;
   sublet_start_date: string | null;
   sublet_end_date: string | null;
@@ -335,7 +337,8 @@ export interface ListingDetailResponse {
   per_room_pricing: boolean;
   rooms: ListingRoomResponse[];
   lease_type: string;
-  move_in_date: string;
+  move_in_date: string | null;
+  has_flexible_move_in?: boolean;
   is_sublet: boolean;
   sublet_start_date: string | null;
   sublet_end_date: string | null;
@@ -396,7 +399,8 @@ export interface ListingCreate {
   per_room_pricing: boolean;
   rooms?: ListingRoomCreate[];
   lease_type: LeaseType;
-  move_in_date: string;
+  move_in_date?: string | null;
+  has_flexible_move_in?: boolean;
   is_sublet?: boolean;
   sublet_start_date?: string;
   sublet_end_date?: string;
@@ -407,7 +411,8 @@ export interface ListingUpdate {
   rent_per_room?: number;
   rent_total?: number;
   lease_type?: LeaseType;
-  move_in_date?: string;
+  move_in_date?: string | null;
+  has_flexible_move_in?: boolean;
   status?: string;
   gender_preference?: GenderPreference;
 }

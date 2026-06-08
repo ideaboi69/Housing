@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, BackgroundTasks, File, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from typing import Optional
 from datetime import date
 from tables import Sublet, SubletImage,SubletConversation, SubletMessage, User, get_db
@@ -210,6 +210,10 @@ def start_sublet_conversation(payload: StartSubletConversation, background_tasks
 
     existing = db.query(SubletConversation).filter(SubletConversation.sublet_id == payload.sublet_id, SubletConversation.inquirer_id == current_user.id).first()
     if existing:
+        existing.poster_archived_at = None
+        existing.inquirer_archived_at = None
+        existing.updated_at = func.now()
+        db.commit()
         raise HTTPException(
             status_code=409,
             detail="Conversation already exists",
@@ -229,6 +233,9 @@ def start_sublet_conversation(payload: StartSubletConversation, background_tasks
         sender_id=current_user.id,
         content=payload.content,
     )
+    conversation.poster_archived_at = None
+    conversation.inquirer_archived_at = None
+    conversation.updated_at = func.now()
     db.add(message)
     db.commit()
     db.refresh(message)
@@ -304,8 +311,16 @@ def send_sublet_message(conversation_id: int, payload: SubletMessageCreate, back
 @sublet_router.get("/conversations", response_model=list[SubletConversationResponse])
 def get_my_sublet_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     conversations = db.query(SubletConversation).filter(
-        (SubletConversation.poster_id == current_user.id) | 
-        (SubletConversation.inquirer_id == current_user.id)
+        or_(
+            and_(
+                SubletConversation.poster_id == current_user.id,
+                SubletConversation.poster_archived_at.is_(None),
+            ),
+            and_(
+                SubletConversation.inquirer_id == current_user.id,
+                SubletConversation.inquirer_archived_at.is_(None),
+            ),
+        )
     ).order_by(SubletConversation.updated_at.desc()).all()
 
     result = []
@@ -384,16 +399,26 @@ def delete_sublet_conversation(conversation_id: int, db: Session = Depends(get_d
     if conversation.poster_id != current_user.id and conversation.inquirer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    db.query(SubletMessage).filter(SubletMessage.conversation_id == conversation.id).delete()
-    db.delete(conversation)
+    if conversation.poster_id == current_user.id:
+        conversation.poster_archived_at = func.now()
+    else:
+        conversation.inquirer_archived_at = func.now()
     db.commit()
 
 # Get total unread sublet messages for the current user
 @sublet_router.get("/unread-count")
 def get_sublet_unread_count(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     conversation_ids = [c.id for c in db.query(SubletConversation.id).filter(
-        (SubletConversation.poster_id == current_user.id) | 
-        (SubletConversation.inquirer_id == current_user.id)
+        or_(
+            and_(
+                SubletConversation.poster_id == current_user.id,
+                SubletConversation.poster_archived_at.is_(None),
+            ),
+            and_(
+                SubletConversation.inquirer_id == current_user.id,
+                SubletConversation.inquirer_archived_at.is_(None),
+            ),
+        )
     ).all()]
 
     if not conversation_ids:

@@ -25,7 +25,8 @@ function UserAvatar({
   lastName,
   photoUrl,
   size = 34,
-}: { firstName: string; lastName: string; photoUrl?: string | null; size?: number }) {
+  tone = "default",
+}: { firstName: string; lastName: string; photoUrl?: string | null; size?: number; tone?: "default" | "landlord" }) {
   const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
 
   if (photoUrl) {
@@ -45,7 +46,7 @@ function UserAvatar({
       style={{
         width: size,
         height: size,
-        background: "linear-gradient(135deg, #FF6B35, #FFB627)",
+        background: tone === "landlord" ? "linear-gradient(135deg, #1B2D45, #2F6FED)" : "linear-gradient(135deg, #FF6B35, #FFB627)",
         fontSize: `${size * 0.38}px`,
         fontWeight: 700,
         letterSpacing: "-0.02em",
@@ -106,9 +107,7 @@ export function Navbar() {
   const isLandlord = displayUser?.role === "landlord";
   const landlordTab = searchParams.get("tab");
 
-  const allNavItems = isLandlord
-    ? [{ label: "Dashboard", path: "/landlord" }, ...navItems]
-    : navItems;
+  const allNavItems = isLandlord ? [] : navItems;
 
   // Poll unread message count
   const fetchUnread = useCallback(async () => {
@@ -263,7 +262,20 @@ export function Navbar() {
     if (href.startsWith("/landlord?tab=")) {
       return pathname === "/landlord" && landlordTab === href.split("tab=")[1];
     }
+    if (href === "/landlord") {
+      return pathname === "/landlord" && !landlordTab;
+    }
     return pathname === href;
+  };
+
+  const isNavItemActive = (href: string) => {
+    if (href.startsWith("/landlord?tab=")) {
+      return pathname === "/landlord" && landlordTab === href.split("tab=")[1];
+    }
+    if (href === "/landlord") {
+      return pathname === "/landlord" && !landlordTab;
+    }
+    return pathname === href || pathname.startsWith(`${href}/`);
   };
 
   return (
@@ -272,16 +284,16 @@ export function Navbar() {
         {/* Logo */}
         <Link
           href="/"
-          className="text-[#FF6B35]"
+          className={isLandlord ? "text-[#1B2D45]" : "text-[#FF6B35]"}
           style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.04em" }}
         >
           cribb
         </Link>
 
         {/* Center nav – desktop */}
-        <div className="hidden md:flex items-center gap-1">
+        {!isLandlord && <div className="hidden md:flex items-center gap-1">
           {allNavItems.map((item) => {
-            const isActive = pathname === item.path;
+            const isActive = isNavItemActive(item.path);
             return (
               <Link
                 key={item.label}
@@ -297,7 +309,9 @@ export function Navbar() {
                 }
                 className={`px-4 py-2 rounded-lg transition-all ${
                   isActive
-                    ? "bg-[#FF6B35]/10 text-[#FF6B35]"
+                    ? isLandlord
+                      ? "bg-[#1B2D45]/10 text-[#1B2D45]"
+                      : "bg-[#FF6B35]/10 text-[#FF6B35]"
                     : "text-[#1B2D45]/70 hover:text-[#1B2D45] hover:bg-[#1B2D45]/5"
                 }`}
                 style={{
@@ -309,7 +323,7 @@ export function Navbar() {
               </Link>
             );
           })}
-        </div>
+        </div>}
 
         {/* Right side – desktop */}
         <div className="hidden md:flex items-center gap-2">
@@ -317,20 +331,31 @@ export function Navbar() {
             <div className="h-9 w-28 rounded-xl bg-[#1B2D45]/[0.04]" />
           ) : displayUser ? (
             <>
+              {isLandlord && (
+                <Link
+                  href="/"
+                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[#1B2D45]/12 px-3 text-[#1B2D45] transition-all hover:border-[#1B2D45]/25 hover:bg-[#1B2D45]/[0.03]"
+                  style={{ fontSize: "12px", fontWeight: 800 }}
+                >
+                  View as Student
+                </Link>
+              )}
               {/* Message icon */}
               {!writerSessionActive && (
                 <Link
                   href={isLandlord ? "/landlord?tab=messages" : "/messages"}
                   className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                     (!isLandlord && pathname === "/messages") || (isLandlord && pathname === "/landlord" && landlordTab === "messages")
-                      ? "bg-[#FF6B35]/10 text-[#FF6B35]"
+                      ? isLandlord
+                        ? "bg-[#1B2D45]/10 text-[#1B2D45]"
+                        : "bg-[#FF6B35]/10 text-[#FF6B35]"
                       : "text-[#1B2D45]/40 hover:bg-[#1B2D45]/5 hover:text-[#1B2D45]/60"
                   }`}
                 >
                   <MessageCircle className="w-[18px] h-[18px]" />
                   {unreadCount > 0 && (
                     <span
-                      className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-[#FF6B35] text-white flex items-center justify-center"
+                      className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-white flex items-center justify-center ${isLandlord ? "bg-[#1B2D45]" : "bg-[#FF6B35]"}`}
                       style={{ fontSize: "9px", fontWeight: 800 }}
                     >
                       {unreadCount > 9 ? "9+" : unreadCount}
@@ -345,7 +370,7 @@ export function Navbar() {
                 onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-[#1B2D45]/[0.04] transition-all"
               >
-                <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} />
+                <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} tone={isLandlord ? "landlord" : "default"} />
                 <span
                   className="text-[#1B2D45]/80 max-w-[120px] truncate"
                   style={{ fontSize: "13px", fontWeight: 600 }}
@@ -366,7 +391,7 @@ export function Navbar() {
                   {/* User info header */}
                   <div className="px-4 pt-4 pb-3 border-b border-black/[0.04]">
                     <div className="flex items-center gap-3">
-                      <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} size={40} />
+                      <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} size={40} tone={isLandlord ? "landlord" : "default"} />
                       <div className="min-w-0 flex-1">
                         <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
                           {displayUser.first_name} {displayUser.last_name}
@@ -404,7 +429,9 @@ export function Navbar() {
                           href={item.href}
                           className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${
                             isActive
-                              ? "bg-[#FF6B35]/5 text-[#FF6B35]"
+                              ? isLandlord
+                                ? "bg-[#1B2D45]/5 text-[#1B2D45]"
+                                : "bg-[#FF6B35]/5 text-[#FF6B35]"
                               : "text-[#1B2D45]/70 hover:bg-[#1B2D45]/[0.03] hover:text-[#1B2D45]"
                           }`}
                           style={{ fontSize: "13px", fontWeight: isActive ? 600 : 500 }}
@@ -478,7 +505,7 @@ export function Navbar() {
             {/* User info on mobile */}
             {displayUser && (
               <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-[#FAF8F4] rounded-xl">
-                <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} size={36} />
+                <UserAvatar firstName={displayUser.first_name} lastName={displayUser.last_name} photoUrl={"profile_photo_url" in displayUser ? displayUser.profile_photo_url : undefined} size={36} tone={isLandlord ? "landlord" : "default"} />
                 <div className="min-w-0 flex-1">
                   <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
                     {displayUser.first_name} {displayUser.last_name}
@@ -492,7 +519,7 @@ export function Navbar() {
 
             {/* Nav links */}
             {allNavItems.map((item) => {
-              const isActive = pathname === item.path;
+              const isActive = isNavItemActive(item.path);
               return (
                 <Link
                   key={item.label}
@@ -500,7 +527,9 @@ export function Navbar() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`block px-4 py-2.5 rounded-xl transition-all ${
                     isActive
-                      ? "bg-[#FF6B35]/10 text-[#FF6B35]"
+                      ? isLandlord
+                        ? "bg-[#1B2D45]/10 text-[#1B2D45]"
+                        : "bg-[#FF6B35]/10 text-[#FF6B35]"
                       : "text-[#1B2D45]/70 hover:bg-[#1B2D45]/5"
                   }`}
                   style={{ fontSize: "15px", fontWeight: isActive ? 700 : 500 }}
@@ -509,6 +538,17 @@ export function Navbar() {
                 </Link>
               );
             })}
+
+            {isLandlord && (
+              <Link
+                href="/"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block px-4 py-2.5 rounded-xl text-[#1B2D45]/70 hover:bg-[#1B2D45]/5"
+                style={{ fontSize: "15px", fontWeight: 700 }}
+              >
+                View as Student
+              </Link>
+            )}
 
             {/* User-specific links on mobile */}
             {displayUser && (
@@ -523,7 +563,9 @@ export function Navbar() {
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
                         isActive
-                          ? "bg-[#FF6B35]/8 text-[#FF6B35]"
+                          ? isLandlord
+                            ? "bg-[#1B2D45]/8 text-[#1B2D45]"
+                            : "bg-[#FF6B35]/8 text-[#FF6B35]"
                           : "text-[#1B2D45]/60 hover:bg-[#1B2D45]/5"
                       }`}
                       style={{ fontSize: "14px", fontWeight: isActive ? 700 : 500 }}

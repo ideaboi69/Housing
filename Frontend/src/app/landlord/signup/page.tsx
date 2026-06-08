@@ -1,19 +1,15 @@
 "use client";
 import { AuthBackground } from "@/components/ui/AuthBackground";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
-import { AuthBackLink } from "@/components/ui/AuthBackLink";
 import { motion } from "framer-motion";
 import {
   Building2, Phone, Shield, Upload, FileText, X, Check,
   ArrowLeft, ArrowRight, User, Mail, Lock, AlertCircle, Loader2,
 } from "lucide-react";
-
-const NAVY = "#1B2D45";
-const NAVY_LIGHT = "rgba(27,45,69,0.06)";
 
 /* ════════════════════════════════════════════════════════
    Step indicator — navy theme
@@ -57,7 +53,7 @@ function FileUploadBox({
   return (
     <div className="space-y-2">
       <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>{label}</label>
-      <p className="text-[#1B2D45]/30" style={{ fontSize: "11px", lineHeight: 1.4 }}>{description}</p>
+      <p className="text-[#1B2D45]/55" style={{ fontSize: "11px", lineHeight: 1.4 }}>{description}</p>
 
       {file ? (
         <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#4ADE80]/[0.06] border border-[#4ADE80]/20">
@@ -73,8 +69,8 @@ function FileUploadBox({
       ) : (
         <label className="flex flex-col items-center gap-2 px-4 py-6 rounded-xl border-2 border-dashed border-[#1B2D45]/10 hover:border-[#1B2D45]/25 hover:bg-[#1B2D45]/[0.02] transition-all cursor-pointer">
           <Upload className="w-6 h-6 text-[#1B2D45]/20" />
-          <span className="text-[#1B2D45]/40" style={{ fontSize: "12px", fontWeight: 500 }}>Click to upload or drag and drop</span>
-          <span className="text-[#1B2D45]/20" style={{ fontSize: "10px" }}>PDF, JPG, PNG up to 10MB</span>
+          <span className="text-[#1B2D45]/55" style={{ fontSize: "12px", fontWeight: 500 }}>Click to upload or drag and drop</span>
+          <span className="text-[#1B2D45]/40" style={{ fontSize: "10px" }}>PDF, JPG, PNG up to 10MB</span>
           <input type="file" accept={accepted} className="hidden" onChange={(e) => {
             const f = e.target.files?.[0];
             if (!f) return;
@@ -94,7 +90,6 @@ function FileUploadBox({
 
 function LandlordSignupPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const setAuthState = useAuthStore.setState;
   const [step, setStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -192,14 +187,14 @@ function LandlordSignupPageContent() {
   }
 
   // Shared input class
-  const inputCls = "w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#1B2D45]/20 focus:bg-white focus:outline-none transition-all";
+  const inputCls = "w-full mt-1.5 px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all";
 
   // Selected pill style (navy instead of orange)
   function pillCls(selected: boolean) {
     return `flex-1 py-2.5 rounded-lg border transition-all ${
       selected
         ? "border-[#1B2D45]/25 bg-[#1B2D45]/[0.06] text-[#1B2D45]"
-        : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#1B2D45]/15"
+        : "border-black/[0.08] text-[#1B2D45]/60 hover:border-[#1B2D45]/20 hover:bg-[#1B2D45]/[0.02]"
     }`;
   }
 
@@ -214,8 +209,6 @@ function LandlordSignupPageContent() {
             transition={{ duration: 0.45, ease: "easeOut" }}
             className="min-w-0 lg:pr-6 lg:self-center"
           >
-              <AuthBackLink />
-
             <div className="mt-6 max-w-[620px]">
               <motion.div
                 initial={{ opacity: 0, y: 18 }}
@@ -224,7 +217,7 @@ function LandlordSignupPageContent() {
                 className="inline-flex items-center gap-2 rounded-full border border-[#1B2D45]/10 bg-white/72 px-4 py-2 text-[#1B2D45]/55 backdrop-blur-sm"
                 style={{ fontSize: "12px", fontWeight: 700 }}
               >
-                <Shield className="h-4 w-4 text-[#FF6B35]" />
+                <Shield className="h-4 w-4 text-[#1B2D45]" />
                 Landlord dashboard
               </motion.div>
 
@@ -245,7 +238,7 @@ function LandlordSignupPageContent() {
                 animate={{ opacity: 1, scaleX: 1 }}
                 transition={{ delay: 0.18, duration: 0.45, ease: "easeOut" }}
                 className="mt-4 h-[3px] w-24 origin-left rounded-full"
-                style={{ background: "linear-gradient(90deg, rgba(255,107,53,0.9) 0%, rgba(255,107,53,0.2) 100%)" }}
+                style={{ background: "linear-gradient(90deg, rgba(27,45,69,0.9) 0%, rgba(46,196,182,0.25) 100%)" }}
               />
 
               <motion.p
@@ -281,9 +274,22 @@ function LandlordSignupPageContent() {
             <div className="pointer-events-none absolute -inset-x-6 -top-6 h-24 rounded-[36px] bg-white/22 blur-2xl" />
 
             <div className="relative z-10">
-              <Link href="/" className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-6" style={{ fontSize: "13px", fontWeight: 500 }}>
-                <ArrowLeft className="w-4 h-4" /> Back to cribb
-              </Link>
+              <div className="mb-6 flex flex-wrap items-center gap-3">
+                <Link href="/" className="inline-flex items-center gap-1.5 text-[#1B2D45]/60 hover:text-[#1B2D45] transition-colors" style={{ fontSize: "13px", fontWeight: 600 }}>
+                  <ArrowLeft className="w-4 h-4" /> Back to Cribb Landing Page
+                </Link>
+                {step > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setStep(step - 1); setError(""); }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-[#1B2D45]/10 bg-white/75 px-3 py-1.5 text-[#1B2D45]/65 hover:border-[#1B2D45]/20 hover:text-[#1B2D45] transition-all"
+                    style={{ fontSize: "12px", fontWeight: 700 }}
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    Back to Stage {step}
+                  </button>
+                )}
+              </div>
               <StepIndicator current={step} />
 
               {/* ─── Step 0: Account ─── */}
@@ -295,33 +301,39 @@ function LandlordSignupPageContent() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>First name</label>
-                <input type="text" value={account.first_name} onChange={(e) => setAccount({ ...account, first_name: e.target.value })} required className={inputCls} style={{ fontSize: "14px" }} />
+                <label htmlFor="landlord-first-name" className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>First name</label>
+                <input id="landlord-first-name" type="text" value={account.first_name} onChange={(e) => setAccount({ ...account, first_name: e.target.value })} required className={inputCls} style={{ fontSize: "14px" }} />
               </div>
               <div>
-                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Last name</label>
-                <input type="text" value={account.last_name} onChange={(e) => setAccount({ ...account, last_name: e.target.value })} required className={inputCls} style={{ fontSize: "14px" }} />
+                <label htmlFor="landlord-last-name" className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Last name</label>
+                <input id="landlord-last-name" type="text" value={account.last_name} onChange={(e) => setAccount({ ...account, last_name: e.target.value })} required className={inputCls} style={{ fontSize: "14px" }} />
               </div>
             </div>
 
             <div>
-              <label className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
+              <label htmlFor="landlord-email" className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
                 <Mail className="w-3.5 h-3.5 text-[#1B2D45]/40" /> Email
               </label>
-              <input type="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} placeholder="you@email.com" required className={inputCls} style={{ fontSize: "14px" }} />
-              <p className="text-[#1B2D45]/25 mt-1" style={{ fontSize: "11px" }}>Use a personal or business email — @uoguelph.ca is for student accounts</p>
+              <input id="landlord-email" type="email" value={account.email} onChange={(e) => setAccount({ ...account, email: e.target.value })} placeholder="you@email.com" required className={inputCls} style={{ fontSize: "14px" }} />
+              <p className="text-[#1B2D45]/55 mt-1" style={{ fontSize: "11px" }}>Use a business or personal email.</p>
             </div>
 
             <div>
-              <label className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
+              <label htmlFor="landlord-password" className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
                 <Lock className="w-3.5 h-3.5 text-[#1B2D45]/40" /> Password
               </label>
-              <input type="password" value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="Min 8 characters" required className={inputCls} style={{ fontSize: "14px" }} />
+              <input id="landlord-password" type="password" value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="Min 8 characters" required className={inputCls} style={{ fontSize: "14px" }} />
+              <p className="text-[#1B2D45]/55 mt-1" style={{ fontSize: "11px" }}>Password must be at least 8 characters.</p>
             </div>
 
             <div>
-              <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Confirm password</label>
-              <input type="password" value={account.confirm_password} onChange={(e) => setAccount({ ...account, confirm_password: e.target.value })} placeholder="Re-enter password" required className={inputCls} style={{ fontSize: "14px" }} />
+              <label htmlFor="landlord-confirm-password" className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Confirm password</label>
+              <input id="landlord-confirm-password" type="password" value={account.confirm_password} onChange={(e) => setAccount({ ...account, confirm_password: e.target.value })} placeholder="Re-enter password" required className={inputCls} style={{ fontSize: "14px" }} />
+              {account.confirm_password && (
+                <p className={account.password === account.confirm_password ? "text-[#2EC4B6] mt-1" : "text-[#E71D36] mt-1"} style={{ fontSize: "11px", fontWeight: 600 }}>
+                  {account.password === account.confirm_password ? "Passwords match." : "Passwords do not match yet."}
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -334,16 +346,16 @@ function LandlordSignupPageContent() {
             </h2>
 
             <div>
-              <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Company or management name</label>
-              <input type="text" value={business.company_name} onChange={(e) => setBusiness({ ...business, company_name: e.target.value })} placeholder="Optional — leave blank if individual landlord" className={inputCls} style={{ fontSize: "14px" }} />
+              <label htmlFor="landlord-company-name" className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Company or management name</label>
+              <input id="landlord-company-name" type="text" value={business.company_name} onChange={(e) => setBusiness({ ...business, company_name: e.target.value })} placeholder="Optional — leave blank if individual landlord" className={inputCls} style={{ fontSize: "14px" }} />
             </div>
 
             <div>
-              <label className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
+              <label htmlFor="landlord-phone" className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
                 <Phone className="w-3.5 h-3.5 text-[#1B2D45]/40" /> Phone number *
               </label>
-              <input type="tel" value={business.phone} onChange={(e) => setBusiness({ ...business, phone: e.target.value })} placeholder="519-555-0123" required className={inputCls} style={{ fontSize: "14px" }} />
-              <p className="text-[#1B2D45]/25 mt-1" style={{ fontSize: "11px" }}>Students may use this to contact you about listings</p>
+              <input id="landlord-phone" type="tel" value={business.phone} onChange={(e) => setBusiness({ ...business, phone: e.target.value })} placeholder="519-555-0123" required className={inputCls} style={{ fontSize: "14px" }} />
+              <p className="text-[#1B2D45]/55 mt-1" style={{ fontSize: "11px" }}>Students may use this to contact you about listings.</p>
             </div>
 
             <div>
@@ -369,16 +381,9 @@ function LandlordSignupPageContent() {
                 <Shield className="w-4 h-4 text-[#1B2D45]/50" /> Verification Documents
               </h2>
 
-              <div className="rounded-2xl bg-[#1B2D45]/[0.04] p-4">
-                <p className="text-[#1B2D45]/60" style={{ fontSize: "12px", lineHeight: 1.6 }}>
-                </p>
-              </div>
-
-              <FileUploadBox label="Government-issued ID *" description="Driver's license, passport, or provincial ID card. Must show your name clearly." accepted=".pdf,.jpg,.jpeg,.png" file={govId} onSelect={setGovId} onRemove={() => setGovId(null)} onError={setError} />
-
               <div>
                 <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>ID Type *</label>
-                <div className="flex gap-2 mt-2">
+                <div className="grid grid-cols-3 gap-2 mt-2">
                   {[
                     { key: "drivers_license", label: "Driver's License" },
                     { key: "passport", label: "Passport" },
@@ -393,22 +398,22 @@ function LandlordSignupPageContent() {
                 </div>
               </div>
 
-              <FileUploadBox label="Proof of property ownership *" description="Property tax bill, utility bill in your name at the property address, mortgage statement, or property management license." accepted=".pdf,.jpg,.jpeg,.png" file={proofOfOwnership} onSelect={setProofOfOwnership} onRemove={() => setProofOfOwnership(null)} onError={setError} />
+              <FileUploadBox label="Government-issued ID *" description="Driver's license, passport, or provincial ID card. Must show your name clearly." accepted=".pdf,.jpg,.jpeg,.png" file={govId} onSelect={setGovId} onRemove={() => setGovId(null)} onError={setError} />
 
               <div>
                 <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Document Type *</label>
-                <div className="flex flex-wrap gap-2 mt-2">
+                <div className="grid grid-cols-2 gap-2 mt-2 sm:grid-cols-4">
                   {[
                     { key: "property_tax_bill", label: "Property Tax Bill" },
                     { key: "utility_bill", label: "Utility Bill" },
                     { key: "mortgage_statement", label: "Mortgage Statement" },
-                    { key: "property_management_license", label: "Mgmt License" },
+                    { key: "property_management_license", label: "Management License" },
                   ].map((opt) => (
                     <button key={opt.key} type="button" onClick={() => setDocumentType(opt.key)}
-                      className={`px-3 py-2 rounded-lg border transition-all ${
+                      className={`px-2.5 py-2 rounded-lg border transition-all ${
                         documentType === opt.key
                           ? "border-[#1B2D45]/25 bg-[#1B2D45]/[0.06] text-[#1B2D45]"
-                          : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#1B2D45]/15"
+                          : "border-black/[0.08] text-[#1B2D45]/60 hover:border-[#1B2D45]/20 hover:bg-[#1B2D45]/[0.02]"
                       }`}
                       style={{ fontSize: "12px", fontWeight: documentType === opt.key ? 600 : 500 }}>
                       {opt.label}
@@ -416,6 +421,8 @@ function LandlordSignupPageContent() {
                   ))}
                 </div>
               </div>
+
+              <FileUploadBox label="Proof of property ownership *" description="Property tax bill, utility bill in your name at the property address, mortgage statement, or property management license." accepted=".pdf,.jpg,.jpeg,.png" file={proofOfOwnership} onSelect={setProofOfOwnership} onRemove={() => setProofOfOwnership(null)} onError={setError} />
             </div>
 
             {/* What happens next */}
@@ -434,14 +441,6 @@ function LandlordSignupPageContent() {
 
               {/* Navigation — navy buttons */}
               <div className="flex items-center gap-3 mt-6">
-                {step > 0 && (
-                  <button onClick={() => { setStep(step - 1); setError(""); }}
-                    className="px-5 py-3 rounded-xl border border-black/[0.08] text-[#1B2D45]/60 hover:bg-black/[0.02] transition-all"
-                    style={{ fontSize: "14px", fontWeight: 500 }}>
-                    ← Back
-                  </button>
-                )}
-
                 {step < 2 ? (
                   <button onClick={handleNext}
                     className="flex-1 py-3 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-all flex items-center justify-center gap-2"

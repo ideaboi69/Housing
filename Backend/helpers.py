@@ -539,6 +539,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         rooms=[ListingRoomResponse.model_validate(r) for r in listing.rooms],
         lease_type=lease_type,
         move_in_date=listing.move_in_date,
+        has_flexible_move_in=listing.has_flexible_move_in,
         is_sublet=listing.is_sublet,
         sublet_start_date=listing.sublet_start_date,
         sublet_end_date=listing.sublet_end_date,
@@ -598,6 +599,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         terms=ListingTerms(
             lease_type=lease_type,
             move_in_date=listing.move_in_date,
+            has_flexible_move_in=listing.has_flexible_move_in,
             gender_preference=gender_preference,
         ),
         landlord_id=landlord.id,
@@ -619,6 +621,7 @@ def build_listing_response(listing: Listing) -> ListingResponse:
         rooms=[ListingRoomResponse.model_validate(r) for r in listing.rooms],
         lease_type=listing.lease_type if isinstance(listing.lease_type, str) else listing.lease_type.value,
         move_in_date=listing.move_in_date,
+        has_flexible_move_in=listing.has_flexible_move_in,
         is_sublet=listing.is_sublet,
         sublet_start_date=listing.sublet_start_date,
         sublet_end_date=listing.sublet_end_date,
@@ -692,7 +695,7 @@ def compute_lease_clarity(listing: Listing, prop: Property) -> float:
     total_checks = 8
 
     # listing fields
-    if listing.move_in_date:
+    if listing.move_in_date or listing.has_flexible_move_in:
         score += 1
     if listing.lease_type:
         score += 1
@@ -1144,7 +1147,7 @@ def build_listing_prompt_data(listing: Listing, prop: Property, landlord: Landlo
         f"  Rent: ${listing.rent_per_room}/room, ${listing.rent_total}/total",
         f"  Rooms: {prop.total_rooms} bed, {prop.bathrooms} bath",
         f"  Lease: {lease}",
-        f"  Move-in: {listing.move_in_date}",
+        f"  Move-in: {'Any move-in date' if listing.has_flexible_move_in else listing.move_in_date}",
         f"  Amenities: {', '.join(amenities) if amenities else 'None listed'}",
         f"  Distance to campus: {prop.distance_to_campus_km}km" if prop.distance_to_campus_km else "",
         f"  Walk time: {prop.walk_time_minutes} min" if prop.walk_time_minutes else "",

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from typing import Optional
 from tables import get_db, User, MarketplaceItem, MarketplaceImage, MarketplaceConversation, MarketplaceMessage
 from Schemas.marketplaceSchema import *
@@ -248,6 +248,10 @@ def start_marketplace_conversation(payload: StartMarketplaceConversation, backgr
 
     existing = db.query(MarketplaceConversation).filter(MarketplaceConversation.item_id == payload.item_id, MarketplaceConversation.buyer_id == current_user.id).first()
     if existing:
+        existing.buyer_archived_at = None
+        existing.seller_archived_at = None
+        existing.updated_at = func.now()
+        db.commit()
         raise HTTPException(
             status_code=409,
             detail="Conversation already exists",
@@ -267,6 +271,9 @@ def start_marketplace_conversation(payload: StartMarketplaceConversation, backgr
         sender_id=current_user.id,
         content=payload.content,
     )
+    conversation.buyer_archived_at = None
+    conversation.seller_archived_at = None
+    conversation.updated_at = func.now()
     db.add(message)
     db.commit()
     db.refresh(message)
@@ -342,8 +349,16 @@ def send_marketplace_message(conversation_id: int, payload: MarketplaceMessageCr
 @marketplace_router.get("/conversations", response_model=list[MarketplaceConversationResponse])
 def get_my_marketplace_conversations(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     conversations = db.query(MarketplaceConversation).filter(
-        (MarketplaceConversation.buyer_id == current_user.id) |
-        (MarketplaceConversation.seller_id == current_user.id)
+        or_(
+            and_(
+                MarketplaceConversation.buyer_id == current_user.id,
+                MarketplaceConversation.buyer_archived_at.is_(None),
+            ),
+            and_(
+                MarketplaceConversation.seller_id == current_user.id,
+                MarketplaceConversation.seller_archived_at.is_(None),
+            ),
+        )
     ).order_by(MarketplaceConversation.updated_at.desc()).all()
 
     result = []
@@ -423,16 +438,26 @@ def delete_marketplace_conversation(conversation_id: int, db: Session = Depends(
     if conversation.buyer_id != current_user.id and conversation.seller_id != current_user.id:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    db.query(MarketplaceMessage).filter(MarketplaceMessage.conversation_id == conversation.id).delete()
-    db.delete(conversation)
+    if conversation.buyer_id == current_user.id:
+        conversation.buyer_archived_at = func.now()
+    else:
+        conversation.seller_archived_at = func.now()
     db.commit()
 
 # Get Unread Count
 @marketplace_router.get("/unread-count")
 def get_marketplace_unread_count(db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     conversation_ids = db.query(MarketplaceConversation.id).filter(
-        (MarketplaceConversation.buyer_id == current_user.id) |
-        (MarketplaceConversation.seller_id == current_user.id)
+        or_(
+            and_(
+                MarketplaceConversation.buyer_id == current_user.id,
+                MarketplaceConversation.buyer_archived_at.is_(None),
+            ),
+            and_(
+                MarketplaceConversation.seller_id == current_user.id,
+                MarketplaceConversation.seller_archived_at.is_(None),
+            ),
+        )
     ).all()
     ids = [c.id for c in conversation_ids]
 

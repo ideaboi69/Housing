@@ -34,6 +34,10 @@ def start_conversation(payload: StartConversation, background_tasks: BackgroundT
     ).first()
 
     if existing:
+        existing.student_archived_at = None
+        existing.landlord_archived_at = None
+        existing.updated_at = func.now()
+        db.commit()
         raise HTTPException(
             status_code=409,
             detail="Conversation already exists",
@@ -102,6 +106,9 @@ def send_message( conversation_id: int, payload: MessageCreate, background_tasks
         sender_id=current_user.id,
         content=payload.content,
     )
+    conversation.student_archived_at = None
+    conversation.landlord_archived_at = None
+    conversation.updated_at = func.now()
     db.add(message)
     db.commit()
     db.refresh(message)
@@ -163,6 +170,9 @@ def landlord_reply(conversation_id: int, payload: MessageCreate, background_task
         sender_id=landlord.id,
         content=payload.content,
     )
+    conversation.student_archived_at = None
+    conversation.landlord_archived_at = None
+    conversation.updated_at = func.now()
     db.add(message)
     db.commit()
     db.refresh(message)
@@ -196,7 +206,10 @@ def landlord_reply(conversation_id: int, payload: MessageCreate, background_task
 @message_router.get("/conversations", response_model=list[ConversationResponse])
 def get_conversations( db: Session = Depends(get_db), current_user=Depends(get_current_student)):
     
-    conversations = db.query(Conversation).filter(Conversation.user_id == current_user.id).order_by(Conversation.updated_at.desc()).all()
+    conversations = db.query(Conversation).filter(
+        Conversation.user_id == current_user.id,
+        Conversation.student_archived_at.is_(None),
+    ).order_by(Conversation.updated_at.desc()).all()
 
     result = []
     for conv in conversations:
@@ -234,7 +247,10 @@ def get_conversations( db: Session = Depends(get_db), current_user=Depends(get_c
 @message_router.get("/landlord/conversations", response_model=list[ConversationResponse])
 def get_landlord_conversations( db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
 
-    conversations = db.query(Conversation).filter(Conversation.landlord_id == landlord.id).order_by(Conversation.updated_at.desc()).all()
+    conversations = db.query(Conversation).filter(
+        Conversation.landlord_id == landlord.id,
+        Conversation.landlord_archived_at.is_(None),
+    ).order_by(Conversation.updated_at.desc()).all()
 
     result = []
     for conv in conversations:
@@ -312,7 +328,10 @@ def get_specific_conversation( conversation_id: int, db: Session = Depends(get_d
 @message_router.get("/unread-count")
 def get_user_unread_count(db: Session = Depends(get_db),current_user: User = Depends(get_current_student)):
   
-    conversations = db.query(Conversation.id).filter(Conversation.user_id == current_user.id).all()
+    conversations = db.query(Conversation.id).filter(
+        Conversation.user_id == current_user.id,
+        Conversation.student_archived_at.is_(None),
+    ).all()
     conversation_ids = [c.id for c in conversations]
 
     if not conversation_ids:
@@ -331,7 +350,10 @@ def get_user_unread_count(db: Session = Depends(get_db),current_user: User = Dep
 @message_router.get("/landlord/unread-count")
 def get_landlord_unread_count(db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
     
-    conversations = db.query(Conversation.id).filter(Conversation.landlord_id == landlord.id).all()
+    conversations = db.query(Conversation.id).filter(
+        Conversation.landlord_id == landlord.id,
+        Conversation.landlord_archived_at.is_(None),
+    ).all()
     conversation_ids = [c.id for c in conversations]
 
     if not conversation_ids:
@@ -371,7 +393,7 @@ def delete_message(conversation_id: int, message_id: int, db: Session = Depends(
     db.delete(message)
     db.commit()
 
-# User deletes a conversation
+# User removes a conversation from their inbox
 @message_router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.user_id == current_user.id).first()
@@ -379,11 +401,10 @@ def delete_conversation(conversation_id: int, db: Session = Depends(get_db), cur
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    db.query(Message).filter(Message.conversation_id == conversation.id).delete()
-    db.delete(conversation)
+    conversation.student_archived_at = func.now()
     db.commit()
 
-# Landlord deletes a conversation
+# Landlord removes a conversation from their inbox
 @message_router.delete("/landlord/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def landlord_delete_conversation(conversation_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.landlord_id == landlord.id).first()
@@ -391,6 +412,5 @@ def landlord_delete_conversation(conversation_id: int, db: Session = Depends(get
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    db.query(Message).filter(Message.conversation_id == conversation.id).delete()
-    db.delete(conversation)
+    conversation.landlord_archived_at = func.now()
     db.commit()

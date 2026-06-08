@@ -413,6 +413,12 @@ export const listings = {
       body: JSON.stringify(data),
     }),
 
+  publish: (id: number) =>
+    request<ListingResponse>(`/api/listings/${id}/publish`, { method: "PATCH" }),
+
+  unpublish: (id: number) =>
+    request<ListingResponse>(`/api/listings/${id}/unpublish`, { method: "PATCH" }),
+
   delete: (id: number) =>
     request<null>(`/api/listings/${id}`, { method: "DELETE" }),
 
@@ -891,11 +897,11 @@ export const messages = {
       method: "DELETE",
     }),
 
-  // Delete conversation (student)
+  // Remove conversation from inbox (student)
   deleteConversation: (id: number) =>
     request<null>(`/api/messages/conversations/${id}`, { method: "DELETE" }),
 
-  // Delete conversation (landlord)
+  // Remove conversation from inbox (landlord)
   landlordDeleteConversation: (id: number) =>
     request<null>(`/api/messages/landlord/conversations/${id}`, { method: "DELETE" }),
 };

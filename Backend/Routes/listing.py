@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation, ListingRoom
 from Schemas.listingSchema import *
@@ -25,6 +26,8 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
         raise HTTPException(status_code=404, detail="Property not found")
     if prop.landlord_id != landlord.id:
         raise HTTPException(status_code=403, detail="You do not own this property")
+    if not payload.has_flexible_move_in and payload.move_in_date is None:
+        raise HTTPException(status_code=400, detail="move_in_date is required unless has_flexible_move_in is true")
 
     # Resolve rooms based on pricing mode
     if payload.per_room_pricing:
@@ -56,7 +59,8 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
         rent_total=rent_total,
         per_room_pricing=payload.per_room_pricing,
         lease_type=payload.lease_type,
-        move_in_date=payload.move_in_date,
+        move_in_date=None if payload.has_flexible_move_in else payload.move_in_date,
+        has_flexible_move_in=payload.has_flexible_move_in,
         is_sublet=payload.is_sublet,
         sublet_start_date=payload.sublet_start_date,
         sublet_end_date=payload.sublet_end_date,
@@ -194,9 +198,9 @@ def list_listings(
     if gender_preference:
         query = query.filter(Listing.gender_preference == gender_preference)
     if move_in_before:
-        query = query.filter(Listing.move_in_date <= move_in_before)
+        query = query.filter(or_(Listing.has_flexible_move_in == True, Listing.move_in_date <= move_in_before))
     if move_in_after:
-        query = query.filter(Listing.move_in_date >= move_in_after)
+        query = query.filter(or_(Listing.has_flexible_move_in == True, Listing.move_in_date >= move_in_after))
 
     # property filters
     if property_type:
@@ -319,6 +323,13 @@ def update_listing(
     listing = get_listing_owned_by(listing_id, landlord.id, db)
 
     update_data = payload.model_dump(exclude_unset=True)
+    if update_data.get("has_flexible_move_in") is True:
+        update_data["move_in_date"] = None
+    elif update_data.get("move_in_date") is not None:
+        update_data["has_flexible_move_in"] = False
+    elif update_data.get("has_flexible_move_in") is False and listing.move_in_date is None:
+        raise HTTPException(status_code=400, detail="move_in_date is required when has_flexible_move_in is false")
+
     for field, value in update_data.items():
         setattr(listing, field, value)
 

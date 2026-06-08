@@ -37,7 +37,8 @@ class ListingCreate(BaseModel):
     per_room_pricing: bool = False
     rooms: Optional[list[ListingRoomCreate]] = None
     lease_type: LeaseType
-    move_in_date: date
+    move_in_date: Optional[date] = None
+    has_flexible_move_in: bool = False
     is_sublet: bool = False
     sublet_start_date: Optional[date] = None
     sublet_end_date: Optional[date] = None
@@ -54,6 +55,7 @@ class ListingUpdate(BaseModel):
     rent_total: Optional[Decimal] = None
     lease_type: Optional[str] = None
     move_in_date: Optional[date] = None
+    has_flexible_move_in: Optional[bool] = None
     is_sublet: Optional[bool] = None
     sublet_start_date: Optional[date] = None
     sublet_end_date: Optional[date] = None
@@ -97,7 +99,8 @@ class ListingResponse(BaseModel):
     per_room_pricing: bool
     rooms: list[ListingRoomResponse] = []
     lease_type: str
-    move_in_date: date
+    move_in_date: Optional[date] = None
+    has_flexible_move_in: bool = False
     is_sublet: bool
     sublet_start_date: Optional[date] = None
     sublet_end_date: Optional[date] = None
@@ -121,7 +124,8 @@ class ListingDetailResponse(BaseModel):
     per_room_pricing: bool
     rooms: list[ListingRoomResponse] = []
     lease_type: str
-    move_in_date: date
+    move_in_date: Optional[date] = None
+    has_flexible_move_in: bool = False
     is_sublet: bool
     sublet_start_date: Optional[date] = None
     sublet_end_date: Optional[date] = None

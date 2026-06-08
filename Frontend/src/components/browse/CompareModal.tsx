@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { formatPrice, getScoreColor } from "@/lib/utils";
+import { formatDate, formatPrice, getScoreColor } from "@/lib/utils";
 import type { ListingDetailResponse } from "@/types";
 
 /* ── Types ────────────────────────────────── */
@@ -163,7 +163,7 @@ export function CompareModal({ isOpen, onClose, listings, healthScores }: Compar
       { label: "Type", values: vals((l) => l.property_type), type: "text" },
       { label: "Rooms", values: vals((l) => `${l.total_rooms} bed · ${l.bathrooms} bath`), type: "text" },
       { label: "Lease", values: vals((l) => l.lease_type === "8_month" ? "8-month" : l.lease_type === "12_month" ? "12-month" : "Flexible"), type: "text" },
-      { label: "Move-in", values: vals((l) => new Date(l.move_in_date).toLocaleDateString("en-CA", { month: "short", year: "numeric" })), type: "text" },
+      { label: "Move-in", values: vals((l) => l.has_flexible_move_in ? "Any move-in date" : formatDate(l.move_in_date)), type: "text" },
       { label: "Furnished", icon: <Shirt className="w-3.5 h-3.5" />, values: vals((l) => l.is_furnished), type: "boolean" },
       { label: "Parking", icon: <Car className="w-3.5 h-3.5" />, values: vals((l) => l.has_parking), type: "boolean" },
       { label: "Laundry", icon: <Droplets className="w-3.5 h-3.5" />, values: vals((l) => l.has_laundry), type: "boolean" },

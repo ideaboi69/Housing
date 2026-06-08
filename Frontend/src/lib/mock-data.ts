@@ -114,3 +114,180 @@ export const mockCoordinates: Record<number, { lat: number; lng: number }> = {
   7: { lat: 43.5230, lng: -80.2520 },
   8: { lat: 43.5190, lng: -80.2280 },
 };
+
+export type LandlordAnalyticsPeriod = "7d" | "30d" | "90d" | "all";
+
+export interface LandlordDailyMetric {
+  date: string;
+  views: number;
+  saves: number;
+  inquiries: number;
+  responseRate: number;
+  responseMinutes: number;
+}
+
+export interface LandlordListingPerformance {
+  listingId: number;
+  propertyId: number;
+  title: string;
+  room: string;
+  status: "active" | "draft" | "archived";
+  listedAt: string;
+  moveInDate: string;
+  lastActivityAt: string;
+  views: number;
+  saves: number;
+  inquiries: number;
+}
+
+export interface LandlordListingDailyMetric {
+  listingId: number;
+  date: string;
+  views: number;
+  saves: number;
+  inquiries: number;
+}
+
+export interface LandlordScoreBreakdown {
+  price: number;
+  location: number;
+  amenities: number;
+  reviews: number;
+}
+
+const ANALYTICS_TODAY = new Date("2026-06-07T12:00:00-04:00");
+const isoDate = (date: Date) => date.toISOString().slice(0, 10);
+
+export const mockLandlordAnalyticsUpdatedAt = "2026-06-07T11:58:00-04:00";
+
+export const mockLandlordDailyMetrics: LandlordDailyMetric[] = Array.from({ length: 120 }, (_, index) => {
+  const daysAgo = 119 - index;
+  const date = new Date(ANALYTICS_TODAY);
+  date.setDate(ANALYTICS_TODAY.getDate() - daysAgo);
+
+  const weeklyPulse = Math.sin(index / 4.2) * 8;
+  const leasingSeasonLift = index > 72 ? (index - 72) * 0.42 : 0;
+  const weekendDip = [0, 6].includes(date.getDay()) ? -5 : 0;
+  const campaignSpike = [86, 87, 103, 104, 105].includes(index) ? 18 : 0;
+  const views = Math.max(18, Math.round(42 + weeklyPulse + leasingSeasonLift + weekendDip + campaignSpike + (index % 5)));
+  const saves = Math.max(2, Math.round(views * (0.13 + ((index % 7) * 0.006))));
+  const inquiries = Math.max(1, Math.round(views * (0.05 + ((index % 6) * 0.004))));
+  const responseRate = Math.min(98, Math.round(82 + (index / 120) * 10 + Math.sin(index / 9) * 3));
+  const responseMinutes = Math.max(18, Math.round(64 - (index / 120) * 22 + Math.cos(index / 8) * 5));
+
+  return { date: isoDate(date), views, saves, inquiries, responseRate, responseMinutes };
+});
+
+export const mockLandlordListingPerformance: LandlordListingPerformance[] = [
+  {
+    listingId: 1,
+    propertyId: 1,
+    title: "Cozy Townhouse on College Ave",
+    room: "Room 1",
+    status: "active",
+    listedAt: "2026-04-18T10:30:00-04:00",
+    moveInDate: "2026-09-01",
+    lastActivityAt: "2026-06-07T10:44:00-04:00",
+    views: 186,
+    saves: 31,
+    inquiries: 14,
+  },
+  {
+    listingId: 3,
+    propertyId: 3,
+    title: "Bright Studio on Gordon St",
+    room: "Studio",
+    status: "active",
+    listedAt: "2026-05-06T09:00:00-04:00",
+    moveInDate: "2027-01-01",
+    lastActivityAt: "2026-06-06T17:10:00-04:00",
+    views: 118,
+    saves: 19,
+    inquiries: 8,
+  },
+  {
+    listingId: 7,
+    propertyId: 7,
+    title: "Charming Duplex with Yard",
+    room: "Room 2",
+    status: "active",
+    listedAt: "2026-05-22T08:00:00-04:00",
+    moveInDate: "2026-07-01",
+    lastActivityAt: "2026-06-07T08:16:00-04:00",
+    views: 94,
+    saves: 11,
+    inquiries: 6,
+  },
+  {
+    listingId: 901,
+    propertyId: 1,
+    title: "Cozy Townhouse on College Ave",
+    room: "Room 3",
+    status: "draft",
+    listedAt: "2026-06-02T12:20:00-04:00",
+    moveInDate: "2026-09-01",
+    lastActivityAt: "2026-06-07T09:02:00-04:00",
+    views: 0,
+    saves: 0,
+    inquiries: 0,
+  },
+  {
+    listingId: 902,
+    propertyId: 3,
+    title: "Bright Studio on Gordon St",
+    room: "Parking spot",
+    status: "archived",
+    listedAt: "2026-03-12T09:00:00-04:00",
+    moveInDate: "2026-05-01",
+    lastActivityAt: "2026-05-25T14:12:00-04:00",
+    views: 61,
+    saves: 4,
+    inquiries: 2,
+  },
+];
+
+export const mockLandlordListingDailyMetrics: LandlordListingDailyMetric[] = mockLandlordListingPerformance.flatMap((listing, listingIndex) => (
+  Array.from({ length: 60 }, (_, index) => {
+    const date = new Date(ANALYTICS_TODAY);
+    date.setDate(ANALYTICS_TODAY.getDate() - (59 - index));
+
+    if (listing.status === "draft") {
+      return { listingId: listing.listingId, date: isoDate(date), views: 0, saves: 0, inquiries: 0 };
+    }
+
+    const listedDate = new Date(listing.listedAt);
+    if (date < listedDate || listing.status === "archived") {
+      const archivedLift = listing.status === "archived" && date < new Date("2026-05-24T00:00:00-04:00") ? 1 : 0;
+      return {
+        listingId: listing.listingId,
+        date: isoDate(date),
+        views: archivedLift ? Math.max(0, Math.round(1 + Math.sin(index / 3))) : 0,
+        saves: 0,
+        inquiries: 0,
+      };
+    }
+
+    const age = Math.max(1, index - listingIndex * 3);
+    const demand = listing.listingId === 1 ? 6.1 : listing.listingId === 3 ? 3.9 : listing.listingId === 7 ? 3.1 : 1.3;
+    const weeklyPulse = Math.sin((index + listingIndex) / 4) * 1.6;
+    const launchLift = age < 10 ? 2.4 : 0;
+    const views = Math.max(0, Math.round(demand + weeklyPulse + launchLift + ((index + listingIndex) % 3)));
+    const saves = Math.max(0, Math.round(views * (listing.listingId === 1 ? 0.18 : 0.13)));
+    const inquiryCadence = listing.listingId === 1 ? 2 : listing.listingId === 3 ? 4 : listing.listingId === 7 ? 5 : 8;
+    const inquiries = views > 0 && (index + listingIndex) % inquiryCadence === 0 ? 1 : 0;
+
+    return { listingId: listing.listingId, date: isoDate(date), views, saves, inquiries };
+  })
+));
+
+export const mockLandlordScoreBreakdown: LandlordScoreBreakdown = {
+  price: 86,
+  location: 94,
+  amenities: 81,
+  reviews: 90,
+};
+
+export const mockLandlordAttention = {
+  viewingsThisWeek: 2,
+  approachingMoveIns: 1,
+};

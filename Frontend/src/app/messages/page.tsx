@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   ArrowRight,
+  Archive,
   Bookmark,
   Calendar,
   Check,
@@ -16,7 +17,6 @@ import {
   Send,
   ShoppingBag,
   Sparkles,
-  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
@@ -225,13 +225,13 @@ function ConversationItem({
   convo,
   isActive,
   onClick,
-  onDelete,
+  onArchive,
   currentUserId,
 }: {
   convo: UnifiedConversation;
   isActive: boolean;
   onClick: () => void;
-  onDelete: () => void;
+  onArchive: () => void;
   currentUserId: number;
 }) {
   const meta = TYPE_META[convo.type];
@@ -292,13 +292,13 @@ function ConversationItem({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onDelete();
+          onArchive();
         }}
-        className="flex w-11 shrink-0 items-center justify-center text-[#98A3B0] opacity-100 transition-all hover:bg-[#E71D36]/[0.05] hover:text-[#E71D36] md:opacity-0 md:group-hover:opacity-100"
-        aria-label={`Delete conversation with ${convo.otherName}`}
-        title="Delete conversation"
+        className="flex w-11 shrink-0 items-center justify-center text-[#98A3B0] opacity-100 transition-all hover:bg-[#1B2D45]/[0.05] hover:text-[#1B2D45] md:opacity-0 md:group-hover:opacity-100"
+        aria-label={`Remove conversation with ${convo.otherName} from inbox`}
+        title="Remove from inbox"
       >
-        <Trash2 className="h-4 w-4" />
+        <Archive className="h-4 w-4" />
       </button>
     </div>
   );
@@ -597,8 +597,10 @@ export default function MessagesPage() {
     void fetchConversations();
   };
 
-  const handleDeleteConversation = async (conversation: UnifiedConversation) => {
-    const confirmed = window.confirm(`Delete this ${TYPE_META[conversation.type].label.toLowerCase()} conversation with ${conversation.otherName}?`);
+  const handleArchiveConversation = async (conversation: UnifiedConversation) => {
+    const confirmed = window.confirm(
+      `Remove this ${TYPE_META[conversation.type].label.toLowerCase()} conversation with ${conversation.otherName} from your inbox? The message history will be preserved.`
+    );
     if (!confirmed) return;
 
     try {
@@ -613,8 +615,8 @@ export default function MessagesPage() {
       setConversations((prev) => prev.filter((item) => item.key !== conversation.key));
       setActiveKey((current) => current === conversation.key ? null : current);
     } catch (error) {
-      console.error("Failed to delete conversation:", error);
-      window.alert("Could not delete this conversation. Please try again.");
+      console.error("Failed to remove conversation from inbox:", error);
+      window.alert("Could not remove this conversation from your inbox. Please try again.");
     }
   };
 
@@ -682,7 +684,7 @@ export default function MessagesPage() {
           ))}
         </div>
 
-        <div className="flex h-[calc(100vh-260px)] min-h-[620px]">
+        <div className="flex h-[calc(100dvh-120px)] min-h-[520px] md:h-[calc(100vh-260px)] md:min-h-[620px]">
           <div className="flex w-full overflow-hidden rounded-[28px] border border-black/[0.04] bg-white shadow-[0_6px_28px_rgba(27,45,69,0.06)]">
             {showSidebar && (
               <div className={`${isMobile ? "w-full" : "w-[360px]"} flex shrink-0 flex-col border-r border-black/[0.04] bg-white`}>
@@ -783,7 +785,7 @@ export default function MessagesPage() {
                           convo={convo}
                           isActive={activeKey === convo.key}
                           onClick={() => setActiveKey(convo.key)}
-                          onDelete={() => void handleDeleteConversation(convo)}
+                          onArchive={() => void handleArchiveConversation(convo)}
                           currentUserId={user.id}
                         />
                       ))}

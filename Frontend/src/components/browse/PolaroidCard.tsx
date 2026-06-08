@@ -80,9 +80,11 @@ export function PolaroidCard({
 
   /* ── Format move-in date for display ────────────── */
   const moveInDate = listing.move_in_date ? new Date(listing.move_in_date) : null;
-  const moveInLabel = moveInDate && !isNaN(moveInDate.getTime())
-    ? moveInDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    : null;
+  const moveInLabel = listing.has_flexible_move_in
+    ? "Any move-in"
+    : moveInDate && !isNaN(moveInDate.getTime())
+      ? moveInDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+      : null;
 
   /* ── Lease type short label ─────────────────────── */
   const leaseLabel = listing.lease_type ? formatLeaseType(listing.lease_type) : null;
@@ -317,7 +319,7 @@ export function PolaroidCard({
                   </div>
                 )}
 
-                {(viewCount > 0 || saveCount > 0) && (
+                {!isMobile && (viewCount > 0 || saveCount > 0) && (
                   <div className="flex items-center gap-3 mt-3 text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 500 }}>
                     {viewCount > 0 && (
                       <span className="flex items-center gap-0.5">
@@ -456,7 +458,7 @@ export function PolaroidCard({
                   ))}
                 </div>
 
-                {(viewCount > 0 || saveCount > 0) && (
+                {!isMobile && (viewCount > 0 || saveCount > 0) && (
                   <div className="flex items-center gap-2.5 mt-2 text-[#1B2D45]/25" style={{ fontSize: "10px", fontWeight: 500 }}>
                     {viewCount > 0 && (
                       <span className="flex items-center gap-0.5">

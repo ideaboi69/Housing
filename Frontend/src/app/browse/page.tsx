@@ -8,6 +8,7 @@ import {
   useSpring,
   useInView,
 } from "framer-motion";
+import { CalendarDays, Grid2X2, LayoutList, Map as MapIcon, Pin, Sparkles, TrendingUp } from "lucide-react";
 import { useIsMobile } from "@/hooks";
 import { useRouter } from "next/navigation";
 import { PolaroidCard } from "@/components/browse/PolaroidCard";
@@ -217,9 +218,14 @@ export default function BrowsePage() {
   const avgRent = filteredListings.length > 0
     ? Math.round(filteredListings.reduce((acc, l) => acc + Number(l.rent_per_room), 0) / filteredListings.length)
     : 0;
+  const browseModeOptions: { mode: ViewMode; label: string; icon: typeof LayoutList }[] = [
+    { mode: "board", label: "Board", icon: LayoutList },
+    { mode: "grid", label: "Grid", icon: Grid2X2 },
+    { mode: "map", label: "Map", icon: MapIcon },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#FAF8F4]">
+    <div className="min-h-screen bg-[#FAF8F4] pb-[calc(env(safe-area-inset-bottom,0px)+24px)] md:pb-0">
       {/* Hero + View toggle */}
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 pt-5 md:pt-8 pb-1 md:pb-2">
         <motion.div
@@ -233,7 +239,7 @@ export default function BrowsePage() {
               className="text-[#1B2D45]"
               style={{ fontSize: isMobile ? "24px" : "32px", fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1.2 }}
             >
-              Find your Guelph cribb 🏠
+              Find your Guelph cribb
             </h1>
             <p className="mt-1 md:mt-1.5 text-[#1B2D45]/45" style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 400 }}>
               <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{filteredListings.length} listings</span>{" "}
@@ -243,15 +249,16 @@ export default function BrowsePage() {
           </div>
 
           {/* View toggle with indicator */}
-          <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0 w-full sm:w-auto" data-tour="view-switcher">
-            {(["board", "grid", "map"] as const).map((mode) => (
+          <div className="grid w-full grid-cols-3 items-center rounded-lg border border-black/[0.06] bg-white p-0.5 sm:flex sm:w-auto" data-tour="view-switcher">
+            {browseModeOptions.map(({ mode, label, icon: Icon }) => (
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md transition-all duration-200 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
+                className={`flex min-w-0 items-center justify-center gap-1.5 rounded-md px-2 py-2 transition-all duration-200 sm:flex-none sm:px-3 sm:py-1.5 ${viewMode === mode ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/45 hover:text-[#1B2D45]/65"}`}
                 style={{ fontSize: "12px", fontWeight: 600, minWidth: 0 }}
               >
-                {mode === "board" ? "📌 Board" : mode === "grid" ? "▦ Grid" : "🗺 Map"}
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{label}</span>
               </button>
             ))}
           </div>
@@ -265,18 +272,21 @@ export default function BrowsePage() {
           transition={{ delay: 0.15, duration: 0.4 }}
         >
           {[
-            { icon: "📈", label: "Avg rent", ticker: <Ticker value={avgRent} prefix="$" suffix="/rm" />, bg: "rgba(46,196,182,0.08)" },
-            { icon: "✨", label: "New this week", ticker: <Ticker value={12} />, bg: "rgba(255,107,53,0.08)" },
-            { icon: "📅", label: "8-mo leases", ticker: <Ticker value={filteredListings.filter(l => l.lease_type === "8_month").length} />, bg: "rgba(255,182,39,0.08)" },
-          ].map((s) => (
+            { icon: TrendingUp, label: "Avg rent", ticker: <Ticker value={avgRent} prefix="$" suffix="/rm" />, bg: "rgba(46,196,182,0.08)", color: "#2EC4B6" },
+            { icon: Sparkles, label: "New this week", ticker: <Ticker value={12} />, bg: "rgba(255,107,53,0.08)", color: "#FF6B35" },
+            { icon: CalendarDays, label: "8-mo leases", ticker: <Ticker value={filteredListings.filter(l => l.lease_type === "8_month").length} />, bg: "rgba(255,182,39,0.08)", color: "#FFB627" },
+          ].map((s) => {
+            const Icon = s.icon;
+            return (
             <div key={s.label} className="flex items-center gap-2 md:gap-2.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl border border-black/5 shrink-0" style={{ backgroundColor: s.bg }}>
-              <span style={{ fontSize: isMobile ? "14px" : "16px" }}>{s.icon}</span>
+              <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: s.color }} />
               <div>
                 <div className="text-[#1B2D45]/40" style={{ fontSize: isMobile ? "9px" : "10px", fontWeight: 500, lineHeight: 1.2 }}>{s.label}</div>
                 <div className="text-[#1B2D45]" style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 800, lineHeight: 1.2 }}>{s.ticker}</div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </motion.div>
       </div>
 
@@ -403,7 +413,7 @@ export default function BrowsePage() {
       <AnimatePresence>
         {isMobile && pinnedIds.length > 0 && !showPicksSheet && (
           <motion.div
-            className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+16px)] right-4 z-30"
+            className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+14px)] left-1/2 z-30 -translate-x-1/2"
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
@@ -411,10 +421,11 @@ export default function BrowsePage() {
           >
             <button
               onClick={() => setShowPicksSheet(true)}
-              className="flex items-center gap-1.5 bg-[#FF6B35] text-white px-4 py-2 rounded-full shadow-[0_2px_12px_rgba(255,107,53,0.4)] active:scale-95 transition-transform"
-              style={{ fontSize: "13px", fontWeight: 700 }}
+              className="flex min-h-11 items-center gap-2 rounded-full border border-white/70 bg-[#1B2D45] px-4 py-2 text-white shadow-[0_8px_24px_rgba(27,45,69,0.22)] active:scale-95 transition-transform"
+              style={{ fontSize: "13px", fontWeight: 750 }}
             >
-              📌 {pinnedIds.length} pick{pinnedIds.length !== 1 ? "s" : ""}
+              <Pin className="h-3.5 w-3.5" />
+              {pinnedIds.length} pick{pinnedIds.length !== 1 ? "s" : ""}
             </button>
           </motion.div>
         )}

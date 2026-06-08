@@ -6,12 +6,106 @@ import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import type { PropertyResponse, ListingDetailResponse, HealthScoreResponse } from "@/types";
-import { formatPrice, formatLeaseType, formatDate, getScoreColor } from "@/lib/utils";
+import { formatPrice, formatDate, formatPropertyType } from "@/lib/utils";
+import { getListingImages, getMockHealthScore, mockListings } from "@/lib/mock-data";
 import {
-  ArrowLeft, Plus, Eye, Trash2, Edit3, Home, Calendar, DollarSign,
-  MapPin, Loader2, AlertTriangle, Check, X, Image as ImageIcon,
+  ArrowLeft, Plus, Eye, Trash2, Edit3, Home, Calendar,
+  MapPin, Loader2, AlertTriangle,
+  Building2, Camera, ChevronDown, Clock, DoorOpen,
 } from "lucide-react";
 import { EditPropertyModal } from "@/components/landlord/EditPropertyModal";
+import { EditListingModal } from "@/components/landlord/EditListingModal";
+import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
+
+type ListingStatusFilter = "all" | "active" | "draft" | "archived";
+
+function getListingStatusBucket(status: string): Exclude<ListingStatusFilter, "all"> {
+  const normalized = status.toLowerCase();
+  if (normalized === "active") return "active";
+  if (normalized === "draft" || normalized === "pending") return "draft";
+  return "archived";
+}
+
+function getListingStatusLabel(status: string) {
+  const normalized = status.toLowerCase();
+  if (normalized === "active") return "Active";
+  if (normalized === "pending") return "Draft";
+  if (normalized === "draft") return "Draft";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function getMoveInLabel(listing: ListingDetailResponse) {
+  return listing.has_flexible_move_in ? "Any move-in date" : `Move-in ${formatDate(listing.move_in_date)}`;
+}
+
+function getListingRowLabel(listing: ListingDetailResponse, index: number) {
+  const firstRoom = listing.rooms?.[0];
+  if (firstRoom?.label) return firstRoom.label;
+  if (listing.rooms?.length === 1) return "Room 1";
+  if (listing.rooms?.length > 1) return `${listing.rooms.length} rooms`;
+  return `Listing ${index + 1}`;
+}
+
+function getListingTypeLabel(listing: ListingDetailResponse) {
+  if (listing.rooms?.length === 1) return "Private Room";
+  if (listing.rooms?.length > 1) return `${listing.rooms.length} Rooms`;
+  return listing.is_sublet ? "Sublet" : "Unit";
+}
+
+function buildMockProperty(propertyId: number): PropertyResponse | null {
+  const listing = mockListings.find((item) => item.property_id === propertyId);
+  if (!listing) return null;
+
+  return {
+    id: listing.property_id,
+    landlord_id: listing.landlord_id,
+    title: listing.title,
+    address: listing.address,
+    postal_code: "",
+    latitude: listing.latitude ?? null,
+    longitude: listing.longitude ?? null,
+    property_type: listing.property_type as PropertyResponse["property_type"],
+    total_rooms: listing.total_rooms,
+    bathrooms: listing.bathrooms,
+    is_furnished: listing.is_furnished,
+    has_parking: listing.has_parking,
+    has_laundry: listing.has_laundry,
+    utilities_included: listing.utilities_included,
+    has_wifi: Boolean(listing.has_wifi),
+    has_air_conditioning: Boolean(listing.has_air_conditioning),
+    has_dishwasher: Boolean(listing.has_dishwasher),
+    has_gym: Boolean(listing.has_gym),
+    has_elevator: Boolean(listing.has_elevator),
+    has_backyard: Boolean(listing.has_backyard),
+    has_balcony: Boolean(listing.has_balcony),
+    wheelchair_accessible: Boolean(listing.wheelchair_accessible),
+    pet_policy: (listing.pet_policy ?? (listing.pet_friendly ? "friendly" : "not_allowed")) as PropertyResponse["pet_policy"],
+    smoking_policy: (listing.smoking_policy ?? (listing.smoking_allowed ? "allowed" : "not_allowed")) as PropertyResponse["smoking_policy"],
+    estimated_utility_cost: listing.estimated_utility_cost ?? 0,
+    distance_to_campus_km: listing.distance_to_campus_km ?? 0,
+    walk_time_minutes: listing.walk_time_minutes ?? 0,
+    drive_time_minutes: listing.drive_time_minutes ?? 0,
+    bus_time_minutes: listing.bus_time_minutes ?? 0,
+    nearest_bus_route: listing.nearest_bus_route ?? "",
+    amenities: listing.amenities,
+    policies: listing.policies,
+    created_at: listing.created_at,
+    updated_at: listing.updated_at,
+  };
+}
+
+function getMockPropertyListings(propertyId: number): ListingDetailResponse[] {
+  return mockListings
+    .filter((listing) => listing.property_id === propertyId)
+    .map((listing) => ({
+      ...listing,
+      images: listing.images ?? getListingImages(listing.id).map((imageUrl, index) => ({
+        id: listing.id * 100 + index,
+        image_url: imageUrl,
+        display_order: index,
+      })),
+    }));
+}
 
 export default function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -26,15 +120,40 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const [deletingProperty, setDeletingProperty] = useState(false);
   const [confirmDeleteProperty, setConfirmDeleteProperty] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<ListingStatusFilter>("all");
+  const [editingListing, setEditingListing] = useState<ListingDetailResponse | null>(null);
+  const [photosListing, setPhotosListing] = useState<ListingDetailResponse | null>(null);
+  const [togglingListing, setTogglingListing] = useState<number | null>(null);
   
   useEffect(() => {
     async function load() {
       try {
-        const prop = await api.properties.getById(propertyId);
+        let prop: PropertyResponse | null = null;
+        try {
+          prop = await api.properties.getById(propertyId);
+        } catch {
+          prop = buildMockProperty(propertyId);
+        }
+
+        if (!prop) {
+          setProperty(null);
+          setListings([]);
+          setScores({});
+          return;
+        }
+
         setProperty(prop);
 
-        const allListings = await api.listings.browse({ skip: 0, limit: 100 });
-        const propListings = allListings.filter(l => l.property_id === propertyId);
+        const listingResults = await Promise.allSettled(
+          ["active", "draft", "rented", "expired"].map((status) =>
+            api.listings.browse({ skip: 0, limit: 100, status })
+          )
+        );
+        const allListings = listingResults.flatMap((result) => (
+          result.status === "fulfilled" ? result.value : []
+        ));
+        const backendListings = allListings.filter(l => l.property_id === propertyId);
+        const propListings = backendListings.length > 0 ? backendListings : getMockPropertyListings(propertyId);
         setListings(propListings);
 
         // Fetch Cribb Scores
@@ -44,12 +163,23 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
             try {
               const hs = await api.healthScores.get(l.id);
               scoreMap[l.id] = hs;
-            } catch { /* not computed */ }
+            } catch {
+              const mockScore = getMockHealthScore(l.id);
+              if (mockScore) scoreMap[l.id] = mockScore;
+            }
           })
         );
         setScores(scoreMap);
       } catch {
-        // Property not found
+        const fallbackProperty = buildMockProperty(propertyId);
+        const fallbackListings = getMockPropertyListings(propertyId);
+        setProperty(fallbackProperty);
+        setListings(fallbackListings);
+        setScores(Object.fromEntries(
+          fallbackListings
+            .map((listing) => [listing.id, getMockHealthScore(listing.id)] as const)
+            .filter((entry): entry is readonly [number, HealthScoreResponse] => Boolean(entry[1]))
+        ));
       } finally {
         setIsLoading(false);
       }
@@ -58,6 +188,9 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   }, [propertyId]);
 
   async function deleteListing(listingId: number) {
+    const confirmed = window.confirm("Delete this listing? This cannot be undone.");
+    if (!confirmed) return;
+
     setDeleting(listingId);
     try {
       await api.listings.delete(listingId);
@@ -66,6 +199,38 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       alert(err instanceof Error ? err.message : "Failed to delete");
     } finally {
       setDeleting(null);
+    }
+  }
+
+  async function refreshListing(listingId: number) {
+    try {
+      const updated = await api.listings.getById(listingId);
+      setListings((prev) => prev.map((listing) => (
+        listing.id === listingId ? updated : listing
+      )));
+    } catch {
+      // Keep the current card if refresh fails; the user can reload the page.
+    }
+  }
+
+  async function toggleListingVisibility(listing: ListingDetailResponse) {
+    if (togglingListing === listing.id) return;
+
+    setTogglingListing(listing.id);
+    try {
+      if (listing.status.toLowerCase() === "active") {
+        await api.listings.unpublish(listing.id);
+      } else if (listing.status.toLowerCase() === "draft") {
+        await api.listings.publish(listing.id);
+      } else {
+        window.alert("Only active and draft listings can be toggled right now.");
+        return;
+      }
+      await refreshListing(listing.id);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Could not update listing status.");
+    } finally {
+      setTogglingListing(null);
     }
   }
 
@@ -85,7 +250,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-[#FF6B35] animate-spin" />
+        <Loader2 className="w-6 h-6 text-[#1B2D45] animate-spin" />
       </div>
     );
   }
@@ -94,206 +259,224 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
         <div className="text-center">
-          <AlertTriangle className="w-8 h-8 text-[#FFB627] mx-auto mb-2" />
+          <AlertTriangle className="w-8 h-8 text-[#1B2D45] mx-auto mb-2" />
           <p className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Property not found</p>
-          <Link href="/landlord" className="text-[#FF6B35] mt-2 inline-block" style={{ fontSize: "13px", fontWeight: 600 }}>← Back to Dashboard</Link>
+          <Link href="/landlord" className="text-[#1B2D45] mt-2 inline-block" style={{ fontSize: "13px", fontWeight: 600 }}>← Back to Dashboard</Link>
         </div>
       </div>
     );
   }
 
-  const activeListings = listings.filter(l => l.status === "active").length;
+  const counts = {
+    all: listings.length,
+    active: listings.filter((listing) => getListingStatusBucket(listing.status) === "active").length,
+    draft: listings.filter((listing) => getListingStatusBucket(listing.status) === "draft").length,
+    archived: listings.filter((listing) => getListingStatusBucket(listing.status) === "archived").length,
+  };
+  const filterLabels: Record<ListingStatusFilter, string> = {
+    all: `All listings (${counts.all})`,
+    active: `Active (${counts.active})`,
+    draft: `Draft (${counts.draft})`,
+    archived: `Archived (${counts.archived})`,
+  };
+  const filteredListings = listings.filter((listing) => (
+    statusFilter === "all" ? true : getListingStatusBucket(listing.status) === statusFilter
+  ));
+  const activeListings = counts.active;
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
-      <div className="max-w-[800px] mx-auto px-4 md:px-6 py-6 md:py-10">
-        <Link href="/landlord" className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-6" style={{ fontSize: "13px", fontWeight: 500 }}>
-          <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-        </Link>
-
-        {/* Property header */}
-        <div className="bg-white rounded-xl border border-black/[0.04] p-5 mb-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800 }}>{property.title}</h1>
-              <p className="text-[#1B2D45]/40 flex items-center gap-1.5 mt-1" style={{ fontSize: "13px" }}>
-                <MapPin className="w-3.5 h-3.5" /> {property.address}
+      <div className="max-w-[1100px] mx-auto px-4 md:px-6 py-6 md:py-10">
+        <div className="mb-5 rounded-[20px] border border-[#1B2D45]/[0.06] bg-white p-4 shadow-[0_12px_30px_rgba(27,45,69,0.04)] md:p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0">
+              <Link href="/landlord" className="mb-4 inline-flex items-center gap-1.5 text-[#1B2D45]/70 hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>
+                <ArrowLeft className="h-3.5 w-3.5" /> Back to Properties
+              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-[#1B2D45]" style={{ fontSize: "clamp(24px,4vw,32px)", lineHeight: 1.1, fontWeight: 900 }}>{property.title}</h1>
+                {activeListings > 0 && (
+                  <span className="rounded-full bg-[#4ADE80]/10 px-2.5 py-1 text-[#239B55]" style={{ fontSize: "10px", fontWeight: 800 }}>
+                    {activeListings} active
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 flex items-center gap-1.5 text-[#1B2D45]/70" style={{ fontSize: "12px", fontWeight: 600 }}>
+                <MapPin className="h-3.5 w-3.5 shrink-0" /> {property.address}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Link
-                href={`/landlord/properties/${propertyId}/listings/new`}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-colors"
-                style={{ fontSize: "12px", fontWeight: 600 }}
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Listing
-              </Link>
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-black/[0.06] text-[#1B2D45]/55 hover:text-[#1B2D45] hover:border-[#1B2D45]/20 transition-all"
-                style={{ fontSize: "12px", fontWeight: 600 }}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B2D45] px-3.5 py-2.5 text-white transition-all hover:bg-[#152438]"
+                style={{ fontSize: "12px", fontWeight: 800 }}
               >
-                <Edit3 className="w-3.5 h-3.5" /> Edit property
+                <Edit3 className="h-3.5 w-3.5" /> Edit Property
               </button>
+              <Link
+                href={`/landlord/properties/${propertyId}/listings/new`}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#1B2D45]/10 px-3.5 py-2.5 text-[#1B2D45]/65 transition-all hover:border-[#1B2D45]/20 hover:text-[#1B2D45]"
+                style={{ fontSize: "12px", fontWeight: 800 }}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Listing
+              </Link>
+              <Link
+                href="/landlord?tab=messages"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#1B2D45]/10 px-3.5 py-2.5 text-[#1B2D45]/65 transition-all hover:border-[#1B2D45]/20 hover:text-[#1B2D45]"
+                style={{ fontSize: "12px", fontWeight: 800 }}
+              >
+                Messages
+              </Link>
             </div>
           </div>
 
-          {/* Property details grid */}
-          <div className="flex flex-wrap gap-2 mt-4">
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
             {[
-              { label: property.property_type, icon: "🏠" },
-              { label: `${property.total_rooms} bed`, icon: "🛏️" },
-              { label: `${property.bathrooms} bath`, icon: "🚿" },
-              property.is_furnished && { label: "Furnished", icon: "🛋️" },
-              property.has_parking && { label: "Parking", icon: "🅿️" },
-              property.has_laundry && { label: "Laundry", icon: "🧺" },
-              property.utilities_included && { label: "Utilities Incl.", icon: "💡" },
-              property.distance_to_campus_km && { label: `${property.distance_to_campus_km} km`, icon: "📍" },
-              property.walk_time_minutes && { label: `${property.walk_time_minutes} min walk`, icon: "🚶" },
-            ].filter(Boolean).map((tag, i) => (
-              <span key={i} className="bg-[#1B2D45]/5 text-[#1B2D45]/60 px-2.5 py-1 rounded-lg" style={{ fontSize: "11px", fontWeight: 500 }}>
-                {(tag as { icon: string }).icon} {(tag as { label: string }).label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Listings */}
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>
-            Listings ({listings.length})
-          </h2>
-          <span className={`px-2.5 py-1 rounded-lg ${activeListings > 0 ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#1B2D45]/5 text-[#1B2D45]/30"}`} style={{ fontSize: "11px", fontWeight: 600 }}>
-            {activeListings} active
-          </span>
-        </div>
-
-        {listings.length === 0 ? (
-          <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-8 text-center">
-            <Calendar className="w-8 h-8 text-[#FF6B35]/30 mx-auto mb-2" />
-            <p className="text-[#1B2D45]/40" style={{ fontSize: "14px", fontWeight: 500 }}>No listings yet</p>
-            <Link
-              href={`/landlord/properties/${propertyId}/listings/new`}
-              className="inline-flex items-center gap-1.5 mt-3 text-[#FF6B35]"
-              style={{ fontSize: "13px", fontWeight: 600 }}
-            >
-              <Plus className="w-3.5 h-3.5" /> Create your first listing
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {listings.map((listing) => {
-              const score = scores[listing.id];
-              const scoreColor = score?.overall_score ? getScoreColor(score.overall_score) : undefined;
-
+              { label: "Property Details", value: `${property.total_rooms} bed · ${property.bathrooms} bath`, sub: formatPropertyType(property.property_type), icon: Home, tone: "#1B2D45" },
+              { label: "Active Listings", value: String(counts.active), sub: `${counts.all} total listing${counts.all === 1 ? "" : "s"}`, icon: Building2, tone: "#2EC4B6" },
+              { label: "Draft Listings", value: String(counts.draft), sub: "Not currently visible", icon: Clock, tone: "#1B2D45" },
+            ].map((card) => {
+              const Icon = card.icon;
               return (
-                <div key={listing.id} className="bg-white rounded-xl border border-black/[0.04] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[#FF6B35]" style={{ fontSize: "18px", fontWeight: 800 }}>
-                          {formatPrice(Number(listing.rent_per_room))}
-                          <span className="text-[#1B2D45]/30" style={{ fontSize: "11px", fontWeight: 400 }}>/room</span>
-                        </span>
-                        <span className={`px-2 py-0.5 rounded-full ${listing.status === "active" ? "bg-[#4ADE80]/10 text-[#4ADE80]" : listing.status === "rented" ? "bg-[#2EC4B6]/10 text-[#2EC4B6]" : "bg-[#1B2D45]/5 text-[#1B2D45]/30"}`} style={{ fontSize: "10px", fontWeight: 600 }}>
-                          {listing.status}
-                        </span>
-                        {listing.is_sublet && (
-                          <span className="px-2 py-0.5 rounded-full bg-[#FFB627]/10 text-[#FFB627]" style={{ fontSize: "10px", fontWeight: 600 }}>
-                            ☀️ Sublet
-                          </span>
-                        )}
-                        {score?.overall_score && (
-                          <span className="px-2 py-0.5 rounded-full" style={{ fontSize: "10px", fontWeight: 700, color: scoreColor, background: `${scoreColor}15` }}>
-                            CS {score.overall_score}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1.5 text-[#1B2D45]/40" style={{ fontSize: "12px" }}>
-                        <span>{formatLeaseType(listing.lease_type)}</span>
-                        <span>·</span>
-                        <span>Move-in {formatDate(listing.move_in_date)}</span>
-                        <span>·</span>
-                        <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {listing.view_count} views</span>
-                      </div>
+                <div key={card.label} className="rounded-xl border border-[#1B2D45]/[0.07] bg-[#FCFBF8] p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${card.tone}12`, color: card.tone }}>
+                      <Icon className="h-4 w-4" />
                     </div>
-                    <button
-                      onClick={() => deleteListing(listing.id)}
-                      disabled={deleting === listing.id}
-                      className="w-8 h-8 rounded-lg border border-black/[0.06] flex items-center justify-center text-[#1B2D45]/30 hover:text-[#E71D36] hover:border-[#E71D36]/20 transition-all shrink-0"
-                    >
-                      {deleting === listing.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-
-                  <div className="mt-4">
-                    {(listing.images?.length ?? 0) > 0 ? (
-                      <div className="grid gap-2 md:grid-cols-[minmax(0,1.6fr)_180px]">
-                        <div className="relative overflow-hidden rounded-xl bg-[#FAF8F4] aspect-[16/9]">
-                          <img
-                            src={listing.images?.[0]?.image_url}
-                            alt={`${property.title} listing cover`}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-1 text-white" style={{ fontSize: "10px", fontWeight: 700 }}>
-                            {listing.images?.length} photo{listing.images?.length === 1 ? "" : "s"}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 md:grid-cols-1 gap-2">
-                          {listing.images?.slice(1, 4).map((image, index) => (
-                            <div key={image.id} className="relative overflow-hidden rounded-xl bg-[#FAF8F4] aspect-[4/3]">
-                              <img
-                                src={image.image_url}
-                                alt={`${property.title} listing photo ${index + 2}`}
-                                className="w-full h-full object-cover"
-                              />
-                              {index === 2 && (listing.images?.length ?? 0) > 4 && (
-                                <div className="absolute inset-0 bg-black/45 flex items-center justify-center text-white" style={{ fontSize: "12px", fontWeight: 800 }}>
-                                  +{(listing.images?.length ?? 0) - 4}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-black/[0.08] bg-[#FAF8F4] px-4 py-5 flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white border border-black/[0.05]">
-                          <ImageIcon className="w-4 h-4 text-[#1B2D45]/25" />
-                        </div>
-                        <div>
-                          <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>No listing photos yet</div>
-                          <p className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px", lineHeight: 1.5 }}>
-                            Add photos so students get a better first impression of this home.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Health score breakdown */}
-                  {score && (
-                    <div className="mt-3 pt-3 border-t border-black/[0.04] grid grid-cols-4 gap-2">
-                      {[
-                        { label: "Price", value: score.price_vs_market_score },
-                        { label: "Reputation", value: score.landlord_reputation_score },
-                        { label: "Maintenance", value: score.maintenance_score },
-                        { label: "Lease Clarity", value: score.lease_clarity_score },
-                      ].map((s) => (
-                        <div key={s.label} className="text-center">
-                          <div className="text-[#1B2D45]/30" style={{ fontSize: "9px", fontWeight: 500 }}>{s.label}</div>
-                          <div style={{ fontSize: "14px", fontWeight: 700, color: s.value ? getScoreColor(s.value) : "#1B2D45" }}>
-                            {s.value ?? "—"}
-                          </div>
-                        </div>
-                      ))}
+                      <div className="min-w-0">
+                      <div className="text-[#1B2D45]/65" style={{ fontSize: "10px", fontWeight: 900 }}>{card.label}</div>
+                      <div className="mt-1 truncate text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 900 }}>{card.value}</div>
+                      <div className="mt-0.5 truncate text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 750 }}>{card.sub}</div>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}
           </div>
-        )}
+        </div>
+
+        <section className="overflow-hidden rounded-[20px] border border-[#1B2D45]/[0.06] bg-white shadow-[0_12px_30px_rgba(27,45,69,0.04)]">
+          <div className="border-b border-black/[0.04] px-4 py-4 md:px-5">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 900 }}>Listings in this Property</h2>
+                <p className="mt-1 text-[#1B2D45]/62" style={{ fontSize: "12px", lineHeight: 1.5, fontWeight: 650 }}>
+                  Toggle rooms or units live, review status, and manage listing details from one place.
+                </p>
+              </div>
+              <label className="flex min-w-[220px] flex-col gap-1.5">
+                <span className="text-[#1B2D45]/70" style={{ fontSize: "10px", fontWeight: 900, letterSpacing: "0.08em" }}>STATUS</span>
+                <span className="relative">
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value as ListingStatusFilter)}
+                    className="h-10 w-full appearance-none rounded-xl border border-[#1B2D45]/12 bg-[#F7F9FC] px-3 pr-9 text-[#1B2D45] outline-none transition-all hover:border-[#1B2D45]/25 focus:border-[#1B2D45]/40 focus:bg-white"
+                    style={{ fontSize: "12px", fontWeight: 850 }}
+                  >
+                    {(Object.keys(filterLabels) as ListingStatusFilter[]).map((key) => (
+                      <option key={key} value={key}>{filterLabels[key]}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1B2D45]/55" />
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {listings.length === 0 ? (
+            <div className="p-8 text-center">
+              <Calendar className="mx-auto mb-3 h-8 w-8 text-[#1B2D45]/25" />
+              <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>This property has no listings yet</h3>
+              <p className="mx-auto mt-1 max-w-[360px] text-[#1B2D45]/65" style={{ fontSize: "12px", lineHeight: 1.6 }}>
+                Create a listing when you are ready to publish a rentable room or space for students.
+              </p>
+              <Link
+                href={`/landlord/properties/${propertyId}/listings/new`}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#1B2D45] px-4 py-2.5 text-white transition-colors hover:bg-[#152438]"
+                style={{ fontSize: "13px", fontWeight: 800 }}
+              >
+                <Plus className="h-3.5 w-3.5" /> Create First Listing
+              </Link>
+            </div>
+          ) : filteredListings.length === 0 ? (
+            <div className="p-6 text-center">
+              <p className="text-[#1B2D45]/70" style={{ fontSize: "13px", fontWeight: 700 }}>
+                No {statusFilter} listings for this property.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-[780px] table-fixed">
+                  <thead className="bg-[#F3F6FA]">
+                    <tr className="text-left text-[#1B2D45]/75" style={{ fontSize: "10px", fontWeight: 950 }}>
+                      <th className="w-[22%] px-4 py-3">LISTING / ROOM</th>
+                      <th className="w-[16%] px-4 py-3">TYPE</th>
+                      <th className="w-[15%] px-4 py-3">RENT</th>
+                      <th className="w-[15%] px-4 py-3">STATUS</th>
+                      <th className="w-[16%] px-4 py-3">ON / OFF LIST</th>
+                      <th className="w-[16%] px-4 py-3 text-right">ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/[0.04]">
+                    {filteredListings.map((listing, index) => {
+                      const statusBucket = getListingStatusBucket(listing.status);
+                      const isActive = listing.status.toLowerCase() === "active";
+                      const isToggleable = ["active", "draft"].includes(listing.status.toLowerCase());
+                      return (
+                        <tr key={listing.id} className="transition-colors hover:bg-[#F7F9FC]">
+                          <td className="px-4 py-3">
+                            <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 850 }}>{getListingRowLabel(listing, index)}</div>
+                            <div className="mt-0.5 text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 750 }}>{getMoveInLabel(listing)}</div>
+                          </td>
+                          <td className="px-4 py-3 text-[#1B2D45]/78" style={{ fontSize: "11px", fontWeight: 800 }}>{getListingTypeLabel(listing)}</td>
+                          <td className="px-4 py-3 text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 850 }}>{formatPrice(Number(listing.rent_per_room))}</td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full px-2.5 py-1 ${
+                              statusBucket === "active"
+                                ? "bg-[#4ADE80]/10 text-[#239B55]"
+                                : statusBucket === "draft"
+                                  ? "bg-[#E9EEF7] text-[#1B2D45]"
+                                  : "bg-[#1B2D45]/[0.06] text-[#1B2D45]/70"
+                            }`} style={{ fontSize: "10px", fontWeight: 850 }}>
+                              {getListingStatusLabel(listing.status)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => void toggleListingVisibility(listing)}
+                              disabled={!isToggleable || togglingListing === listing.id}
+                              className={`relative h-6 w-11 rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-55 ${isActive ? "bg-[#1B2D45]" : "bg-[#1B2D45]/20"}`}
+                              title={isActive ? "Unpublish listing" : "Publish listing"}
+                            >
+                              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isActive ? "translate-x-[23px]" : "translate-x-1"}`} />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button type="button" onClick={() => setEditingListing(listing)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]" title="Edit listing">
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </button>
+                              <button type="button" onClick={() => setPhotosListing(listing)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]" title="Manage photos">
+                                <Camera className="h-3.5 w-3.5" />
+                              </button>
+                              <Link href={`/browse/${listing.id}`} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]" title="Preview listing">
+                                <Eye className="h-3.5 w-3.5" />
+                              </Link>
+                              <button type="button" onClick={() => void deleteListing(listing.id)} disabled={deleting === listing.id} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#E71D36]/75 transition-all hover:bg-[#E71D36]/[0.06] disabled:opacity-40" title="Delete listing">
+                                {deleting === listing.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+          )}
+
+        </section>
 
         {/* Danger zone */}
         <div className="mt-10 pt-6 border-t border-black/[0.06]">
@@ -319,7 +502,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
               </button>
               <button
                 onClick={() => setConfirmDeleteProperty(false)}
-                className="px-4 py-2 rounded-lg border border-black/[0.06] text-[#1B2D45]/40"
+                className="px-4 py-2 rounded-lg border border-black/[0.06] text-[#1B2D45]/65"
                 style={{ fontSize: "12px", fontWeight: 500 }}
               >
                 Cancel
@@ -333,6 +516,26 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           property={property}
           onClose={() => setEditing(false)}
           onSaved={(updated) => setProperty(updated)}
+        />
+      )}
+      {editingListing && (
+        <EditListingModal
+          listing={editingListing}
+          onClose={() => setEditingListing(null)}
+          onSaved={(updated) => {
+            setListings((prev) => prev.map((listing) => (
+              listing.id === updated.id ? { ...listing, ...updated } : listing
+            )));
+            setEditingListing(null);
+          }}
+        />
+      )}
+      {photosListing && (
+        <ListingImageUpload
+          listingId={photosListing.id}
+          existingImages={photosListing.images}
+          onClose={() => setPhotosListing(null)}
+          onUploaded={() => void refreshListing(photosListing.id)}
         />
       )}
     </div>

@@ -43,8 +43,12 @@ export function formatPropertyType(type: string): string {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
-export function formatDate(dateStr: string): string {
+export function formatDate(dateStr?: string | null, fallback = "Any move-in date"): string {
+  if (!dateStr) return fallback;
+
   const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return fallback;
+
   return date.toLocaleDateString("en-CA", {
     month: "short",
     year: "numeric",

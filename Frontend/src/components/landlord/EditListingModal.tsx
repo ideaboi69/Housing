@@ -5,10 +5,10 @@ import { X, Calendar, DollarSign, Loader2, Check, AlertCircle } from "lucide-rea
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { GenderPreference, LeaseType } from "@/types";
-import type { ListingResponse } from "@/types";
+import type { ListingDetailResponse, ListingResponse } from "@/types";
 
 interface EditListingModalProps {
-  listing: ListingResponse;
+  listing: ListingResponse | ListingDetailResponse;
   onClose: () => void;
   onSaved: (updated: ListingResponse) => void;
 }
@@ -17,6 +17,7 @@ export function EditListingModal({ listing, onClose, onSaved }: EditListingModal
   const [rent, setRent] = useState(listing.rent_per_room.toString());
   const [rentTotal, setRentTotal] = useState(listing.rent_total.toString());
   const [moveInDate, setMoveInDate] = useState(listing.move_in_date?.split("T")[0] ?? "");
+  const [hasFlexibleMoveIn, setHasFlexibleMoveIn] = useState(Boolean(listing.has_flexible_move_in));
   const [leaseType, setLeaseType] = useState<LeaseType | undefined>(
     Object.values(LeaseType).includes(listing.lease_type as LeaseType)
       ? (listing.lease_type as LeaseType)
@@ -39,7 +40,8 @@ export function EditListingModal({ listing, onClose, onSaved }: EditListingModal
       const updated = await api.listings.update(listing.id, {
         rent_per_room: parseFloat(rent),
         rent_total: parseFloat(rentTotal),
-        move_in_date: moveInDate || undefined,
+        move_in_date: hasFlexibleMoveIn ? null : moveInDate || undefined,
+        has_flexible_move_in: hasFlexibleMoveIn,
         lease_type: leaseType,
         status: status as "active" | "inactive",
         gender_preference: genderPref === "any" ? undefined : genderPref,
@@ -126,7 +128,19 @@ export function EditListingModal({ listing, onClose, onSaved }: EditListingModal
             <label className="text-[#1B2D45]/40 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>
               <Calendar className="w-3 h-3 inline mr-0.5" />Preferred move-in date
             </label>
-            <input type="date" value={moveInDate} onChange={(e) => setMoveInDate(e.target.value)} className={inputCls} style={{ fontSize: "13px" }} />
+            <input type="date" value={moveInDate} onChange={(e) => setMoveInDate(e.target.value)} disabled={hasFlexibleMoveIn} className={`${inputCls} disabled:bg-[#1B2D45]/[0.03] disabled:text-[#1B2D45]/35`} style={{ fontSize: "13px" }} />
+            <label className="mt-2 flex items-center gap-2 rounded-lg border border-[#1B2D45]/10 bg-[#1B2D45]/[0.025] px-3 py-2 text-[#1B2D45]/65 cursor-pointer" style={{ fontSize: "12px", fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={hasFlexibleMoveIn}
+                onChange={(e) => {
+                  setHasFlexibleMoveIn(e.target.checked);
+                  if (e.target.checked) setMoveInDate("");
+                }}
+                className="w-4 h-4 accent-[#1B2D45]"
+              />
+              Any move-in date
+            </label>
           </div>
 
           {/* Lease Type */}

@@ -181,7 +181,8 @@ class Listing(Base):
     rent_total = Column(Numeric(8, 2), nullable=False)
     per_room_pricing = Column(Boolean, default=False, nullable=False)
     lease_type = Column(Enum(LeaseType), nullable=False)
-    move_in_date = Column(Date, nullable=False)
+    move_in_date = Column(Date, nullable=True)
+    has_flexible_move_in = Column(Boolean, default=False, nullable=False)
     is_sublet = Column(Boolean, default=False, nullable=False)
     sublet_start_date = Column(Date, nullable=True)
     sublet_end_date = Column(Date, nullable=True)
@@ -334,6 +335,8 @@ class Conversation(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     landlord_id = Column(Integer, ForeignKey("landlords.id"), nullable=False)
     listing_id = Column(Integer, ForeignKey("listings.id"), nullable=False)
+    student_archived_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    landlord_archived_at = Column(TIMESTAMP(timezone=True), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -572,6 +575,8 @@ class MarketplaceConversation(Base):
     item_id = Column(Integer, ForeignKey("marketplace_items.id", ondelete="CASCADE"), nullable=False)
     buyer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     seller_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    buyer_archived_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    seller_archived_at = Column(TIMESTAMP(timezone=True), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -604,6 +609,8 @@ class SubletConversation(Base):
     sublet_id = Column(Integer, ForeignKey("sublets.id", ondelete="CASCADE"), nullable=False)
     poster_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     inquirer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    poster_archived_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    inquirer_archived_at = Column(TIMESTAMP(timezone=True), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -977,6 +984,23 @@ class PostVote(Base):
     )
  
 Base.metadata.create_all(engine)
+
+def ensure_listing_schema_compatibility():
+    """Apply small additive schema updates for deployments without Alembic."""
+    if engine.dialect.name != "postgresql":
+        return
+
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE listings ADD COLUMN IF NOT EXISTS has_flexible_move_in BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE listings ALTER COLUMN move_in_date DROP NOT NULL"))
+        conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS student_archived_at TIMESTAMP WITH TIME ZONE"))
+        conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS landlord_archived_at TIMESTAMP WITH TIME ZONE"))
+        conn.execute(text("ALTER TABLE marketplace_conversations ADD COLUMN IF NOT EXISTS buyer_archived_at TIMESTAMP WITH TIME ZONE"))
+        conn.execute(text("ALTER TABLE marketplace_conversations ADD COLUMN IF NOT EXISTS seller_archived_at TIMESTAMP WITH TIME ZONE"))
+        conn.execute(text("ALTER TABLE sublet_conversations ADD COLUMN IF NOT EXISTS poster_archived_at TIMESTAMP WITH TIME ZONE"))
+        conn.execute(text("ALTER TABLE sublet_conversations ADD COLUMN IF NOT EXISTS inquirer_archived_at TIMESTAMP WITH TIME ZONE"))
+
+ensure_listing_schema_compatibility()
 
 def get_db():
     db = Local_Session()

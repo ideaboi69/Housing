@@ -599,7 +599,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   { label: "Type", value: formatPropertyType(listing.property_type), icon: Ruler },
                   { label: "Rooms", value: `${listing.total_rooms} bed · ${listing.bathrooms} bath`, icon: Bed },
                   { label: "Lease", value: formatLeaseType(listing.lease_type), icon: Calendar },
-                  { label: "Move-in", value: formatDate(listing.move_in_date), icon: Clock },
+                  { label: "Move-in", value: listing.has_flexible_move_in ? "Any move-in date" : formatDate(listing.move_in_date), icon: Clock },
                 ].map((fact) => {
                   const Icon = fact.icon;
                   return (

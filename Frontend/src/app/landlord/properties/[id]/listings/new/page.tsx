@@ -13,7 +13,7 @@ const leaseTypes = [
   { value: LeaseType.EIGHT_MONTH, label: "8-month", desc: "Sep – Apr", emoji: "📚" },
   { value: LeaseType.TEN_MONTH, label: "10-month", desc: "Sep – Jun", emoji: "📅" },
   { value: LeaseType.TWELVE_MONTH, label: "12-month", desc: "Full year", emoji: "🏠" },
-  { value: LeaseType.FLEXIBLE, label: "Flexible", desc: "Custom dates", emoji: "🔄" },
+  { value: LeaseType.FLEXIBLE, label: "Flexible", desc: "Flexible lease timing", emoji: "🔄" },
 ];
 
 function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +35,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     rent_total: "",
     lease_type: LeaseType.TWELVE_MONTH,
     move_in_date: "",
+    has_flexible_move_in: false,
     is_sublet: false,
     sublet_start_date: "",
     sublet_end_date: "",
@@ -212,7 +213,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
       }
     }
 
-    if (!form.move_in_date) {
+    if (!form.has_flexible_move_in && !form.move_in_date) {
       setError("Move-in date is required");
       return;
     }
@@ -230,7 +231,8 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
         property_id: propertyId,
         per_room_pricing: perRoomPricing,
         lease_type: form.lease_type,
-        move_in_date: form.move_in_date,
+        move_in_date: form.has_flexible_move_in ? null : form.move_in_date,
+        has_flexible_move_in: form.has_flexible_move_in,
         is_sublet: form.is_sublet,
         sublet_start_date: form.is_sublet && form.sublet_start_date ? form.sublet_start_date : undefined,
         sublet_end_date: form.is_sublet && form.sublet_end_date ? form.sublet_end_date : undefined,
@@ -280,7 +282,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
   if (loadingProperty) {
     return (
       <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-[#FF6B35] animate-spin" />
+        <Loader2 className="w-6 h-6 text-[#1B2D45] animate-spin" />
       </div>
     );
   }
@@ -299,10 +301,15 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
 
         <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 800 }}>Create a Listing</h1>
         {property && (
-          <div className="flex items-center gap-2 mt-1 mb-6">
-            <Home className="w-3.5 h-3.5 text-[#FF6B35]" />
-            <span className="text-[#FF6B35]" style={{ fontSize: "13px", fontWeight: 600 }}>{property.title}</span>
-            <span className="text-[#1B2D45]/30" style={{ fontSize: "13px" }}>— {property.address}</span>
+          <div className="mt-1 mb-6 space-y-1">
+            <div className="flex items-center gap-2">
+              <Home className="w-3.5 h-3.5 text-[#1B2D45]" />
+              <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>{property.title}</span>
+              <span className="text-[#1B2D45]/30" style={{ fontSize: "13px" }}>— {property.address}</span>
+            </div>
+            <p className="text-[#1B2D45]/45" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+              A property is the physical address. A listing is the rentable room or space students will see.
+            </p>
           </div>
         )}
 
@@ -311,14 +318,14 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-                <DollarSign className="w-4 h-4 text-[#FF6B35]" /> Pricing
+                <DollarSign className="w-4 h-4 text-[#1B2D45]" /> Pricing
               </h2>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={perRoomPricing}
                   onChange={(e) => setPerRoomPricing(e.target.checked)}
-                  className="w-4 h-4 accent-[#FF6B35]"
+                  className="w-4 h-4 accent-[#1B2D45]"
                 />
                 <span className="text-[#1B2D45]/70" style={{ fontSize: "12px", fontWeight: 500 }}>
                   Different price per room
@@ -341,7 +348,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                         value={form.rent_per_room}
                         onChange={(e) => updateRentPerRoom(e.target.value)}
                         placeholder="650"
-                        className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                        className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all"
                         style={{ fontSize: "14px" }}
                       />
                     </div>
@@ -355,7 +362,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                         value={form.rent_total}
                         onChange={(e) => update("rent_total", e.target.value)}
                         placeholder="2600"
-                        className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                        className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all"
                         style={{ fontSize: "14px" }}
                       />
                     </div>
@@ -380,7 +387,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                         value={room.label}
                         onChange={(e) => updateRoom(i, "label", e.target.value)}
                         placeholder={i === 0 ? "Master Bedroom" : `Room ${i + 1}`}
-                        className="px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                        className="px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all"
                         style={{ fontSize: "13px" }}
                       />
                       <div className="relative">
@@ -390,7 +397,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                           value={room.rent}
                           onChange={(e) => updateRoom(i, "rent", e.target.value)}
                           placeholder="650"
-                          className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                          className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all"
                           style={{ fontSize: "13px" }}
                         />
                       </div>
@@ -410,7 +417,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
           {/* Lease Details */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-              <Calendar className="w-4 h-4 text-[#FF6B35]" /> Lease Details
+              <Calendar className="w-4 h-4 text-[#1B2D45]" /> Lease Details
             </h2>
 
             <div>
@@ -423,13 +430,13 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                     onClick={() => update("lease_type", t.value)}
                     className={`p-3 rounded-xl border transition-all text-left ${
                       form.lease_type === t.value
-                        ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06]"
-                        : "border-black/[0.06] hover:border-[#FF6B35]/15"
+                        ? "border-[#1B2D45]/30 bg-[#1B2D45]/[0.06]"
+                        : "border-black/[0.06] hover:border-[#1B2D45]/15"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <span style={{ fontSize: "16px" }}>{t.emoji}</span>
-                      <span className={form.lease_type === t.value ? "text-[#FF6B35]" : "text-[#1B2D45]"} style={{ fontSize: "13px", fontWeight: 600 }}>{t.label}</span>
+                      <span className={form.lease_type === t.value ? "text-[#1B2D45]" : "text-[#1B2D45]"} style={{ fontSize: "13px", fontWeight: 600 }}>{t.label}</span>
                     </div>
                     <div className="text-[#1B2D45]/30 mt-0.5 ml-7" style={{ fontSize: "11px" }}>{t.desc}</div>
                   </button>
@@ -443,10 +450,24 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                 type="date"
                 value={form.move_in_date}
                 onChange={(e) => update("move_in_date", e.target.value)}
-                required
-                className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                required={!form.has_flexible_move_in}
+                disabled={form.has_flexible_move_in}
+                className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 disabled:bg-[#1B2D45]/[0.03] disabled:text-[#1B2D45]/35 focus:outline-none transition-all"
                 style={{ fontSize: "14px" }}
               />
+              <label className="mt-2 flex items-center gap-2 rounded-lg border border-[#1B2D45]/10 bg-[#1B2D45]/[0.025] px-3 py-2 text-[#1B2D45]/65 cursor-pointer" style={{ fontSize: "12px", fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={form.has_flexible_move_in}
+                  onChange={(e) => setForm((prev) => ({
+                    ...prev,
+                    has_flexible_move_in: e.target.checked,
+                    move_in_date: e.target.checked ? "" : prev.move_in_date,
+                  }))}
+                  className="w-4 h-4 accent-[#1B2D45]"
+                />
+                Any move-in date
+              </label>
             </div>
           </div>
 
@@ -460,7 +481,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
               <button
                 type="button"
                 onClick={() => update("is_sublet", !form.is_sublet)}
-                className={`w-12 h-7 rounded-full transition-all ${form.is_sublet ? "bg-[#FF6B35]" : "bg-[#1B2D45]/10"}`}
+                className={`w-12 h-7 rounded-full transition-all ${form.is_sublet ? "bg-[#1B2D45]" : "bg-[#1B2D45]/10"}`}
               >
                 <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${form.is_sublet ? "translate-x-6" : "translate-x-1"}`} />
               </button>
@@ -474,7 +495,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                     type="date"
                     value={form.sublet_start_date}
                     onChange={(e) => update("sublet_start_date", e.target.value)}
-                    className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                    className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all"
                     style={{ fontSize: "14px" }}
                   />
                 </div>
@@ -484,7 +505,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                     type="date"
                     value={form.sublet_end_date}
                     onChange={(e) => update("sublet_end_date", e.target.value)}
-                    className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                    className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all"
                     style={{ fontSize: "14px" }}
                   />
                 </div>
@@ -495,14 +516,13 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
           {/* Gender preference */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-3">
             <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-              <Users className="w-4 h-4 text-[#FF6B35]" /> Tenant Preference
+              <Users className="w-4 h-4 text-[#1B2D45]" /> Tenant Preference
             </h2>
             <div className="flex gap-2 flex-wrap">
               {[
                 { value: GenderPreference.ANY, label: "Any" },
                 { value: GenderPreference.MALE, label: "Male" },
                 { value: GenderPreference.FEMALE, label: "Female" },
-                { value: GenderPreference.OTHER, label: "Other" },
               ].map((g) => (
                 <button
                   key={g.value}
@@ -510,8 +530,8 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                   onClick={() => update("gender_preference", g.value)}
                   className={`px-4 py-2 rounded-lg border transition-all ${
                     form.gender_preference === g.value
-                      ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]"
-                      : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#FF6B35]/15"
+                      ? "border-[#1B2D45]/30 bg-[#1B2D45]/[0.06] text-[#1B2D45]"
+                      : "border-black/[0.06] text-[#1B2D45]/60 hover:border-[#1B2D45]/15"
                   }`}
                   style={{ fontSize: "13px", fontWeight: form.gender_preference === g.value ? 600 : 500 }}
                 >
@@ -531,7 +551,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <div>
               <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
-                <ImageIcon className="w-4 h-4 text-[#FF6B35]" /> Photos <span className="text-[#E71D36]" style={{ fontWeight: 500 }}>*</span>
+                <ImageIcon className="w-4 h-4 text-[#1B2D45]" /> Photos <span className="text-[#E71D36]" style={{ fontWeight: 500 }}>*</span>
               </h2>
               <p className="text-[#1B2D45]/40 mt-1" style={{ fontSize: "12px" }}>
                 At least 1 photo required. Listings with 3–5 photos perform best.
@@ -556,7 +576,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                       onDragEnd={handleDragEnd}
                       className={`relative aspect-square rounded-lg overflow-hidden bg-[#f3f3f5] group cursor-grab active:cursor-grabbing transition-all ${
                         isDragging ? "opacity-30" : ""
-                      } ${isDragTarget ? "ring-2 ring-[#FF6B35] ring-offset-2" : ""}`}
+                      } ${isDragTarget ? "ring-2 ring-[#1B2D45] ring-offset-2" : ""}`}
                     >
                       <img src={src} alt={`Preview ${idx + 1}`} draggable={false} className="w-full h-full object-cover" />
                       {/* Drag hint */}
@@ -585,7 +605,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
             {imageFiles.length < 10 && (
               <label
                 htmlFor="listing-photos"
-                className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-lg border-2 border-dashed border-[#1B2D45]/15 hover:border-[#FF6B35]/40 hover:bg-[#FF6B35]/[0.02] cursor-pointer transition-all"
+                className="flex flex-col items-center justify-center gap-2 px-4 py-8 rounded-lg border-2 border-dashed border-[#1B2D45]/15 hover:border-[#1B2D45]/40 hover:bg-[#1B2D45]/[0.02] cursor-pointer transition-all"
               >
                 <Upload className="w-5 h-5 text-[#1B2D45]/40" />
                 <span className="text-[#1B2D45]/60" style={{ fontSize: "13px", fontWeight: 600 }}>
@@ -621,8 +641,8 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
             <button
               type="submit"
               disabled={isSubmitting || imageFiles.length < 1}
-              className="flex-1 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
-              style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
+              className="flex-1 py-3 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+              style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(27,45,69,0.2)" }}
             >
               {isSubmitting ? (
                 <>

@@ -1,6 +1,6 @@
 "use client";
 
-import { X, ArrowRight, ChevronDown } from "lucide-react";
+import { X, ArrowRight, ChevronDown, Pin } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { getScoreColor, formatPrice } from "@/lib/utils";
@@ -38,7 +38,7 @@ function PickCard({
         {thumbnail ? (
           <img src={thumbnail} alt="" className="w-full h-full object-cover" />
         ) : (
-          <span style={{ fontSize: "14px" }}>🏠</span>
+          <Pin className="h-4 w-4 text-[#1B2D45]/25" />
         )}
       </div>
       <div className="min-w-0">
@@ -109,7 +109,7 @@ export function MyPicksTray({
 
             {/* Drawer */}
             <motion.div
-              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-[0_-8px_40px_rgba(0,0,0,0.15)] max-h-[60vh] overflow-hidden"
+              className="absolute bottom-0 left-0 right-0 max-h-[68vh] overflow-hidden rounded-t-2xl bg-white shadow-[0_-8px_40px_rgba(0,0,0,0.15)]"
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
@@ -124,7 +124,7 @@ export function MyPicksTray({
               {/* Header */}
               <div className="flex items-center justify-between px-4 pb-3 border-b border-black/5">
                 <div className="flex items-center gap-2">
-                  <span style={{ fontSize: "15px" }}>📌</span>
+                  <Pin className="h-4 w-4 text-[#FF6B35]" />
                   <span
                     className="text-[#1B2D45]"
                     style={{ fontSize: "15px", fontWeight: 700 }}
@@ -163,7 +163,9 @@ export function MyPicksTray({
               {/* Cards or Empty */}
               {picks.length === 0 ? (
                 <div className="py-10 text-center">
-                  <span style={{ fontSize: "32px" }}>📌</span>
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FF6B35]/10">
+                    <Pin className="h-5 w-5 text-[#FF6B35]" />
+                  </div>
                   <p
                     className="text-[#1B2D45]/40 mt-2"
                     style={{ fontSize: "13px", fontWeight: 500 }}
@@ -214,7 +216,7 @@ export function MyPicksTray({
           <div className="bg-white rounded-2xl border border-[#FF6B35]/15 p-4 shadow-[0_2px_12px_rgba(255,107,53,0.08)]">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <span style={{ fontSize: "15px" }}>📌</span>
+                <Pin className="h-4 w-4 text-[#FF6B35]" />
                 <span
                   className="text-[#1B2D45]"
                   style={{ fontSize: "14px", fontWeight: 700 }}
