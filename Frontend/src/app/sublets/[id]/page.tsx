@@ -23,6 +23,7 @@ import {
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { CribbMap } from "@/components/ui/CribbMap";
 import { getProximityLabel } from "@/lib/proximity";
+import { cloudinaryUrl } from "@/lib/cloudinary";
 import type { ReviewResponse, SubletResponse } from "@/types";
 import type { SubletDetail } from "@/lib/mock-sublets";
 import { toast } from "sonner";
@@ -761,7 +762,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                   </button>
                 </div>
                 <div className="flex items-center gap-3 bg-[#FAF8F4] rounded-xl px-3 py-2.5">
-                  {sublet.images[0] && <img src={sublet.images[0]} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
+                  {sublet.images[0] && <img src={cloudinaryUrl(sublet.images[0], { w: 96 })} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="text-[#1B2D45] truncate" style={{ fontSize: "13px", fontWeight: 600 }}>{sublet.title}</p>
                     <p className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 800 }}>${sublet.subletPrice}/mo</p>

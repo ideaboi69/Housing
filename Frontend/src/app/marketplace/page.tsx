@@ -9,6 +9,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
 import { MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo, MOCK_ITEMS_WITH_ZONES } from "@/components/marketplace/marketplace-data";
+import { cloudinaryUrl } from "@/lib/cloudinary";
 import type { MarketplaceItemListResponse, MarketplaceCategory, ItemCondition } from "@/types";
 import { toast } from "sonner";
 
@@ -31,7 +32,7 @@ function ItemCard({
     <Link href={`/marketplace/${item.id}`}>
       <motion.div className="bg-white rounded-2xl overflow-hidden cursor-pointer group" style={{ border: "1px solid rgba(27,45,69,0.06)", boxShadow: "0 2px 8px rgba(27,45,69,0.04)" }} whileHover={{ y: -4, boxShadow: "0 8px 24px rgba(27,45,69,0.08)" }} transition={{ type: "spring", stiffness: 400, damping: 25 }}>
         <div className="relative aspect-[4/3] bg-[#FAF8F4] overflow-hidden">
-          {item.primary_image ? (<img src={item.primary_image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />) : (<div className="w-full h-full flex items-center justify-center"><Package className="w-10 h-10 text-[#1B2D45]/10" /></div>)}
+          {item.primary_image ? (<img src={cloudinaryUrl(item.primary_image, { w: 500 })} alt={item.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />) : (<div className="w-full h-full flex items-center justify-center"><Package className="w-10 h-10 text-[#1B2D45]/10" /></div>)}
           <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur-sm" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
             <span style={{ fontSize: "14px", fontWeight: 800, color: price.color }}>{price.text}</span>
             {price.badge && <span className="ml-1.5 text-[#FF6B35]" style={{ fontSize: "10px", fontWeight: 700 }}>{price.badge}</span>}

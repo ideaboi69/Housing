@@ -18,6 +18,7 @@ import {
   getProximityLabel,
 } from "@/lib/proximity";
 import { buildStaticMapUrl, GUELPH_CENTER, projectLngLatToContainer } from "@/lib/mapbox";
+import { cloudinaryUrl } from "@/lib/cloudinary";
 import {
   DEFAULT_MAP_VIEW_LANDMARKS,
   GUELPH_LANDMARKS,
@@ -896,7 +897,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
         {/* Image area */}
         <div className="relative rounded-sm overflow-hidden" style={{ height: isMobile ? "138px" : "176px" }}>
           {listing.coverImage ? (
-            <img src={listing.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <img src={cloudinaryUrl(listing.coverImage, { w: 800 })} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.15) 0%, rgba(46,196,182,0.15) 100%)" }}>
               <span style={{ fontSize: "36px", opacity: 0.3 }}>☀️</span>
@@ -1321,7 +1322,7 @@ function SubletPickCard({ listing, onRemove }: { listing: SubletListing; onRemov
     >
       <div className="w-10 h-10 rounded-lg overflow-hidden bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center shrink-0">
         {listing.coverImage ? (
-          <img src={listing.coverImage} alt="" className="w-full h-full object-cover" />
+          <img src={cloudinaryUrl(listing.coverImage, { w: 600 })} alt="" loading="lazy" className="w-full h-full object-cover" />
         ) : (
           <span style={{ fontSize: "14px" }}>🏠</span>
         )}
@@ -1473,7 +1474,7 @@ function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { lis
       {/* Image */}
       <div className="h-[152px] bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center relative overflow-hidden">
         {listing.coverImage ? (
-          <img src={listing.coverImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <img src={cloudinaryUrl(listing.coverImage, { w: 800 })} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
         ) : (
           <span style={{ fontSize: "30px" }}>🏠</span>
         )}

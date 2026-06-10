@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { getAmenityChecklist } from "@/lib/amenities";
+import { cloudinaryUrl } from "@/lib/cloudinary";
 import { CribbMap } from "@/components/ui/CribbMap";
 import { getProximityFromKm, getProximityLabel } from "@/lib/proximity";
 import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
@@ -219,7 +220,7 @@ function ImageGallery({ images }: { images: string[] }) {
                     className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden transition-all ${i === current ? "ring-2 ring-white" : "opacity-50 hover:opacity-100"
                       }`}
                   >
-                    <img src={src} alt={`Thumb ${i + 1}`} className="w-full h-full object-cover" />
+                    <img src={cloudinaryUrl(src, { w: 200 })} alt={`Thumb ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -970,7 +971,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   </button>
                 </div>
                 <div className="flex items-center gap-3 bg-[#FAF8F4] rounded-xl px-3 py-2.5">
-                  {images[0] && <img src={images[0]} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
+                  {images[0] && <img src={cloudinaryUrl(images[0], { w: 96 })} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="text-[#1B2D45] truncate" style={{ fontSize: "13px", fontWeight: 600 }}>{listing.title}</p>
                     <p className="text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 800 }}>{formatPrice(Number(listing.rent_min ?? listing.rent_per_room ?? listing.rent_total))}/mo</p>

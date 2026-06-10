@@ -16,6 +16,7 @@ import {
   MOCK_MARKETPLACE_ITEMS,
 } from "@/components/marketplace/marketplace-data";
 import type { MarketplaceItemListResponse, MarketplaceItemResponse } from "@/types";
+import { cloudinaryUrl } from "@/lib/cloudinary";
 import { toast } from "sonner";
 
 /* ════════════════════════════════════════════════════════
@@ -58,7 +59,7 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
     >
       <div className="relative h-[420px] sm:h-[520px] lg:h-[660px] xl:h-[760px]">
         <img
-          src={images[current]?.image_url}
+          src={cloudinaryUrl(images[current]?.image_url, { w: 200, q: 30 })}
           alt=""
           className="absolute inset-0 w-full h-full object-cover scale-110 blur-3xl opacity-35"
         />
@@ -66,7 +67,7 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,transparent_56%,rgba(0,0,0,0.18)_100%)]" />
         <div className="relative z-10 h-full w-full overflow-hidden">
           <img
-            src={images[current]?.image_url}
+            src={cloudinaryUrl(images[current]?.image_url, { w: 1400 })}
             alt=""
             className="h-full w-full object-cover object-center"
             style={{ filter: "drop-shadow(0 24px 50px rgba(0,0,0,0.22))" }}
@@ -123,7 +124,7 @@ function ImageGallery({ images }: { images: { id: number; image_url: string }[] 
                 i === current ? "border-white opacity-100 translate-y-0" : "border-transparent opacity-60 hover:opacity-90 hover:-translate-y-0.5"
               }`}
             >
-              <img src={img.image_url} alt="" className="w-full h-full object-cover" />
+              <img src={cloudinaryUrl(img.image_url, { w: 200 })} alt="" loading="lazy" className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
@@ -440,7 +441,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                   >
                     <div className="relative aspect-[4/3] bg-[#FAF8F4] overflow-hidden">
                       {sim.primary_image ? (
-                        <img src={sim.primary_image} alt={sim.title} className="w-full h-full object-cover" />
+                        <img src={cloudinaryUrl(sim.primary_image, { w: 400 })} alt={sim.title} loading="lazy" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <Package className="w-8 h-8 text-[#1B2D45]/10" />
@@ -502,7 +503,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                   </button>
                 </div>
                 <div className="flex items-center gap-3 bg-[#FAF8F4] rounded-xl px-3 py-2.5">
-                  {item.primary_image && <img src={item.primary_image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
+                  {item.primary_image && <img src={cloudinaryUrl(item.primary_image, { w: 96 })} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover shrink-0" />}
                   <div className="flex-1 min-w-0">
                     <p className="text-[#1B2D45] truncate" style={{ fontSize: "13px", fontWeight: 600 }}>{item.title}</p>
                     <p style={{ fontSize: "12px", fontWeight: 800, color: getPriceLabel(item.pricing_type, item.price).color }}>{getPriceLabel(item.pricing_type, item.price).text}</p>

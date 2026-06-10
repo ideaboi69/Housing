@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { cloudinaryUrl } from "@/lib/cloudinary";
 import { Heart, Pin, Eye } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { ScoreRing } from "@/components/ui/ScoreRing";
@@ -148,7 +150,13 @@ export function PolaroidCard({
             style={{ height: isBoard ? (isMobile ? "148px" : "192px") : (isMobile ? "150px" : "170px") }}
           >
             {coverImage ? (
-              <img src={coverImage} alt="" className="w-full h-full object-cover" />
+              <Image
+                src={cloudinaryUrl(coverImage, { w: 600 })}
+                alt=""
+                fill
+                sizes="(max-width: 768px) 50vw, 25vw"
+                className="object-cover"
+              />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] flex items-center justify-center text-[#1B2D45]/20">
                 <motion.span
