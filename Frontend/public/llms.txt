@@ -31,6 +31,18 @@ Expanding to additional Canadian university cities in the future.
 ## Service Area
 Guelph
 
+## Markdown Mirrors (Clean AI-Readable Versions)
+Every public page on this site has a plain markdown mirror. Append `.md` to any URL to get the clean content without navigation, scripts, or layout chrome.
+
+- https://findyourcribb.com/browse.md
+- https://findyourcribb.com/sublets.md
+- https://findyourcribb.com/marketplace.md
+- https://findyourcribb.com/roommates.md
+- https://findyourcribb.com/the-bubble.md
+- https://findyourcribb.com/landlord.md
+- https://findyourcribb.com/privacy.md
+- https://findyourcribb.com/terms.md
+
 ## What Makes Us Different
 Cribb is student-first and built by students. Access requires a @uoguelph.ca email, which keeps the community to actual University of Guelph students. Landlords go through identity verification before they can list anything. Reviews are stars-only to reduce defamation risk while still surfacing landlord quality. The roommate feature is designed for friends finding a place together, not stranger-matching with people you've never met. Cribb does not handle leases, rent collection, or deposits — students sign directly with landlords, the way it should be.
 
