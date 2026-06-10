@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /messages
+Disallow: /marketplace/messages
+Disallow: /landlord/properties
+Disallow: /landlord/onboarding
+Disallow: /roommates/invites
+Disallow: /roommates/my-group
+Disallow: /onboarding
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /landlord-claim
+
+Sitemap: https://findyourcribb.com/sitemap.xml
