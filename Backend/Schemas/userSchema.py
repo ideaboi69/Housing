@@ -36,6 +36,7 @@ class UserCreate(BaseModel):
     password: str
     first_name: str
     last_name: str
+    turnstile_token: Optional[str] = None
 
     @field_validator("password")
     @classmethod
@@ -90,6 +91,7 @@ class PasswordChange(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+    turnstile_token: Optional[str] = None
 
 class ResetPasswordRequest(BaseModel):
     token: str

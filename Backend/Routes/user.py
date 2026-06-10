@@ -16,6 +16,7 @@ from Schemas.convoSchema import SenderType
 from Schemas.viewingSchema import BookingStatus
 from Schemas.roommateSchema import InviteStatus, RequestStatus
 from Utils.rate_limit import limiter
+from Utils.turnstile import verify_turnstile
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from config import settings
 
@@ -25,6 +26,7 @@ user_router = APIRouter()
 @user_router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register_users(request: Request, payload: UserCreate, db: Session = Depends(get_db)):
+    verify_turnstile(payload.turnstile_token, request.client.host if request.client else None)
     if not check_uoguelph_email(payload.email):
         raise HTTPException(status_code=400, detail="Only @uoguelph.ca emails are allowed")
 
@@ -142,6 +144,7 @@ def resend_verification(email: str = Form(...), db: Session = Depends(get_db)):
 @user_router.post("/forgot-password", status_code=status.HTTP_200_OK)
 @limiter.limit("3/minute")
 def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    verify_turnstile(payload.turnstile_token, request.client.host if request.client else None)
     # Always return success to prevent email enumeration
     user = db.query(User).filter(User.email == payload.email).first()
     if user:

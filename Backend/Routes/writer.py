@@ -7,6 +7,7 @@ from Schemas.writerSchema import WriterRegister, WriterResponse, WriterTokenResp
 from Utils.security import hash_password, verify_password, create_access_token, validate_password, get_current_writer
 from Utils.rate_limit import limiter
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
+from Utils.turnstile import verify_turnstile
 from config import settings
 
 writer_router = APIRouter()
@@ -15,6 +16,7 @@ writer_router = APIRouter()
 @writer_router.post("/register", response_model=WriterResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register_writer(request: Request, payload: WriterRegister, db: Session = Depends(get_db)):
+    verify_turnstile(payload.turnstile_token, request.client.host if request.client else None)
     existing = db.query(Writer).filter(Writer.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")

@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     UPSTASH_REDIS_REST_URL: str = ""
     UPSTASH_REDIS_REST_TOKEN: str = ""
 
+    TURNSTILE_SECRET: str = ""
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

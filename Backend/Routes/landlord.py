@@ -13,6 +13,7 @@ from typing import Optional
 from pydantic import EmailStr
 from Utils.rate_limit import limiter
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
+from Utils.turnstile import verify_turnstile
 import uuid
 import json
 
@@ -22,8 +23,8 @@ landlord_router = APIRouter()
 @landlord_router.post("/register", response_model=LandlordTokenResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 def register_landlord(request: Request, email: EmailStr = Form(...), password: str = Form(...), first_name: str = Form(...), last_name: str = Form(...), phone: str = Form(...), no_of_property: PropertyRange = Form(...), 
-                    id_type: IDType = Form(...), document_type: DocumentType = Form(...), company_name: Optional[str] = Form(None), id_file: UploadFile = File(...), document_file: UploadFile = File(...), db: Session = Depends(get_db)):
-    
+                    id_type: IDType = Form(...), document_type: DocumentType = Form(...), company_name: Optional[str] = Form(None), id_file: UploadFile = File(...), document_file: UploadFile = File(...), turnstile_token: Optional[str] = Form(None), db: Session = Depends(get_db)):
+    verify_turnstile(turnstile_token, request.client.host if request.client else None)
     existing = db.query(Landlord).filter(Landlord.email == email).first()
     if existing:
         raise HTTPException(

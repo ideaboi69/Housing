@@ -22,6 +22,7 @@ class WriterRegister(BaseModel):
     website: Optional[str] = None
     phone: Optional[str] = None
     reason: str
+    turnstile_token: Optional[str] = None
 
 class WriterUpdate(BaseModel):
     first_name: Optional[str] = None
