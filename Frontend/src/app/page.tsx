@@ -717,12 +717,174 @@ function ShowcaseVisual({ featureId }: { featureId: (typeof showcaseFeatures)[nu
    LANDING PAGE
    ════════════════════════════════════════════════════════ */
 
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://findyourcribb.com/#organization",
+      name: "Cribb",
+      alternateName: "FindYourCribb",
+      url: "https://findyourcribb.com",
+      logo: "https://findyourcribb.com/logo.png",
+      description:
+        "Student housing platform for University of Guelph students. Verified listings, sublets, roommate groups, and a student-only marketplace.",
+      foundingDate: "2025",
+      founder: [
+        { "@type": "Person", name: "Adeoluwa Ojulari" },
+        { "@type": "Person", name: "David Amaefula" },
+      ],
+      areaServed: {
+        "@type": "City",
+        name: "Guelph",
+        containedInPlace: {
+          "@type": "AdministrativeArea",
+          name: "Ontario, Canada",
+        },
+      },
+      sameAs: ["https://www.instagram.com/findyourcribb"],
+      contactPoint: [
+        {
+          "@type": "ContactPoint",
+          contactType: "customer support",
+          email: "professionaldavid14@gmail.com",
+          areaServed: "CA",
+          availableLanguage: "English",
+        },
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://findyourcribb.com/#website",
+      url: "https://findyourcribb.com",
+      name: "Cribb",
+      description: "Student housing in Guelph, done right.",
+      publisher: { "@id": "https://findyourcribb.com/#organization" },
+      inLanguage: "en-CA",
+    },
+    {
+      "@type": "Service",
+      "@id": "https://findyourcribb.com/#service-listings",
+      serviceType: "Verified Housing Listings",
+      provider: { "@id": "https://findyourcribb.com/#organization" },
+      areaServed: { "@type": "City", name: "Guelph" },
+      description:
+        "Browse identity-verified landlord listings with photos, rent breakdowns, amenities, and a Cribb Score on every property.",
+      audience: {
+        "@type": "EducationalAudience",
+        educationalRole: "student",
+      },
+    },
+    {
+      "@type": "Service",
+      "@id": "https://findyourcribb.com/#service-sublets",
+      serviceType: "Sublet Marketplace",
+      provider: { "@id": "https://findyourcribb.com/#organization" },
+      areaServed: { "@type": "City", name: "Guelph" },
+      description:
+        "Post and find short-term and semester sublets from other University of Guelph students.",
+    },
+    {
+      "@type": "Service",
+      "@id": "https://findyourcribb.com/#service-roommates",
+      serviceType: "Roommate Groups and Compatibility Matching",
+      provider: { "@id": "https://findyourcribb.com/#organization" },
+      areaServed: { "@type": "City", name: "Guelph" },
+      description:
+        "Form a roommate group with friends or find compatible students through a 10-factor compatibility quiz covering sleep schedule, cleanliness, noise, smoking, pets, study habits, and more.",
+    },
+    {
+      "@type": "Service",
+      "@id": "https://findyourcribb.com/#service-marketplace",
+      serviceType: "Student Marketplace",
+      provider: { "@id": "https://findyourcribb.com/#organization" },
+      areaServed: { "@type": "City", name: "Guelph" },
+      description:
+        "Buy, sell, and give away furniture, textbooks, and household items within a verified University of Guelph student community.",
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://findyourcribb.com/#faq",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "Who can sign up for Cribb?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Any current University of Guelph student with a valid @uoguelph.ca email. Email verification is required before you can use the platform.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Is Cribb free to use?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes. Cribb is completely free for students and free for landlords to register, get verified, and post listings. No subscription fees and no commission on rentals.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "How are landlords verified on Cribb?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Landlords submit government-issued ID and proof of property ownership during signup. Documents are processed through AWS Textract and reviewed before the landlord can publish any listing. Verified landlords display a verification badge on their listings.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Does Cribb handle leases or rent payments?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "No. Cribb is a discovery and connection platform only. Leases, deposits, and rent are arranged directly between students and landlords. Students should always read leases carefully and understand their rights under the Ontario Residential Tenancies Act.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "What is the Cribb Score?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "A 0 to 100 score displayed on every listing. At launch the score is based on property data (price, location, amenities, listing completeness). As tenant reviews accumulate, the score shifts to weight real tenant experiences more heavily.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "How does roommate matching work?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "You create or join a roommate group with people you already know, or browse other students looking for housemates. A 10-question compatibility quiz scores potential matches on sleep schedule, cleanliness, noise level, smoking, pets, study habits, kitchen use, budget, and timing. The feature is designed for friends finding a place together, not anonymous stranger matching.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Can I post a sublet on Cribb?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes. Any verified student can post a sublet for any duration, from one month to a full term. Sublets appear on a dedicated sublet board and in main housing search results.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Where does Cribb operate?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Cribb currently operates only at the University of Guelph in Guelph, Ontario. Expansion to additional Canadian university cities is planned.",
+          },
+        },
+      ],
+    },
+  ],
+};
+
 export default function HomePage() {
   const [activeShowcase, setActiveShowcase] = useState<(typeof showcaseFeatures)[number]["id"]>("compare");
   const activeFeature = showcaseFeatures.find((feature) => feature.id === activeShowcase) ?? showcaseFeatures[0];
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       {/* ═══ 1. HERO ═══════════════════════════════════════ */}
       <section className="relative overflow-hidden">
         <div className="max-w-[1200px] mx-auto px-6 pt-16 pb-20 relative z-10">

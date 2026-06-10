@@ -1,3 +1,6 @@
+# ════════════════════════════════════════════════════════
+# Default policy — all crawlers
+# ════════════════════════════════════════════════════════
 User-agent: *
 Allow: /
 
@@ -17,4 +20,110 @@ Disallow: /reset-password
 Disallow: /forgot-password
 Disallow: /landlord-claim
 
+# ════════════════════════════════════════════════════════
+# AI crawlers — explicitly allowed on public content,
+# blocked from private/auth pages.
+# Named bots only obey their own section, so the
+# disallows below must be repeated.
+# ════════════════════════════════════════════════════════
+
+# OpenAI (ChatGPT)
+User-agent: GPTBot
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /messages
+Disallow: /marketplace/messages
+Disallow: /landlord/properties
+Disallow: /landlord/onboarding
+Disallow: /roommates/invites
+Disallow: /roommates/my-group
+Disallow: /onboarding
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /landlord-claim
+
+# Anthropic (Claude)
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /messages
+Disallow: /marketplace/messages
+Disallow: /landlord/properties
+Disallow: /landlord/onboarding
+Disallow: /roommates/invites
+Disallow: /roommates/my-group
+Disallow: /onboarding
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /landlord-claim
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /messages
+Disallow: /marketplace/messages
+Disallow: /landlord/properties
+Disallow: /landlord/onboarding
+Disallow: /roommates/invites
+Disallow: /roommates/my-group
+Disallow: /onboarding
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /landlord-claim
+
+# Google AI training
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /messages
+Disallow: /marketplace/messages
+Disallow: /landlord/properties
+Disallow: /landlord/onboarding
+Disallow: /roommates/invites
+Disallow: /roommates/my-group
+Disallow: /onboarding
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /landlord-claim
+
+# Common Crawl (used to train many open models)
+User-agent: CCBot
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /messages
+Disallow: /marketplace/messages
+Disallow: /landlord/properties
+Disallow: /landlord/onboarding
+Disallow: /roommates/invites
+Disallow: /roommates/my-group
+Disallow: /onboarding
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /forgot-password
+Disallow: /landlord-claim
+
+# ════════════════════════════════════════════════════════
+# Sitemap and LLM index
+# ════════════════════════════════════════════════════════
 Sitemap: https://findyourcribb.com/sitemap.xml
+LLM: https://findyourcribb.com/llms.txt
