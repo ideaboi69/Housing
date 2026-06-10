@@ -11,6 +11,11 @@ Sentry.init({
   tracesSampleRate: 1,
   enableLogs: true,
   sendDefaultPii: true,
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 1.0,
+  integrations: [
+    Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
+  ],
 });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

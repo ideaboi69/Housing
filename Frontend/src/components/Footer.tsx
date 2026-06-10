@@ -1,0 +1,47 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+export function Footer() {
+  const pathname = usePathname();
+  if (pathname === "/") return null;
+
+  const year = new Date().getFullYear();
+
+  return (
+    <footer className="border-t border-[#1B2D45]/8 bg-[#FAF8F4]">
+      <div className="mx-auto max-w-7xl px-6 py-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="font-extrabold text-lg text-[#1B2D45] tracking-tight">
+            cribb
+          </span>
+          <span className="text-sm text-[#1B2D45]/50">
+            © {year} · Student housing, finally done right.
+          </span>
+        </div>
+
+        <nav className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+          <Link
+            href="/privacy"
+            className="text-[#1B2D45]/65 hover:text-[#FF6B35] transition-colors"
+          >
+            Privacy
+          </Link>
+          <Link
+            href="/terms"
+            className="text-[#1B2D45]/65 hover:text-[#FF6B35] transition-colors"
+          >
+            Terms
+          </Link>
+          <a
+            href="mailto:hello@findyourcribb.com"
+            className="text-[#1B2D45]/65 hover:text-[#FF6B35] transition-colors"
+          >
+            Contact
+          </a>
+        </nav>
+      </div>
+    </footer>
+  );
+}

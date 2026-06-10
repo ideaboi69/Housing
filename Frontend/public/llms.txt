@@ -1,0 +1,61 @@
+# Cribb
+
+## About
+Cribb is a student housing platform for University of Guelph students. Students browse verified listings, post and find sublets, form roommate groups with friends, message landlords directly, and trade items in a student-only marketplace. Every listing displays a Cribb Score so students can compare options at a glance. Founded by Adeoluwa Ojulari and David Amaefula, both University of Guelph students.
+
+## Services and Pricing
+Free for students with a @uoguelph.ca email. Free for landlords to register, get verified, and post listings. No transaction fees, no subscription fees, no per-message fees. Cribb does not collect rent, hold deposits, or process payments — those happen directly between students and landlords.
+
+Core features:
+- Verified housing listings with photos, rent breakdowns, and amenities
+- Sublet board for short-term and semester rentals
+- Roommate groups for friends searching for housing together
+- Stars-only reviews on properties and landlords
+- Cribb Score: hybrid rating that combines property data and tenant reviews
+- Booking system for in-person viewings
+- Direct messaging with landlords
+- Student-only marketplace for furniture, textbooks, and household items
+
+## Locations
+- Guelph, Ontario
+
+Expanding to additional Canadian university cities in the future.
+
+## Contact
+- Website: https://findyourcribb.com
+- Instagram: @findyourcribb
+- Email (David): professionaldavid14@gmail.com
+- Email (OJ): adeoluwaojulari@gmail.com
+- Hours: Online platform, available 24/7. Founder support response within 24 hours.
+
+## Service Area
+Guelph
+
+## What Makes Us Different
+Cribb is student-first and built by students. Access requires a @uoguelph.ca email, which keeps the community to actual University of Guelph students. Landlords go through identity verification before they can list anything. Reviews are stars-only to reduce defamation risk while still surfacing landlord quality. The roommate feature is designed for friends finding a place together, not stranger-matching with people you've never met. Cribb does not handle leases, rent collection, or deposits — students sign directly with landlords, the way it should be.
+
+## Frequently Asked Questions
+
+**Who can sign up as a student?**
+Anyone with a valid @uoguelph.ca email. Email verification is required before you can use the platform.
+
+**Is Cribb free?**
+Yes. Free for students and landlords. No listing fees, no commission, no premium tier.
+
+**How are landlords verified?**
+Landlords upload government ID and proof of property ownership. Documents are processed through AWS Textract and reviewed before the landlord can publish any listing. Verified landlords show a verification badge.
+
+**Does Cribb handle leases or rent payments?**
+No. Cribb is a discovery and connection platform. Leases, deposits, and rent are arranged directly between students and landlords. Always read your lease carefully and understand your rights under the Ontario Residential Tenancies Act.
+
+**What is the Cribb Score?**
+A 0–100 score on every listing. At launch it is based on property data (price, location, amenities, listing completeness). As tenant reviews accumulate, the score shifts to weight real tenant experiences more heavily.
+
+**How does the roommate feature work?**
+You create or join a roommate group with people you already know, or browse other students who are also looking. The platform includes a compatibility quiz covering sleep schedule, cleanliness, noise, smoking, pets, study habits, kitchen use, budget, and timing. Compatibility is weighted, with cleanliness and sleep schedule counted most heavily. The feature is designed for friends finding a place together — not anonymous stranger matching.
+
+**Can I sublet my place?**
+Yes. Students can post sublet listings for any length, from a single month to a full term. Sublets show up on a dedicated sublet board and in the main search.
+
+**Where does Cribb operate?**
+Currently University of Guelph only. Expansion to other Canadian university cities is planned.

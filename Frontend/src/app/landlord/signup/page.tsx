@@ -449,6 +449,15 @@ function LandlordSignupPageContent() {
                 </div>
               )}
 
+              {step === 2 && (
+                <p className="text-center text-[#1B2D45]/55 mt-4" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                  By creating an account, you agree to our{" "}
+                  <Link href="/terms" className="text-[#FF6B35] underline-offset-4 hover:underline">Terms</Link>
+                  {" "}and{" "}
+                  <Link href="/privacy" className="text-[#FF6B35] underline-offset-4 hover:underline">Privacy Policy</Link>.
+                </p>
+              )}
+
               {/* Navigation — navy buttons */}
               <div className="flex items-center gap-3 mt-6">
                 {step < 2 ? (

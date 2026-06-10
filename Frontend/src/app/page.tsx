@@ -766,7 +766,7 @@ export default function HomePage() {
                   <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Built by Guelph students</span>
                 </div>
                 <div className="inline-flex items-center gap-2 bg-[#FAF8F4] border border-black/5 rounded-full px-4 py-1.5">
-                  <span style={{ fontSize: "13px" }}>💚</span>
+                  <span style={{ fontSize: "13px" }}>🧡</span>
                   <span className="text-[#1B2D45]/60" style={{ fontSize: "12px", fontWeight: 500 }}>Cribb Score on every listing</span>
                 </div>
                 <div className="inline-flex items-center gap-2 bg-[#FAF8F4] border border-black/5 rounded-full px-4 py-1.5">

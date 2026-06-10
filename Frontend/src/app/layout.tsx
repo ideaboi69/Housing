@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { AuthHydrator } from "@/components/AuthHydrator";
 import { OnboardingProvider } from "@/components/OnboardingProvider";
 import { Toaster } from "sonner";
@@ -31,6 +32,7 @@ export default function RootLayout({
           <Navbar />
         </Suspense>
         <main>{children}</main>
+        <Footer />
         <Toaster position="bottom-right" richColors />
       </body>
     </html>

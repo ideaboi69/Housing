@@ -495,6 +495,13 @@ export default function WriterSignupPage() {
 
                           <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
 
+                          <p className="text-center text-[#1B2D45]/55" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                            By applying, you agree to our{" "}
+                            <Link href="/terms" className="text-[#FF6B35] underline-offset-4 hover:underline">Terms</Link>
+                            {" "}and{" "}
+                            <Link href="/privacy" className="text-[#FF6B35] underline-offset-4 hover:underline">Privacy Policy</Link>.
+                          </p>
+
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px_minmax(0,1fr)]">
                             <button
                               type="button"

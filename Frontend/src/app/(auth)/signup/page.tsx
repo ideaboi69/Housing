@@ -327,6 +327,13 @@ export default function SignupPage() {
 
                     <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
 
+                    <p className="text-center text-[#1B2D45]/55" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                      By signing up, you agree to our{" "}
+                      <Link href="/terms" className="text-[#FF6B35] underline-offset-4 hover:underline">Terms</Link>
+                      {" "}and{" "}
+                      <Link href="/privacy" className="text-[#FF6B35] underline-offset-4 hover:underline">Privacy Policy</Link>.
+                    </p>
+
                     <button
                       type="submit"
                       disabled={isLoading || !allPasswordRulesPassed || !turnstileToken}
