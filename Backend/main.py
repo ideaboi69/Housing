@@ -33,7 +33,16 @@ from slowapi.errors import RateLimitExceeded
 from Utils.rate_limit import limiter 
 import Utils.cloudinary_config
 import asyncio
+import sentry_sdk
 from config import settings
+
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        send_default_pii=True,
+        traces_sample_rate=0.2,
+        environment=settings.SENTRY_ENV,
+    )
 
 app = FastAPI(title="Cribb API")
 app.state.limiter = limiter

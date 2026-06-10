@@ -17,3 +17,5 @@ cloudinary
 apscheduler
 slowapi
 anthropic
+sentry-sdk[fastapi]
+upstash-redis

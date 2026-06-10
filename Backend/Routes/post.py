@@ -7,6 +7,7 @@ from Schemas.postSchema import PostCreate, PostUpdate, PostResponse, PostListRes
 from Utils.security import get_current_user, get_current_author, get_current_student
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from helpers import generate_slug, get_owned_post
+from Utils.cache import cached, invalidate
 post_router = APIRouter()
 
 # Create a post
@@ -60,6 +61,7 @@ async def upload_cover_image(post_id: int, file: UploadFile = File(...), db: Ses
 
 # Get all published posts (public)
 @post_router.get("/", response_model=list[PostListResponse])
+@cached("posts:list", ttl=300)
 def get_all_posts(category: Optional[PostCategory] = Query(None), db: Session = Depends(get_db)):
     query = db.query(Post).filter(Post.status == PostStatus.PUBLISHED)
 
@@ -247,6 +249,7 @@ def update_post(post_id: int, payload: PostUpdate, db: Session = Depends(get_db)
     db.commit()
     db.refresh(post)
 
+    invalidate("posts:list")
     return PostResponse.model_validate(post)
 
 # Delete Post
@@ -266,6 +269,7 @@ def delete_post(post_id: int, db: Session = Depends(get_db), author=Depends(get_
 
     db.delete(post)
     db.commit()
+    invalidate("posts:list")
 
 # Publish
 @post_router.patch("/{post_id}/publish", response_model=PostResponse)
@@ -279,6 +283,7 @@ def publish_post(post_id: int, db: Session = Depends(get_db), author = Depends(g
     db.commit()
     db.refresh(post)
 
+    invalidate("posts:list")
     return PostResponse.model_validate(post)
 
 # Unpublish
@@ -293,6 +298,7 @@ def unpublish_post(post_id: int, db: Session = Depends(get_db), author = Depends
     db.commit()
     db.refresh(post)
 
+    invalidate("posts:list")
     return PostResponse.model_validate(post)
 
 # Archive
@@ -307,6 +313,7 @@ def archive_post( post_id: int, db: Session = Depends(get_db), author = Depends(
     db.commit()
     db.refresh(post)
 
+    invalidate("posts:list")
     return PostResponse.model_validate(post)
 
 # Unarchive
@@ -321,4 +328,5 @@ def unarchive_post(post_id: int, db: Session = Depends(get_db), author = Depends
     db.commit()
     db.refresh(post)
 
+    invalidate("posts:list")
     return PostResponse.model_validate(post)

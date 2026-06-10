@@ -3,12 +3,13 @@ from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation, ListingRoom
 from Schemas.listingSchema import *
 from Schemas.propertySchema import PropertyType
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from helpers import get_landlord_for_user, require_landlord, build_listing_detail, get_listing_owned_by, build_listing_response
+from Utils.cache import cached, invalidate
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
@@ -82,6 +83,7 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
     db.commit()
     db.refresh(listing)
 
+    invalidate("listings:list")
     return build_listing_response(listing)
 
 @listing_router.post("/{listing_id}/images", status_code=status.HTTP_201_CREATED)
@@ -120,6 +122,7 @@ async def upload_listing_images(listing_id: int, files: list[UploadFile] = File(
     for img in images:
         db.refresh(img)
 
+    invalidate("listings:list")
     return [ListingImageResponse.model_validate(img) for img in images]
 
 # Reorder listing images
@@ -143,12 +146,14 @@ def reorder_listing_images(listing_id: int, payload: ListingImageReorder, db: Se
         image_by_id[image_id].display_order = new_order
  
     db.commit()
- 
+
+    invalidate("listings:list")
     ordered = sorted(images, key=lambda img: img.display_order)
     return [ListingImageResponse.model_validate(img) for img in ordered]
  
 # Browse Listings (public, with filters)
 @listing_router.get("/", response_model=list[ListingDetailResponse])
+@cached("listings:list", ttl=180)
 def list_listings(
     db: Session = Depends(get_db),
     # price filters
@@ -182,6 +187,9 @@ def list_listings(
         Property, Listing.property_id == Property.id
     ).join(
         Landlord, Property.landlord_id == Landlord.id
+    ).options(
+        selectinload(Listing.rooms),
+        selectinload(Listing.images),
     )
 
     # listing filters
@@ -269,6 +277,7 @@ def publish_listing(listing_id: int, db: Session = Depends(get_db),landlord: Lan
     db.commit()
     db.refresh(listing)
 
+    invalidate("listings:list")
     return build_listing_response(listing)
 
 @listing_router.patch("/{listing_id}/unpublish", response_model=ListingResponse)
@@ -288,6 +297,7 @@ def unpublish_listing(listing_id: int, db: Session = Depends(get_db), landlord: 
     db.commit()
     db.refresh(listing)
 
+    invalidate("listings:list")
     return build_listing_response(listing)
 
 # Get Single Listings (public, increments view count)
@@ -297,6 +307,9 @@ def get_listing(listing_id: int, db: Session = Depends(get_db)):
         Property, Listing.property_id == Property.id
     ).join(
         Landlord, Property.landlord_id == Landlord.id
+    ).options(
+        selectinload(Listing.rooms),
+        selectinload(Listing.images),
     ).filter(Listing.id == listing_id).first()
 
     if not result:
@@ -336,6 +349,7 @@ def update_listing(
     db.commit()
     db.refresh(listing)
 
+    invalidate("listings:list")
     return build_listing_response(listing)
 
 # Convert to sublet (landlord only)
@@ -358,6 +372,7 @@ def convert_to_sublet(
     db.commit()
     db.refresh(listing)
 
+    invalidate("listings:list")
     return build_listing_response(listing)
 
 # Delete Listing (landlord only, must own it)
@@ -389,6 +404,7 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db), landlord: Lan
 
     db.delete(listing)
     db.commit()
+    invalidate("listings:list")
 
 # delete a specific image in a listing
 @listing_router.delete("/{listing_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -405,6 +421,7 @@ def delete_a_listing_image(listing_id: int, image_id: int, db: Session = Depends
     delete_image_from_cloudinary(image.image_url)
     db.delete(image)
     db.commit()
+    invalidate("listings:list")
 
 # Dynamic room pricing
 @listing_router.patch("/{listing_id}/rooms/{room_id}", response_model=ListingRoomResponse)
@@ -430,6 +447,7 @@ def update_listing_room(listing_id: int, room_id: int, payload: ListingRoomUpdat
 
     db.commit()
     db.refresh(room)
+    invalidate("listings:list")
     return ListingRoomResponse.model_validate(room)
 
 
@@ -455,6 +473,7 @@ def add_listing_room(listing_id: int, payload: ListingRoomCreate, db: Session = 
 
     db.commit()
     db.refresh(room)
+    invalidate("listings:list")
     return ListingRoomResponse.model_validate(room)
 
 
@@ -478,3 +497,4 @@ def delete_listing_room(listing_id: int, room_id: int, db: Session = Depends(get
     listing.rent_total = sum(remaining_rents)
 
     db.commit()
+    invalidate("listings:list")

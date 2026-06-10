@@ -24,6 +24,11 @@ class Settings(BaseSettings):
 
     FORMSPREE_ENDPOINT: str
     ANTHROPIC_API_KEY: str
+    SENTRY_DSN: str = ""
+    SENTRY_ENV: str = "development"
+
+    UPSTASH_REDIS_REST_URL: str = ""
+    UPSTASH_REDIS_REST_TOKEN: str = ""
 
     @computed_field
     @property

@@ -8,6 +8,7 @@ from Schemas.subletSchema import *
 from Schemas.listingSchema import GenderPreference
 from Utils.security import get_current_student
 from helpers import build_sublet_list_response, build_sublet_response
+from Utils.cache import cached, invalidate
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.email import send_message_notification
 from Utils.websocket import connection_manager
@@ -64,6 +65,7 @@ def create_sublet(payload: SubletCreate, db: Session = Depends(get_db), current_
     db.commit()
     db.refresh(sublet)
 
+    invalidate("sublets:list")
     return build_sublet_response(sublet)
 
 # upload sublet images
@@ -102,6 +104,7 @@ async def upload_sublet_images(sublet_id: int, files: list[UploadFile] = File(..
     for img in images:
         db.refresh(img)
 
+    invalidate("sublets:list")
     return [SubletImageResponse.model_validate(img) for img in images]
 
 # Reorder sublet images — provide image IDs in the new desired order
@@ -128,13 +131,15 @@ def reorder_sublet_images(sublet_id: int, payload: SubletImageReorder, db: Sessi
         img.is_primary = (new_order == 0)
  
     db.commit()
- 
+
+    invalidate("sublets:list")
     ordered = sorted(images, key=lambda img: img.display_order)
     return [SubletImageResponse.model_validate(img) for img in ordered]
  
  
 # Get all active sublets (public, with filters)
 @sublet_router.get("/", response_model=list[SubletListResponse])
+@cached("sublets:list", ttl=180)
 def get_all_sublets(
     min_rent: Optional[float] = Query(None),
     max_rent: Optional[float] = Query(None),
@@ -465,6 +470,7 @@ def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: U
     db.commit()
     db.refresh(sublet)
 
+    invalidate("sublets:list")
     return build_sublet_response(sublet)
 
 @sublet_router.patch("/{sublet_id}/unpublish", response_model=SubletResponse)
@@ -481,6 +487,7 @@ def unpublish_sublet(sublet_id: int, db: Session = Depends(get_db), current_user
     db.commit()
     db.refresh(sublet)
 
+    invalidate("sublets:list")
     return build_sublet_response(sublet)
 
 # Update a sublet
@@ -508,6 +515,7 @@ def update_sublet(sublet_id: int, payload: SubletUpdate, db: Session = Depends(g
     db.commit()
     db.refresh(sublet)
 
+    invalidate("sublets:list")
     return build_sublet_response(sublet)
 
 # Delete a sublet
@@ -524,6 +532,7 @@ def delete_sublet(sublet_id: int, db: Session = Depends(get_db), current_user: U
 
     db.delete(sublet)
     db.commit()
+    invalidate("sublets:list")
 
 # Delete an image from a sublet
 @sublet_router.delete("/{sublet_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -542,3 +551,4 @@ def delete_sublet_image(sublet_id: int, image_id: int, db: Session = Depends(get
     delete_image_from_cloudinary(image.image_url)
     db.delete(image)
     db.commit()
+    invalidate("sublets:list")
