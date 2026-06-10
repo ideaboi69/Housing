@@ -8,6 +8,7 @@ import { Mail, ArrowLeft, CheckCircle, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { AuthBackLink } from "@/components/ui/AuthBackLink";
+import { TurnstileWidget } from "@/components/ui/TurnstileWidget";
 
 const rotatingResetLines = ["reset access", "get back to your picks", "stay in the flow"];
 
@@ -17,6 +18,7 @@ export default function ForgotPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [rotatingIndex, setRotatingIndex] = useState(0);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -36,7 +38,7 @@ export default function ForgotPasswordPage() {
 
     setIsLoading(true);
     try {
-      await api.auth.forgotPassword(email);
+      await api.auth.forgotPassword(email, turnstileToken);
       setSent(true);
     } catch {
       setSent(true);
@@ -178,10 +180,12 @@ export default function ForgotPasswordPage() {
                       </div>
                     )}
 
+                    <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
+
                     <button
                       type="submit"
-                      disabled={isLoading}
-                      className="w-full rounded-2xl bg-[#FF6B35] py-3.5 text-white hover:bg-[#e55e2e] disabled:opacity-60 transition-all"
+                      disabled={isLoading || !turnstileToken}
+                      className="w-full rounded-2xl bg-[#FF6B35] py-3.5 text-white hover:bg-[#e55e2e] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
                       style={{ fontSize: "15px", fontWeight: 800, boxShadow: "0 10px 28px rgba(255,107,53,0.28)" }}
                     >
                       {isLoading ? "Sending..." : "Send reset link"}

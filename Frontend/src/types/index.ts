@@ -161,6 +161,7 @@ export interface UserCreate {
   password: string;
   first_name: string;
   last_name: string;
+  turnstile_token?: string | null;
 }
 
 export interface UserLogin {
@@ -777,6 +778,7 @@ export interface WriterRegister {
   website?: string;
   phone?: string;
   reason: string;
+  turnstile_token?: string | null;
 }
 
 export interface WriterResponse {

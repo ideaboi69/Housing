@@ -10,6 +10,7 @@ import {
   Building2, Phone, Shield, Upload, FileText, X, Check,
   ArrowLeft, ArrowRight, User, Mail, Lock, AlertCircle, Loader2,
 } from "lucide-react";
+import { TurnstileWidget } from "@/components/ui/TurnstileWidget";
 
 /* ════════════════════════════════════════════════════════
    Step indicator — navy theme
@@ -101,6 +102,7 @@ function LandlordSignupPageContent() {
   const [documentType, setDocumentType] = useState<string>("property_tax_bill");
   const [govId, setGovId] = useState<File | null>(null);
   const [proofOfOwnership, setProofOfOwnership] = useState<File | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   function validateStep0() {
     if (!account.first_name || !account.last_name || !account.email || !account.password) { setError("All fields are required"); return false; }
@@ -147,6 +149,7 @@ function LandlordSignupPageContent() {
       formData.append("id_file", govId);
       formData.append("document_file", proofOfOwnership);
       if (business.company_name) formData.append("company_name", business.company_name);
+      if (turnstileToken) formData.append("turnstile_token", turnstileToken);
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await fetch(`${API_URL}/api/landlords/register`, { method: "POST", body: formData });
@@ -439,6 +442,13 @@ function LandlordSignupPageContent() {
                 </div>
               )}
 
+              {/* Captcha on final step */}
+              {step === 2 && (
+                <div className="mt-5">
+                  <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
+                </div>
+              )}
+
               {/* Navigation — navy buttons */}
               <div className="flex items-center gap-3 mt-6">
                 {step < 2 ? (
@@ -448,8 +458,8 @@ function LandlordSignupPageContent() {
                     Continue <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
-                  <button onClick={handleSubmit} disabled={isLoading}
-                    className="flex-1 py-3 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                  <button onClick={handleSubmit} disabled={isLoading || !turnstileToken}
+                    className="flex-1 py-3 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                     style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(27,45,69,0.2)" }}>
                     {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account...</> : <>Create Landlord Account <ArrowRight className="w-4 h-4" /></>}
                   </button>

@@ -11,6 +11,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { AlertCircle, ArrowRight, CheckCircle2, PenLine, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WriterRegister } from "@/types";
+import { TurnstileWidget } from "@/components/ui/TurnstileWidget";
 
 type WriterSignupStep = 1 | 2;
 
@@ -41,6 +42,7 @@ export default function WriterSignupPage() {
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [rotatingIndex, setRotatingIndex] = useState(0);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -96,6 +98,7 @@ export default function WriterSignupPage() {
         website: form.website?.trim() || undefined,
         phone: form.phone?.trim() || undefined,
         reason: form.reason.trim(),
+        turnstile_token: turnstileToken,
       });
       setSubmitted(true);
     } catch (err) {
@@ -490,6 +493,8 @@ export default function WriterSignupPage() {
                             </div>
                           )}
 
+                          <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
+
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[140px_minmax(0,1fr)]">
                             <button
                               type="button"
@@ -508,8 +513,8 @@ export default function WriterSignupPage() {
 
                             <button
                               type="submit"
-                              disabled={isLoading || !canSubmit}
-                              className="rounded-2xl bg-[#FF6B35] px-4 py-3.5 text-white transition-all hover:bg-[#e55e2e] disabled:opacity-60"
+                              disabled={isLoading || !canSubmit || !turnstileToken}
+                              className="rounded-2xl bg-[#FF6B35] px-4 py-3.5 text-white transition-all hover:bg-[#e55e2e] disabled:opacity-60 disabled:cursor-not-allowed"
                               style={{ fontSize: "15px", fontWeight: 800, boxShadow: "0 10px 24px rgba(255,107,53,0.24)" }}
                             >
                               {isLoading ? (

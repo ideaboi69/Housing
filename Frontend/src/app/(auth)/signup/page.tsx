@@ -8,6 +8,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { AuthBackLink } from "@/components/ui/AuthBackLink";
 import { Mail, CheckCircle, ArrowRight, Check, X, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { TurnstileWidget } from "@/components/ui/TurnstileWidget";
 
 const PASSWORD_RULES = [
   { key: "length", label: "At least 8 characters", test: (pw: string) => pw.length >= 8 },
@@ -76,6 +77,7 @@ export default function SignupPage() {
   const [showVerification, setShowVerification] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rotatingIndex, setRotatingIndex] = useState(0);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -99,7 +101,7 @@ export default function SignupPage() {
     if (!allPasswordRulesPassed) return;
 
     try {
-      await register(form);
+      await register({ ...form, turnstile_token: turnstileToken });
       setShowVerification(true);
     } catch {
       // Error handled by store
@@ -323,9 +325,11 @@ export default function SignupPage() {
                       </div>
                     )}
 
+                    <TurnstileWidget onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} />
+
                     <button
                       type="submit"
-                      disabled={isLoading || !allPasswordRulesPassed}
+                      disabled={isLoading || !allPasswordRulesPassed || !turnstileToken}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF6B35] py-3.5 text-white hover:bg-[#e55e2e] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                       style={{ fontSize: "15px", fontWeight: 800, boxShadow: allPasswordRulesPassed ? "0 10px 28px rgba(255,107,53,0.28)" : "none" }}
                     >

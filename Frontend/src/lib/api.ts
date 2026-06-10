@@ -335,10 +335,10 @@ export const auth = {
   getUserById: (id: number) =>
     request<UserResponse>(`/api/users/${id}`),
 
-  forgotPassword: (email: string) =>
+  forgotPassword: (email: string, turnstile_token?: string | null) =>
     request<{ message: string }>("/api/users/forgot-password", {
       method: "POST",
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, turnstile_token }),
     }),
 
   resetPassword: (token: string, new_password: string) =>
