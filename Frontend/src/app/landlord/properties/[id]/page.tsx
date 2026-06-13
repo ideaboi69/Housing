@@ -16,6 +16,7 @@ import {
 import { EditPropertyModal } from "@/components/landlord/EditPropertyModal";
 import { EditListingModal } from "@/components/landlord/EditListingModal";
 import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
+import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
 
 type ListingStatusFilter = "all" | "active" | "draft" | "archived";
 
@@ -442,15 +443,12 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              type="button"
+                            <ListingVisibilitySwitch
+                              isActive={isActive}
+                              disabled={!isToggleable}
+                              loading={togglingListing === listing.id}
                               onClick={() => void toggleListingVisibility(listing)}
-                              disabled={!isToggleable || togglingListing === listing.id}
-                              className={`relative h-6 w-11 rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-55 ${isActive ? "bg-[#1B2D45]" : "bg-[#1B2D45]/20"}`}
-                              title={isActive ? "Unpublish listing" : "Publish listing"}
-                            >
-                              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isActive ? "translate-x-[23px]" : "translate-x-1"}`} />
-                            </button>
+                            />
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1.5">

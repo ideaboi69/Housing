@@ -10,7 +10,7 @@ import {
   Plus, Building2, Eye, EyeOff, Trash2, TrendingUp, Shield, ShieldCheck,
   ChevronDown, ChevronRight, Home, Phone, Mail, Pencil, Check, X,
   MessageCircle, LayoutDashboard, Send,
-  ToggleLeft, ToggleRight, Calendar, Loader2,
+  Calendar, Loader2,
   ArrowRight, Archive, Inbox, Clock, AlertCircle, Image, CalendarDays, Star, Flag,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,6 +29,7 @@ import {
 import { EditListingModal } from "@/components/landlord/EditListingModal";
 import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
 import { ShowingsManager } from "@/components/landlord/ShowingsManager";
+import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
 import { LandlordOverviewSkeleton } from "@/components/ui/Skeletons";
 import { TenantCardModal } from "@/components/ui/TenantCardModal";
@@ -1013,19 +1014,15 @@ function ListingsTab({
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
+                        <ListingVisibilitySwitch
+                          isActive={isActive}
+                          disabled={!isToggleable}
+                          loading={togglingListingId === listing.id}
                           onClick={(event) => {
                             event.stopPropagation();
                             void handleToggleListing(listing);
                           }}
-                          disabled={!isToggleable || togglingListingId === listing.id}
-                          className={`relative h-6 w-11 rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-55 ${isActive ? "bg-[#1B2D45]" : "bg-[#1B2D45]/20"}`}
-                          title={isActive ? "Unpublish listing" : "Publish listing"}
-                          aria-label={isActive ? "Unpublish listing" : "Publish listing"}
-                        >
-                          <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isActive ? "translate-x-[23px]" : "translate-x-1"}`} />
-                        </button>
+                        />
                       </td>
                       <td className="px-4 py-3 text-[#1B2D45]/78" style={{ fontSize: "11px", fontWeight: 850 }}>{listing.view_count}</td>
                       <td className="px-4 py-3 text-[#1B2D45]/78" style={{ fontSize: "11px", fontWeight: 800 }}>{daysSince(listing.created_at)} days</td>
