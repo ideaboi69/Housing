@@ -841,7 +841,7 @@ function ListingsTab({
 
   async function handleToggleListing(listing: ListingResponse) {
     const status = listing.status.toLowerCase();
-    if (!["active", "draft"].includes(status) || togglingListingId === listing.id) return;
+    if (!["active", "draft", "expired"].includes(status) || togglingListingId === listing.id) return;
 
     setTogglingListingId(listing.id);
     try {
@@ -970,7 +970,8 @@ function ListingsTab({
                 {filteredListings.map(({ listing, property }) => {
                   const statusBucket = getListingStatusBucket(listing.status);
                   const isActive = statusBucket === "active";
-                  const isToggleable = ["active", "draft"].includes(statusBucket);
+                  const rawStatus = listing.status.toLowerCase();
+                  const isToggleable = rawStatus === "active" || rawStatus === "draft" || rawStatus === "expired";
                   const roomLabel = getListingRoomLabel(listing, property);
                   const typeLabel = getListingTypeLabel(listing);
 

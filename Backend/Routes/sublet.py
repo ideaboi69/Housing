@@ -463,8 +463,8 @@ def publish_sublet(sublet_id: int, db: Session = Depends(get_db),current_user: U
     if not sublet:
         raise HTTPException(status_code=404, detail="Sublet not found")
 
-    if sublet.status != SubletStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Only drafts can be published")
+    if sublet.status not in (SubletStatus.DRAFT, SubletStatus.EXPIRED):
+        raise HTTPException(status_code=400, detail="Only drafts or expired sublets can be published")
 
     sublet.status = SubletStatus.ACTIVE
     db.commit()

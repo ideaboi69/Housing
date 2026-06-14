@@ -270,8 +270,8 @@ def publish_listing(listing_id: int, db: Session = Depends(get_db),landlord: Lan
     if prop.landlord_id != landlord.id:
         raise HTTPException(status_code=403, detail="Not your listing")
 
-    if listing.status != ListingStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Only drafts can be published")
+    if listing.status not in (ListingStatus.DRAFT, ListingStatus.EXPIRED):
+        raise HTTPException(status_code=400, detail="Only drafts or expired listings can be published")
 
     listing.status = ListingStatus.ACTIVE
     db.commit()

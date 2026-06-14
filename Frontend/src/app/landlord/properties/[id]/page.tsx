@@ -219,14 +219,15 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   async function toggleListingVisibility(listing: ListingDetailResponse) {
     if (togglingListing === listing.id) return;
 
+    const status = listing.status.toLowerCase();
     setTogglingListing(listing.id);
     try {
-      if (listing.status.toLowerCase() === "active") {
+      if (status === "active") {
         await api.listings.unpublish(listing.id);
-      } else if (listing.status.toLowerCase() === "draft") {
+      } else if (status === "draft" || status === "expired") {
         await api.listings.publish(listing.id);
       } else {
-        window.alert("Only active and draft listings can be toggled right now.");
+        window.alert("This listing can't be toggled right now.");
         return;
       }
       await refreshListing(listing.id);
@@ -424,8 +425,9 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                   <tbody className="divide-y divide-black/[0.04]">
                     {filteredListings.map((listing, index) => {
                       const statusBucket = getListingStatusBucket(listing.status);
-                      const isActive = listing.status.toLowerCase() === "active";
-                      const isToggleable = ["active", "draft"].includes(listing.status.toLowerCase());
+                      const rawStatus = listing.status.toLowerCase();
+                      const isActive = rawStatus === "active";
+                      const isToggleable = rawStatus === "active" || rawStatus === "draft" || rawStatus === "expired";
                       return (
                         <tr key={listing.id} className="transition-colors hover:bg-[#F7F9FC]">
                           <td className="px-4 py-3">

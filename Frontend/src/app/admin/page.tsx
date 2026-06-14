@@ -7,14 +7,14 @@ import {
   Shield, ShieldCheck, ShieldX, Trash2, Check, X, Search,
   LogOut, ChevronDown, Eye, Ban, UserCheck, UserX, Loader2,
   Mail, Calendar, TrendingUp, AlertCircle, CheckCircle2, Star,
-  UsersRound, ShoppingBag,
+  UsersRound, ShoppingBag, CalendarX, BedDouble,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
 import { toast } from "sonner";
 import type {
   AdminStatsResponse, AdminUserResponse, AdminLandlordResponse,
-  AdminListingResponse, AdminFlagResponse, WriterResponse, PostListResponse,
+  AdminListingResponse, AdminSubletResponse, AdminFlagResponse, WriterResponse, PostListResponse,
   MarketplaceItemListResponse, GroupCardResponse,
 } from "@/types";
 
@@ -22,7 +22,7 @@ import type {
    Helpers
    ════════════════════════════════════════════════════════ */
 
-type Tab = "overview" | "users" | "landlords" | "listings" | "flags" | "writers" | "posts" | "groups" | "marketplace";
+type Tab = "overview" | "users" | "landlords" | "listings" | "sublets" | "flags" | "writers" | "posts" | "groups" | "marketplace";
 
 function getTabFromQuery(value: string | null): Tab {
   if (
@@ -30,6 +30,7 @@ function getTabFromQuery(value: string | null): Tab {
     value === "users" ||
     value === "landlords" ||
     value === "listings" ||
+    value === "sublets" ||
     value === "flags" ||
     value === "writers" ||
     value === "posts" ||
@@ -73,6 +74,7 @@ const TABS: { key: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "users", label: "Users", icon: Users },
   { key: "landlords", label: "Landlords", icon: Building2 },
   { key: "listings", label: "Listings", icon: Home },
+  { key: "sublets", label: "Sublets", icon: BedDouble },
   { key: "flags", label: "Flags", icon: Flag },
   { key: "writers", label: "Writers", icon: PenLine },
   { key: "posts", label: "Posts", icon: FileText },
@@ -395,10 +397,16 @@ function LandlordsTab({ landlords, onRefresh }: { landlords: AdminLandlordRespon
 
 function ListingsTab({ listings, onRefresh }: { listings: AdminListingResponse[]; onRefresh: () => void }) {
   const router = useRouter();
-  
+
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this listing?")) return;
     try { await api.admin.deleteListing(id); toast.success("Listing deleted"); onRefresh(); } catch { toast.error("Failed"); }
+  };
+
+  const handleExpire = async (id: number) => {
+    if (!confirm("Mark this listing as expired? The landlord will be emailed so they can clean it up.")) return;
+    try { await api.admin.expireListing(id); toast.success("Listing expired — landlord notified"); onRefresh(); }
+    catch (e) { toast.error(e instanceof ApiError ? e.detail : "Failed to expire"); }
   };
 
   return (
@@ -421,11 +429,67 @@ function ListingsTab({ listings, onRefresh }: { listings: AdminListingResponse[]
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <ActionButton onClick={() => router.push(`/browse/${l.id}`)} icon={Eye} label="View" color="#60A5FA" />
+              {l.status !== "expired" && <ActionButton onClick={() => handleExpire(l.id)} icon={CalendarX} label="Expire" color="#FFB627" />}
               <ActionButton onClick={() => handleDelete(l.id)} icon={Trash2} label="Delete" danger />
             </div>
           </div>
         ))}
         {listings.length === 0 && <div className="text-center py-12 text-white/20" style={{ fontSize: "13px" }}>No listings</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════
+   Sublets Tab
+   ════════════════════════════════════════════════════════ */
+
+function SubletsTab({ sublets, onRefresh }: { sublets: AdminSubletResponse[]; onRefresh: () => void }) {
+  const router = useRouter();
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this sublet entirely? Images, bookings, and conversations will also be removed. This can't be undone.")) return;
+    try { await api.admin.deleteSublet(id); toast.success("Sublet deleted"); onRefresh(); }
+    catch (e) { toast.error(e instanceof ApiError ? e.detail : "Failed to delete"); }
+  };
+
+  const handleExpire = async (id: number) => {
+    if (!confirm("Mark this sublet as expired? The owner will be emailed so they can clean it up.")) return;
+    try { await api.admin.expireSublet(id); toast.success("Sublet expired — owner notified"); onRefresh(); }
+    catch (e) { toast.error(e instanceof ApiError ? e.detail : "Failed to expire"); }
+  };
+
+  const statusColor = (s: string) => s === "active" ? "#4ADE80" : s === "draft" ? "#FFB627" : s === "rented" ? "#60A5FA" : s === "expired" ? "#98A3B0" : "#E71D36";
+
+  return (
+    <div>
+      <h2 className="text-white mb-4" style={{ fontSize: "20px", fontWeight: 800 }}>Sublets ({sublets.length})</h2>
+      <div className="space-y-1">
+        {sublets.map((s) => (
+          <div key={s.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="text-white flex items-center gap-2 flex-wrap" style={{ fontSize: "13px", fontWeight: 600 }}>
+                <button onClick={() => router.push(`/sublets/${s.id}`)} className="hover:text-[#FF6B35] transition-colors text-left truncate">
+                  {s.title || `Sublet #${s.id}`}
+                </button>
+                <Badge label={s.status} color={statusColor(s.status)} />
+                <Badge label={s.room_type} color="#2EC4B6" />
+              </div>
+              <div className="text-white/30 truncate" style={{ fontSize: "11px" }}>
+                {s.address ? `${s.address} · ` : ""}${s.rent}/mo · {new Date(s.start_date).toLocaleDateString()} → {new Date(s.end_date).toLocaleDateString()} · {timeAgo(s.created_at)}
+              </div>
+              <div className="text-white/30 truncate mt-0.5" style={{ fontSize: "10px" }}>
+                Owner: {s.owner_name || `User #${s.user_id}`} · {s.owner_email || "—"}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <ActionButton onClick={() => router.push(`/sublets/${s.id}`)} icon={Eye} label="View" color="#60A5FA" />
+              {s.status !== "expired" && <ActionButton onClick={() => handleExpire(s.id)} icon={CalendarX} label="Expire" color="#FFB627" />}
+              <ActionButton onClick={() => handleDelete(s.id)} icon={Trash2} label="Delete" danger />
+            </div>
+          </div>
+        ))}
+        {sublets.length === 0 && <div className="text-center py-12 text-white/20" style={{ fontSize: "13px" }}>No sublets</div>}
       </div>
     </div>
   );
@@ -879,6 +943,7 @@ function AdminContent() {
   const [users, setUsers] = useState<AdminUserResponse[]>([]);
   const [landlords, setLandlords] = useState<AdminLandlordResponse[]>([]);
   const [listings, setListings] = useState<AdminListingResponse[]>([]);
+  const [sublets, setSublets] = useState<AdminSubletResponse[]>([]);
   const [flags, setFlags] = useState<AdminFlagResponse[]>([]);
   const [writers, setWriters] = useState<WriterResponse[]>([]);
   const [pendingWriters, setPendingWriters] = useState<AdminUserResponse[]>([]);
@@ -915,6 +980,9 @@ function AdminContent() {
       } else if (tab === "listings") {
         const l = await api.admin.getListings();
         setListings(l);
+      } else if (tab === "sublets") {
+        const s = await api.admin.getSublets();
+        setSublets(s);
       } else if (tab === "flags") {
         const f = await api.admin.getFlags();
         setFlags(f);
@@ -1022,6 +1090,7 @@ function AdminContent() {
             {tab === "users" && <UsersTab users={users} onRefresh={fetchData} />}
             {tab === "landlords" && <LandlordsTab landlords={landlords} onRefresh={fetchData} />}
             {tab === "listings" && <ListingsTab listings={listings} onRefresh={fetchData} />}
+            {tab === "sublets" && <SubletsTab sublets={sublets} onRefresh={fetchData} />}
             {tab === "flags" && <FlagsTab flags={flags} onRefresh={fetchData} />}
             {tab === "writers" && <WritersTab writers={writers} pendingUsers={pendingWriters} onRefresh={fetchData} />}
             {tab === "posts" && <PostsTab posts={posts} onRefresh={fetchData} />}

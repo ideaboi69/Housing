@@ -1,15 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, func
+from typing import Optional
 from tables import *
-from Schemas.adminSchema import AdminCreate, AdminResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminStatsResponse, AccountType, SubletOnboardingEmailRequest
+from Schemas.adminSchema import AdminCreate, AdminResponse, AdminUserResponse, AdminLandlordResponse, AdminListingResponse, AdminSubletResponse, AdminStatsResponse, AccountType, SubletOnboardingEmailRequest
+from Schemas.subletSchema import SubletStatus
 from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse
 from helpers import require_admin, cascade_delete_landlord, get_account_or_404
 from Utils.security import hash_password, create_access_token, verify_password, validate_password
 from Utils.cloudinary import delete_image_from_cloudinary
-from Utils.email import send_approval_email, send_rejection_email, send_revoked_email, send_sublet_onboarding_email
+from Utils.email import send_approval_email, send_rejection_email, send_revoked_email, send_sublet_onboarding_email, send_sublet_expired_email, send_listing_expired_email
+from Schemas.listingSchema import ListingStatus
 from Utils.rate_limit import limiter
 from config import settings
 
@@ -369,6 +373,100 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db), admin: User =
     db.commit()
 
     return None
+
+@admin_router.patch("/listings/{listing_id}/expire", status_code=status.HTTP_200_OK)
+def admin_expire_listing(listing_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Force a listing to EXPIRED status and email the landlord so they can clean it up."""
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found")
+    if listing.status == ListingStatus.EXPIRED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Listing is already expired")
+
+    listing.status = ListingStatus.EXPIRED
+    db.commit()
+    db.refresh(listing)
+
+    landlord = None
+    if listing.property and listing.property.landlord_id:
+        landlord = db.query(Landlord).filter(Landlord.id == listing.property.landlord_id).first()
+
+    listing_title = listing.property.title if listing.property else f"Listing #{listing.id}"
+
+    if landlord and landlord.email:
+        background_tasks.add_task(send_listing_expired_email, landlord.email, landlord.first_name, listing_title)
+
+    return {"message": "Listing expired and landlord notified", "listing_id": listing.id, "status": listing.status.value}
+
+# SUBLET ENDPOINTS
+@admin_router.get("/sublets", response_model=list[AdminSubletResponse])
+def list_all_sublets(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+    status_filter: Optional[SubletStatus] = Query(None, alias="status"),
+    user_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """List sublets across all users. Admin moderation surface."""
+    query = db.query(Sublet)
+    if status_filter is not None:
+        query = query.filter(Sublet.status == status_filter)
+    if user_id is not None:
+        query = query.filter(Sublet.user_id == user_id)
+    if search:
+        like = f"%{search.lower()}%"
+        query = query.filter(or_(func.lower(Sublet.title).like(like), func.lower(Sublet.address).like(like)))
+
+    sublets = query.order_by(Sublet.created_at.desc()).offset(offset).limit(limit).all()
+
+    results = []
+    for s in sublets:
+        data = AdminSubletResponse.model_validate(s)
+        if s.user:
+            data.owner_name = f"{s.user.first_name} {s.user.last_name}"
+            data.owner_email = s.user.email
+        results.append(data)
+    return results
+
+@admin_router.delete("/sublets/{sublet_id}", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_sublet(sublet_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Remove a sublet entirely. Cascades images (incl. Cloudinary), bookings, slots, availabilities, conversations, flags."""
+    sublet = db.query(Sublet).filter(Sublet.id == sublet_id).first()
+    if not sublet:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sublet not found")
+
+    # Cloudinary cleanup before DB cascade removes the SubletImage rows
+    for image in sublet.images:
+        delete_image_from_cloudinary(image.image_url)
+
+    # Flag rows are FK SET NULL — clear them explicitly so they don't dangle as pending flags on nothing
+    db.query(Flag).filter(Flag.sublet_id == sublet.id).delete(synchronize_session=False)
+
+    # Remaining children (SubletImage, ViewingAvailability, ViewingSlot, ViewingBooking, SubletConversation)
+    # cascade via FK ondelete=CASCADE
+    db.delete(sublet)
+    db.commit()
+    return None
+
+@admin_router.patch("/sublets/{sublet_id}/expire", status_code=status.HTTP_200_OK)
+def admin_expire_sublet(sublet_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Force a sublet to EXPIRED status and email the owner so they can clean it up."""
+    sublet = db.query(Sublet).filter(Sublet.id == sublet_id).first()
+    if not sublet:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sublet not found")
+    if sublet.status == SubletStatus.EXPIRED:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sublet is already expired")
+
+    sublet.status = SubletStatus.EXPIRED
+    db.commit()
+    db.refresh(sublet)
+
+    if sublet.user and sublet.user.email:
+        background_tasks.add_task(send_sublet_expired_email, sublet.user.email, sublet.user.first_name, sublet.title)
+
+    return {"message": "Sublet expired and owner notified", "sublet_id": sublet.id, "status": sublet.status.value}
 
 # REVIEW ENDPOINT
 @admin_router.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -77,6 +77,24 @@ class AdminListingResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class AdminSubletResponse(BaseModel):
+    id: int
+    user_id: int
+    owner_name: str = ""
+    owner_email: str = ""
+    title: str
+    address: str
+    rent: float
+    room_type: str
+    start_date: datetime
+    end_date: datetime
+    status: str
+    view_count: int = 0
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class AdminStatsResponse(BaseModel):
     total_users: int
     total_landlords: int

@@ -1294,6 +1294,22 @@ export interface AdminListingResponse {
   created_at: string;
 }
 
+export interface AdminSubletResponse {
+  id: number;
+  user_id: number;
+  owner_name: string;
+  owner_email: string;
+  title: string;
+  address: string;
+  rent: number;
+  room_type: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  view_count: number;
+  created_at: string;
+}
+
 export interface AdminFlagResponse {
   id: number;
   reporter_id: number;

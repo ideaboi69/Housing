@@ -80,6 +80,7 @@ import type {
   AdminUserResponse,
   AdminLandlordResponse,
   AdminListingResponse,
+  AdminSubletResponse,
   AdminFlagResponse,
   // Marketplace
   MarketplaceItemResponse,
@@ -1212,6 +1213,14 @@ export const admin = {
   // Listings
   getListings: () => request<AdminListingResponse[]>("/api/admin/listings"),
   deleteListing: (id: number) => request<null>(`/api/admin/listings/${id}`, { method: "DELETE" }),
+  expireListing: (id: number) =>
+    request<{ message: string; listing_id: number; status: string }>(`/api/admin/listings/${id}/expire`, { method: "PATCH" }),
+
+  // Sublets
+  getSublets: () => request<AdminSubletResponse[]>("/api/admin/sublets"),
+  deleteSublet: (id: number) => request<null>(`/api/admin/sublets/${id}`, { method: "DELETE" }),
+  expireSublet: (id: number) =>
+    request<{ message: string; sublet_id: number; status: string }>(`/api/admin/sublets/${id}/expire`, { method: "PATCH" }),
 
   // Reviews
   deleteReview: (id: number) => request<null>(`/api/admin/reviews/${id}`, { method: "DELETE" }),

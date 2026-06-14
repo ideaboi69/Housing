@@ -934,3 +934,169 @@ def send_sublet_onboarding_email(to_email: str, first_name: str = None):
         "subject": "You're in early — here's how to post your sublet on Cribb",
         "html": html_content,
     })
+
+# Listing expired by admin (moderation)
+def send_listing_expired_email(to_email: str, first_name: str, listing_title: str):
+    """Notify a landlord that their listing was expired by Cribb moderation."""
+
+    safe_name = first_name or "there"
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #fef3c7; color: #92400e; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Listing Expired
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Hi {safe_name},
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    Your listing <strong>"{listing_title}"</strong> has been moved to <strong>expired</strong> status by the Cribb team. It's no longer visible to students browsing for housing.
+                                </p>
+
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    This usually happens when a listing's move-in date has passed or the listing looks like it's no longer relevant. Open your landlord dashboard to update or republish.
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td align="center" style="padding: 4px 0 24px;">
+                                            <a href="{settings.FRONTEND_URL}/landlord"
+                                               style="display: inline-block; background-color: #f58259; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                                Open Landlord Dashboard
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    Think this was a mistake? Reply to this email and we'll take another look.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    return resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"Your listing \"{listing_title}\" was expired — FindYourCribb",
+        "html": html_content,
+    })
+
+# Sublet expired by admin (moderation)
+def send_sublet_expired_email(to_email: str, first_name: str, sublet_title: str):
+    """Notify a sublet owner that their listing was expired by Cribb moderation."""
+
+    safe_name = first_name or "there"
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: #fef3c7; color: #92400e; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        Sublet Expired
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Hi {safe_name},
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    Your sublet listing <strong>"{sublet_title}"</strong> has been moved to <strong>expired</strong> status by the Cribb team. It's no longer visible to students browsing sublets.
+                                </p>
+
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    This usually happens when a sublet's dates have passed or the listing looks like it's no longer relevant. If you'd like to clean it up or update the details, head to your sublets dashboard.
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td align="center" style="padding: 4px 0 24px;">
+                                            <a href="{settings.FRONTEND_URL}/sublets/my"
+                                               style="display: inline-block; background-color: #f58259; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                                Manage My Sublets
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    Think this was a mistake? Reply to this email and we'll take another look.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    return resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"Your sublet \"{sublet_title}\" was expired — FindYourCribb",
+        "html": html_content,
+    })
