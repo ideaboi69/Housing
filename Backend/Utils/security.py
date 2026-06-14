@@ -93,6 +93,14 @@ def decode_access_token(token: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         ) 
 
+def _check_token_version(payload: dict, user) -> None:
+    if payload.get("tv", 0) != getattr(user, "token_version", 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session expired. Please log in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 def get_current_user(token: str = Depends(user_oauth2), db: Session = Depends(get_db)):
     payload = decode_access_token(token)
 
@@ -118,6 +126,7 @@ def get_current_user(token: str = Depends(user_oauth2), db: Session = Depends(ge
             detail="User not found",
         )
 
+    _check_token_version(payload, user)
     return user
 
 def get_current_student(token: str = Depends(user_oauth2), db: Session = Depends(get_db)):
@@ -150,6 +159,7 @@ def get_current_student(token: str = Depends(user_oauth2), db: Session = Depends
             detail="Please verify your email first",
         )
 
+    _check_token_version(payload, user)
     return user
 
 def get_current_landlord(token: str = Depends(landlord_oauth2), db: Session = Depends(get_db)):
@@ -168,6 +178,7 @@ def get_current_landlord(token: str = Depends(landlord_oauth2), db: Session = De
             detail="Landlord not found",
         )
 
+    _check_token_version(payload, landlord)
     return landlord
 
 def get_current_admin(token: str = Depends(admin_oauth2), db: Session = Depends(get_db)):
@@ -186,6 +197,7 @@ def get_current_admin(token: str = Depends(admin_oauth2), db: Session = Depends(
     if not admin.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin account is deactivated")
 
+    _check_token_version(payload, admin)
     return admin
 
 def get_current_writer(token: str = Depends(writer_oauth2), db: Session = Depends(get_db)):
@@ -201,6 +213,7 @@ def get_current_writer(token: str = Depends(writer_oauth2), db: Session = Depend
     if writer.status != WriterStatus.APPROVED:
         raise HTTPException(status_code=403, detail="Your account is not approved yet")
 
+    _check_token_version(payload, writer)
     return writer
 
 def get_current_author( credentials: HTTPAuthorizationCredentials = Security(post_bearer), db: Session = Depends(get_db)):
@@ -218,6 +231,7 @@ def get_current_author( credentials: HTTPAuthorizationCredentials = Security(pos
             raise HTTPException(status_code=404, detail="Writer not found")
         if writer.status != WriterStatus.APPROVED:
             raise HTTPException(status_code=403, detail="Your writer account is not approved yet")
+        _check_token_version(payload, writer)
         return writer
 
     elif role == UserRole.STUDENT.value:
@@ -228,6 +242,7 @@ def get_current_author( credentials: HTTPAuthorizationCredentials = Security(pos
             raise HTTPException(status_code=403, detail="Verify your email first")
         if not user.is_writable:
             raise HTTPException(status_code=403, detail="You don't have write access. Request it first.")
+        _check_token_version(payload, user)
         return user
 
     else:

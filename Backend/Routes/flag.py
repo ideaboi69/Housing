@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from tables import get_db, User, Listing, Review, Flag, MarketplaceItem, Sublet
 from Schemas.flagSchema import FlagCreate, FlagResponse, FlagStatus
 from Utils.security import get_current_user, get_current_student
+from Utils.rate_limit import limiter
 
 flag_router = APIRouter()
 
 # Create flag (logged in only)
 @flag_router.post("/", response_model=FlagResponse, status_code=status.HTTP_201_CREATED)
-def create_flag(payload: FlagCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+@limiter.limit("10/hour")
+def create_flag(request: Request, payload: FlagCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     # Validation is handled by the schema's model_validator (exactly one target required)
  
     # Verify the target exists

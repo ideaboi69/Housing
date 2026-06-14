@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from tables import Listing, Conversation, User, get_db, Landlord, Message, Property
@@ -8,6 +8,7 @@ from Utils.security import get_current_user, get_current_student
 from helpers import require_landlord
 from Utils.email import send_message_notification
 from Utils.websocket import connection_manager
+from Utils.rate_limit import limiter
 
 message_router = APIRouter()
 
@@ -86,7 +87,8 @@ def start_conversation(payload: StartConversation, background_tasks: BackgroundT
 
 # Send a message in an existing conversation
 @message_router.post("/conversations/{conversation_id}", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-def send_message( conversation_id: int, payload: MessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user=Depends(get_current_student)):
+@limiter.limit("30/minute")
+def send_message(request: Request, conversation_id: int, payload: MessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user=Depends(get_current_student)):
     
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
     if not conversation:
@@ -158,7 +160,8 @@ def send_message( conversation_id: int, payload: MessageCreate, background_tasks
 
 # Landlord replies to a conversation
 @message_router.post("/landlord/conversations/{conversation_id}", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-def landlord_reply(conversation_id: int, payload: MessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+@limiter.limit("30/minute")
+def landlord_reply(request: Request, conversation_id: int, payload: MessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
     conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.landlord_id == landlord.id).first()
 
     if not conversation:

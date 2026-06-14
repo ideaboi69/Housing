@@ -87,7 +87,7 @@ def register_landlord(request: Request, email: EmailStr = Form(...), password: s
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
-    token = create_access_token({"user_id": landlord.id, "role": landlord.role.value, "verified": verification_status == LandlordVerification.VERIFIED})
+    token = create_access_token({"user_id": landlord.id, "role": landlord.role.value, "verified": verification_status == LandlordVerification.VERIFIED, "tv": landlord.token_version})
 
     return LandlordTokenResponse(
         access_token=token,
@@ -103,7 +103,7 @@ def login_landlord(request: Request, payload: OAuth2PasswordRequestForm = Depend
     if not landlord or not verify_password(payload.password, landlord.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
 
-    token = create_access_token({"user_id": landlord.id, "role": landlord.role.value, "verified": landlord.identity_verified})
+    token = create_access_token({"user_id": landlord.id, "role": landlord.role.value, "verified": landlord.identity_verified, "tv": landlord.token_version})
 
     return {
         "access_token": token, 
@@ -118,6 +118,12 @@ def login_landlord(request: Request, payload: OAuth2PasswordRequestForm = Depend
             "phone": landlord.phone,
     },
     }
+
+@landlord_router.post("/me/logout-all", status_code=status.HTTP_200_OK)
+def logout_all_landlord_sessions(db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    current_landlord.token_version = (current_landlord.token_version or 0) + 1
+    db.commit()
+    return {"message": "Signed out of all sessions."}
 
 # Private Landlord Profile
 @landlord_router.get("/me", response_model=LandlordResponse)

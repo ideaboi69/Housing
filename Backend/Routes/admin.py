@@ -52,7 +52,7 @@ def admin_login(request: Request,form_data: OAuth2PasswordRequestForm = Depends(
     if not admin.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin account is deactivated")
 
-    token = create_access_token({"user_id": admin.id, "role": "admin"})
+    token = create_access_token({"user_id": admin.id, "role": "admin", "tv": admin.token_version})
 
     return {
         "access_token": token,

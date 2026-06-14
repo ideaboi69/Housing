@@ -47,6 +47,7 @@ class User(Base):
     program = Column(String(255), nullable=True)
     year = Column(Enum(StudentYear), nullable=True)
     bio = Column(String(200), nullable=True)
+    token_version = Column(Integer, nullable=False, server_default="0", default=0)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -87,6 +88,7 @@ class Landlord(Base):
     phone = Column(String(20), nullable=False)
     no_of_property = Column(Enum(PropertyRange), nullable=False)
     profile_photo_url = Column(String(500), nullable=True)
+    token_version = Column(Integer, nullable=False, server_default="0", default=0)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -124,6 +126,7 @@ class Admin(Base):
     last_name = Column(String(100), nullable=False)
     role = Column(String(50), default="admin", nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    token_version = Column(Integer, nullable=False, server_default="0", default=0)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -460,6 +463,7 @@ class Writer(Base):
     status = Column(Enum(WriterStatus), default=WriterStatus.PENDING, nullable=False)
     is_early_adopter = Column(Boolean, default=False, nullable=False)
     profile_photo_url = Column(String(500), nullable=True)
+    token_version = Column(Integer, nullable=False, server_default="0", default=0)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, or_
 from typing import Optional
@@ -8,6 +8,7 @@ from Utils.security import get_current_student
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.email import send_message_notification
 from Utils.websocket import connection_manager
+from Utils.rate_limit import limiter
 
 marketplace_router = APIRouter()
 
@@ -15,7 +16,8 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 
 # Create a Marketplace item
 @marketplace_router.post("/items", response_model=MarketplaceItemResponse, status_code=status.HTTP_201_CREATED)
-def create_item(payload: MarketplaceItemCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+@limiter.limit("10/hour")
+def create_item(request: Request, payload: MarketplaceItemCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     if not current_user.email_verified:
         raise HTTPException(status_code=403, detail="Verify your email first")
 
@@ -301,7 +303,8 @@ def start_marketplace_conversation(payload: StartMarketplaceConversation, backgr
 
 # Sending a message
 @marketplace_router.post("/conversations/{conversation_id}/messages", response_model=MarketplaceMessageResponse, status_code=status.HTTP_201_CREATED)
-def send_marketplace_message(conversation_id: int, payload: MarketplaceMessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+@limiter.limit("30/minute")
+def send_marketplace_message(request: Request, conversation_id: int, payload: MarketplaceMessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     conversation = db.query(MarketplaceConversation).filter(MarketplaceConversation.id == conversation_id).first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")

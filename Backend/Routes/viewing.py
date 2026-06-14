@@ -1,12 +1,13 @@
 from datetime import datetime, date, time, timedelta, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from tables import get_db, Listing, Property, Landlord, User, ViewingAvailability, ViewingSlot, ViewingBooking, ViewingSlotStatus, BookingStatus, Sublet
 from Schemas.viewingSchema import AvailabilityCreate, BulkAvailabilityCreate, BookingCreate, AvailabilityResponse, ViewingSlotResponse, BookingResponse
 from Utils.security import get_current_user, get_current_student
 from Utils.email import send_booking_confirmed_email, send_booking_cancelled_email
 from helpers import require_landlord, generate_hourly_slots, build_booking_response, get_booking_details, get_host_info
+from Utils.rate_limit import limiter
 
 viewing_router = APIRouter()
 
@@ -187,7 +188,8 @@ def get_available_slots(listing_id: Optional[int] = Query(None), sublet_id: Opti
 
 # USER - book viewing
 @viewing_router.post("/book", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
-def book_viewing(payload: BookingCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+@limiter.limit("20/hour")
+def book_viewing(request: Request, payload: BookingCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     slot = db.query(ViewingSlot).filter(ViewingSlot.id == payload.slot_id).with_for_update().first()
     if not slot:
         raise HTTPException(status_code=404, detail="Slot not found")

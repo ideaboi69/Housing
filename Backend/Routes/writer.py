@@ -78,12 +78,18 @@ def writer_login(request: Request, form_data: OAuth2PasswordRequestForm = Depend
             detail="Your application is still pending review.",
         )
 
-    token = create_access_token({"user_id": writer.id, "role": "writer"})
+    token = create_access_token({"user_id": writer.id, "role": "writer", "tv": writer.token_version})
 
     return WriterTokenResponse(
         access_token=token,
         writer=WriterResponse.model_validate(writer),
     )
+
+@writer_router.post("/me/logout-all", status_code=status.HTTP_200_OK)
+def logout_all_writer_sessions(db: Session = Depends(get_db), current_writer: Writer = Depends(get_current_writer)):
+    current_writer.token_version = (current_writer.token_version or 0) + 1
+    db.commit()
+    return {"message": "Signed out of all sessions."}
 
 @writer_router.patch("/me", response_model=WriterResponse)
 def update_writer_profile(payload: WriterUpdate, db: Session = Depends(get_db), current_writer: Writer = Depends(get_current_writer)):

@@ -57,7 +57,7 @@ def register_users(request: Request, payload: UserCreate, db: Session = Depends(
     email_token = create_email_verification_token(user.email)
     send_verification_email(user.email, user.first_name, email_token)
 
-    access_token = create_access_token({"user_id": user.id, "role": user.role.value})
+    access_token = create_access_token({"user_id": user.id, "role": user.role.value, "tv": user.token_version})
 
     return TokenResponse(
         access_token=access_token,
@@ -73,7 +73,7 @@ def user_login(request: Request, payload: UserLogin, db: Session = Depends(get_d
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
-    token = create_access_token({"user_id": user.id, "role": user.role.value})
+    token = create_access_token({"user_id": user.id, "role": user.role.value, "tv": user.token_version})
 
     return {
         "access_token": token, 
@@ -98,7 +98,7 @@ def user_login_swagger(request: Request, payload: OAuth2PasswordRequestForm = De
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
-    token = create_access_token({"user_id": user.id, "role": user.role.value})
+    token = create_access_token({"user_id": user.id, "role": user.role.value, "tv": user.token_version})
 
     return {"access_token": token, "token_type": "bearer"}
 
@@ -117,7 +117,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     user.email_verified = True
     db.commit()
 
-    access_token = create_access_token({"user_id": user.id, "role": user.role.value})
+    access_token = create_access_token({"user_id": user.id, "role": user.role.value, "tv": user.token_version})
 
     return TokenResponse(
         access_token=access_token,
@@ -173,8 +173,14 @@ def reset_password(request: Request, payload: ResetPasswordRequest, db: Session 
 # Refresh Token — issue a new access token if the current one is still valid
 @user_router.post("/refresh", status_code=status.HTTP_200_OK)
 def refresh_token(current_user: User = Depends(get_current_user)):
-    token = create_access_token({"user_id": current_user.id, "role": current_user.role.value})
+    token = create_access_token({"user_id": current_user.id, "role": current_user.role.value, "tv": current_user.token_version})
     return {"access_token": token, "token_type": "bearer"}
+
+@user_router.post("/me/logout-all", status_code=status.HTTP_200_OK)
+def logout_all_sessions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    current_user.token_version = (current_user.token_version or 0) + 1
+    db.commit()
+    return {"message": "Signed out of all sessions."}
 
 # Viewing and updating user profiles
 @user_router.get("/me", response_model=UserResponse)
@@ -366,7 +372,7 @@ def get_tenant_status(db: Session = Depends(get_db), current_user: User = Depend
  
 # Tenant card (landlord taps student profile picture in chat)
 @user_router.get("/{user_id}/tenant-card", response_model=TenantCardResponse)
-def get_tenant_card(user_id: int, db: Session = Depends(get_db)):
+def get_tenant_card(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -394,7 +400,7 @@ def get_tenant_card(user_id: int, db: Session = Depends(get_db)):
 
 # Get user by ID
 @user_router.get("/{user_id}", response_model=UserResponse)
-def get_user_profile_by_id(user_id: int, db: Session = Depends(get_db)):
+def get_user_profile_by_id(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
