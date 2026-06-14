@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { SmartBackLink } from "@/components/ui/SmartBackLink";
 import {
   type LifestyleProfile, type RoommateGroup, type GroupRequest,
   TAG_SHORT_LABELS, MOCK_PROFILES, getRoommateGroupById, removeStoredRoommateGroup, upsertStoredRoommateGroup,
@@ -454,9 +455,14 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[1120px] mx-auto px-4 py-6 md:py-8">
         {/* Back */}
-        <Link href={`/roommates/groups/${id}`} className="inline-flex items-center gap-1 text-[#1B2D45]/35 hover:text-[#1B2D45] transition-colors mb-5" style={{ fontSize: "12px", fontWeight: 600 }}>
-          <ChevronLeft className="w-4 h-4" /> Back to group
-        </Link>
+        <SmartBackLink
+          fallback={`/roommates/groups/${id}`}
+          icon="chevron"
+          className="inline-flex items-center gap-1 text-[#1B2D45]/35 hover:text-[#1B2D45] transition-colors mb-5"
+          style={{ fontSize: "12px", fontWeight: 600 }}
+        >
+          Back to group
+        </SmartBackLink>
 
         <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
           <div className="relative space-y-4 lg:sticky lg:top-24">

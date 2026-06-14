@@ -11,6 +11,7 @@ import { useIsMobile } from "@/hooks";
 import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
 import { RequestWriterAccessModal } from "@/components/ui/RequestWriterAccessModal";
+import { BubbleFeedSkeleton } from "@/components/ui/Skeletons";
 import type { PostListResponse, PostCategory as PostCategoryType } from "@/types";
 import { toast } from "sonner";
 
@@ -985,6 +986,7 @@ export default function TheBubblePage() {
   const [showWriterRequestModal, setShowWriterRequestModal] = useState(false);
   const [isWriter, setIsWriter] = useState(false);
   const [livePosts, setLivePosts] = useState<Post[]>([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const { user } = useAuthStore();
   const isMobile = useIsMobile();
   const isLandlord = user?.role === "landlord";
@@ -1006,10 +1008,6 @@ export default function TheBubblePage() {
     }
     if (user?.role === "student") {
       if (!writerRequestPending) setShowWriterRequestModal(true);
-      return;
-    }
-    if (!user) {
-      router.push("/login?next=/the-bubble");
       return;
     }
     router.push("/writers/signup");
@@ -1051,6 +1049,8 @@ export default function TheBubblePage() {
         }
       } catch {
         if (!cancelled) setLivePosts([]);
+      } finally {
+        if (!cancelled) setIsLoadingPosts(false);
       }
     }
 
@@ -1117,7 +1117,7 @@ export default function TheBubblePage() {
     }
 
     if (!user) {
-      return <BecomeWriterCard compact={compact} onApply={() => router.push("/login?next=/the-bubble")} />;
+      return <BecomeWriterCard compact={compact} onApply={() => router.push("/writers/signup")} />;
     }
 
     if (isWriter) {
@@ -1236,7 +1236,9 @@ export default function TheBubblePage() {
               </div>
             )}
 
-            {filteredAndSorted.length > 0 ? (
+            {isLoadingPosts && filteredAndSorted.length === 0 ? (
+              <BubbleFeedSkeleton />
+            ) : filteredAndSorted.length > 0 ? (
               filteredAndSorted.map((post, i) => <PostCard key={post.id} post={post} index={i} onPostUpdated={handlePostUpdated} />)
             ) : (
               <EmptyState onReset={() => setActiveCategory("all")} />

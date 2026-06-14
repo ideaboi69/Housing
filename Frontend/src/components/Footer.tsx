@@ -13,7 +13,7 @@ export function Footer() {
     <footer className="border-t border-[#1B2D45]/8 bg-[#FAF8F4]">
       <div className="mx-auto max-w-7xl px-6 py-10 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="font-extrabold text-lg text-[#1B2D45] tracking-tight">
+          <span className="font-extrabold text-lg text-[#FF6b35] tracking-tight">
             cribb
           </span>
           <span className="text-sm text-[#1B2D45]/50">

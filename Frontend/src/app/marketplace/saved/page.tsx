@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Heart, Package, ShoppingBag } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
+import { SmartBackLink } from "@/components/ui/SmartBackLink";
 import { api } from "@/lib/api";
 import { MOCK_ITEMS_WITH_ZONES } from "@/components/marketplace/marketplace-data";
 import type { MarketplaceItemListResponse } from "@/types";
@@ -74,9 +75,13 @@ export default function SavedMarketplacePage() {
     return (
       <div className="min-h-screen bg-[#FAF8F4]">
         <div className="max-w-[820px] mx-auto px-4 md:px-6 py-10">
-          <Link href="/marketplace" className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-6" style={{ fontSize: "12px", fontWeight: 600 }}>
-            <ArrowLeft className="w-4 h-4" /> Back to Marketplace
-          </Link>
+          <SmartBackLink
+            fallback="/marketplace"
+            className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-6"
+            style={{ fontSize: "12px", fontWeight: 600 }}
+          >
+            Back to Marketplace
+          </SmartBackLink>
           <div className="bg-white rounded-[28px] border border-black/[0.06] px-6 py-12 text-center" style={{ boxShadow: "0 14px 44px rgba(27,45,69,0.06)" }}>
             <Heart className="w-10 h-10 text-[#FF6B35]/25 mx-auto mb-4" />
             <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800 }}>Save marketplace finds for later</h1>
@@ -100,9 +105,13 @@ export default function SavedMarketplacePage() {
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-8">
-        <Link href="/marketplace" className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-6" style={{ fontSize: "12px", fontWeight: 600 }}>
-          <ArrowLeft className="w-4 h-4" /> Back to Marketplace
-        </Link>
+        <SmartBackLink
+          fallback="/marketplace"
+          className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-6"
+          style={{ fontSize: "12px", fontWeight: 600 }}
+        >
+          Back to Marketplace
+        </SmartBackLink>
 
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between mb-6">
           <div>

@@ -731,8 +731,9 @@ function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: 
                     <div
                       className="text-white/60 max-w-none"
                       style={{ fontSize: "12px", lineHeight: 1.7, whiteSpace: "pre-wrap" }}
-                      dangerouslySetInnerHTML={{ __html: p.content || "<em>No stored content body.</em>" }}
-                    />
+                    >
+                      {p.content || <em className="text-white/40">No stored content body.</em>}
+                    </div>
                   </div>
                   <div className="space-y-3">
                     {p.cover_image_url && (

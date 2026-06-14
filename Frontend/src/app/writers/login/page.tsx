@@ -36,7 +36,7 @@ function WriterLoginPageContent() {
     clearError();
     try {
       await login(email, password);
-      useAuthStore.getState().logout();
+      useAuthStore.getState().logout({ redirect: false });
       router.push(nextPath);
     } catch {
       // store sets the error

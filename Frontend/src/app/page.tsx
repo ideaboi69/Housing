@@ -1177,7 +1177,7 @@ export default function HomePage() {
           <FadeUp>
             <h2 className="text-[#1B2D45] max-w-[600px] mx-auto" style={{ fontSize: "28px", fontWeight: 800, lineHeight: 1.25 }}>Built by students who got tired of the housing search.</h2>
             <p className="mt-4 text-[#1B2D45]/50 max-w-[560px] mx-auto" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.7 }}>
-              We spent too long on sketchy sites, ghosted by landlords, and signing leases we didn&apos;t understand. So we built cribb — the platform we wish existed in first year.
+              We spent too long on sketchy sites, ghosted by landlords, and signing leases we didn't understand. So we built cribb — the platform we wish existed.
             </p>
           </FadeUp>
           <FadeUp delay={0.2}>

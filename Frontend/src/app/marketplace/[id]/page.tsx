@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
+import { SmartBackLink } from "@/components/ui/SmartBackLink";
 import {
   MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo,
   MOCK_MARKETPLACE_ITEMS,
@@ -275,9 +276,13 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[1460px] mx-auto px-4 md:px-6 py-5 md:py-6">
-        <Link href="/marketplace" className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-4" style={{ fontSize: "12px", fontWeight: 600 }}>
-          <ArrowLeft className="w-4 h-4" /> Back to Marketplace
-        </Link>
+        <SmartBackLink
+          fallback="/marketplace"
+          className="inline-flex items-center gap-1 text-[#1B2D45]/40 hover:text-[#1B2D45] transition-colors mb-4"
+          style={{ fontSize: "12px", fontWeight: 600 }}
+        >
+          Back to Marketplace
+        </SmartBackLink>
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_400px] gap-5 items-start">
           <div className="min-w-0">

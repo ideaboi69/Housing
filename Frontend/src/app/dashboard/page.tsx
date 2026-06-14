@@ -9,7 +9,6 @@ import {
   CalendarDays,
   Home,
   LayoutDashboard,
-  Loader2,
   MessageCircle,
   PenSquare,
   Settings,
@@ -20,6 +19,7 @@ import {
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { RequestWriterAccessModal } from "@/components/ui/RequestWriterAccessModal";
+import { DashboardSkeleton } from "@/components/ui/Skeletons";
 import type { PostListResponse, UserDashboardResponse } from "@/types";
 
 const emptyDashboard: UserDashboardResponse = {
@@ -212,15 +212,7 @@ export default function StudentDashboardPage() {
   }, [token, user, hasWriterAccess]);
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F4]">
-        <div className="mx-auto max-w-[1120px] px-4 py-8 md:px-6 md:py-10">
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="h-7 w-7 animate-spin text-[#FF6B35]" />
-          </div>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
@@ -387,12 +379,14 @@ export default function StudentDashboardPage() {
                   <span className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>{dashboard.marketplace_sold}</span>
                 </div>
               </div>
-              <Link href="/marketplace/my" className="mt-4 inline-flex items-center gap-1.5 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 700 }}>
-                Manage your items <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-              <Link href="/messages?type=marketplace" className="mt-2 inline-flex items-center gap-1.5 text-[#1B2D45]/55 hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>
-                Open marketplace messages <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-black/[0.05] pt-4">
+                <Link href="/marketplace/my" className="inline-flex items-center gap-1.5 whitespace-nowrap text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 700 }}>
+                  Manage items <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+                <Link href="/messages?type=marketplace" className="inline-flex items-center gap-1.5 whitespace-nowrap text-[#1B2D45]/55 hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>
+                  Open messages <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-black/[0.04] bg-white p-5" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>

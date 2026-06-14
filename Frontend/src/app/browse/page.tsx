@@ -8,7 +8,7 @@ import {
   useSpring,
   useInView,
 } from "framer-motion";
-import { CalendarDays, Grid2X2, LayoutList, Map as MapIcon, Pin, Sparkles, TrendingUp } from "lucide-react";
+import { Footprints, Grid2X2, Home, LayoutList, Map as MapIcon, Pin, TrendingUp } from "lucide-react";
 import { useIsMobile } from "@/hooks";
 import { useRouter } from "next/navigation";
 import { PolaroidCard } from "@/components/browse/PolaroidCard";
@@ -218,6 +218,13 @@ export default function BrowsePage() {
   const avgRent = filteredListings.length > 0
     ? Math.round(filteredListings.reduce((acc, l) => acc + Number(l.rent_per_room), 0) / filteredListings.length)
     : 0;
+  const avgWalk = useMemo(() => {
+    const walks = filteredListings
+      .map((l) => Number(l.walk_time_minutes))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (walks.length === 0) return 0;
+    return Math.round(walks.reduce((a, b) => a + b, 0) / walks.length);
+  }, [filteredListings]);
   const browseModeOptions: { mode: ViewMode; label: string; icon: typeof LayoutList }[] = [
     { mode: "board", label: "Board", icon: LayoutList },
     { mode: "grid", label: "Grid", icon: Grid2X2 },
@@ -239,12 +246,25 @@ export default function BrowsePage() {
               className="text-[#1B2D45]"
               style={{ fontSize: isMobile ? "24px" : "32px", fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1.2 }}
             >
-              Find your Guelph cribb
+              Find your Guelph{" "}
+              <span className="inline-block" style={{ color: "#FF6B35" }} aria-label="cribb">
+                {"cribb".split("").map((char, i) => (
+                  <motion.span
+                    key={i}
+                    aria-hidden
+                    className="inline-block"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 + i * 0.05, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    {char}
+                  </motion.span>
+                ))}
+              </span>
             </h1>
             <p className="mt-1 md:mt-1.5 text-[#1B2D45]/45" style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 400 }}>
               <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{filteredListings.length} listings</span>{" "}
               available in Guelph
-              {<span className="ml-2 text-[#FF6B35]/60" style={{ fontSize: "11px" }}>(demo data)</span>}
             </p>
           </div>
 
@@ -264,29 +284,42 @@ export default function BrowsePage() {
           </div>
         </motion.div>
 
-        {/* Stat cards with number tickers */}
+        {/* Stat cards — slim, horizontal, fills the row */}
         <motion.div
-          className="flex items-center gap-2 md:gap-3 mt-4 md:mt-5 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0"
+          className="mt-4 md:mt-5 grid grid-cols-3 gap-2 md:gap-2.5"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.4 }}
         >
           {[
-            { icon: TrendingUp, label: "Avg rent", ticker: <Ticker value={avgRent} prefix="$" suffix="/rm" />, bg: "rgba(46,196,182,0.08)", color: "#2EC4B6" },
-            { icon: Sparkles, label: "New this week", ticker: <Ticker value={12} />, bg: "rgba(255,107,53,0.08)", color: "#FF6B35" },
-            { icon: CalendarDays, label: "8-mo leases", ticker: <Ticker value={filteredListings.filter(l => l.lease_type === "8_month").length} />, bg: "rgba(255,182,39,0.08)", color: "#FFB627" },
-          ].map((s) => {
-            const Icon = s.icon;
-            return (
-            <div key={s.label} className="flex items-center gap-2 md:gap-2.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl border border-black/5 shrink-0" style={{ backgroundColor: s.bg }}>
-              <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: s.color }} />
-              <div>
-                <div className="text-[#1B2D45]/40" style={{ fontSize: isMobile ? "9px" : "10px", fontWeight: 500, lineHeight: 1.2 }}>{s.label}</div>
-                <div className="text-[#1B2D45]" style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 800, lineHeight: 1.2 }}>{s.ticker}</div>
+            { emoji: "💰", label: "Avg rent", ticker: <Ticker value={avgRent} prefix="$" suffix="/rm" /> },
+            { emoji: "🏠", label: "Homes live", ticker: <Ticker value={filteredListings.length} /> },
+            { emoji: "🚶", label: "Avg walk to campus", ticker: <Ticker value={avgWalk} suffix=" min" /> },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="bg-white rounded-lg border border-[#1B2D45]/[0.06] px-2.5 md:px-3 py-2 md:py-2.5 flex items-center gap-2 md:gap-2.5 min-w-0"
+              style={{ boxShadow: "0 1px 2px rgba(27,45,69,0.03)" }}
+            >
+              <span className="shrink-0" style={{ fontSize: isMobile ? "16px" : "18px", lineHeight: 1 }} aria-hidden>
+                {s.emoji}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div
+                  className="text-[#1B2D45] truncate"
+                  style={{ fontSize: isMobile ? "13px" : "14px", fontWeight: 700, letterSpacing: "-0.015em", lineHeight: 1.15 }}
+                >
+                  {s.ticker}
+                </div>
+                <div
+                  className="text-[#1B2D45]/45 truncate mt-0.5"
+                  style={{ fontSize: isMobile ? "10px" : "11px", fontWeight: 500 }}
+                >
+                  {s.label}
+                </div>
               </div>
             </div>
-            );
-          })}
+          ))}
         </motion.div>
       </div>
 

@@ -8,6 +8,8 @@ import { ReportModal } from "@/components/ui/ReportModal";
 import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
+import { SmartBackLink } from "@/components/ui/SmartBackLink";
+import { DetailPageSkeleton } from "@/components/ui/Skeletons";
 import { BookShowingModal } from "@/components/landlord/BookShowingModal";
 import { TenantProfilePrompt } from "@/components/ui/TenantProfilePrompt";
 import {
@@ -515,15 +517,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
-        <motion.div className="flex flex-col items-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <motion.div className="w-10 h-10 rounded-full bg-[#FF6B35]/20"
-            animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1.2 }} />
-          <p className="text-[#1B2D45]/40" style={{ fontSize: "14px" }}>Loading listing...</p>
-        </motion.div>
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (error || !listing) {
@@ -552,10 +546,14 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       <motion.div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6" variants={stagger} initial="hidden" animate="visible">
         {/* Back link */}
         <motion.div variants={fadeUp}>
-          <Link href="/browse" className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-5 group"
-            style={{ fontSize: "13px", fontWeight: 500 }}>
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to listings
-          </Link>
+          <SmartBackLink
+            fallback="/browse"
+            iconClassName="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+            className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-5 group"
+            style={{ fontSize: "13px", fontWeight: 500 }}
+          >
+            Back to listings
+          </SmartBackLink>
         </motion.div>
 
         <motion.div
@@ -793,7 +791,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* ─── Sidebar ─── */}
-          <motion.div className="space-y-4 lg:sticky lg:top-[80px] lg:self-start lg:max-h-[calc(100vh-100px)] lg:overflow-y-auto no-scrollbar" variants={fadeUp}>
+          <motion.div className="space-y-4 lg:sticky lg:top-[80px] lg:self-start" variants={fadeUp}>
             {/* Price card */}
             <div className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5"
               style={{ boxShadow: "0 4px 30px rgba(0,0,0,0.04)" }}>

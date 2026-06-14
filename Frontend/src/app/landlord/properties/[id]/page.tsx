@@ -14,6 +14,8 @@ import {
   Building2, Camera, ChevronDown, Clock, DoorOpen,
 } from "lucide-react";
 import { EditPropertyModal } from "@/components/landlord/EditPropertyModal";
+import { SmartBackLink } from "@/components/ui/SmartBackLink";
+import { LandlordPropertyDetailSkeleton } from "@/components/ui/Skeletons";
 import { EditListingModal } from "@/components/landlord/EditListingModal";
 import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
 import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
@@ -249,11 +251,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   if (!user || user.role !== "landlord") return null;
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-[#1B2D45] animate-spin" />
-      </div>
-    );
+    return <LandlordPropertyDetailSkeleton />;
   }
 
   if (!property) {
@@ -291,9 +289,14 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
         <div className="mb-5 rounded-[20px] border border-[#1B2D45]/[0.06] bg-white p-4 shadow-[0_12px_30px_rgba(27,45,69,0.04)] md:p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
-              <Link href="/landlord" className="mb-4 inline-flex items-center gap-1.5 text-[#1B2D45]/70 hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 700 }}>
-                <ArrowLeft className="h-3.5 w-3.5" /> Back to Properties
-              </Link>
+              <SmartBackLink
+                fallback="/landlord"
+                iconClassName="h-3.5 w-3.5"
+                className="mb-4 inline-flex items-center gap-1.5 text-[#1B2D45]/70 hover:text-[#1B2D45]"
+                style={{ fontSize: "12px", fontWeight: 700 }}
+              >
+                Back to Properties
+              </SmartBackLink>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-[#1B2D45]" style={{ fontSize: "clamp(24px,4vw,32px)", lineHeight: 1.1, fontWeight: 900 }}>{property.title}</h1>
                 {activeListings > 0 && (

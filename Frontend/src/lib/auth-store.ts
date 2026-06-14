@@ -67,7 +67,7 @@ interface AuthState {
 
   login: (data: UserLogin) => Promise<void>;
   register: (data: UserCreate) => Promise<unknown>;
-  logout: () => void;
+  logout: (options?: { redirect?: boolean }) => void;
   loadUser: () => Promise<void>;
   clearError: () => void;
 }
@@ -114,7 +114,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  logout: () => {
+  logout: (options) => {
+    const role = get().user?.role;
     localStorage.removeItem("cribb_token");
     // Clear per-user client state so the next person who signs in on this browser
     // doesn't inherit stale tags / groups from the previous user
@@ -124,6 +125,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useSavedStore.getState().clear();
     useMarketplaceSavedStore.getState().clear();
     set({ user: null, token: null });
+    if (options?.redirect !== false && typeof window !== "undefined") {
+      // Edge case: if user logs out from the landing page, leave them there
+      if (window.location.pathname === "/") {
+        window.location.reload();
+        return;
+      }
+      const dest = role === "landlord" ? "/landlord/login" : role === "writer" ? "/writers/login" : "/browse";
+      window.location.href = dest;
+    }
   },
 
   /**

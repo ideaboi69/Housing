@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Users, Shield, ShieldCheck, ChevronLeft, ChevronRight, MessageCircle, Link2, Copy, Check, MapPin, Home, Calendar, DollarSign, Sparkles, Send, Settings, Search, Share2, Camera, ExternalLink, X, UserCheck, LogOut } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
+import { SmartBackLink } from "@/components/ui/SmartBackLink";
 import {
   type LifestyleProfile, type RoommateGroup, type GroupHousing,
   TAG_SHORT_LABELS, computeGroupCompatibility,
@@ -560,9 +561,14 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[700px] mx-auto px-4 py-6 md:py-8">
         {/* Back */}
-        <Link href="/roommates" className="inline-flex items-center gap-1 text-[#1B2D45]/35 hover:text-[#1B2D45] transition-colors mb-6" style={{ fontSize: "12px", fontWeight: 600 }}>
-          <ChevronLeft className="w-4 h-4" /> Back to Roommates
-        </Link>
+        <SmartBackLink
+          fallback="/roommates"
+          icon="chevron"
+          className="inline-flex items-center gap-1 text-[#1B2D45]/35 hover:text-[#1B2D45] transition-colors mb-6"
+          style={{ fontSize: "12px", fontWeight: 600 }}
+        >
+          Back to Roommates
+        </SmartBackLink>
 
         {/* Insider banner */}
         {isOwner && (

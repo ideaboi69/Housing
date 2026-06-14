@@ -8,6 +8,7 @@ import { ChevronLeft, Mail, Check, X, Users, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
+import { SmartBackLink } from "@/components/ui/SmartBackLink";
 import type { InviteResponse } from "@/types";
 
 function formatRelative(iso: string): string {
@@ -88,13 +89,15 @@ export default function InvitesPage() {
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[720px] mx-auto px-4 py-6 md:py-10">
-        <Link
-          href="/roommates"
+        <SmartBackLink
+          fallback="/roommates"
+          icon="chevron"
+          iconClassName="w-3.5 h-3.5"
           className="inline-flex items-center gap-1 text-[#1B2D45]/45 hover:text-[#1B2D45] transition-colors mb-4"
           style={{ fontSize: "12px", fontWeight: 600 }}
         >
-          <ChevronLeft className="w-3.5 h-3.5" /> Back to roommates
-        </Link>
+          Back to roommates
+        </SmartBackLink>
 
         <div className="mb-6">
           <h1 className="text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 900 }}>

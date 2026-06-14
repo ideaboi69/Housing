@@ -6,6 +6,8 @@ import { ReportModal } from "@/components/ui/ReportModal";
 import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { TenantProfilePrompt } from "@/components/ui/TenantProfilePrompt";
+import { SmartBackLink } from "@/components/ui/SmartBackLink";
+import { DetailPageSkeleton } from "@/components/ui/Skeletons";
 import { getScoreColor } from "@/lib/utils";
 import { getAmenityChecklist } from "@/lib/amenities";
 import { getMockSublet } from "@/lib/mock-sublets";
@@ -427,13 +429,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   ] as const;
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
-        <motion.div className="text-center" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <p className="text-[#1B2D45]/50" style={{ fontSize: "15px", fontWeight: 600 }}>Loading sublet...</p>
-        </motion.div>
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!sublet) {
@@ -462,9 +458,14 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
     <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6">
         <motion.div variants={fadeUp}>
-          <Link href="/sublets" className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-5 group" style={{ fontSize: "13px", fontWeight: 500 }}>
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Sublets
-          </Link>
+          <SmartBackLink
+            fallback="/sublets"
+            iconClassName="w-4 h-4 group-hover:-translate-x-1 transition-transform"
+            className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-5 group"
+            style={{ fontSize: "13px", fontWeight: 500 }}
+          >
+            Back to Sublets
+          </SmartBackLink>
         </motion.div>
 
         <div className="grid lg:grid-cols-[1fr_360px] gap-6">

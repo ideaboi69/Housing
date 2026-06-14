@@ -12,6 +12,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import { IndividualDetailModal } from "@/components/roommates/IndividualDetailModal";
+import { RoommateGridSkeleton } from "@/components/ui/Skeletons";
 import type { GroupCardResponse, GroupDetailResponse } from "@/types";
 import {
   type LifestyleProfile, type RoommateGroup,
@@ -773,6 +774,7 @@ export default function RoommatesPage() {
   const [tab, setTab] = useState<"groups" | "individuals">("groups");
   const [activeFilter, setActiveFilter] = useState("all");
   const [apiGroups, setApiGroups] = useState<RoommateGroup[] | null>(null);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(true);
   const [apiIndividuals, setApiIndividuals] = useState<LifestyleProfile[] | null>(null);
   const [tenantSkipKeys, setTenantSkipKeys] = useState<string[]>([]);
   const [tenantGender, setTenantGender] = useState<string | null>(null);
@@ -803,6 +805,7 @@ export default function RoommatesPage() {
             setApiGroups(groups.map(mapApiGroupToLocal));
           }
         } catch { /* show empty state */ }
+        finally { setIsLoadingGroups(false); }
         setHydrated(true);
         return;
       }
@@ -872,6 +875,7 @@ export default function RoommatesPage() {
                 setApiGroups(groups.map(mapApiGroupToLocal));
               }
             } catch { /* use mock */ }
+            finally { setIsLoadingGroups(false); }
 
             try {
               const individuals = await api.roommates.browseIndividuals();
@@ -1371,7 +1375,9 @@ export default function RoommatesPage() {
         <AnimatePresence mode="wait">
           {tab === "groups" && (
             <motion.div key="groups" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-              {groupsWithCompat.length === 0 ? (
+              {isLoadingGroups && groupsWithCompat.length === 0 ? (
+                <RoommateGridSkeleton count={6} />
+              ) : groupsWithCompat.length === 0 ? (
                 <div className="bg-white rounded-2xl p-10 text-center" style={{ border: "2.5px dashed rgba(27,45,69,0.12)" }}>
                   <Users className="w-10 h-10 text-[#1B2D45]/10 mx-auto mb-2" />
                   <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>

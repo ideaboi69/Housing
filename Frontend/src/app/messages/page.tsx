@@ -24,7 +24,7 @@ import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { MessageListSkeleton } from "@/components/ui/Skeletons";
+import { MessageListSkeleton, MessageThreadSkeleton } from "@/components/ui/Skeletons";
 import type {
   ConversationResponse,
   MarketplaceConversationResponse,
@@ -424,11 +424,7 @@ function ChatThread({
   };
 
   if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#FF6B35]/30 border-t-[#FF6B35]" />
-      </div>
-    );
+    return <MessageThreadSkeleton />;
   }
 
   if (!detail) return <EmptyThread />;
@@ -596,6 +592,16 @@ export default function MessagesPage() {
     setActiveKey(null);
     void fetchConversations();
   };
+
+  // Esc closes the open thread
+  useEffect(() => {
+    if (!activeKey) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveKey(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeKey]);
 
   const handleArchiveConversation = async (conversation: UnifiedConversation) => {
     const confirmed = window.confirm(
@@ -784,7 +790,7 @@ export default function MessagesPage() {
                           key={convo.key}
                           convo={convo}
                           isActive={activeKey === convo.key}
-                          onClick={() => setActiveKey(convo.key)}
+                          onClick={() => setActiveKey((current) => (current === convo.key ? null : convo.key))}
                           onArchive={() => void handleArchiveConversation(convo)}
                           currentUserId={user.id}
                         />

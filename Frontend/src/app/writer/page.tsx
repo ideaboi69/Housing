@@ -745,7 +745,7 @@ function Dashboard() {
             >
               <User className="w-4 h-4" />
             </button>
-            <button onClick={logout}
+            <button onClick={() => logout()}
               className="w-9 h-9 rounded-xl border border-[#E8E4DC] flex items-center justify-center text-[#98A3B0] hover:text-[#E71D36] hover:border-[#E71D36]/20 transition-all">
               <LogOut className="w-4 h-4" />
             </button>

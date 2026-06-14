@@ -44,7 +44,7 @@ import {
    Sub-components
    ════════════════════════════════════════════════════════ */
 
-function SummerBanner() {
+function PromoBanner() {
   return (
     <motion.div
       className="mx-auto max-w-[1200px] px-4 md:px-6 mt-4"
@@ -56,9 +56,9 @@ function SummerBanner() {
         className="rounded-xl border border-[#FF6B35]/15 px-4 py-3 flex items-center gap-3 flex-wrap"
         style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.08) 0%, rgba(46,196,182,0.08) 100%)" }}
       >
-        <span style={{ fontSize: "20px" }}>☀️</span>
-        <span className="text-[#FF6B35]" style={{ fontSize: "14px", fontWeight: 700 }}>Summer 2026 Sublet Season</span>
-        <span className="text-[#1B2D45]/50" style={{ fontSize: "13px", fontWeight: 400 }}>Listings go fast — check back daily</span>
+        <span style={{ fontSize: "20px" }}>✨</span>
+        <span className="text-[#FF6B35]" style={{ fontSize: "14px", fontWeight: 700 }}>Live sublets in Guelph</span>
+        <span className="text-[#1B2D45]/50" style={{ fontSize: "13px", fontWeight: 400 }}>Listings go fast — check back daily!</span>
       </div>
     </motion.div>
   );
@@ -76,7 +76,7 @@ function SubletHero({ onListClick, canList }: { onListClick: () => void; canList
       <div className={`flex ${isMobile ? "flex-col gap-4" : "items-start justify-between"}`}>
         <div style={{ maxWidth: "480px" }}>
           <h1 className="text-[#1B2D45]" style={{ fontSize: isMobile ? "24px" : "30px", fontWeight: 900, lineHeight: 1.15 }}>
-            Summer Sublets in Guelph
+            Sublets in Guelph
           </h1>
           <p className="text-[#1B2D45]/50 mt-2" style={{ fontSize: "14px", fontWeight: 400, lineHeight: 1.6 }}>
             Find short-term housing from students leaving for co-op, or list your place while you&apos;re away.
@@ -89,7 +89,7 @@ function SubletHero({ onListClick, canList }: { onListClick: () => void; canList
             style={{ fontSize: "14px", fontWeight: 700 }}
             whileTap={{ scale: 0.97 }}
           >
-            ☀️ List Your Sublet
+            ✨ List Your Sublet
           </motion.button>
         ) : (
           <div
@@ -104,13 +104,16 @@ function SubletHero({ onListClick, canList }: { onListClick: () => void; canList
   );
 }
 
-function InsightStats() {
+function InsightStats({ listings }: { listings: SubletListing[] }) {
   const isMobile = useIsMobile();
+  const availableCount = listings.length;
+  const avgRent = availableCount > 0
+    ? Math.round(listings.reduce((acc, s) => acc + Number(s.subletPrice), 0) / availableCount)
+    : 0;
+
   const stats = [
-    { emoji: "☀️", bgColor: "rgba(255,107,53,0.12)", label: "Available now", value: "0 sublets" },
-    { emoji: "💰", bgColor: "rgba(46,196,182,0.12)", label: "Avg. savings", value: "28% off regular rent" },
-    { emoji: "🛋️", bgColor: "rgba(255,182,39,0.12)", label: "Furnished", value: "0 of 0" },
-    { emoji: "✓", bgColor: "rgba(46,196,182,0.12)", label: "Landlord approved", value: "3 verified" },
+    { emoji: "🛏️", label: "Available now", value: `${availableCount} sublet${availableCount === 1 ? "" : "s"}`, color: "#ffb091" },
+    { emoji: "💰", label: "Avg rent", value: `$${avgRent.toLocaleString()}/mo`, color: "#4ade80a6" },
   ];
 
   return (
@@ -120,13 +123,29 @@ function InsightStats() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2, duration: 0.4 }}
     >
-      <div className={`grid gap-3 ${isMobile ? "grid-cols-2" : "grid-cols-4"}`}>
+      <div className="grid grid-cols-2 gap-2 md:gap-2.5">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-xl border border-black/[0.04] px-3.5 py-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: s.bgColor, fontSize: "16px" }}>{s.emoji}</div>
-            <div className="min-w-0">
-              <div className="text-[#1B2D45]/40 truncate" style={{ fontSize: "11px", fontWeight: 500 }}>{s.label}</div>
-              <div className="text-[#1B2D45] truncate" style={{ fontSize: "13px", fontWeight: 700 }}>{s.value}</div>
+          <div
+            key={s.label}
+            className="bg-white rounded-lg pl-2.5 md:pl-3 pr-2.5 md:pr-3 py-2 md:py-2.5 flex items-center gap-2 md:gap-2.5 min-w-0"
+            style={{ boxShadow: "0 1px 2px rgba(27,45,69,0.03)", borderLeft: `3px solid ${s.color}` }}
+          >
+            <span className="shrink-0" style={{ fontSize: isMobile ? "16px" : "18px", lineHeight: 1 }} aria-hidden>
+              {s.emoji}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div
+                className="text-[#1B2D45] truncate"
+                style={{ fontSize: isMobile ? "13px" : "14px", fontWeight: 700, letterSpacing: "-0.015em", lineHeight: 1.15 }}
+              >
+                {s.value}
+              </div>
+              <div
+                className="text-[#1B2D45]/45 truncate mt-0.5"
+                style={{ fontSize: isMobile ? "10px" : "11px", fontWeight: 500 }}
+              >
+                {s.label}
+              </div>
             </div>
           </div>
         ))}
@@ -361,9 +380,9 @@ function ListSubletForm({
           transition={{ type: "spring", stiffness: 300, damping: 28 }}
         >
           <div className="bg-white rounded-2xl border border-[#FF6B35]/20 p-5 md:p-7" style={{ boxShadow: "0 4px 24px rgba(255,107,53,0.06)" }}>
-            <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 700 }}>List your sublet ☀️</h3>
+            <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 700 }}>List your sublet ✨</h3>
             <p className="text-[#1B2D45]/50 mt-1 mb-5" style={{ fontSize: "13px", fontWeight: 400 }}>
-              Leaving Guelph for the summer? Every field here shows up on your listing — the more you fill, the better.
+              Leaving Guelph for a term? Every field here shows up on your listing — the more you fill, the better.
             </p>
 
             {/* ─── Photos ─── */}
@@ -900,7 +919,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
             <img src={cloudinaryUrl(listing.coverImage, { w: 800 })} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.15) 0%, rgba(46,196,182,0.15) 100%)" }}>
-              <span style={{ fontSize: "36px", opacity: 0.3 }}>☀️</span>
+              <span style={{ fontSize: "36px", opacity: 0.3 }}>🏠</span>
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent" />
@@ -1025,7 +1044,7 @@ function BottomCTA({ onListClick, canList }: { onListClick: () => void; canList:
     >
       <div className={`bg-white rounded-2xl border border-black/[0.04] p-6 md:p-8 flex ${isMobile ? "flex-col gap-4" : "items-center justify-between"}`} style={{ boxShadow: "0 2px 16px rgba(27,45,69,0.04)" }}>
         <div style={{ maxWidth: "480px" }}>
-          <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Leaving Guelph for the summer? ✈️</h3>
+          <h3 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Leaving Guelph for a term? ✈️</h3>
           <p className="text-[#1B2D45]/45 mt-1.5" style={{ fontSize: "13px", fontWeight: 400, lineHeight: 1.6 }}>
             Don&apos;t pay rent on an empty room. List your sublet in 2 minutes — it&apos;s free, and we&apos;ll help you find someone.
           </p>
@@ -1249,7 +1268,7 @@ function SubletCompareModal({
                             <Link href={`/sublets/${l.id}`} className="group block">
                               <div className="w-full h-[100px] rounded-lg bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] mb-2.5 overflow-hidden relative">
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                  <span style={{ fontSize: "24px" }}>☀️</span>
+                                  <span style={{ fontSize: "24px" }}>🏠</span>
                                 </div>
                                 <div
                                   className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center text-white"
@@ -1610,14 +1629,14 @@ function SubletMapSummary({ listings, selectedRange }: { listings: SubletListing
   return (
     <div className="absolute left-4 top-4 z-[10] max-w-[calc(100%-5rem)] sm:max-w-[250px] rounded-2xl bg-white/92 px-3 py-2.5 shadow-md backdrop-blur-sm sm:px-4 sm:py-3">
       <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 800 }}>
-        Summer sublets
+        Live sublets
       </div>
       <div className="mt-0.5 text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 600 }}>
         {listings.length} sublets · {MONTHS[selectedRange[0]]} to {MONTHS[selectedRange[1]]}
       </div>
       <div className="mt-2 flex items-center gap-2">
         <span className="inline-flex items-center gap-1 rounded-full bg-[#2EC4B6]/10 px-2 py-1 text-[#2EC4B6]" style={{ fontSize: "9px", fontWeight: 700 }}>
-          ☀️ Short-term stays
+          ✨ Short-term stays
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-[#FF6B35]/10 px-2 py-1 text-[#FF6B35]" style={{ fontSize: "9px", fontWeight: 700 }}>
           🎓 Campus-ready
@@ -1837,7 +1856,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
                 {listings.length} sublets found
               </h2>
               <p className="mt-1 text-[#1B2D45]/42" style={{ fontSize: "12px" }}>
-                Compare summer options by price, walk time, and setup.
+                Compare sublet options by price, walk time, and setup.
               </p>
             </div>
 
@@ -2086,9 +2105,9 @@ function SubletsContent() {
 
   return (
       <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
-      <SummerBanner />
+      <PromoBanner />
       <SubletHero onListClick={handleListClick} canList={!isLandlord} />
-      <InsightStats />
+      <InsightStats listings={listings} />
       <DateRangeSelector selectedRange={selectedRange} onChange={setSelectedRange} />
       <SearchAndFilters
         onSearchChange={setSearchQuery}

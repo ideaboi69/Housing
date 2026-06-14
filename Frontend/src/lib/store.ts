@@ -11,7 +11,7 @@ interface WriterAuthState {
   error: string | null;
 
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: (options?: { redirect?: boolean }) => void;
   loadWriter: () => void;
   updateWriter: (writer: WriterResponse) => void;
   clearError: () => void;
@@ -37,10 +37,17 @@ export const useWriterStore = create<WriterAuthState>((set) => ({
     }
   },
 
-  logout: () => {
+  logout: (options) => {
     localStorage.removeItem("cribb_writer_token");
     localStorage.removeItem("cribb_writer");
     set({ writer: null, writerToken: null });
+    if (options?.redirect !== false && typeof window !== "undefined") {
+      if (window.location.pathname === "/") {
+        window.location.reload();
+        return;
+      }
+      window.location.href = "/writers/login";
+    }
   },
 
   loadWriter: () => {

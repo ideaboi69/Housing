@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   User, Lock, Bell, Users, Shield, ChevronRight,
-  Camera, Check, Eye, EyeOff, Trash2, Moon, Sun, X,
+  Camera, Check, Eye, EyeOff, Trash2, Moon, Sun, X, LogOut,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
@@ -729,6 +729,27 @@ function AccountTab() {
     }
   };
 
+  const [signingOutAll, setSigningOutAll] = useState(false);
+  const handleLogoutAll = async () => {
+    if (!confirm("Sign out of every device you've used with this account? You'll need to log in again on each one.")) return;
+    setSigningOutAll(true);
+    try {
+      if (user?.role === "landlord") {
+        await api.landlords.logoutAll();
+      } else if (user?.role === "writer") {
+        await api.writers.logoutAll();
+      } else {
+        await api.auth.logoutAll();
+      }
+      logout();
+      toast.success("Signed out of all devices");
+    } catch {
+      toast.error("Could not sign out of all devices. Please try again.");
+    } finally {
+      setSigningOutAll(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <SectionCard title="Email Address">
@@ -810,6 +831,26 @@ function AccountTab() {
             style={{ fontSize: "13px", fontWeight: 700, boxShadow: canSavePassword ? "0 2px 12px rgba(255,107,53,0.3)" : "none" }}>
             {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
             {saving ? "Saving..." : "Update Password"}
+          </button>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Sessions">
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 600 }}>Sign out of all devices</p>
+            <p className="text-[#98A3B0] mt-0.5" style={{ fontSize: "11px" }}>
+              Ends every active session on this account, including this one. Useful if you lost a device or shared a laptop.
+            </p>
+          </div>
+          <button
+            onClick={handleLogoutAll}
+            disabled={signingOutAll}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[#1B2D45]/15 text-[#1B2D45] hover:bg-[#1B2D45]/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ fontSize: "12px", fontWeight: 600 }}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {signingOutAll ? "Signing out..." : "Sign out everywhere"}
           </button>
         </div>
       </SectionCard>

@@ -332,6 +332,9 @@ export const auth = {
   deleteAccount: () =>
     request<null>("/api/users/me", { method: "DELETE" }),
 
+  logoutAll: () =>
+    request<{ message: string }>("/api/users/me/logout-all", { method: "POST" }),
+
   getUserById: (id: number) =>
     request<UserResponse>(`/api/users/${id}`),
 
@@ -702,6 +705,9 @@ export const landlords = {
     request<{ message: string }>("/api/landlords/me/verify", {
       method: "POST",
     }),
+
+  logoutAll: () =>
+    request<{ message: string }>("/api/landlords/me/logout-all", { method: "POST" }),
 };
 
 // ── Writers ─────────────────────────────────────────────
@@ -759,6 +765,11 @@ export const writers = {
   deleteProfilePhoto: () =>
     writerRequest<{ message: string }>("/api/writers/me/profile-photo", {
       method: "DELETE",
+    }),
+
+  logoutAll: () =>
+    writerRequest<{ message: string }>("/api/writers/me/logout-all", {
+      method: "POST",
     }),
 };
 
