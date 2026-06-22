@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { UserResponse, UserCreate, UserLogin } from "@/types";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, setRefreshToken, clearRefreshToken } from "@/lib/api";
 import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
 import { useSavedStore } from "@/lib/saved-store";
 
@@ -84,6 +84,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const res = await api.auth.login(data);
       localStorage.setItem("cribb_token", res.access_token);
+      if (res.refresh_token) setRefreshToken(res.refresh_token);
       set({ user: res.user, token: res.access_token, isLoading: false });
       useSavedStore.getState().loadSaved();
       useMarketplaceSavedStore.getState().loadSaved();
@@ -100,7 +101,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const res = await api.auth.register(data);
       if ("access_token" in res) {
         localStorage.setItem("cribb_token", res.access_token);
-        set({ user: (res as { access_token: string; user: UserResponse }).user, token: res.access_token, isLoading: false });
+        const typedRes = res as { access_token: string; refresh_token?: string; user: UserResponse };
+        if (typedRes.refresh_token) setRefreshToken(typedRes.refresh_token);
+        set({ user: typedRes.user, token: res.access_token, isLoading: false });
         useSavedStore.getState().loadSaved();
         useMarketplaceSavedStore.getState().loadSaved();
       } else {
@@ -116,7 +119,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: (options) => {
     const role = get().user?.role;
+    // Revoke refresh token server-side (fire-and-forget)
+    const rt = typeof window !== "undefined" ? localStorage.getItem("cribb_refresh_token") : null;
+    if (rt) {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      }).catch(() => {});
+    }
     localStorage.removeItem("cribb_token");
+    clearRefreshToken();
     // Clear per-user client state so the next person who signs in on this browser
     // doesn't inherit stale tags / groups from the previous user
     localStorage.removeItem("cribb_roommate_profile");
@@ -206,6 +220,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch {
       localStorage.removeItem("cribb_token");
+      clearRefreshToken();
       clearLandlordCache();
       set({ user: null, token: null, isLoading: false });
     }

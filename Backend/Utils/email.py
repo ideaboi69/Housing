@@ -1018,6 +1018,97 @@ def send_listing_expired_email(to_email: str, first_name: str, listing_title: st
         "html": html_content,
     })
 
+# Cribb AI draft ready for review
+def send_cribb_draft_review_email(to_email: str, title: str, preview: str, category: str, pillar: str, edit_url: str):
+    """Notify reviewer that a fresh AI-generated Bubble draft is waiting."""
+
+    pillar_label = {
+        "deals": "Weekly Deals",
+        "events": "What's On",
+        "evergreen": "Evergreen Guide",
+    }.get(pillar, pillar.title())
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+
+                        <tr>
+                            <td style="background-color: #FF6B35; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">Cribb AI</h1>
+                                <p style="margin: 6px 0 0; color: #ffffff; opacity: 0.85; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;">
+                                    Draft ready for review
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="padding: 36px 40px;">
+                                <div style="margin-bottom: 16px;">
+                                    <span style="display: inline-block; background-color: #1B2D45; color: #ffffff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; letter-spacing: 0.04em; text-transform: uppercase;">
+                                        {pillar_label}
+                                    </span>
+                                    <span style="display: inline-block; background-color: #f4f4f5; color: #52525b; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; margin-left: 6px;">
+                                        {category}
+                                    </span>
+                                </div>
+
+                                <h2 style="margin: 0 0 12px; color: #1B2D45; font-size: 22px; font-weight: 800; line-height: 1.25;">
+                                    {title}
+                                </h2>
+                                <p style="margin: 0 0 28px; color: #52525b; font-size: 14px; line-height: 1.6;">
+                                    {preview}
+                                </p>
+
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td align="center" style="padding: 4px 0 24px;">
+                                            <a href="{edit_url}"
+                                               style="display: inline-block; background-color: #FF6B35; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 700; padding: 14px 32px; border-radius: 8px;">
+                                                Review & Edit Draft
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    You have 5 days to review. After that, the draft auto-expires and a fresh one gets generated.
+                                </p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 20px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 11px;">
+                                    Cribb AI — automated drafts for The Bubble. &copy; 2026 FindYourCribb.
+                                </p>
+                            </td>
+                        </tr>
+
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    return resend.Emails.send({
+        "from": "Cribb AI <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"[Cribb AI] Draft ready: {title}",
+        "html": html_content,
+    })
+
 # Sublet expired by admin (moderation)
 def send_sublet_expired_email(to_email: str, first_name: str, sublet_title: str):
     """Notify a sublet owner that their listing was expired by Cribb moderation."""
@@ -1102,101 +1193,219 @@ def send_sublet_expired_email(to_email: str, first_name: str, sublet_title: str)
     })
 
 
-def _listing_decision_email(to_email: str, name: str, listing_title: str, *, approved: bool, reason: str = None):
-    """Shared template for listing approval / rejection notifications to landlords."""
-    if approved:
-        badge_bg, badge_color, badge_text = "#dcfce7", "#166534", "Approved"
-        heading = f"Your listing is live, {name}!"
-        message = f"\"{listing_title}\" passed review and is now active and visible to students on Cribb."
-        cta_text = "View in Dashboard"
-    else:
-        badge_bg, badge_color, badge_text = "#fee2e2", "#991b1b", "Changes needed"
-        heading = f"Your listing needs a few changes, {name}"
-        message = f"\"{listing_title}\" wasn't approved yet. It's back in your drafts — update it and resubmit for review."
-        cta_text = "Edit Listing"
-
-    cta_url = f"{settings.FRONTEND_URL}/landlord?tab=listings"
-    reason_block = ""
-    if not approved and reason:
-        reason_block = f"""
-                                <div style="margin: 0 0 24px; padding: 14px 18px; background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
-                                    <p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.6;"><strong>Reviewer note:</strong> {reason}</p>
-                                </div>"""
+# ── New review notification (to landlord) ──
+def send_new_review_email(to_email: str, landlord_name: str, student_name: str, property_title: str, property_id: int):
+    property_url = f"{settings.FRONTEND_URL}/landlord?tab=reviews"
 
     html_content = f"""
     <!DOCTYPE html>
     <html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
     <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
-            <tr>
-                <td align="center">
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                        <tr>
-                            <td style="background-color: #F58259; padding: 24px 40px; text-align: center;">
-                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 40px;">
-                                <div style="text-align: center; margin-bottom: 24px;">
-                                    <span style="display: inline-block; background-color: {badge_bg}; color: {badge_color}; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
-                                        {badge_text}
-                                    </span>
-                                </div>
-                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
-                                    {heading}
-                                </h2>
-                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
-                                    {message}
-                                </p>
-                                {reason_block}
-                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                                    <tr>
-                                        <td align="center" style="padding: 4px 0 24px;">
-                                            <a href="{cta_url}"
-                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
-                                                {cta_text}
-                                            </a>
-                                        </td>
-                                    </tr>
-                                </table>
-                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
-                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
-                                    If you have any questions, reply to this email or reach out at support@findyourcribb.com
-                                </p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
-                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
+            <tr><td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <tr><td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
+                        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                    </td></tr>
+                    <tr><td style="padding: 36px 40px;">
+                        <h2 style="margin: 0 0 8px; color: #18181b; font-size: 18px; font-weight: 600;">New review on your property</h2>
+                        <p style="margin: 0 0 20px; color: #52525b; font-size: 14px; line-height: 1.6;">
+                            Hi {landlord_name}, <strong>{student_name}</strong> left a review on <strong>{property_title}</strong>.
+                        </p>
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr><td align="center" style="padding: 8px 0 16px;">
+                                <a href="{property_url}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px;">
+                                    View Reviews
+                                </a>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                    <tr><td style="background-color: #fafafa; padding: 20px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                        <p style="margin: 0; color: #a1a1aa; font-size: 11px;">You're receiving this because you're a landlord on FindYourCribb.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
         </table>
     </body>
     </html>
     """
 
-    return resend.Emails.send({
+    resend.Emails.send({
         "from": "FindYourCribb <no-reply@findyourcribb.com>",
         "reply_to": "support@findyourcribb.com",
         "to": [to_email],
-        "subject": ("Your listing is live — FindYourCribb" if approved else "Your listing needs changes — FindYourCribb"),
+        "subject": f"New review on {property_title} — FindYourCribb",
         "html": html_content,
     })
 
 
-def send_listing_approved_email(to_email: str, name: str, listing_title: str):
-    """Notify a landlord that their listing passed review and is now active."""
-    return _listing_decision_email(to_email, name, listing_title, approved=True)
+# ── Roommate invite received notification ──
+def send_roommate_invite_email(to_email: str, invitee_name: str, inviter_name: str, group_name: str):
+    roommates_url = f"{settings.FRONTEND_URL}/roommates"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr><td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <tr><td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
+                        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                    </td></tr>
+                    <tr><td style="padding: 36px 40px;">
+                        <h2 style="margin: 0 0 8px; color: #18181b; font-size: 18px; font-weight: 600;">You've been invited!</h2>
+                        <p style="margin: 0 0 20px; color: #52525b; font-size: 14px; line-height: 1.6;">
+                            Hey {invitee_name}, <strong>{inviter_name}</strong> invited you to join their roommate group <strong>{group_name}</strong>.
+                        </p>
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr><td align="center" style="padding: 8px 0 16px;">
+                                <a href="{roommates_url}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px;">
+                                    View Invite
+                                </a>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                    <tr><td style="background-color: #fafafa; padding: 20px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                        <p style="margin: 0; color: #a1a1aa; font-size: 11px;">You're receiving this because someone invited you on FindYourCribb.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"{inviter_name} invited you to join {group_name} — FindYourCribb",
+        "html": html_content,
+    })
 
 
-def send_listing_rejected_email(to_email: str, name: str, listing_title: str, reason: str = None):
-    """Notify a landlord that their listing was sent back to drafts with a reason."""
-    return _listing_decision_email(to_email, name, listing_title, approved=False, reason=reason)
+# ── Roommate response notification (invite accepted/declined, request accepted/declined) ──
+def send_roommate_response_email(to_email: str, recipient_name: str, responder_name: str, group_name: str, action: str, context: str):
+    """
+    action: "accepted" or "declined"
+    context: "invite" (responder is the invitee) or "request" (responder is the group owner)
+    """
+    roommates_url = f"{settings.FRONTEND_URL}/roommates"
+
+    if context == "invite":
+        subject_line = f"{responder_name} {action} your invite"
+        body_text = f"<strong>{responder_name}</strong> has <strong>{action}</strong> your invite to join <strong>{group_name}</strong>."
+    else:
+        subject_line = f"Your request to join {group_name} was {action}"
+        body_text = f"Your request to join <strong>{group_name}</strong> has been <strong>{action}</strong>."
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr><td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <tr><td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
+                        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                    </td></tr>
+                    <tr><td style="padding: 36px 40px;">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <span style="display: inline-block; background-color: {'#dcfce7' if action == 'accepted' else '#fee2e2'}; color: {'#166534' if action == 'accepted' else '#991b1b'}; font-size: 13px; font-weight: 600; padding: 5px 14px; border-radius: 20px;">
+                                {action.title()}
+                            </span>
+                        </div>
+                        <h2 style="margin: 0 0 8px; color: #18181b; font-size: 18px; font-weight: 600; text-align: center;">
+                            Hi {recipient_name},
+                        </h2>
+                        <p style="margin: 0 0 20px; color: #52525b; font-size: 14px; line-height: 1.6; text-align: center;">
+                            {body_text}
+                        </p>
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr><td align="center" style="padding: 8px 0 16px;">
+                                <a href="{roommates_url}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px;">
+                                    View Group
+                                </a>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                    <tr><td style="background-color: #fafafa; padding: 20px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                        <p style="margin: 0; color: #a1a1aa; font-size: 11px;">You're receiving this because you're part of a roommate group on FindYourCribb.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"{subject_line} — FindYourCribb",
+        "html": html_content,
+    })
+
+
+def send_new_post_email(to_email: str, recipient_name: str, author_name: str, post_title: str, post_url: str, is_official: bool = False):
+    badge_label = "Cribb Official" if is_official else "New Post"
+    badge_bg = "#dcfce7" if is_official else "#e0f2fe"
+    badge_color = "#166534" if is_official else "#075985"
+    subject_line = f"New post from {author_name}: {post_title}"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr><td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <tr><td style="background-color: #f58259; padding: 24px 40px; text-align: center;">
+                        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                    </td></tr>
+                    <tr><td style="padding: 36px 40px;">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <span style="display: inline-block; background-color: {badge_bg}; color: {badge_color}; font-size: 13px; font-weight: 600; padding: 5px 14px; border-radius: 20px;">
+                                {badge_label}
+                            </span>
+                        </div>
+                        <h2 style="margin: 0 0 8px; color: #18181b; font-size: 18px; font-weight: 600; text-align: center;">
+                            Hi {recipient_name},
+                        </h2>
+                        <p style="margin: 0 0 6px; color: #52525b; font-size: 14px; line-height: 1.6; text-align: center;">
+                            <strong>{author_name}</strong> just published a new post on The Bubble:
+                        </p>
+                        <p style="margin: 0 0 24px; color: #18181b; font-size: 16px; font-weight: 600; text-align: center;">
+                            {post_title}
+                        </p>
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                            <tr><td align="center" style="padding: 8px 0 16px;">
+                                <a href="{post_url}" style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 600; padding: 12px 28px; border-radius: 8px;">
+                                    Read Post
+                                </a>
+                            </td></tr>
+                        </table>
+                    </td></tr>
+                    <tr><td style="background-color: #fafafa; padding: 20px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                        <p style="margin: 0; color: #a1a1aa; font-size: 11px;">You're receiving this because you follow this author on FindYourCribb. Manage in Settings.</p>
+                    </td></tr>
+                </table>
+            </td></tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"{subject_line} — FindYourCribb",
+        "html": html_content,
+    })

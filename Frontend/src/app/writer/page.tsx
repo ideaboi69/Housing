@@ -671,6 +671,20 @@ function Dashboard() {
     }
   }, [searchParams]);
 
+  // Deep-link: /writer?edit={postId} auto-opens the edit modal for that post.
+  // Used by the Cribb AI draft review email.
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId || loading || posts.length === 0) return;
+    const target = posts.find((p) => String(p.id) === editId);
+    if (!target) return;
+    api.posts.getBySlug(target.slug).then((full) => {
+      setEditingPost(full);
+      setEditorOpen(true);
+      router.replace("/writer");
+    }).catch(() => { /* leave the URL — user can retry */ });
+  }, [searchParams, posts, loading, router]);
+
   const closeProfileEditor = useCallback(() => {
     setProfileOpen(false);
     if (searchParams.get("profile") === "1") {

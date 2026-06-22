@@ -29,6 +29,9 @@ export const useWriterStore = create<WriterAuthState>((set) => ({
       const res = await api.writers.login({ username: email, password });
       localStorage.setItem("cribb_writer_token", res.access_token);
       localStorage.setItem("cribb_writer", JSON.stringify(res.writer));
+      if (res.refresh_token) {
+        localStorage.setItem("cribb_writer_refresh_token", res.refresh_token);
+      }
       set({ writer: res.writer, writerToken: res.access_token, isLoading: false });
     } catch (err) {
       const message = err instanceof ApiError ? err.detail : "Login failed";
@@ -38,8 +41,19 @@ export const useWriterStore = create<WriterAuthState>((set) => ({
   },
 
   logout: (options) => {
+    // Revoke refresh token server-side (fire-and-forget)
+    const rt = typeof window !== "undefined" ? localStorage.getItem("cribb_writer_refresh_token") : null;
+    if (rt) {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      }).catch(() => {});
+    }
     localStorage.removeItem("cribb_writer_token");
     localStorage.removeItem("cribb_writer");
+    localStorage.removeItem("cribb_writer_refresh_token");
     set({ writer: null, writerToken: null });
     if (options?.redirect !== false && typeof window !== "undefined") {
       if (window.location.pathname === "/") {
@@ -61,6 +75,7 @@ export const useWriterStore = create<WriterAuthState>((set) => ({
       } catch {
         localStorage.removeItem("cribb_writer_token");
         localStorage.removeItem("cribb_writer");
+        localStorage.removeItem("cribb_writer_refresh_token");
         set({ writer: null, writerToken: null, isLoading: false });
       }
       return;
@@ -68,6 +83,7 @@ export const useWriterStore = create<WriterAuthState>((set) => ({
     if (token || writerStr) {
       localStorage.removeItem("cribb_writer_token");
       localStorage.removeItem("cribb_writer");
+      localStorage.removeItem("cribb_writer_refresh_token");
     }
     set({ writer: null, writerToken: null, isLoading: false });
   },

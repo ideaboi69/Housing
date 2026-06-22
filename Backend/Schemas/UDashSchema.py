@@ -136,20 +136,18 @@ class RoommateProfileResponse(BaseModel):
 
 # Notification Preferences
 class NotificationPreferencesUpdate(BaseModel):
-    new_listings_matching: Optional[bool] = None
-    price_drops_saved: Optional[bool] = None
-    new_roommate_matches: Optional[bool] = None
-    weekly_bubble_digest: Optional[bool] = None
-    cribb_news_updates: Optional[bool] = None
+    notify_new_messages: Optional[bool] = None
+    notify_roommate_updates: Optional[bool] = None
+    notify_viewing_updates: Optional[bool] = None
+    notify_bubble_posts: Optional[bool] = None
 
 class NotificationPreferencesResponse(BaseModel):
     id: int
     user_id: int
-    new_listings_matching: bool
-    price_drops_saved: bool
-    new_roommate_matches: bool
-    weekly_bubble_digest: bool
-    cribb_news_updates: bool
+    notify_new_messages: bool
+    notify_roommate_updates: bool
+    notify_viewing_updates: bool
+    notify_bubble_posts: bool
     updated_at: datetime
 
     class Config:

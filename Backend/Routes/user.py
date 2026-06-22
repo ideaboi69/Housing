@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
 from tables import *
 from Schemas.userSchema import *
-from helpers import check_uoguelph_email, cascade_delete_user
-from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password, create_password_reset_token, decode_password_reset_token, get_current_student
+from helpers import check_uoguelph_email, cascade_delete_user, log_security_event
+from Schemas.authSchema import SecurityEventType, SecurityEventResponse
+from Utils.security import hash_password, verify_password, create_access_token, get_current_user, validate_password, create_password_reset_token, decode_password_reset_token, get_current_student, create_refresh_token_for_user, revoke_all_refresh_tokens
 from Utils.email_token import create_email_verification_token, decode_email_verification_token
 from Utils.email import send_verification_email, send_password_reset_email
 from Schemas.subletSchema import SubletStatus
@@ -58,9 +59,13 @@ def register_users(request: Request, payload: UserCreate, db: Session = Depends(
     send_verification_email(user.email, user.first_name, email_token)
 
     access_token = create_access_token({"user_id": user.id, "role": user.role.value, "tv": user.token_version})
+    refresh_token = create_refresh_token_for_user(user.id, user.role.value, db)
+    log_security_event(db, user.id, user.role.value, SecurityEventType.ACCOUNT_CREATED, request)
+    db.commit()
 
     return TokenResponse(
         access_token=access_token,
+        refresh_token=refresh_token,
         user=UserResponse.model_validate(user),
     )
 
@@ -71,13 +76,20 @@ def register_users(request: Request, payload: UserCreate, db: Session = Depends(
 def user_login(request: Request, payload: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
+        if user:
+            log_security_event(db, user.id, user.role.value, SecurityEventType.SIGN_IN_FAILED, request)
+            db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     token = create_access_token({"user_id": user.id, "role": user.role.value, "tv": user.token_version})
+    refresh_token = create_refresh_token_for_user(user.id, user.role.value, db)
+    log_security_event(db, user.id, user.role.value, SecurityEventType.SIGN_IN, request)
+    db.commit()
 
     return {
-        "access_token": token, 
-        "token_type": "bearer", 
+        "access_token": token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
         "user": {
         "id": user.id,
         "email": user.email,
@@ -96,11 +108,17 @@ def user_login(request: Request, payload: UserLogin, db: Session = Depends(get_d
 def user_login_swagger(request: Request, payload: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.username).first()
     if not user or not verify_password(payload.password, user.password_hash):
+        if user:
+            log_security_event(db, user.id, user.role.value, SecurityEventType.SIGN_IN_FAILED, request)
+            db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     token = create_access_token({"user_id": user.id, "role": user.role.value, "tv": user.token_version})
+    refresh_token = create_refresh_token_for_user(user.id, user.role.value, db)
+    log_security_event(db, user.id, user.role.value, SecurityEventType.SIGN_IN, request)
+    db.commit()
 
-    return {"access_token": token, "token_type": "bearer"}
+    return {"access_token": token, "refresh_token": refresh_token, "token_type": "bearer"}
 
 # Verify email
 @user_router.get("/verify-email", status_code=status.HTTP_200_OK)
@@ -118,9 +136,13 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     db.commit()
 
     access_token = create_access_token({"user_id": user.id, "role": user.role.value, "tv": user.token_version})
+    refresh_token = create_refresh_token_for_user(user.id, user.role.value, db)
+    log_security_event(db, user.id, user.role.value, SecurityEventType.EMAIL_VERIFIED)
+    db.commit()
 
     return TokenResponse(
         access_token=access_token,
+        refresh_token=refresh_token,
         user=UserResponse.model_validate(user),
     )
 
@@ -150,6 +172,8 @@ def forgot_password(request: Request, payload: ForgotPasswordRequest, db: Sessio
     if user:
         reset_token = create_password_reset_token(user.email)
         send_password_reset_email(user.email, user.first_name, reset_token)
+        log_security_event(db, user.id, user.role.value, SecurityEventType.PASSWORD_RESET_REQUESTED, request)
+        db.commit()
 
     return {"message": "If an account exists with that email, a reset link has been sent."}
 
@@ -166,21 +190,44 @@ def reset_password(request: Request, payload: ResetPasswordRequest, db: Session 
     validate_password(payload.new_password)
 
     user.password_hash = hash_password(payload.new_password)
+    user.token_version = (user.token_version or 0) + 1
+    revoke_all_refresh_tokens(user.id, user.role.value, db)
+    log_security_event(db, user.id, user.role.value, SecurityEventType.PASSWORD_RESET_COMPLETED, request)
     db.commit()
 
     return {"message": "Password has been reset successfully. You can now log in."}
 
-# Refresh Token — issue a new access token if the current one is still valid
-@user_router.post("/refresh", status_code=status.HTTP_200_OK)
-def refresh_token(current_user: User = Depends(get_current_user)):
-    token = create_access_token({"user_id": current_user.id, "role": current_user.role.value, "tv": current_user.token_version})
-    return {"access_token": token, "token_type": "bearer"}
-
 @user_router.post("/me/logout-all", status_code=status.HTTP_200_OK)
-def logout_all_sessions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def logout_all_sessions(request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     current_user.token_version = (current_user.token_version or 0) + 1
+    revoke_all_refresh_tokens(current_user.id, current_user.role.value, db)
+    log_security_event(db, current_user.id, current_user.role.value, SecurityEventType.SIGN_OUT_ALL, request)
     db.commit()
     return {"message": "Signed out of all sessions."}
+
+# Security event log
+@user_router.get("/me/security-log", response_model=list[SecurityEventResponse])
+def get_security_log(limit: int = 50, offset: int = 0, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from tables import SecurityEvent
+    events = (
+        db.query(SecurityEvent)
+        .filter(SecurityEvent.user_id == current_user.id, SecurityEvent.role == current_user.role.value)
+        .order_by(SecurityEvent.created_at.desc())
+        .offset(offset)
+        .limit(min(limit, 100))
+        .all()
+    )
+    return [
+        SecurityEventResponse(
+            id=e.id,
+            event_type=e.event_type,
+            ip_address=e.ip_address,
+            user_agent=e.user_agent,
+            metadata=e.metadata_,
+            created_at=e.created_at,
+        )
+        for e in events
+    ]
 
 # Viewing and updating user profiles
 @user_router.get("/me", response_model=UserResponse)
@@ -188,16 +235,18 @@ def view_user_profile(current_user: User = Depends(get_current_user)):
     return UserResponse.model_validate(current_user)
 
 @user_router.patch("/me", response_model=UserResponse)
-def update_user_profile(payload: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_user_profile(request: Request, payload: UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if payload.email and payload.email != current_user.email:
         existing = db.query(User).filter(User.email == payload.email).first()
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists")
-        
+
         if payload.email and not check_uoguelph_email(payload.email):
             raise HTTPException(status_code=400, detail="Only @uoguelph.ca emails are allowed")
+        old_email = current_user.email
         current_user.email = payload.email
         current_user.email_verified = False  # re-verify on email change
+        log_security_event(db, current_user.id, current_user.role.value, SecurityEventType.EMAIL_CHANGED, request, {"old_email": old_email, "new_email": payload.email})
 
     if payload.first_name:
         current_user.first_name = payload.first_name
@@ -217,12 +266,15 @@ def update_user_profile(payload: UserUpdate, db: Session = Depends(get_db), curr
 
 # Changing Password
 @user_router.patch("/me/password", status_code=status.HTTP_200_OK)
-def change_password(payload: PasswordChange, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def change_password(request: Request, payload: PasswordChange, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
 
     validate_password(payload.new_password)
     current_user.password_hash = hash_password(payload.new_password)
+    current_user.token_version = (current_user.token_version or 0) + 1
+    revoke_all_refresh_tokens(current_user.id, current_user.role.value, db)
+    log_security_event(db, current_user.id, current_user.role.value, SecurityEventType.PASSWORD_CHANGED, request)
     db.commit()
 
     return {"message": "Password updated successfully"}
@@ -280,20 +332,18 @@ def update_notification_preferences(payload: NotificationPreferencesUpdate, db: 
         db.add(prefs)
         db.flush()
  
-    if payload.new_listings_matching is not None:
-        prefs.new_listings_matching = payload.new_listings_matching
-    if payload.price_drops_saved is not None:
-        prefs.price_drops_saved = payload.price_drops_saved
-    if payload.new_roommate_matches is not None:
-        prefs.new_roommate_matches = payload.new_roommate_matches
-    if payload.weekly_bubble_digest is not None:
-        prefs.weekly_bubble_digest = payload.weekly_bubble_digest
-    if payload.cribb_news_updates is not None:
-        prefs.cribb_news_updates = payload.cribb_news_updates
- 
+    if payload.notify_new_messages is not None:
+        prefs.notify_new_messages = payload.notify_new_messages
+    if payload.notify_roommate_updates is not None:
+        prefs.notify_roommate_updates = payload.notify_roommate_updates
+    if payload.notify_viewing_updates is not None:
+        prefs.notify_viewing_updates = payload.notify_viewing_updates
+    if payload.notify_bubble_posts is not None:
+        prefs.notify_bubble_posts = payload.notify_bubble_posts
+
     db.commit()
     db.refresh(prefs)
- 
+
     return NotificationPreferencesResponse.model_validate(prefs)
 
 @user_router.post("/request-write-access", status_code=status.HTTP_200_OK)
@@ -327,7 +377,10 @@ def request_write_access( reason: str = Form(...), db: Session = Depends(get_db)
 
 # Delete Account
 @user_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-def delete_me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_me(payload: DeleteAccount, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if not verify_password(payload.password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Password is incorrect")
+    
     cascade_delete_user(current_user, db)
     db.commit()
 

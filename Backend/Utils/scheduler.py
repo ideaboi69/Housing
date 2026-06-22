@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from sqlalchemy.orm import Session
 from tables import get_db, ViewingBooking, ViewingSlot, User, Landlord, Listing, Property, Sublet, BookingStatus
 from Utils.email import send_booking_reminder_email
+from helpers import should_notify_student, should_notify_landlord
 
 def send_viewing_reminders():
     """Find all confirmed bookings for tomorrow and send reminders."""
@@ -55,31 +56,40 @@ def send_viewing_reminders():
                 host_name = owner.first_name
                 host_full = f"{owner.first_name} {owner.last_name}"
 
-            try:
-                send_booking_reminder_email(
-                    to_email=student.email,
-                    name=student.first_name,
-                    role="student",
-                    booking_details={
-                        **booking_details,
-                        "other_party_name": host_full,
-                    },
-                )
-            except Exception:
-                pass
+            # Send reminder to student (if viewing updates enabled)
+            if should_notify_student(db, student.id, "notify_viewing_updates"):
+                try:
+                    send_booking_reminder_email(
+                        to_email=student.email,
+                        name=student.first_name,
+                        role="student",
+                        booking_details={
+                            **booking_details,
+                            "other_party_name": host_full,
+                        },
+                    )
+                except Exception:
+                    pass
 
-            try:
-                send_booking_reminder_email(
-                    to_email=host_email,
-                    name=host_name,
-                    role="landlord",
-                    booking_details={
-                        **booking_details,
-                        "other_party_name": f"{student.first_name} {student.last_name}",
-                    },
-                )
-            except Exception:
-                pass
+            # Send reminder to host (landlord or sublet owner)
+            if booking.listing_id:
+                should_send = should_notify_landlord(db, landlord.id, "notify_new_messages")
+            else:
+                should_send = should_notify_student(db, owner.id, "notify_viewing_updates")
+
+            if should_send:
+                try:
+                    send_booking_reminder_email(
+                        to_email=host_email,
+                        name=host_name,
+                        role="landlord",
+                        booking_details={
+                            **booking_details,
+                            "other_party_name": f"{student.first_name} {student.last_name}",
+                        },
+                    )
+                except Exception:
+                    pass
 
     finally:
         db.close()

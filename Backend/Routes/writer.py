@@ -4,10 +4,12 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from tables import get_db, Writer
 from Schemas.writerSchema import WriterRegister, WriterResponse, WriterTokenResponse, WriterStatus, WriterUpdate
-from Utils.security import hash_password, verify_password, create_access_token, validate_password, get_current_writer
+from Utils.security import hash_password, verify_password, create_access_token, validate_password, get_current_writer, create_refresh_token_for_user, revoke_all_refresh_tokens
 from Utils.rate_limit import limiter
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.turnstile import verify_turnstile
+from helpers import log_security_event
+from Schemas.authSchema import SecurityEventType
 from config import settings
 
 writer_router = APIRouter()
@@ -39,6 +41,9 @@ def register_writer(request: Request, payload: WriterRegister, db: Session = Dep
     db.commit()
     db.refresh(writer)
 
+    log_security_event(db, writer.id, "writer", SecurityEventType.ACCOUNT_CREATED, request)
+    db.commit()
+
     # Send to Formspree (your inbox)
     try:
         httpx.post(
@@ -66,6 +71,9 @@ def writer_login(request: Request, form_data: OAuth2PasswordRequestForm = Depend
     writer = db.query(Writer).filter(Writer.email == form_data.username).first()
 
     if not writer or not verify_password(form_data.password, writer.password_hash):
+        if writer:
+            log_security_event(db, writer.id, "writer", SecurityEventType.SIGN_IN_FAILED, request)
+            db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -79,15 +87,21 @@ def writer_login(request: Request, form_data: OAuth2PasswordRequestForm = Depend
         )
 
     token = create_access_token({"user_id": writer.id, "role": "writer", "tv": writer.token_version})
+    refresh_token = create_refresh_token_for_user(writer.id, "writer", db)
+    log_security_event(db, writer.id, "writer", SecurityEventType.SIGN_IN, request)
+    db.commit()
 
     return WriterTokenResponse(
         access_token=token,
+        refresh_token=refresh_token,
         writer=WriterResponse.model_validate(writer),
     )
 
 @writer_router.post("/me/logout-all", status_code=status.HTTP_200_OK)
-def logout_all_writer_sessions(db: Session = Depends(get_db), current_writer: Writer = Depends(get_current_writer)):
+def logout_all_writer_sessions(request: Request, db: Session = Depends(get_db), current_writer: Writer = Depends(get_current_writer)):
     current_writer.token_version = (current_writer.token_version or 0) + 1
+    revoke_all_refresh_tokens(current_writer.id, "writer", db)
+    log_security_event(db, current_writer.id, "writer", SecurityEventType.SIGN_OUT_ALL, request)
     db.commit()
     return {"message": "Signed out of all sessions."}
 

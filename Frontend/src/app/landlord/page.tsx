@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
-import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse, ListingDetailResponse } from "@/types";
+import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse, ListingDetailResponse, SecurityEvent } from "@/types";
 import {
   Plus, Building2, Eye, EyeOff, Trash2, Shield, ShieldCheck,
   ChevronDown, ChevronRight, Home, Phone, Mail, Pencil, Check, X,
@@ -14,6 +14,7 @@ import {
   Archive, Inbox, Clock, AlertCircle, Star,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { formatLeaseType, formatPropertyType } from "@/lib/utils";
 import { getListingStatusBucket, getListingStatusLabel, getListingStatusTone, isToggleableStatus } from "@/lib/listing-status";
 import { useMessagesSocket } from "@/lib/use-messages-socket";
@@ -1412,6 +1413,145 @@ function MessagesTab({
    Settings Tab
    ════════════════════════════════════════════════════════ */
 
+const LL_EVENT_LABELS: Record<string, string> = {
+  sign_in: "Sign in",
+  sign_in_failed: "Failed sign-in",
+  sign_out: "Sign out",
+  sign_out_all: "Sign out all devices",
+  password_changed: "Password changed",
+  password_reset_requested: "Password reset requested",
+  password_reset_completed: "Password reset",
+  email_verified: "Email verified",
+  email_changed: "Email changed",
+  token_reuse_detected: "Token reuse detected",
+  account_created: "Account created",
+};
+
+function llParseBrowser(ua: string | null): string {
+  if (!ua) return "—";
+  if (/Edg\//.test(ua)) return "Edge";
+  if (/OPR\/|Opera/.test(ua)) return "Opera";
+  if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) return "Chrome";
+  if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) return "Safari";
+  if (/Firefox\//.test(ua)) return "Firefox";
+  return "Other";
+}
+
+function llParseOS(ua: string | null): string {
+  if (!ua) return "—";
+  if (/iPhone/.test(ua)) return "iPhone";
+  if (/iPad/.test(ua)) return "iPad";
+  if (/Android/.test(ua)) return "Android";
+  if (/Mac OS/.test(ua)) return "macOS";
+  if (/Windows/.test(ua)) return "Windows";
+  if (/Linux/.test(ua)) return "Linux";
+  return "—";
+}
+
+function llFormatDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  }) + ", " + d.toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
+}
+
+function LandlordSecurityLog() {
+  const [events, setEvents] = useState<SecurityEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await api.landlords.getSecurityLog(20, 0);
+        if (cancelled) return;
+        setEvents(data);
+        setHasMore(data.length === 20);
+      } catch {
+        // API not available
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const data = await api.landlords.getSecurityLog(20, events.length);
+      setEvents((prev) => [...prev, ...data]);
+      setHasMore(data.length === 20);
+    } catch { /* ignore */ }
+    finally { setLoadingMore(false); }
+  };
+
+  const sectionCls = "bg-white rounded-xl border border-black/[0.04] p-5";
+  const thStyle: React.CSSProperties = { fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", padding: "8px 12px", textAlign: "left", whiteSpace: "nowrap" };
+  const tdStyle: React.CSSProperties = { fontSize: "12px", padding: "10px 12px", whiteSpace: "nowrap" };
+
+  return (
+    <div className={sectionCls} style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
+      <h3 className="text-[#1B2D45] mb-1" style={{ fontSize: "14px", fontWeight: 700 }}>Recent activity</h3>
+      <p className="text-[#1B2D45]/58 mb-4" style={{ fontSize: "11px" }}>Security events on your account</p>
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-10 rounded-lg bg-[#FAF8F4] animate-pulse" />
+          ))}
+        </div>
+      ) : events.length === 0 ? (
+        <p className="text-[#1B2D45]/40 py-4 text-center" style={{ fontSize: "13px" }}>No activity yet</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto -mx-5 px-5">
+            <table className="w-full min-w-[600px]">
+              <thead>
+                <tr className="border-b border-black/[0.06]">
+                  <th className="text-[#1B2D45]/40" style={thStyle}>Event</th>
+                  <th className="text-[#1B2D45]/40" style={thStyle}>IP address</th>
+                  <th className="text-[#1B2D45]/40" style={thStyle}>Browser</th>
+                  <th className="text-[#1B2D45]/40" style={thStyle}>OS</th>
+                  <th className="text-[#1B2D45]/40" style={thStyle}>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((evt) => (
+                  <tr key={evt.id} className="border-b border-black/[0.03] last:border-0">
+                    <td style={tdStyle}>
+                      <span className={`font-medium ${evt.event_type === "sign_in_failed" || evt.event_type === "token_reuse_detected" ? "text-[#E71D36]" : "text-[#1B2D45]"}`}>
+                        {LL_EVENT_LABELS[evt.event_type] || evt.event_type}
+                      </span>
+                    </td>
+                    <td className="text-[#1B2D45]/60 font-mono" style={tdStyle}>{evt.ip_address || "—"}</td>
+                    <td className="text-[#1B2D45]/60" style={tdStyle}>{llParseBrowser(evt.user_agent)}</td>
+                    <td className="text-[#1B2D45]/60" style={tdStyle}>{llParseOS(evt.user_agent)}</td>
+                    <td className="text-[#1B2D45]/40" style={tdStyle}>{llFormatDate(evt.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {hasMore && (
+            <div className="pt-3 flex justify-center">
+              <button onClick={loadMore} disabled={loadingMore}
+                className="text-[#1B2D45]/60 hover:text-[#1B2D45] transition-colors disabled:opacity-50"
+                style={{ fontSize: "12px", fontWeight: 600 }}>
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function SettingsTab({ user }: { user: { email: string; first_name: string; last_name: string; identity_verified?: boolean; company_name?: string | null; phone?: string | null } }) {
   const router = useRouter();
   const { logout, loadUser } = useAuthStore();
@@ -1434,9 +1574,12 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState(false);
 
-  // Notifications (stored locally for now — no backend support yet)
+  // Notification preferences (synced with backend)
   const [notifInquiries, setNotifInquiries] = useState(true);
   const [notifReviews, setNotifReviews] = useState(true);
+  const [notifFlags, setNotifFlags] = useState(true);
+  const [notifLoading, setNotifLoading] = useState(true);
+  const [notifSaving, setNotifSaving] = useState(false);
 
   // Listing defaults (stored locally)
   const [defaultLeaseType, setDefaultLeaseType] = useState("12_months");
@@ -1478,6 +1621,37 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
     } catch (err) {
       setPwError(err instanceof Error ? err.message : "Failed to change password");
     } finally { setPwSaving(false); }
+  };
+
+  // Load landlord notification preferences
+  useEffect(() => {
+    let cancelled = false;
+    async function loadNotifPrefs() {
+      try {
+        const prefs = await api.landlords.getNotificationPreferences();
+        if (cancelled) return;
+        setNotifInquiries(prefs.notify_new_messages);
+        setNotifReviews(prefs.notify_new_reviews);
+        setNotifFlags(prefs.notify_new_flags);
+      } catch { /* keep defaults */ }
+      finally { if (!cancelled) setNotifLoading(false); }
+    }
+    loadNotifPrefs();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleSaveNotifPrefs = async () => {
+    setNotifSaving(true);
+    try {
+      await api.landlords.updateNotificationPreferences({
+        notify_new_messages: notifInquiries,
+        notify_new_reviews: notifReviews,
+        notify_new_flags: notifFlags,
+      });
+      toast.success("Notification preferences saved");
+    } catch {
+      toast.error("Failed to save notification preferences");
+    } finally { setNotifSaving(false); }
   };
 
   const handleDeleteAccount = async () => {
@@ -1646,27 +1820,56 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
         )}
       </div>
 
+      {/* ─── Security Log ─── */}
+      <LandlordSecurityLog />
+
       {/* ─── Notification Preferences ─── */}
       <div className={sectionCls} style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
         <h3 className="text-[#1B2D45] mb-1" style={{ fontSize: "14px", fontWeight: 700 }}>Notifications</h3>
         <p className="text-[#1B2D45]/58 mb-4" style={{ fontSize: "11px" }}>Choose what email notifications you receive.</p>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>New student inquiries</div>
-              <div className="text-[#1B2D45]/58" style={{ fontSize: "11px" }}>Get notified when a student messages you about a listing</div>
-            </div>
-            <Toggle on={notifInquiries} onToggle={() => setNotifInquiries(!notifInquiries)} />
+        {notifLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-[46px] rounded-xl bg-[#FAF8F4] animate-pulse" />
+            ))}
           </div>
-          <div className="h-px bg-black/[0.04]" />
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>New reviews</div>
-              <div className="text-[#1B2D45]/58" style={{ fontSize: "11px" }}>Get notified when a student leaves a review</div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>New student inquiries</div>
+                <div className="text-[#1B2D45]/58" style={{ fontSize: "11px" }}>Get notified when a student messages you about a listing</div>
+              </div>
+              <Toggle on={notifInquiries} onToggle={() => setNotifInquiries(!notifInquiries)} />
             </div>
-            <Toggle on={notifReviews} onToggle={() => setNotifReviews(!notifReviews)} />
+            <div className="h-px bg-black/[0.04]" />
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>New reviews</div>
+                <div className="text-[#1B2D45]/58" style={{ fontSize: "11px" }}>Get notified when a student leaves a review</div>
+              </div>
+              <Toggle on={notifReviews} onToggle={() => setNotifReviews(!notifReviews)} />
+            </div>
+            <div className="h-px bg-black/[0.04]" />
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Listing flags</div>
+                <div className="text-[#1B2D45]/58" style={{ fontSize: "11px" }}>Get notified when one of your listings is flagged</div>
+              </div>
+              <Toggle on={notifFlags} onToggle={() => setNotifFlags(!notifFlags)} />
+            </div>
+            <div className="pt-2">
+              <button
+                onClick={handleSaveNotifPrefs}
+                disabled={notifSaving}
+                className="px-5 py-2 rounded-lg text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "#FF6B35" }}
+              >
+                {notifSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ─── Listing Defaults ─── */}

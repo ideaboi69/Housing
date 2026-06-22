@@ -46,6 +46,7 @@ function VerifyEmailContent() {
 
         if (isTokenResponse(result)) {
           localStorage.setItem("cribb_token", result.access_token);
+          if (result.refresh_token) localStorage.setItem("cribb_refresh_token", result.refresh_token);
           useAuthStore.setState({ user: result.user, token: result.access_token });
           setVerifiedUser(result.user);
           setStatus("success");

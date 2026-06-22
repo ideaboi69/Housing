@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     CRIBB_RESEND_API: str
     FRONTEND_URL: str
@@ -31,6 +32,11 @@ class Settings(BaseSettings):
     UPSTASH_REDIS_REST_TOKEN: str = ""
 
     TURNSTILE_SECRET: str = ""
+
+    CRIBB_AI_WRITER_EMAIL: str
+    CRIBB_AI_WRITER_PASSWORD: str
+    CRIBB_REVIEW_EMAIL: str
+    FIRECRAWL_API_KEY: str = ""
 
     @computed_field
     @property

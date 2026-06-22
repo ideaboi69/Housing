@@ -175,6 +175,7 @@ function LandlordSignupPageContent() {
           phone: data.landlord.phone,
         };
         localStorage.setItem("cribb_token", data.access_token);
+        if (data.refresh_token) localStorage.setItem("cribb_refresh_token", data.refresh_token);
         sessionStorage.setItem("cribb_landlord_profile", JSON.stringify(landlordUser));
         setAuthState({
           user: landlordUser,

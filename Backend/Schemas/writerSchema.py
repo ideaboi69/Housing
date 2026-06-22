@@ -45,6 +45,7 @@ class WriterResponse(BaseModel):
     profile_photo_url: Optional[str] = None
     status: WriterStatus
     is_early_adopter: bool = False
+    is_official: bool = False
     reason: Optional[str] = None
     created_at: datetime
 
@@ -54,4 +55,5 @@ class WriterResponse(BaseModel):
 
 class WriterTokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     writer: WriterResponse

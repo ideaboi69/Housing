@@ -1025,6 +1025,8 @@ function AdminContent() {
     }
     // Override the regular token for admin API calls
     localStorage.setItem("cribb_token", token);
+    const adminRefresh = localStorage.getItem("cribb_admin_refresh_token");
+    if (adminRefresh) localStorage.setItem("cribb_refresh_token", adminRefresh);
     const profile = getAdminProfile();
     setAdminProfile(profile);
     setLoading(false);
@@ -1069,7 +1071,9 @@ function AdminContent() {
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         localStorage.removeItem("cribb_admin_token");
+        localStorage.removeItem("cribb_admin_refresh_token");
         localStorage.removeItem("cribb_admin_profile");
+        localStorage.removeItem("cribb_refresh_token");
         router.push("/admin/login");
       }
     }
@@ -1097,9 +1101,21 @@ function AdminContent() {
   }, [loading]);
 
   const handleLogout = () => {
+    // Revoke refresh token server-side (fire-and-forget)
+    const rt = localStorage.getItem("cribb_admin_refresh_token");
+    if (rt) {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      }).catch(() => {});
+    }
     localStorage.removeItem("cribb_admin_token");
+    localStorage.removeItem("cribb_admin_refresh_token");
     localStorage.removeItem("cribb_admin_profile");
     localStorage.removeItem("cribb_token");
+    localStorage.removeItem("cribb_refresh_token");
     router.push("/admin/login");
   };
 

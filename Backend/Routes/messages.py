@@ -5,7 +5,7 @@ from tables import Listing, Conversation, User, get_db, Landlord, Message, Prope
 from Schemas.convoSchema import SenderType
 from Schemas.convoSchema import ConversationDetailResponse, StartConversation, MessageCreate, MessageResponse, ConversationResponse
 from Utils.security import get_current_user, get_current_student
-from helpers import require_landlord
+from helpers import require_landlord, should_notify_student, should_notify_landlord
 from Utils.email import send_message_notification
 from Utils.websocket import connection_manager
 from Utils.rate_limit import limiter
@@ -63,17 +63,18 @@ def start_conversation(payload: StartConversation, background_tasks: BackgroundT
     db.commit()
     db.refresh(conversation)
 
-    # Email the landlord in the background
+    # Email the landlord in the background (if they have notifications enabled)
     landlord = db.query(Landlord).filter(Landlord.id == property.landlord_id).first()
-    background_tasks.add_task(
-        send_message_notification,
-        to_email=landlord.email,
-        recipient_name=landlord.first_name,
-        sender_name=f"{current_user.first_name} {current_user.last_name}",
-        message_preview=payload.content,
-        conversation_id=conversation.id,
-        property_title=property.title,
-    )
+    if should_notify_landlord(db, landlord.id, "notify_new_messages"):
+        background_tasks.add_task(
+            send_message_notification,
+            to_email=landlord.email,
+            recipient_name=landlord.first_name,
+            sender_name=f"{current_user.first_name} {current_user.last_name}",
+            message_preview=payload.content,
+            conversation_id=conversation.id,
+            property_title=property.title,
+        )
 
     # Push real-time notification to the landlord (frontend will refetch)
     background_tasks.add_task(
@@ -121,15 +122,16 @@ def send_message(request: Request, conversation_id: int, payload: MessageCreate,
 
     if sender_type == SenderType.STUDENT:
         landlord = db.query(Landlord).filter(Landlord.id == conversation.landlord_id).first()
-        background_tasks.add_task(
-            send_message_notification,
-            to_email=landlord.email,
-            recipient_name=landlord.first_name,
-            sender_name=f"{current_user.first_name} {current_user.last_name}",
-            message_preview=payload.content,
-            property_title=property.title,
-            conversation_id=conversation.id,
-        )
+        if should_notify_landlord(db, landlord.id, "notify_new_messages"):
+            background_tasks.add_task(
+                send_message_notification,
+                to_email=landlord.email,
+                recipient_name=landlord.first_name,
+                sender_name=f"{current_user.first_name} {current_user.last_name}",
+                message_preview=payload.content,
+                property_title=property.title,
+                conversation_id=conversation.id,
+            )
         # Notify landlord in real time
         background_tasks.add_task(
             connection_manager.send_to_user,
@@ -139,15 +141,16 @@ def send_message(request: Request, conversation_id: int, payload: MessageCreate,
         )
     else:
         user = db.query(User).filter(User.id == conversation.user_id).first()
-        background_tasks.add_task(
-            send_message_notification,
-            to_email=user.email,
-            recipient_name=user.first_name,
-            sender_name=f"{current_user.first_name} {current_user.last_name}",
-            message_preview=payload.content,
-            property_title=property.title,
-            conversation_id=conversation.id,
-        )
+        if should_notify_student(db, user.id, "notify_new_messages"):
+            background_tasks.add_task(
+                send_message_notification,
+                to_email=user.email,
+                recipient_name=user.first_name,
+                sender_name=f"{current_user.first_name} {current_user.last_name}",
+                message_preview=payload.content,
+                property_title=property.title,
+                conversation_id=conversation.id,
+            )
         # Notify student in real time
         background_tasks.add_task(
             connection_manager.send_to_user,
@@ -180,20 +183,21 @@ def landlord_reply(request: Request, conversation_id: int, payload: MessageCreat
     db.commit()
     db.refresh(message)
 
-    # Email the user
+    # Email the user (if they have message notifications enabled)
     user = db.query(User).filter(User.id == conversation.user_id).first()
     listing = db.query(Listing).filter(Listing.id == conversation.listing_id).first()
     property = db.query(Property).filter(Property.id == listing.property_id).first()
 
-    background_tasks.add_task(
-        send_message_notification,
-        to_email=user.email,
-        recipient_name=user.first_name,
-        sender_name=f"{landlord.first_name} {landlord.last_name}",
-        message_preview=payload.content,
-        conversation_id=conversation.id,
-        property_title=property.title,
-    )
+    if should_notify_student(db, user.id, "notify_new_messages"):
+        background_tasks.add_task(
+            send_message_notification,
+            to_email=user.email,
+            recipient_name=user.first_name,
+            sender_name=f"{landlord.first_name} {landlord.last_name}",
+            message_preview=payload.content,
+            conversation_id=conversation.id,
+            property_title=property.title,
+        )
 
     # Notify student in real time
     background_tasks.add_task(
@@ -296,11 +300,8 @@ def get_specific_conversation( conversation_id: int, db: Session = Depends(get_d
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Landlords and students live in separate tables with independent IDs, so an
-    # identity check must be scoped by type — otherwise an ID collision misclassifies
-    # the viewer and the wrong side's messages get marked read (badge never clears).
+    is_user = conversation.user_id == current_user.id
     is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id == current_user.id
-    is_user = not isinstance(current_user, Landlord) and conversation.user_id == current_user.id
     if not is_user and not is_landlord:
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -381,10 +382,9 @@ def delete_message(conversation_id: int, message_id: int, db: Session = Depends(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Verify access — scope identity by type so a landlord/student ID collision
-    # can't misclassify the viewer (separate tables, independent IDs).
+    # Verify access
+    is_user = conversation.user_id == current_user.id
     is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id == current_user.id
-    is_user = not isinstance(current_user, Landlord) and conversation.user_id == current_user.id
     if not is_user and not is_landlord:
         raise HTTPException(status_code=403, detail="Access denied")
 

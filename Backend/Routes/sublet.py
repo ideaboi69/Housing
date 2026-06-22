@@ -7,7 +7,7 @@ from tables import Sublet, SubletImage,SubletConversation, SubletMessage, User, 
 from Schemas.subletSchema import *
 from Schemas.listingSchema import GenderPreference
 from Utils.security import get_current_student
-from helpers import build_sublet_list_response, build_sublet_response
+from helpers import build_sublet_list_response, build_sublet_response, should_notify_student
 from Utils.cache import cached, invalidate
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.email import send_message_notification
@@ -246,15 +246,16 @@ def start_sublet_conversation(payload: StartSubletConversation, background_tasks
     db.refresh(message)
 
     poster = db.query(User).filter(User.id == sublet.user_id).first()
-    background_tasks.add_task(
-        send_message_notification,
-        to_email=poster.email,
-        recipient_name=poster.first_name,
-        sender_name=f"{current_user.first_name} {current_user.last_name}",
-        message_preview=payload.content,
-        conversation_id=conversation.id,
-        property_title=sublet.title,
-    )
+    if should_notify_student(db, poster.id, "notify_new_messages"):
+        background_tasks.add_task(
+            send_message_notification,
+            to_email=poster.email,
+            recipient_name=poster.first_name,
+            sender_name=f"{current_user.first_name} {current_user.last_name}",
+            message_preview=payload.content,
+            conversation_id=conversation.id,
+            property_title=sublet.title,
+        )
 
     # Notify the poster in real time
     background_tasks.add_task(
@@ -292,15 +293,16 @@ def send_sublet_message(conversation_id: int, payload: SubletMessageCreate, back
     other_user_id = conversation.poster_id if is_inquirer else conversation.inquirer_id
     other_user = db.query(User).filter(User.id == other_user_id).first()
 
-    background_tasks.add_task(
-        send_message_notification,
-        to_email=other_user.email,
-        recipient_name=other_user.first_name,
-        sender_name=f"{current_user.first_name} {current_user.last_name}",
-        message_preview=payload.content,
-        conversation_id=conversation.id,
-        property_title=sublet.title,
-    )
+    if should_notify_student(db, other_user_id, "notify_new_messages"):
+        background_tasks.add_task(
+            send_message_notification,
+            to_email=other_user.email,
+            recipient_name=other_user.first_name,
+            sender_name=f"{current_user.first_name} {current_user.last_name}",
+            message_preview=payload.content,
+            conversation_id=conversation.id,
+            property_title=sublet.title,
+        )
 
     # Notify the other party in real time
     background_tasks.add_task(

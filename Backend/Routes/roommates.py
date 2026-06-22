@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from typing import Optional
@@ -8,6 +8,7 @@ from helpers import *
 from Utils.security import get_current_student
 from Utils.roommate import build_group_card, build_group_detail, build_invite_response, build_listing_detail, build_request_response, generate_invite_code
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
+from Utils.email import send_roommate_invite_email, send_roommate_response_email
 import secrets
 roommate_router = APIRouter()
 
@@ -682,7 +683,7 @@ def get_individual(user_id: int, db: Session = Depends(get_db), current_user: Us
 
 # Invites
 @roommate_router.post("/invites", response_model=InviteResponse, status_code=status.HTTP_201_CREATED)
-def send_invite(payload: InviteCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+def send_invite(payload: InviteCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     group = db.query(RoommateGroup).filter(RoommateGroup.owner_id == current_user.id, RoommateGroup.is_active == True).first()
 
     if not group:
@@ -732,10 +733,21 @@ def send_invite(payload: InviteCreate, db: Session = Depends(get_db), current_us
     db.commit()
     db.refresh(invite)
 
+    # Notify invitee via email (if enabled)
+    invitee = db.query(User).filter(User.id == payload.invited_user_id).first()
+    if invitee and should_notify_student(db, invitee.id, "notify_roommate_updates"):
+        background_tasks.add_task(
+            send_roommate_invite_email,
+            to_email=invitee.email,
+            invitee_name=invitee.first_name,
+            inviter_name=f"{current_user.first_name} {current_user.last_name}",
+            group_name=group.name,
+        )
+
     return build_invite_response(invite, db)
 
 @roommate_router.patch("/invites/{invite_id}/accept", response_model=InviteResponse)
-def accept_invite(invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+def accept_invite(invite_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     invite = db.query(RoommateInvite).filter(
         RoommateInvite.id == invite_id,
         RoommateInvite.invited_user_id == current_user.id,
@@ -773,10 +785,23 @@ def accept_invite(invite_id: int, db: Session = Depends(get_db), current_user: U
     db.commit()
     db.refresh(invite)
 
+    # Notify the group owner that invite was accepted
+    inviter = db.query(User).filter(User.id == invite.invited_by_id).first()
+    if inviter and should_notify_student(db, inviter.id, "notify_roommate_updates"):
+        background_tasks.add_task(
+            send_roommate_response_email,
+            to_email=inviter.email,
+            recipient_name=inviter.first_name,
+            responder_name=f"{current_user.first_name} {current_user.last_name}",
+            group_name=group.name,
+            action="accepted",
+            context="invite",
+        )
+
     return build_invite_response(invite, db)
 
 @roommate_router.patch("/invites/{invite_id}/decline", response_model=InviteResponse)
-def decline_invite(invite_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+def decline_invite(invite_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     invite = db.query(RoommateInvite).filter(
         RoommateInvite.id == invite_id,
         RoommateInvite.invited_user_id == current_user.id,
@@ -789,6 +814,20 @@ def decline_invite(invite_id: int, db: Session = Depends(get_db), current_user: 
     invite.status = InviteStatus.DECLINED
     db.commit()
     db.refresh(invite)
+
+    # Notify the group owner that invite was declined
+    inviter = db.query(User).filter(User.id == invite.invited_by_id).first()
+    group = db.query(RoommateGroup).filter(RoommateGroup.id == invite.group_id).first()
+    if inviter and group and should_notify_student(db, inviter.id, "notify_roommate_updates"):
+        background_tasks.add_task(
+            send_roommate_response_email,
+            to_email=inviter.email,
+            recipient_name=inviter.first_name,
+            responder_name=f"{current_user.first_name} {current_user.last_name}",
+            group_name=group.name,
+            action="declined",
+            context="invite",
+        )
 
     return build_invite_response(invite, db)
 
@@ -858,7 +897,7 @@ def send_request(payload: RequestCreate, db: Session = Depends(get_db), current_
     return build_request_response(request, db)
 
 @roommate_router.patch("/requests/{request_id}/accept", response_model=RequestResponse)
-def accept_request(request_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+def accept_request(request_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     req = db.query(RoommateRequest).filter(RoommateRequest.id == request_id, RoommateRequest.status == RequestStatus.PENDING).first()
 
     if not req:
@@ -898,10 +937,23 @@ def accept_request(request_id: int, db: Session = Depends(get_db), current_user:
     db.commit()
     db.refresh(req)
 
+    # Notify the requester that their request was accepted
+    requester = db.query(User).filter(User.id == req.user_id).first()
+    if requester and should_notify_student(db, requester.id, "notify_roommate_updates"):
+        background_tasks.add_task(
+            send_roommate_response_email,
+            to_email=requester.email,
+            recipient_name=requester.first_name,
+            responder_name=f"{current_user.first_name} {current_user.last_name}",
+            group_name=group.name,
+            action="accepted",
+            context="request",
+        )
+
     return build_request_response(req, db)
 
 @roommate_router.patch("/requests/{request_id}/decline", response_model=RequestResponse)
-def decline_request(request_id: int, db: Session = Depends(get_db),current_user: User = Depends(get_current_student)):
+def decline_request(request_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
     req = db.query(RoommateRequest).filter(RoommateRequest.id == request_id, RoommateRequest.status == RequestStatus.PENDING).first()
 
     if not req:
@@ -914,6 +966,19 @@ def decline_request(request_id: int, db: Session = Depends(get_db),current_user:
     req.status = RequestStatus.DECLINED
     db.commit()
     db.refresh(req)
+
+    # Notify the requester that their request was declined
+    requester = db.query(User).filter(User.id == req.user_id).first()
+    if requester and should_notify_student(db, requester.id, "notify_roommate_updates"):
+        background_tasks.add_task(
+            send_roommate_response_email,
+            to_email=requester.email,
+            recipient_name=requester.first_name,
+            responder_name=f"{current_user.first_name} {current_user.last_name}",
+            group_name=group.name,
+            action="declined",
+            context="request",
+        )
 
     return build_request_response(req, db)
 

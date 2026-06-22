@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
+import type { SecurityEvent } from "@/types";
 import { toast } from "sonner";
 import { PhotoCropper } from "@/components/PhotoCropper";
 
@@ -591,11 +592,10 @@ function RoommateTab() {
    ═══════════════════════════════════════════════════════ */
 
 function NotificationsTab() {
-  const [emailNew, setEmailNew] = useState(true);
-  const [emailPrice, setEmailPrice] = useState(true);
-  const [emailMatch, setEmailMatch] = useState(true);
-  const [emailBubble, setEmailBubble] = useState(false);
-  const [emailMarketing, setEmailMarketing] = useState(false);
+  const [notifyMessages, setNotifyMessages] = useState(true);
+  const [notifyRoommate, setNotifyRoommate] = useState(true);
+  const [notifyViewing, setNotifyViewing] = useState(true);
+  const [notifyBubble, setNotifyBubble] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -606,11 +606,10 @@ function NotificationsTab() {
       try {
         const prefs = await api.auth.getNotificationPreferences();
         if (cancelled) return;
-        setEmailNew(prefs.new_listings_matching);
-        setEmailPrice(prefs.price_drops_saved);
-        setEmailMatch(prefs.new_roommate_matches);
-        setEmailBubble(prefs.weekly_bubble_digest);
-        setEmailMarketing(prefs.cribb_news_updates);
+        setNotifyMessages(prefs.notify_new_messages);
+        setNotifyRoommate(prefs.notify_roommate_updates);
+        setNotifyViewing(prefs.notify_viewing_updates);
+        setNotifyBubble(prefs.notify_bubble_posts);
       } catch {
         // Keep demo-friendly defaults if the API isn't available.
       } finally {
@@ -628,11 +627,10 @@ function NotificationsTab() {
     setSaving(true);
     try {
       await api.auth.updateNotificationPreferences({
-        new_listings_matching: emailNew,
-        price_drops_saved: emailPrice,
-        new_roommate_matches: emailMatch,
-        weekly_bubble_digest: emailBubble,
-        cribb_news_updates: emailMarketing,
+        notify_new_messages: notifyMessages,
+        notify_roommate_updates: notifyRoommate,
+        notify_viewing_updates: notifyViewing,
+        notify_bubble_posts: notifyBubble,
       });
       toast.success("Notification preferences saved");
     } catch (err) {
@@ -644,25 +642,164 @@ function NotificationsTab() {
 
   return (
     <div className="space-y-5">
-      <SectionCard title="Email Notifications" description="What should we email you about?">
+      <SectionCard title="Activity Notifications" description="Get emailed when things happen on your account.">
         {loading ? (
           <div className="space-y-3">
-            {Array.from({ length: 5 }).map((_, index) => (
+            {Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="h-[46px] rounded-xl bg-[#FAF8F4] animate-pulse" />
             ))}
           </div>
         ) : (
           <div className="divide-y divide-black/[0.04]">
-          <Toggle enabled={emailNew} onChange={setEmailNew} label="New listings and housing updates" />
-          <Toggle enabled={emailPrice} onChange={setEmailPrice} label="Price drops on saved listings" />
-          <Toggle enabled={emailMatch} onChange={setEmailMatch} label="New roommate matches" />
-          <Toggle enabled={emailBubble} onChange={setEmailBubble} label="Weekly Bubble digest" />
-          <Toggle enabled={emailMarketing} onChange={setEmailMarketing} label="cribb news and updates" />
+          <Toggle enabled={notifyMessages} onChange={setNotifyMessages} label="New messages (listings, sublets, marketplace)" />
+          <Toggle enabled={notifyRoommate} onChange={setNotifyRoommate} label="Roommate invites, requests, and responses" />
+          <Toggle enabled={notifyViewing} onChange={setNotifyViewing} label="Viewing confirmations, cancellations, and reminders" />
+          <Toggle enabled={notifyBubble} onChange={setNotifyBubble} label="Bubble post notifications from starred authors" />
           </div>
         )}
         <SaveBar onSave={handleSave} saving={saving} />
       </SectionCard>
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
+   RECENT ACTIVITY
+   ═══════════════════════════════════════════════════════ */
+
+const EVENT_LABELS: Record<string, string> = {
+  sign_in: "Sign in",
+  sign_in_failed: "Failed sign-in",
+  sign_out: "Sign out",
+  sign_out_all: "Sign out all devices",
+  password_changed: "Password changed",
+  password_reset_requested: "Password reset requested",
+  password_reset_completed: "Password reset",
+  email_verified: "Email verified",
+  email_changed: "Email changed",
+  token_reuse_detected: "Token reuse detected",
+  account_created: "Account created",
+};
+
+function parseBrowser(ua: string | null): string {
+  if (!ua) return "—";
+  if (/Edg\//.test(ua)) return "Edge";
+  if (/OPR\/|Opera/.test(ua)) return "Opera";
+  if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) return "Chrome";
+  if (/Safari\//.test(ua) && !/Chrome\//.test(ua)) return "Safari";
+  if (/Firefox\//.test(ua)) return "Firefox";
+  return "Other";
+}
+
+function parseOS(ua: string | null): string {
+  if (!ua) return "—";
+  if (/iPhone/.test(ua)) return "iPhone";
+  if (/iPad/.test(ua)) return "iPad";
+  if (/Android/.test(ua)) return "Android";
+  if (/Mac OS/.test(ua)) return "macOS";
+  if (/Windows/.test(ua)) return "Windows";
+  if (/Linux/.test(ua)) return "Linux";
+  return "—";
+}
+
+function formatFullDate(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+  }) + ", " + d.toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit", hour12: true,
+  });
+}
+
+function SecurityLogSection({ fetchLog }: { fetchLog: (limit: number, offset: number) => Promise<SecurityEvent[]> }) {
+  const [events, setEvents] = useState<SecurityEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await fetchLog(20, 0);
+        if (cancelled) return;
+        setEvents(data);
+        setHasMore(data.length === 20);
+      } catch {
+        // API not available
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [fetchLog]);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const data = await fetchLog(20, events.length);
+      setEvents((prev) => [...prev, ...data]);
+      setHasMore(data.length === 20);
+    } catch { /* ignore */ }
+    finally { setLoadingMore(false); }
+  };
+
+  const thStyle: React.CSSProperties = { fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", padding: "8px 12px", textAlign: "left", whiteSpace: "nowrap" };
+  const tdStyle: React.CSSProperties = { fontSize: "12px", padding: "10px 12px", whiteSpace: "nowrap" };
+
+  return (
+    <SectionCard title="Recent activity" description="Security events on your account">
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-10 rounded-lg bg-[#FAF8F4] animate-pulse" />
+          ))}
+        </div>
+      ) : events.length === 0 ? (
+        <p className="text-[#98A3B0] py-6 text-center" style={{ fontSize: "13px" }}>No activity yet</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto -mx-5 md:-mx-6 px-5 md:px-6">
+            <table className="w-full min-w-[600px]">
+              <thead>
+                <tr className="border-b border-black/[0.06]">
+                  <th className="text-[#98A3B0]" style={thStyle}>Event</th>
+                  <th className="text-[#98A3B0]" style={thStyle}>IP address</th>
+                  <th className="text-[#98A3B0]" style={thStyle}>Browser</th>
+                  <th className="text-[#98A3B0]" style={thStyle}>OS</th>
+                  <th className="text-[#98A3B0]" style={thStyle}>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((evt) => (
+                  <tr key={evt.id} className="border-b border-black/[0.03] last:border-0">
+                    <td style={tdStyle}>
+                      <span className={`font-medium ${evt.event_type === "sign_in_failed" || evt.event_type === "token_reuse_detected" ? "text-[#E71D36]" : "text-[#1B2D45]"}`}>
+                        {EVENT_LABELS[evt.event_type] || evt.event_type}
+                      </span>
+                    </td>
+                    <td className="text-[#5C6B7A] font-mono" style={tdStyle}>{evt.ip_address || "—"}</td>
+                    <td className="text-[#5C6B7A]" style={tdStyle}>{parseBrowser(evt.user_agent)}</td>
+                    <td className="text-[#5C6B7A]" style={tdStyle}>{parseOS(evt.user_agent)}</td>
+                    <td className="text-[#98A3B0]" style={tdStyle}>{formatFullDate(evt.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {hasMore && (
+            <div className="pt-3 flex justify-center">
+              <button onClick={loadMore} disabled={loadingMore}
+                className="text-[#5C6B7A] hover:text-[#1B2D45] transition-colors disabled:opacity-50"
+                style={{ fontSize: "12px", fontWeight: 600 }}>
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </SectionCard>
   );
 }
 
@@ -842,6 +979,8 @@ function AccountTab() {
           </button>
         </div>
       </SectionCard>
+
+      <SecurityLogSection fetchLog={api.auth.getSecurityLog} />
 
       <SectionCard title="Danger Zone">
         <div className="flex items-center justify-between py-2">

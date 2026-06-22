@@ -9,12 +9,12 @@ from Schemas.subletSchema import SubletStatus
 from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse
-from Schemas.listingSchema import ListingStatus, ListingReject, ListingResponse
-from helpers import require_admin, cascade_delete_landlord, get_account_or_404, build_listing_response
-from Utils.security import hash_password, create_access_token, verify_password, validate_password
+from helpers import require_admin, cascade_delete_landlord, get_account_or_404, log_security_event
+from Utils.security import hash_password, create_access_token, verify_password, validate_password, create_refresh_token_for_user
+from Schemas.authSchema import SecurityEventType
 from Utils.cloudinary import delete_image_from_cloudinary
-from Utils.email import send_approval_email, send_rejection_email, send_revoked_email, send_sublet_onboarding_email, send_sublet_expired_email, send_listing_expired_email, send_listing_approved_email, send_listing_rejected_email
-from Utils.cache import invalidate
+from Utils.email import send_approval_email, send_rejection_email, send_revoked_email, send_sublet_onboarding_email, send_sublet_expired_email, send_listing_expired_email
+from Schemas.listingSchema import ListingStatus
 from Utils.rate_limit import limiter
 from config import settings
 
@@ -48,6 +48,9 @@ def admin_login(request: Request,form_data: OAuth2PasswordRequestForm = Depends(
     admin = db.query(Admin).filter(Admin.email == form_data.username).first()
 
     if not admin or not verify_password(form_data.password, admin.password_hash):
+        if admin:
+            log_security_event(db, admin.id, "admin", SecurityEventType.SIGN_IN_FAILED, request)
+            db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -58,9 +61,13 @@ def admin_login(request: Request,form_data: OAuth2PasswordRequestForm = Depends(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin account is deactivated")
 
     token = create_access_token({"user_id": admin.id, "role": "admin", "tv": admin.token_version})
+    refresh_token = create_refresh_token_for_user(admin.id, "admin", db)
+    log_security_event(db, admin.id, "admin", SecurityEventType.SIGN_IN, request)
+    db.commit()
 
     return {
         "access_token": token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "admin": {
             "id": admin.id,
@@ -102,7 +109,6 @@ def get_website_stats(db: Session = Depends(get_db), admin: User = Depends(requi
         total_landlords=db.query(Landlord).count(),
         total_properties=db.query(Property).count(),
         total_listings=db.query(Listing).count(),
-        listings_under_review=db.query(Listing).filter(Listing.status == ListingStatus.UNDER_REVIEW).count(),
         total_reviews=db.query(Review).count(),
         total_flags_pending=db.query(Flag).filter(Flag.status == FlagStatus.PENDING).count(),
         total_marketplace_items=db.query(MarketplaceItem).count(),
@@ -356,63 +362,6 @@ def list_all_listings(db: Session = Depends(get_db), admin: User = Depends(requi
         results.append(data)
     return results
 
-# Listings awaiting admin review (UNDER_REVIEW). Defined before any dynamic path.
-@admin_router.get("/listings/pending", response_model=list[AdminListingResponse])
-def list_pending_listings(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    listings = db.query(Listing).filter(Listing.status == ListingStatus.UNDER_REVIEW).order_by(Listing.created_at.asc()).all()
-    results = []
-    for l in listings:
-        data = AdminListingResponse.model_validate(l)
-        if l.property:
-            data.property_title = l.property.title
-            data.address = l.property.address
-        results.append(data)
-    return results
-
-# Approve a listing under review -> ACTIVE (notifies the landlord)
-@admin_router.patch("/listings/{listing_id}/approve", response_model=ListingResponse)
-def approve_listing(listing_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found")
-    if listing.status != ListingStatus.UNDER_REVIEW:
-        raise HTTPException(status_code=400, detail="Only listings under review can be approved")
-
-    listing.status = ListingStatus.ACTIVE
-    listing.rejection_reason = None
-    db.commit()
-    db.refresh(listing)
-    invalidate("listings:list")
-
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
-    landlord = db.query(Landlord).filter(Landlord.id == prop.landlord_id).first() if prop else None
-    if landlord:
-        background_tasks.add_task(send_listing_approved_email, landlord.email, landlord.first_name, prop.title)
-
-    return build_listing_response(listing)
-
-# Reject a listing under review -> DRAFT with a reason (notifies the landlord)
-@admin_router.patch("/listings/{listing_id}/reject", response_model=ListingResponse)
-def reject_listing(listing_id: int, payload: ListingReject, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found")
-    if listing.status != ListingStatus.UNDER_REVIEW:
-        raise HTTPException(status_code=400, detail="Only listings under review can be rejected")
-
-    listing.status = ListingStatus.DRAFT
-    listing.rejection_reason = payload.reason
-    db.commit()
-    db.refresh(listing)
-    invalidate("listings:list")
-
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
-    landlord = db.query(Landlord).filter(Landlord.id == prop.landlord_id).first() if prop else None
-    if landlord:
-        background_tasks.add_task(send_listing_rejected_email, landlord.email, landlord.first_name, prop.title, payload.reason)
-
-    return build_listing_response(listing)
-
 @admin_router.delete("/listings/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_listing(listing_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
@@ -432,6 +381,91 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db), admin: User =
     db.commit()
 
     return None
+
+# CRIBB AI — MANUAL TRIGGER (for testing the bi-weekly cron without waiting for Sunday)
+@admin_router.post("/cribb-ai/trigger", status_code=status.HTTP_200_OK)
+def admin_trigger_cribb_ai(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+    pillar: Optional[str] = Query(None, description="Override pillar: deals, events, or evergreen"),
+):
+    """
+    Manually fire one Cribb AI generation cycle. Same code path as the bi-weekly cron.
+    Returns the new post ID + edit link, or a detailed error.
+    Use the optional ?pillar= query to force a specific pillar instead of rotation.
+    """
+    # Preflight checks so we don't waste a Claude call on broken config
+    from Utils.ai_content.pipeline import _get_ai_writer, _count_ai_posts, _pick_evergreen_topic, _insert_draft
+    from Utils.ai_content.prompts import pick_pillar, deals_prompt, events_prompt, evergreen_prompt
+    from Utils.ai_content.scraper import gather_deals_sources, gather_events_sources
+    from Utils.ai_content.generator import generate_post
+    from Utils.email import send_cribb_draft_review_email
+
+    writer = _get_ai_writer(db)
+    if not writer:
+        raise HTTPException(status_code=400, detail=f"AI writer not found or is_official=False (email={settings.CRIBB_AI_WRITER_EMAIL}). Register + approve + flip is_official first.")
+
+    if not settings.FIRECRAWL_API_KEY:
+        raise HTTPException(status_code=400, detail="FIRECRAWL_API_KEY is not set in env")
+    if not settings.ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=400, detail="ANTHROPIC_API_KEY is not set in env")
+
+    selected_pillar = pillar or pick_pillar(_count_ai_posts(db, writer.id))
+    if selected_pillar not in ("deals", "events", "evergreen"):
+        raise HTTPException(status_code=400, detail=f"Invalid pillar: {selected_pillar}")
+
+    # Build prompt
+    if selected_pillar == "deals":
+        sources = gather_deals_sources()
+        prompt = deals_prompt(sources)
+        sources_summary = {k: bool(v.strip()) for k, v in sources.items()}
+    elif selected_pillar == "events":
+        sources = gather_events_sources()
+        prompt = events_prompt(sources)
+        sources_summary = {k: bool(v.strip()) for k, v in sources.items()}
+    else:
+        topic = _pick_evergreen_topic(db, writer.id)
+        prompt = evergreen_prompt(topic)
+        sources_summary = {"evergreen_topic": topic}
+
+    # Generate via Claude
+    try:
+        post_data = generate_post(prompt)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Claude generation failed: {e}")
+
+    # Insert draft
+    try:
+        post = _insert_draft(db, writer, post_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB insert failed: {e}")
+
+    # Send review email (best-effort — draft already saved)
+    email_status = "sent"
+    edit_url = f"{settings.FRONTEND_URL}/writer?edit={post.id}"
+    try:
+        send_cribb_draft_review_email(
+            to_email=settings.CRIBB_REVIEW_EMAIL,
+            title=post.title,
+            preview=post.preview or "",
+            category=post.category.value,
+            pillar=selected_pillar,
+            edit_url=edit_url,
+        )
+    except Exception as e:
+        email_status = f"failed: {e}"
+
+    return {
+        "post_id": post.id,
+        "slug": post.slug,
+        "title": post.title,
+        "category": post.category.value,
+        "pillar": selected_pillar,
+        "sources_available": sources_summary,
+        "edit_url": edit_url,
+        "email_status": email_status,
+        "note": "Draft is saved with status=DRAFT, is_ai_draft=TRUE. Delete via DELETE /api/admin/posts/{post_id} after review.",
+    }
 
 @admin_router.patch("/listings/{listing_id}/expire", status_code=status.HTTP_200_OK)
 def admin_expire_listing(listing_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: User = Depends(require_admin)):

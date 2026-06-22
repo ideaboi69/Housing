@@ -60,14 +60,13 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
         rent_total=rent_total,
         per_room_pricing=payload.per_room_pricing,
         lease_type=payload.lease_type,
-        custom_lease_type=payload.custom_lease_type if payload.lease_type == LeaseType.CUSTOM else None,
         move_in_date=None if payload.has_flexible_move_in else payload.move_in_date,
         has_flexible_move_in=payload.has_flexible_move_in,
         is_sublet=payload.is_sublet,
         sublet_start_date=payload.sublet_start_date,
         sublet_end_date=payload.sublet_end_date,
         gender_preference=payload.gender_preference,
-        status=ListingStatus.DRAFT,
+        status=ListingStatus.ACTIVE,
     )
     db.add(listing)
     db.flush()
@@ -271,11 +270,10 @@ def publish_listing(listing_id: int, db: Session = Depends(get_db),landlord: Lan
     if prop.landlord_id != landlord.id:
         raise HTTPException(status_code=403, detail="Not your listing")
 
-    if listing.status not in (ListingStatus.DRAFT, ListingStatus.EXPIRED, ListingStatus.UNDER_REVIEW):
-        raise HTTPException(status_code=400, detail="Only draft, expired, or under-review listings can be published")
+    if listing.status not in (ListingStatus.DRAFT, ListingStatus.EXPIRED):
+        raise HTTPException(status_code=400, detail="Only drafts or expired listings can be published")
 
     listing.status = ListingStatus.ACTIVE
-    listing.rejection_reason = None
     db.commit()
     db.refresh(listing)
 
@@ -294,49 +292,6 @@ def unpublish_listing(listing_id: int, db: Session = Depends(get_db), landlord: 
 
     if listing.status != ListingStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Only active listings can be unpublished")
-
-    listing.status = ListingStatus.DRAFT
-    db.commit()
-    db.refresh(listing)
-
-    invalidate("listings:list")
-    return build_listing_response(listing)
-
-# Submit a draft listing for admin review (DRAFT -> UNDER_REVIEW)
-@listing_router.patch("/{listing_id}/submit-review", response_model=ListingResponse)
-def submit_listing_for_review(listing_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
-    if prop.landlord_id != landlord.id:
-        raise HTTPException(status_code=403, detail="Not your listing")
-
-    if listing.status != ListingStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Only draft listings can be submitted for review")
-
-    listing.status = ListingStatus.UNDER_REVIEW
-    listing.rejection_reason = None
-    db.commit()
-    db.refresh(listing)
-
-    invalidate("listings:list")
-    return build_listing_response(listing)
-
-# Withdraw a listing from review back to draft (UNDER_REVIEW -> DRAFT)
-@listing_router.patch("/{listing_id}/withdraw-review", response_model=ListingResponse)
-def withdraw_listing_from_review(listing_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
-    if not listing:
-        raise HTTPException(status_code=404, detail="Listing not found")
-
-    prop = db.query(Property).filter(Property.id == listing.property_id).first()
-    if prop.landlord_id != landlord.id:
-        raise HTTPException(status_code=403, detail="Not your listing")
-
-    if listing.status != ListingStatus.UNDER_REVIEW:
-        raise HTTPException(status_code=400, detail="Only listings under review can be withdrawn")
 
     listing.status = ListingStatus.DRAFT
     db.commit()
