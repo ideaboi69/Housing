@@ -7,14 +7,16 @@ import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse, ListingDetailResponse } from "@/types";
 import {
-  Plus, Building2, Eye, EyeOff, Trash2, TrendingUp, Shield, ShieldCheck,
+  Plus, Building2, Eye, EyeOff, Trash2, Shield, ShieldCheck,
   ChevronDown, ChevronRight, Home, Phone, Mail, Pencil, Check, X,
   MessageCircle, LayoutDashboard, Send,
-  Calendar, Loader2,
-  ArrowRight, Archive, Inbox, Clock, AlertCircle, Image, CalendarDays, Star, Flag,
+  Loader2,
+  Archive, Inbox, Clock, AlertCircle, Star,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatLeaseType, formatPropertyType } from "@/lib/utils";
+import { getListingStatusBucket, getListingStatusLabel, getListingStatusTone, isToggleableStatus } from "@/lib/listing-status";
+import { useMessagesSocket } from "@/lib/use-messages-socket";
 import {
   getListingImages,
   type LandlordAnalyticsPeriod,
@@ -24,11 +26,7 @@ import {
   mockLandlordDailyMetrics,
   mockLandlordListingDailyMetrics,
   mockLandlordListingPerformance,
-  mockLandlordScoreBreakdown,
 } from "@/lib/mock-data";
-import { EditListingModal } from "@/components/landlord/EditListingModal";
-import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
-import { ShowingsManager } from "@/components/landlord/ShowingsManager";
 import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
 import { LandlordOverviewSkeleton } from "@/components/ui/Skeletons";
@@ -50,23 +48,6 @@ const LANDLORD_TABS: Tab[] = ["overview", "properties", "listings", "reviews", "
 
 function getTabFromQuery(value: string | null): Tab {
   return LANDLORD_TABS.includes(value as Tab) ? (value as Tab) : "overview";
-}
-
-function getListingStatusBucket(status: string): "active" | "draft" | "archived" {
-  const normalized = status.toLowerCase();
-  if (normalized === "active") return "active";
-  if (normalized === "draft" || normalized === "pending") return "draft";
-  return "archived";
-}
-
-function getListingStatusLabel(status: string): string {
-  const normalized = status.toLowerCase();
-  if (normalized === "active") return "Active";
-  if (normalized === "draft" || normalized === "pending") return "Draft";
-  if (normalized === "rented" || normalized === "leased") return "Rented";
-  if (normalized === "expired") return "Expired";
-  if (normalized === "archived") return "Archived";
-  return normalized.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
 }
 
 function getReportStatusLabel(status: string): string {
@@ -122,27 +103,25 @@ function Sidebar({ active, onChange, unreadCount }: { active: Tab; onChange: (t:
   ];
 
   return (
-    <nav className="w-[220px] shrink-0 hidden md:block">
-      <div className="sticky top-6 space-y-1">
+    <nav className="w-[200px] shrink-0 hidden md:block">
+      <div className="sticky top-6 space-y-0.5">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => onChange(t.key)}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all text-left ${
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left ${
               active === t.key
-                ? "bg-[#1B2D45] text-white"
-                : "text-[#1B2D45]/75 hover:bg-[#1B2D45]/[0.05] hover:text-[#1B2D45]"
+                ? "bg-[#1B2D45]/[0.06] text-[#1B2D45]"
+                : "text-[#1B2D45]/55 hover:bg-[#1B2D45]/[0.035] hover:text-[#1B2D45]"
             }`}
-            style={{ fontSize: "13px", fontWeight: active === t.key ? 800 : 700 }}
+            style={{ fontSize: "13px", fontWeight: active === t.key ? 500 : 400 }}
           >
-            {t.icon}
+            <span className={active === t.key ? "text-[#1B2D45]" : "text-[#1B2D45]/45"}>{t.icon}</span>
             {t.label}
             {t.badge != null && t.badge > 0 && (
               <span
-                className={`ml-auto px-1.5 py-0.5 rounded-full ${
-                  active === t.key ? "bg-white/20 text-white" : "bg-[#E71D36] text-white"
-                }`}
-                style={{ fontSize: "9px", fontWeight: 700, minWidth: 18, textAlign: "center" }}
+                className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E71D36] px-1 text-white"
+                style={{ fontSize: "9px", fontWeight: 500 }}
               >
                 {t.badge > 9 ? "9+" : t.badge}
               </span>
@@ -187,53 +166,6 @@ function MobileTabBar({ active, onChange, unreadCount }: { active: Tab; onChange
   );
 }
 
-/* ════════════════════════════════════════════════════════
-   Stat Card
-   ════════════════════════════════════════════════════════ */
-
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  sub?: string;
-  onClick?: () => void;
-}) {
-  const content = (
-    <>
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <span className="text-[#1B2D45]/65" style={{ fontSize: "11px", fontWeight: 500 }}>{label}</span>
-        {onClick && <ChevronRight className="ml-auto h-3.5 w-3.5 text-[#1B2D45]/25 transition-transform group-hover:translate-x-0.5 group-hover:text-[#1B2D45]/55" />}
-      </div>
-      <div className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 800 }}>{value}</div>
-      {sub && <div className="text-[#1B2D45]/58 mt-0.5" style={{ fontSize: "11px", fontWeight: 500 }}>{sub}</div>}
-    </>
-  );
-
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="group bg-white rounded-xl border border-black/[0.04] p-4 text-left transition-all hover:border-[#1B2D45]/18 hover:shadow-[0_8px_22px_rgba(27,45,69,0.06)]"
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
-      {content}
-    </div>
-  );
-}
 
 /* ════════════════════════════════════════════════════════
    Overview Tab
@@ -281,10 +213,6 @@ function OverviewTab({
     if (!previous) return current ? 100 : 0;
     return Math.round(((current - previous) / previous) * 100);
   };
-  const formatDelta = (delta: number, inverted = false) => {
-    const positive = inverted ? delta < 0 : delta >= 0;
-    return { text: `${delta >= 0 ? "+" : ""}${delta}%`, positive };
-  };
   const daysBetween = (date: string) => Math.max(0, Math.ceil((now.getTime() - new Date(date).getTime()) / 86400000));
   const daysUntil = (date: string) => Math.ceil((new Date(`${date}T12:00:00-04:00`).getTime() - now.getTime()) / 86400000);
   const relativeTime = (date: string) => {
@@ -298,9 +226,6 @@ function OverviewTab({
   const activeListings = mockLandlordListingPerformance.filter((listing) => listing.status === "active").length;
   const draftListings = mockLandlordListingPerformance.filter((listing) => listing.status === "draft").length;
   const totalListings = mockLandlordListingPerformance.length;
-  const avgScore = Math.round(
-    (mockLandlordScoreBreakdown.price + mockLandlordScoreBreakdown.location + mockLandlordScoreBreakdown.amenities + mockLandlordScoreBreakdown.reviews) / 4
-  );
   const currentViews = total(chartSeries, "views");
   const previousViews = total(previousSeries, "views");
   const currentInquiries = total(chartSeries, "inquiries");
@@ -357,98 +282,6 @@ function OverviewTab({
     });
   }, [listingMetricTotals, sortDir, sortKey]);
 
-  const Sparkline = ({ data, color = "#2F6FED" }: { data: number[]; color?: string }) => {
-    const max = Math.max(...data, 1);
-    const min = Math.min(...data, 0);
-    const points = data.map((value, index) => {
-      const x = data.length === 1 ? 0 : (index / (data.length - 1)) * 92;
-      const y = 30 - ((value - min) / Math.max(max - min, 1)) * 26;
-      return `${x},${y}`;
-    }).join(" ");
-    return (
-      <svg viewBox="0 0 92 32" className="h-8 w-full" aria-hidden="true">
-        <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  };
-
-  const FlowKpiCard = ({
-    label,
-    value,
-    sub,
-    delta,
-    spark,
-    onClick,
-    inverted,
-    children,
-  }: {
-    label: string;
-    value: string;
-    sub: string;
-    delta: number;
-    spark: number[];
-    onClick: () => void;
-    inverted?: boolean;
-    children?: React.ReactNode;
-  }) => {
-    const trend = formatDelta(delta, inverted);
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="group rounded-2xl border border-[#1B2D45]/[0.08] bg-white p-4 text-left shadow-[0_8px_22px_rgba(27,45,69,0.035)] transition-all hover:-translate-y-0.5 hover:border-[#1B2D45]/20 hover:shadow-[0_16px_32px_rgba(27,45,69,0.08)]"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-[#1B2D45]/65" style={{ fontSize: "10px", fontWeight: 900, letterSpacing: "0.08em" }}>{label.toUpperCase()}</div>
-            <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 950, lineHeight: 1 }}>{value}</div>
-          </div>
-          <ChevronRight className="h-4 w-4 text-[#1B2D45]/45 transition-transform group-hover:translate-x-0.5 group-hover:text-[#1B2D45]" />
-        </div>
-        <div className="mt-3">
-          <Sparkline data={spark} />
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <span className="text-[#1B2D45]/70" style={{ fontSize: "11px", fontWeight: 750 }}>{sub}</span>
-          <span className={trend.positive ? "text-[#16784F]" : "text-[#B42318]"} style={{ fontSize: "11px", fontWeight: 900 }}>
-            {trend.positive ? "▲" : "▼"} {trend.text}
-          </span>
-        </div>
-        {children}
-      </button>
-    );
-  };
-
-  const StateKpiCard = ({
-    label,
-    value,
-    sub,
-    onClick,
-    children,
-  }: {
-    label: string;
-    value: string;
-    sub: string;
-    onClick: () => void;
-    children?: React.ReactNode;
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group rounded-2xl border border-[#1B2D45]/[0.08] bg-white p-4 text-left shadow-[0_8px_22px_rgba(27,45,69,0.035)] transition-all hover:-translate-y-0.5 hover:border-[#1B2D45]/20 hover:shadow-[0_16px_32px_rgba(27,45,69,0.08)]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[#1B2D45]/65" style={{ fontSize: "10px", fontWeight: 900, letterSpacing: "0.08em" }}>{label.toUpperCase()}</div>
-          <div className="mt-2 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 950, lineHeight: 1 }}>{value}</div>
-        </div>
-        <ChevronRight className="h-4 w-4 text-[#1B2D45]/45 transition-transform group-hover:translate-x-0.5 group-hover:text-[#1B2D45]" />
-      </div>
-      <div className="mt-3 text-[#1B2D45]/70" style={{ fontSize: "11px", fontWeight: 750, lineHeight: 1.45 }}>{sub}</div>
-      {children}
-    </button>
-  );
-
   const sortableHeader = (key: SortKey, label: string) => (
     <button
       type="button"
@@ -468,204 +301,156 @@ function OverviewTab({
   );
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[#1B2D45]/65" style={{ fontSize: "11px", fontWeight: 900, letterSpacing: "0.08em" }}>LANDLORD OVERVIEW</p>
-          <h1 className="mt-2 text-[#1B2D45]" style={{ fontSize: "clamp(28px,4vw,38px)", lineHeight: 1.04, fontWeight: 950 }}>
+          <p className="text-[#1B2D45]/45" style={{ fontSize: "12px", fontWeight: 500 }}>Landlord</p>
+          <h1 className="mt-1 text-[#1B2D45]" style={{ fontSize: "24px", lineHeight: 1.15, fontWeight: 600 }}>
             {user.company_name ?? `${user.first_name}'s portfolio`}
           </h1>
-          <p className="mt-2 max-w-[620px] text-[#1B2D45]/68" style={{ fontSize: "13px", lineHeight: 1.55, fontWeight: 700 }}>
-            Track room demand, follow up with students, and keep listings moving.
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-[#1B2D45]/50" style={{ fontSize: "13px", fontWeight: 400 }}>
+            <span><span className="text-[#1B2D45]/80" style={{ fontWeight: 500 }}>{totalListings}</span> listing{totalListings === 1 ? "" : "s"}</span>
+            <span className="text-[#1B2D45]/25">·</span>
+            <span><span className="text-[#239B55]" style={{ fontWeight: 500 }}>{activeListings}</span> active</span>
+            <span className="text-[#1B2D45]/25">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#4ADE80]" /> updated {relativeTime(mockLandlordAnalyticsUpdatedAt)}
+            </span>
           </p>
-          <div className="mt-2 text-[#1B2D45]/58" style={{ fontSize: "11px", fontWeight: 750 }}>
-            Updated {relativeTime(mockLandlordAnalyticsUpdatedAt)}
-          </div>
         </div>
-        <div className="flex flex-col gap-2 sm:items-end">
-          <Link href="/landlord/properties/new" className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1B2D45] px-4 text-white transition-all hover:bg-[#152438]" style={{ fontSize: "13px", fontWeight: 900, boxShadow: "0 12px 24px rgba(27,45,69,0.16)" }}>
-            <Plus className="h-4 w-4" /> Add Property
-          </Link>
-          <div className="text-[#1B2D45]/70" style={{ fontSize: "12px", fontWeight: 850 }}>
-            {unreadCount > 0 && <span>{unreadCount} unread</span>}
-            {unreadCount > 0 && draftListings > 0 && <span> · </span>}
-            {draftListings > 0 && <span>{draftListings} draft</span>}
-            {unreadCount === 0 && draftListings === 0 && <span>No urgent items</span>}
-          </div>
-        </div>
+        <Link href="/landlord/properties/new" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#1B2D45] px-4 py-2.5 text-white transition-colors hover:bg-[#152438]" style={{ fontSize: "13px", fontWeight: 600 }}>
+          <Plus className="h-4 w-4" /> Add property
+        </Link>
       </div>
 
-      {attentionItems.length > 0 && (
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {attentionItems.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => onSwitchTab(item.tab)}
-              className="group rounded-2xl border border-[#1B2D45]/[0.08] bg-white px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-[#1B2D45]/20 hover:shadow-[0_14px_28px_rgba(27,45,69,0.08)]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 900 }}>{item.label}</div>
-                  <div className="mt-1 text-[#1B2D45]/68" style={{ fontSize: "11px", fontWeight: 700 }}>{item.sub}</div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-[#1B2D45]/45 transition-transform group-hover:translate-x-0.5 group-hover:text-[#1B2D45]" />
-              </div>
-            </button>
-          ))}
-        </section>
+      {(unreadCount > 0 || draftListings > 0) && (
+        <button
+          type="button"
+          onClick={() => onSwitchTab(unreadCount > 0 ? "messages" : "listings")}
+          className="flex w-full items-center gap-2.5 rounded-lg bg-[#1B2D45]/[0.04] px-3.5 py-2.5 text-left transition-colors hover:bg-[#1B2D45]/[0.07]"
+        >
+          <Clock className="h-4 w-4 shrink-0 text-[#A66A00]" />
+          <span className="flex-1 text-[#1B2D45]/70" style={{ fontSize: "13px", fontWeight: 400 }}>
+            {[draftListings > 0 ? `${draftListings} draft listing${draftListings === 1 ? "" : "s"}` : null, unreadCount > 0 ? `${unreadCount} unread message${unreadCount === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
+          </span>
+          <span className="shrink-0 text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>Review →</span>
+        </button>
       )}
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 900 }}>Analytics period</div>
-          <div className="text-[#1B2D45]/65" style={{ fontSize: "11px", fontWeight: 700 }}>{periodConfig[period].compare}</div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
+      {/* Metric strip */}
+      <div>
+        <div className="mb-3 flex items-center justify-end gap-1">
           {(Object.keys(periodConfig) as LandlordAnalyticsPeriod[]).map((key) => (
             <button
               key={key}
               type="button"
               onClick={() => setPeriod(key)}
-              className={`h-9 rounded-lg border px-3 transition-all ${period === key ? "border-[#1B2D45] bg-[#1B2D45] text-white" : "border-[#1B2D45]/12 bg-[#F7F9FC] text-[#1B2D45] hover:border-[#1B2D45]/25"}`}
-              style={{ fontSize: "11px", fontWeight: 850 }}
+              className={`rounded-md px-2.5 py-1 transition-colors ${period === key ? "bg-[#1B2D45]/[0.06] text-[#1B2D45]" : "text-[#1B2D45]/45 hover:text-[#1B2D45]/70"}`}
+              style={{ fontSize: "12px", fontWeight: period === key ? 500 : 400 }}
             >
-              {periodConfig[key].label}
+              {periodConfig[key].label.replace("Last ", "")}
             </button>
           ))}
         </div>
-      </div>
-
-      <section className="grid gap-3 xl:grid-cols-5">
-        <FlowKpiCard
-          label="Student Views"
-          value={currentViews.toLocaleString()}
-          sub={periodConfig[period].compare}
-          delta={percentDelta(currentViews, previousViews)}
-          spark={chartSeries.map((item) => item.views)}
-          onClick={() => onSwitchTab("listings")}
-        />
-        <FlowKpiCard
-          label="Inquiries"
-          value={currentInquiries.toLocaleString()}
-          sub={periodConfig[period].compare}
-          delta={percentDelta(currentInquiries, previousInquiries)}
-          spark={chartSeries.map((item) => item.inquiries)}
-          onClick={() => onSwitchTab("messages")}
-        />
-        <StateKpiCard
-          label="Response"
-          value={`${currentResponseRate}%`}
-          sub={`${currentResponseMinutes} min avg reply`}
-          onClick={() => onSwitchTab("messages")}
-        />
-        <StateKpiCard
-          label="Active Listings"
-          value={`${activeListings} of ${totalListings}`}
-          sub={draftListings > 0 ? `${draftListings} draft not visible` : "No drafts waiting"}
-          onClick={() => onSwitchTab("listings")}
-        />
-        <StateKpiCard
-          label="Avg Cribb Score"
-          value={`${avgScore}`}
-          sub="Price, location, amenities, reviews"
-          onClick={() => onSwitchTab("reviews")}
-        >
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {Object.entries(mockLandlordScoreBreakdown).map(([key, value]) => (
-              <div key={key} className="rounded-lg bg-[#F3F6FA] px-2 py-1">
-                <div className="capitalize text-[#1B2D45]/65" style={{ fontSize: "9px", fontWeight: 850 }}>{key}</div>
-                <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 950 }}>{value}</div>
-              </div>
+        <div className="overflow-hidden rounded-2xl border border-[#1B2D45]/[0.08] bg-white shadow-[0_1px_2px_rgba(27,45,69,0.03)]">
+          <div className="grid grid-cols-2 sm:grid-cols-4">
+            {[
+              { label: "Views", value: currentViews.toLocaleString(), delta: percentDelta(currentViews, previousViews), onClick: () => onSwitchTab("listings") },
+              { label: "Inquiries", value: currentInquiries.toLocaleString(), delta: percentDelta(currentInquiries, previousInquiries), onClick: () => onSwitchTab("messages") },
+              { label: "Active listings", value: `${activeListings} of ${totalListings}`, sub: draftListings > 0 ? `${draftListings} draft` : "all live", onClick: () => onSwitchTab("listings") },
+              { label: "Avg reply", value: `${currentResponseMinutes}m`, sub: `${currentResponseRate}% response`, onClick: () => onSwitchTab("messages") },
+            ].map((m, i) => (
+              <button
+                key={m.label}
+                type="button"
+                onClick={m.onClick}
+                className={`group p-4 text-left transition-colors hover:bg-[#1B2D45]/[0.02] sm:p-5 border-[#1B2D45]/[0.08] ${i % 2 === 1 ? "border-l" : ""} ${i >= 2 ? "border-t sm:border-t-0" : ""} ${i > 0 ? "sm:border-l" : ""}`}
+              >
+                <div className="text-[#1B2D45]/50" style={{ fontSize: "12px", fontWeight: 400 }}>{m.label}</div>
+                <div className="mt-1.5 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 600, lineHeight: 1 }}>{m.value}</div>
+                <div className="mt-1.5" style={{ fontSize: "12px", fontWeight: 400 }}>
+                  {typeof m.delta === "number"
+                    ? <span className={m.delta >= 0 ? "text-[#239B55]" : "text-[#B42318]"}>{m.delta >= 0 ? "↑" : "↓"} {Math.abs(m.delta)}%</span>
+                    : <span className="text-[#1B2D45]/40">{m.sub}</span>}
+                </div>
+              </button>
             ))}
           </div>
-        </StateKpiCard>
-      </section>
+        </div>
+      </div>
 
-      <section className="overflow-hidden rounded-2xl border border-[#1B2D45]/[0.08] bg-white shadow-[0_10px_26px_rgba(27,45,69,0.035)]">
-        <div className="border-b border-[#1B2D45]/[0.06] px-4 py-4 md:px-5">
-          <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 950 }}>Per-listing performance</h2>
-          <p className="mt-1 text-[#1B2D45]/65" style={{ fontSize: "12px", fontWeight: 700 }}>
-            Sort by demand signals to see which rooms are moving and which need attention.
-          </p>
+      <div>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Per-listing performance</h2>
+          <span className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>{sortedListings.length} listings</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] table-fixed">
-            <thead className="bg-[#F3F6FA]">
-              <tr className="text-left">
-                <th className="w-[24%] px-4 py-3">{sortableHeader("listing", "LISTING / ROOM")}</th>
-                <th className="w-[12%] px-4 py-3">{sortableHeader("status", "STATUS")}</th>
-                <th className="w-[10%] px-4 py-3">{sortableHeader("views", "VIEWS")}</th>
-                <th className="w-[10%] px-4 py-3">{sortableHeader("saves", "SAVES")}</th>
-                <th className="w-[12%] px-4 py-3">{sortableHeader("inquiries", "INQUIRIES")}</th>
-                <th className="w-[14%] px-4 py-3">{sortableHeader("daysListed", "DAYS LISTED")}</th>
-                <th className="w-[18%] px-4 py-3">{sortableHeader("lastActivity", "LAST ACTIVITY")}</th>
+          <table className="w-full min-w-[680px]">
+            <thead>
+              <tr className="border-b border-[#1B2D45]/[0.08] text-left">
+                <th className="pb-2.5 pr-4">{sortableHeader("listing", "Listing")}</th>
+                <th className="px-4 pb-2.5">{sortableHeader("status", "Status")}</th>
+                <th className="px-4 pb-2.5">{sortableHeader("views", "Views")}</th>
+                <th className="px-4 pb-2.5">{sortableHeader("saves", "Saves")}</th>
+                <th className="px-4 pb-2.5">{sortableHeader("inquiries", "Inquiries")}</th>
+                <th className="pl-4 pb-2.5">{sortableHeader("lastActivity", "Activity")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1B2D45]/[0.06]">
+            <tbody>
               {sortedListings.map((listing) => {
                 const totals = listingMetricTotals[listing.listingId] ?? { views: 0, saves: 0, inquiries: 0 };
                 return (
-                  <tr key={listing.listingId} className="hover:bg-[#F7F9FC]">
-                    <td className="px-4 py-3">
-                      <Link href={`/landlord/properties/${listing.propertyId}`} className="block text-[#1B2D45] hover:text-[#2F6FED]" style={{ fontSize: "12px", fontWeight: 900 }}>
+                  <tr key={listing.listingId} className="border-b border-[#1B2D45]/[0.05] transition-colors hover:bg-[#1B2D45]/[0.02]">
+                    <td className="py-3 pr-4">
+                      <Link href={`/landlord/properties/${listing.propertyId}`} className="block text-[#1B2D45] hover:underline" style={{ fontSize: "13px", fontWeight: 500 }}>
                         {listing.title}
                       </Link>
-                      <div className="mt-0.5 text-[#1B2D45]/65" style={{ fontSize: "10px", fontWeight: 750 }}>{listing.room}</div>
+                      <div className="mt-0.5 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>{listing.room}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`rounded-full px-2.5 py-1 capitalize ${listing.status === "active" ? "bg-[#E8F7EF] text-[#16784F]" : listing.status === "draft" ? "bg-[#E9EEF7] text-[#1B2D45]" : "bg-[#EEF1F5] text-[#1B2D45]/70"}`} style={{ fontSize: "10px", fontWeight: 900 }}>
-                        {listing.status}
+                      <span className={`inline-flex rounded-full px-2 py-0.5 ${getListingStatusTone(listing.status)}`} style={{ fontSize: "11px", fontWeight: 500 }}>
+                        {getListingStatusLabel(listing.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 900 }}>{totals.views}</td>
-                    <td className="px-4 py-3 text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 900 }}>{totals.saves}</td>
-                    <td className="px-4 py-3 text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 900 }}>{totals.inquiries}</td>
-                    <td className="px-4 py-3 text-[#1B2D45]/78" style={{ fontSize: "11px", fontWeight: 800 }}>
-                      {daysBetween(listing.listedAt)} days
-                    </td>
-                    <td className="px-4 py-3 text-[#1B2D45]/78" style={{ fontSize: "11px", fontWeight: 800 }}>
-                      {relativeTime(listing.lastActivityAt)}
-                    </td>
+                    <td className="px-4 py-3 text-[#1B2D45]/70" style={{ fontSize: "13px" }}>{totals.views}</td>
+                    <td className="px-4 py-3 text-[#1B2D45]/70" style={{ fontSize: "13px" }}>{totals.saves}</td>
+                    <td className="px-4 py-3 text-[#1B2D45]/70" style={{ fontSize: "13px" }}>{totals.inquiries}</td>
+                    <td className="pl-4 py-3 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>{relativeTime(listing.lastActivityAt)}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      </section>
+      </div>
 
-      <section className="rounded-2xl border border-[#1B2D45]/[0.08] bg-white p-5 shadow-[0_10px_26px_rgba(27,45,69,0.035)]">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 950 }}>Recent Messages</h2>
-          <button type="button" onClick={() => onSwitchTab("messages")} className="group inline-flex items-center gap-1 text-[#1B2D45] hover:text-[#2F6FED]" style={{ fontSize: "12px", fontWeight: 900 }}>
-            View all <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-          </button>
+      <div>
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Recent messages</h2>
+          <button type="button" onClick={() => onSwitchTab("messages")} className="text-[#1B2D45]/55 hover:text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>View all →</button>
         </div>
         {recentConvos.length > 0 ? (
-          <div className="mt-3 space-y-2">
+          <div className="divide-y divide-[#1B2D45]/[0.06]">
             {recentConvos.map((conversation) => (
-              <button key={conversation.id} type="button" onClick={() => onSwitchTab("messages")} className="group flex w-full items-center gap-3 rounded-xl border border-[#1B2D45]/[0.06] px-3 py-3 text-left transition-all hover:border-[#1B2D45]/20 hover:shadow-[0_10px_22px_rgba(27,45,69,0.06)]">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E9EEF7] text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 950 }}>
+              <button key={conversation.id} type="button" onClick={() => onSwitchTab("messages")} className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-[#1B2D45]/[0.02]">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1B2D45]/[0.07] text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 500 }}>
                   {(conversation.user_name ?? "S")[0].toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 900 }}>{conversation.user_name ?? "Student"}</span>
-                    {conversation.unread_count > 0 && <span className="rounded-full bg-[#1B2D45] px-2 py-0.5 text-white" style={{ fontSize: "9px", fontWeight: 900 }}>{conversation.unread_count}</span>}
+                    <span className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{conversation.user_name ?? "Student"}</span>
+                    {conversation.unread_count > 0 && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E71D36]" />}
                   </div>
-                  <p className="mt-0.5 truncate text-[#1B2D45]/68" style={{ fontSize: "11px", fontWeight: 700 }}>{conversation.last_message?.content ?? conversation.listing_title}</p>
+                  <p className="mt-0.5 truncate text-[#1B2D45]/50" style={{ fontSize: "12px" }}>{conversation.last_message?.content ?? conversation.listing_title}</p>
                 </div>
-                <ChevronRight className="h-4 w-4 text-[#1B2D45]/45 transition-transform group-hover:translate-x-0.5 group-hover:text-[#1B2D45]" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-[#1B2D45]/30" />
               </button>
             ))}
           </div>
         ) : (
-          <div className="mt-3 rounded-xl bg-[#F7F9FC] px-4 py-5 text-[#1B2D45]/70" style={{ fontSize: "12px", fontWeight: 750 }}>
-            No new student messages in this period.
-          </div>
+          <p className="text-[#1B2D45]/45" style={{ fontSize: "13px" }}>No new student messages in this period.</p>
         )}
-      </section>
+      </div>
     </div>
   );
 }
@@ -677,98 +462,65 @@ function PropertiesTab({ properties }: { properties: PropertyWithListings[] }) {
   const hasProperties = properties.length > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Your Properties</h2>
+        <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 600 }}>Properties</h2>
         {hasProperties && (
-          <Link href="/landlord/properties/new" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-all" style={{ fontSize: "12px", fontWeight: 700 }}>
-            <Plus className="w-3.5 h-3.5" /> Add Property
+          <Link href="/landlord/properties/new" className="inline-flex items-center gap-1.5 rounded-lg bg-[#1B2D45] px-4 py-2.5 text-white transition-colors hover:bg-[#152438]" style={{ fontSize: "13px", fontWeight: 600 }}>
+            <Plus className="w-3.5 h-3.5" /> Add property
           </Link>
         )}
       </div>
 
-      <div className="px-1 py-2">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-[#1B2D45]/[0.06] text-[#1B2D45]">
-            <Building2 className="h-4 w-4" />
-          </div>
-          <div>
-            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 850 }}>Properties are the homes you manage</div>
-            <p className="text-[#1B2D45]/66 mt-1 max-w-[640px]" style={{ fontSize: "11px", lineHeight: 1.55, fontWeight: 650 }}>
-              Add an address once, then manage rooms, listing visibility, photos, and viewing slots from that property detail page.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {!hasProperties ? (
-        <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-10 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[#1B2D45]/[0.06] flex items-center justify-center mx-auto mb-3">
-            <Home className="w-7 h-7 text-[#1B2D45]/65" />
+        <div className="py-16 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#1B2D45]/[0.05]">
+            <Home className="h-6 w-6 text-[#1B2D45]/50" />
           </div>
-          <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No properties yet</h3>
-          <p className="text-[#1B2D45]/65 mt-1 max-w-[320px] mx-auto" style={{ fontSize: "13px" }}>Add your first property to get started.</p>
-          <Link href="/landlord/properties/new" className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-colors" style={{ fontSize: "14px", fontWeight: 600 }}>
-            <Plus className="w-4 h-4" /> Add Property
+          <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>No properties yet</h3>
+          <p className="mx-auto mt-1 max-w-[320px] text-[#1B2D45]/50" style={{ fontSize: "13px" }}>Add an address once, then manage its rooms and listings.</p>
+          <Link href="/landlord/properties/new" className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1B2D45] px-5 py-2.5 text-white transition-colors hover:bg-[#152438]" style={{ fontSize: "13px", fontWeight: 600 }}>
+            <Plus className="w-4 h-4" /> Add property
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y divide-[#1B2D45]/[0.06] border-y border-[#1B2D45]/[0.08]">
           {properties.map((prop) => {
             const scoreTone = prop.healthScore ? getLandlordScoreTone(prop.healthScore) : null;
             const activeCount = prop.listings.filter((listing) => getListingStatusBucket(listing.status) === "active").length;
-            const draftCount = prop.listings.filter((listing) => getListingStatusBucket(listing.status) === "draft").length;
 
             return (
               <Link
                 key={prop.id}
                 href={`/landlord/properties/${prop.id}`}
-                className="group block rounded-2xl border border-[#1B2D45]/[0.07] bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-[#1B2D45]/20 hover:shadow-[0_14px_30px_rgba(27,45,69,0.07)]"
+                className="group flex items-center gap-4 py-4 transition-colors hover:bg-[#1B2D45]/[0.02]"
               >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "15px", fontWeight: 900 }}>{prop.title}</h3>
-                      {scoreTone && (
-                        <span className="shrink-0 rounded-md px-2 py-0.5" style={{ fontSize: "10px", fontWeight: 850, color: scoreTone.color, background: scoreTone.bg }}>
-                          CS {prop.healthScore}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 truncate text-[#1B2D45]/68" style={{ fontSize: "12px", fontWeight: 650 }}>{prop.address}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-[#F3F6FA] px-2 py-1 text-[#1B2D45]/78" style={{ fontSize: "10px", fontWeight: 800 }}>
-                        {formatPropertyType(prop.property_type)} · {prop.total_rooms} bed · {prop.bathrooms} bath
-                      </span>
-                      {prop.is_furnished && <span className="rounded-md bg-[#E8F7EF] px-2 py-1 text-[#16784F]" style={{ fontSize: "10px", fontWeight: 800 }}>Furnished</span>}
-                      {prop.has_parking && <span className="rounded-md bg-[#E7F8F6] px-2 py-1 text-[#11786F]" style={{ fontSize: "10px", fontWeight: 800 }}>Parking</span>}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 lg:min-w-[360px]">
-                    <div className="rounded-xl bg-[#F7F9FC] px-3 py-2">
-                      <div className="text-[#1B2D45]/58" style={{ fontSize: "9px", fontWeight: 900 }}>LISTINGS</div>
-                      <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 950 }}>{prop.listings.length}</div>
-                    </div>
-                    <div className="rounded-xl bg-[#F7F9FC] px-3 py-2">
-                      <div className="text-[#1B2D45]/58" style={{ fontSize: "9px", fontWeight: 900 }}>ACTIVE</div>
-                      <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 950 }}>{activeCount}</div>
-                    </div>
-                    <div className="rounded-xl bg-[#F7F9FC] px-3 py-2">
-                      <div className="text-[#1B2D45]/58" style={{ fontSize: "9px", fontWeight: 900 }}>VIEWS</div>
-                      <div className="mt-1 flex items-center gap-1 text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 950 }}>
-                        <Eye className="h-3.5 w-3.5" /> {prop.totalViews}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 lg:w-[120px]">
-                    {draftCount > 0 && (
-                      <span className="rounded-full bg-[#E9EEF7] px-2.5 py-1 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 850 }}>
-                        {draftCount} draft
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 500 }}>{prop.title}</h3>
+                    {scoreTone && (
+                      <span className="shrink-0 rounded-md px-1.5 py-0.5" style={{ fontSize: "10px", fontWeight: 500, color: scoreTone.color, background: scoreTone.bg }}>
+                        {prop.healthScore}
                       </span>
                     )}
-                    <ChevronRight className="ml-auto h-5 w-5 shrink-0 text-[#1B2D45]/45 transition-transform group-hover:translate-x-1 group-hover:text-[#1B2D45]" />
                   </div>
+                  <p className="mt-0.5 truncate text-[#1B2D45]/50" style={{ fontSize: "12px" }}>
+                    {prop.address} · {formatPropertyType(prop.property_type)} · {prop.total_rooms} bed · {prop.bathrooms} bath
+                  </p>
                 </div>
+                <div className="hidden items-center gap-7 sm:flex">
+                  {[
+                    { v: prop.listings.length, l: "listings" },
+                    { v: activeCount, l: "active" },
+                    { v: prop.totalViews, l: "views" },
+                  ].map((s) => (
+                    <div key={s.l} className="text-right">
+                      <div className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 500 }}>{s.v}</div>
+                      <div className="text-[#1B2D45]/45" style={{ fontSize: "11px" }}>{s.l}</div>
+                    </div>
+                  ))}
+                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-[#1B2D45]/30 transition-transform group-hover:translate-x-0.5 group-hover:text-[#1B2D45]/60" />
               </Link>
             );
           })}
@@ -792,10 +544,7 @@ function ListingsTab({
   onListingDeleted?: (listingId: number) => void;
 }) {
   const router = useRouter();
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
-  const [editListing, setEditListing] = useState<ListingResponse | null>(null);
-  const [photosListing, setPhotosListing] = useState<{ id: number; title: string } | null>(null);
-  const [showingsListing, setShowingsListing] = useState<{ id: number; title: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "review" | "draft" | "archived">("all");
   const [deletingListingId, setDeletingListingId] = useState<number | null>(null);
   const [togglingListingId, setTogglingListingId] = useState<number | null>(null);
   const [showCreatePicker, setShowCreatePicker] = useState(false);
@@ -814,12 +563,14 @@ function ListingsTab({
   const counts = {
     all: allListings.length,
     active: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "active").length,
+    review: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "review").length,
     draft: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "draft").length,
     archived: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "archived").length,
   };
   const filterLabels: Record<typeof statusFilter, string> = {
     all: `All listings (${counts.all})`,
     active: `Active (${counts.active})`,
+    review: `Under review (${counts.review})`,
     draft: `Draft (${counts.draft})`,
     archived: `Archived (${counts.archived})`,
   };
@@ -841,7 +592,8 @@ function ListingsTab({
 
   async function handleToggleListing(listing: ListingResponse) {
     const status = listing.status.toLowerCase();
-    if (!["active", "draft", "expired"].includes(status) || togglingListingId === listing.id) return;
+    // Active → take down (unpublish). Otherwise → publish live.
+    if (!isToggleableStatus(status) || togglingListingId === listing.id) return;
 
     setTogglingListingId(listing.id);
     try {
@@ -850,7 +602,7 @@ function ListingsTab({
         : await api.listings.publish(listing.id);
       onListingUpdated?.(listing.id, updated);
     } catch {
-      window.alert("Could not update listing visibility. Please try again.");
+      window.alert("Could not update this listing. Please try again.");
     } finally {
       setTogglingListingId(null);
     }
@@ -858,23 +610,23 @@ function ListingsTab({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-[#1B2D45]/[0.06] bg-white px-4 py-4 shadow-[0_10px_26px_rgba(27,45,69,0.035)] md:px-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <h2 className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 900 }}>Your Listings</h2>
-            <p className="mt-1 max-w-[560px] text-[#1B2D45]/65" style={{ fontSize: "13px", lineHeight: 1.55, fontWeight: 650 }}>
-              Manage every active, draft, and archived listing from one table.
+            <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 600 }}>Listings</h2>
+            <p className="mt-1 max-w-[560px] text-[#1B2D45]/50" style={{ fontSize: "13px", lineHeight: 1.5 }}>
+              Every active, draft, and archived listing in one place.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:justify-end">
-            <label className="flex min-w-[210px] flex-col gap-1.5">
-              <span className="text-[#1B2D45]/70" style={{ fontSize: "10px", fontWeight: 900, letterSpacing: "0.08em" }}>STATUS</span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end lg:justify-end">
+            <label className="flex min-w-[200px] flex-col gap-1.5">
+              <span className="text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 500 }}>Status</span>
               <span className="relative">
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
-                  className="h-10 w-full appearance-none rounded-xl border border-[#1B2D45]/12 bg-[#F7F9FC] px-3 pr-9 text-[#1B2D45] outline-none transition-all hover:border-[#1B2D45]/25 focus:border-[#1B2D45]/40 focus:bg-white"
-                  style={{ fontSize: "12px", fontWeight: 850 }}
+                  className="h-9 w-full appearance-none rounded-lg border border-[#1B2D45]/12 bg-transparent px-3 pr-9 text-[#1B2D45] outline-none transition-colors hover:border-[#1B2D45]/25 focus:border-[#1B2D45]/40"
+                  style={{ fontSize: "13px", fontWeight: 400 }}
                 >
                   {(Object.keys(filterLabels) as Array<typeof statusFilter>).map((key) => (
                     <option key={key} value={key}>{filterLabels[key]}</option>
@@ -887,19 +639,19 @@ function ListingsTab({
               properties.length === 1 ? (
                 <Link
                   href={`/landlord/properties/${properties[0].id}/listings/new`}
-                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#1B2D45] px-4 text-white transition-all hover:bg-[#152438]"
-                  style={{ fontSize: "12px", fontWeight: 850, boxShadow: "0 10px 22px rgba(27,45,69,0.14)" }}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1B2D45] px-4 text-white transition-colors hover:bg-[#152438]"
+                  style={{ fontSize: "13px", fontWeight: 600 }}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Create Listing
+                  <Plus className="h-3.5 w-3.5" /> Create listing
                 </Link>
               ) : (
                 <button
                   type="button"
                   onClick={() => setShowCreatePicker((value) => !value)}
-                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[#1B2D45] px-4 text-white transition-all hover:bg-[#152438]"
-                  style={{ fontSize: "12px", fontWeight: 850, boxShadow: "0 10px 22px rgba(27,45,69,0.14)" }}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#1B2D45] px-4 text-white transition-colors hover:bg-[#152438]"
+                  style={{ fontSize: "13px", fontWeight: 600 }}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Create Listing
+                  <Plus className="h-3.5 w-3.5" /> Create listing
                 </button>
               )
             )}
@@ -949,29 +701,27 @@ function ListingsTab({
           </Link>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[#1B2D45]/[0.08] bg-white shadow-[0_10px_28px_rgba(27,45,69,0.035)]">
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
             <table className="w-full min-w-[1160px] table-fixed">
-              <thead className="bg-[#F3F6FA]">
-                <tr className="text-left text-[#1B2D45]/75" style={{ fontSize: "10px", fontWeight: 950 }}>
-                  <th className="w-[17%] px-4 py-3">PROPERTY</th>
-                  <th className="w-[14%] px-4 py-3">LISTING / ROOM</th>
-                  <th className="w-[10%] px-4 py-3">TYPE</th>
-                  <th className="w-[10%] px-4 py-3">RENT</th>
-                  <th className="w-[10%] px-4 py-3">STATUS</th>
-                  <th className="w-[10%] px-4 py-3">ON / OFF</th>
-                  <th className="w-[8%] px-4 py-3">VIEWS</th>
-                  <th className="w-[10%] px-4 py-3">DAYS LIVE</th>
-                  <th className="w-[10%] px-4 py-3">ACTIVITY</th>
-                  <th className="w-[11%] px-4 py-3 text-right">ACTIONS</th>
+              <thead>
+                <tr className="border-y border-[#1B2D45]/[0.08] text-left text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 500 }}>
+                  <th className="w-[17%] px-4 py-2.5">Property</th>
+                  <th className="w-[14%] px-4 py-2.5">Listing / room</th>
+                  <th className="w-[10%] px-4 py-2.5">Type</th>
+                  <th className="w-[10%] px-4 py-2.5">Rent</th>
+                  <th className="w-[10%] px-4 py-2.5">Status</th>
+                  <th className="w-[10%] px-4 py-2.5">On / off</th>
+                  <th className="w-[8%] px-4 py-2.5">Views</th>
+                  <th className="w-[10%] px-4 py-2.5">Days live</th>
+                  <th className="w-[10%] px-4 py-2.5">Activity</th>
+                  <th className="w-[11%] px-4 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-black/[0.04]">
+              <tbody className="divide-y divide-[#1B2D45]/[0.05]">
                 {filteredListings.map(({ listing, property }) => {
                   const statusBucket = getListingStatusBucket(listing.status);
                   const isActive = statusBucket === "active";
-                  const rawStatus = listing.status.toLowerCase();
-                  const isToggleable = rawStatus === "active" || rawStatus === "draft" || rawStatus === "expired";
+                  const isToggleable = isToggleableStatus(listing.status);
                   const roomLabel = getListingRoomLabel(listing, property);
                   const typeLabel = getListingTypeLabel(listing);
 
@@ -980,9 +730,9 @@ function ListingsTab({
                       key={listing.id}
                       role="link"
                       tabIndex={0}
-                      onClick={() => router.push(`/landlord/properties/${property.id}`)}
+                      onClick={() => router.push(`/landlord/properties/${property.id}/listings/${listing.id}`)}
                       onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") router.push(`/landlord/properties/${property.id}`);
+                        if (event.key === "Enter" || event.key === " ") router.push(`/landlord/properties/${property.id}/listings/${listing.id}`);
                       }}
                       className="cursor-pointer transition-colors hover:bg-[#F7F9FC]"
                     >
@@ -994,7 +744,7 @@ function ListingsTab({
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 850 }}>{roomLabel}</div>
-                        <div className="mt-0.5 text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 750 }}>{formatLeaseType(listing.lease_type)}</div>
+                        <div className="mt-0.5 text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 750 }}>{formatLeaseType(listing.lease_type, listing.custom_lease_type)}</div>
                       </td>
                       <td className="px-4 py-3 text-[#1B2D45]/78" style={{ fontSize: "11px", fontWeight: 800 }}>{typeLabel}</td>
                       <td className="px-4 py-3 text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 850 }}>
@@ -1002,13 +752,7 @@ function ListingsTab({
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 ${
-                            statusBucket === "active"
-                              ? "bg-[#4ADE80]/10 text-[#239B55]"
-                              : statusBucket === "draft"
-                                ? "bg-[#E9EEF7] text-[#1B2D45]"
-                                : "bg-[#1B2D45]/[0.06] text-[#1B2D45]/70"
-                          }`}
+                          className={`inline-flex rounded-full px-2.5 py-1 ${getListingStatusTone(listing.status)}`}
                           style={{ fontSize: "10px", fontWeight: 850 }}
                         >
                           {getListingStatusLabel(listing.status)}
@@ -1030,42 +774,16 @@ function ListingsTab({
                       <td className="px-4 py-3 text-[#1B2D45]/78" style={{ fontSize: "11px", fontWeight: 800 }}>{relativeActivity(listing.updated_at)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setEditListing(listing);
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]"
-                            title="Edit listing"
-                            aria-label="Edit listing"
+                          <Link
+                            href={`/landlord/properties/${property.id}/listings/${listing.id}`}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#1B2D45]/12 px-2.5 text-[#1B2D45]/80 transition-all hover:border-[#1B2D45]/25 hover:text-[#1B2D45]"
+                            style={{ fontSize: "11px", fontWeight: 800 }}
+                            title="Manage listing"
+                            aria-label="Manage listing"
+                            onClick={(event) => event.stopPropagation()}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setPhotosListing({ id: listing.id, title: `${property.title} - $${listing.rent_per_room}/room` });
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]"
-                            title="Manage photos"
-                            aria-label="Manage listing photos"
-                          >
-                            <Image className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setShowingsListing({ id: listing.id, title: `${property.title} - $${listing.rent_per_room}/room` });
-                            }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]"
-                            title="Viewing slots"
-                            aria-label="Manage viewing slots"
-                          >
-                            <CalendarDays className="h-3.5 w-3.5" />
-                          </button>
+                            <Pencil className="h-3.5 w-3.5" /> Manage
+                          </Link>
                           <Link
                             href={`/browse/${listing.id}`}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]"
@@ -1095,41 +813,9 @@ function ListingsTab({
                 })}
               </tbody>
             </table>
-          </div>
         </div>
       )}
 
-      <AnimatePresence>
-        {editListing && (
-          <EditListingModal
-            listing={editListing}
-            onClose={() => setEditListing(null)}
-            onSaved={(updated) => {
-              onListingUpdated?.(updated.id, updated);
-              setEditListing(null);
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {photosListing && (
-          <ListingImageUpload
-            listingId={photosListing.id}
-            onClose={() => setPhotosListing(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showingsListing && (
-          <ShowingsManager
-            listingId={showingsListing.id}
-            listingTitle={showingsListing.title}
-            onClose={() => setShowingsListing(null)}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
@@ -1168,17 +854,33 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Reviews & Reports</h2>
-        <p className="text-[#1B2D45]/62 mt-1" style={{ fontSize: "12px" }}>
-          Anonymous student feedback across your properties plus reports submitted on your listings.
+        <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 600 }}>Reviews &amp; reports</h2>
+        <p className="mt-1 text-[#1B2D45]/50" style={{ fontSize: "13px" }}>
+          Anonymous student feedback across your properties, plus reports submitted on your listings.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <StatCard icon={<Star className="w-4 h-4 text-[#2F6FED]" />} label="Average Rating" value={avg ?? "—"} sub={avg ? "Across all categories" : "No ratings yet"} />
-        <StatCard icon={<ShieldCheck className="w-4 h-4 text-[#16784F]" />} label="Would Rent Again" value={wouldRentAgain != null ? `${wouldRentAgain}%` : "—"} sub={wouldRentAgain != null ? "Students who would return" : "No ratings yet"} />
-        <StatCard icon={<MessageCircle className="w-4 h-4 text-[#1B2D45]" />} label="Total Reviews" value={reviews.length} onClick={() => setViewMode("reviews")} />
-        <StatCard icon={<Flag className="w-4 h-4 text-[#1B2D45]" />} label="Open Reports" value={pendingFlags} sub={flags.length > 0 ? `${resolvedFlags} resolved` : "No reports yet"} onClick={() => setViewMode("reports")} />
+      <div className="overflow-hidden rounded-2xl border border-[#1B2D45]/[0.08] bg-white shadow-[0_1px_2px_rgba(27,45,69,0.03)]">
+        <div className="grid grid-cols-2 sm:grid-cols-4">
+          {[
+            { label: "Average rating", value: avg ?? "—", sub: avg ? "all categories" : "No ratings yet" },
+            { label: "Would rent again", value: wouldRentAgain != null ? `${wouldRentAgain}%` : "—", sub: wouldRentAgain != null ? "of students" : "No ratings yet" },
+            { label: "Total reviews", value: String(reviews.length), sub: "all properties", onClick: () => setViewMode("reviews") },
+            { label: "Open reports", value: String(pendingFlags), sub: flags.length > 0 ? `${resolvedFlags} resolved` : "none yet", onClick: () => setViewMode("reports") },
+          ].map((m, i) => {
+            const cls = `p-4 text-left sm:p-5 border-[#1B2D45]/[0.08] ${i % 2 === 1 ? "border-l" : ""} ${i >= 2 ? "border-t sm:border-t-0" : ""} ${i > 0 ? "sm:border-l" : ""}`;
+            const inner = (
+              <>
+                <div className="text-[#1B2D45]/50" style={{ fontSize: "12px" }}>{m.label}</div>
+                <div className="mt-1.5 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 600, lineHeight: 1 }}>{m.value}</div>
+                <div className="mt-1.5 text-[#1B2D45]/40" style={{ fontSize: "12px" }}>{m.sub}</div>
+              </>
+            );
+            return m.onClick
+              ? <button key={m.label} type="button" onClick={m.onClick} className={`transition-colors hover:bg-[#1B2D45]/[0.02] ${cls}`}>{inner}</button>
+              : <div key={m.label} className={cls}>{inner}</div>;
+          })}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -1190,100 +892,59 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
           <button
             key={option.key}
             onClick={() => setViewMode(option.key as typeof viewMode)}
-            className={`rounded-full border px-3 py-1.5 transition-all ${
+            className={`rounded-full px-3 py-1.5 transition-colors ${
               viewMode === option.key
-                ? "border-[#1B2D45]/20 bg-[#1B2D45]/[0.06] text-[#1B2D45]"
-                : "border-black/[0.06] text-[#1B2D45]/65 hover:border-[#1B2D45]/15 hover:text-[#1B2D45]"
+                ? "bg-[#1B2D45] text-white"
+                : "text-[#1B2D45]/55 hover:bg-[#1B2D45]/[0.05] hover:text-[#1B2D45]"
             }`}
-            style={{ fontSize: "11px", fontWeight: 700 }}
+            style={{ fontSize: "12px", fontWeight: 500 }}
           >
             {option.label}
           </button>
         ))}
       </div>
 
-      {showReports && (
-      <div className="px-1 py-2">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#1B2D45]/[0.06] text-[#1B2D45]">
-            <Flag className="h-4 w-4" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 850 }}>Listing reports</div>
-            <p className="text-[#1B2D45]/66 mt-1 max-w-[640px]" style={{ fontSize: "11px", lineHeight: 1.55, fontWeight: 650 }}>
-              Students can report inaccurate or suspicious listings. Use this section to see which listings were flagged and what students reported.
-            </p>
-          </div>
-        </div>
-      </div>
-      )}
-
       {showReports && (flags.length === 0 ? (
-        <div className="bg-white rounded-xl border border-black/[0.04] p-8 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-[#E9EEF7] flex items-center justify-center mx-auto mb-3">
-            <Flag className="w-6 h-6 text-[#1B2D45]/55" />
-          </div>
-          <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>No listing reports</h3>
-          <p className="text-[#1B2D45]/65 mt-1 max-w-[360px] mx-auto" style={{ fontSize: "12px", lineHeight: 1.55 }}>
-            If students flag one of your listings, it will appear here with the reported reason and current status.
+        viewMode === "reports" ? (
+          <p className="text-[#1B2D45]/45" style={{ fontSize: "13px" }}>
+            No listing reports. If a student flags one of your listings, it shows up here with the reason.
           </p>
-        </div>
+        ) : null
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {flags.map((flag) => (
-            <div key={flag.id} className="bg-white rounded-xl border border-black/[0.04] p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div key={flag.id} className="rounded-xl border border-[#1B2D45]/[0.08] bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>
-                      {flag.property_title}
-                    </span>
+                    <span className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 500 }}>{flag.property_title}</span>
                     <span
-                      className={`rounded-full px-2.5 py-1 ${
-                        flag.status !== "resolved"
-                          ? "bg-[#E9EEF7] text-[#1B2D45]"
-                          : flag.status === "resolved"
-                            ? "bg-[#E8F7EF] text-[#16784F]"
-                            : "bg-[#E9EEF7] text-[#1B2D45]"
-                      }`}
-                      style={{ fontSize: "10px", fontWeight: 700 }}
+                      className={`rounded-full px-2 py-0.5 ${flag.status === "resolved" ? "bg-[#239B55]/10 text-[#239B55]" : "bg-[#FFB627]/15 text-[#A66A00]"}`}
+                      style={{ fontSize: "11px", fontWeight: 500 }}
                     >
                       {getReportStatusLabel(flag.status)}
                     </span>
                   </div>
-                  <p className="text-[#1B2D45]/58 mt-1" style={{ fontSize: "11px" }}>
-                    {flag.property_address}
-                  </p>
+                  <p className="mt-0.5 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>{flag.property_address}</p>
                 </div>
-                <span className="text-[#1B2D45]/25 shrink-0" style={{ fontSize: "11px" }}>
+                <span className="shrink-0 text-[#1B2D45]/35" style={{ fontSize: "12px" }}>
                   {new Date(flag.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                 </span>
               </div>
-              <div className="mt-3 rounded-lg bg-[#F7F9FC] px-3 py-2.5">
-                <div className="text-[#1B2D45]/62" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.04em" }}>
-                  REPORTED ISSUE
-                </div>
-                <p className="text-[#1B2D45] mt-1" style={{ fontSize: "13px", lineHeight: 1.6 }}>
-                  {flag.reason}
-                </p>
-              </div>
+              <p className="mt-2.5 text-[#1B2D45]/70" style={{ fontSize: "13px", lineHeight: 1.5 }}>
+                <span className="text-[#1B2D45]/40">Reported issue — </span>{flag.reason}
+              </p>
             </div>
           ))}
         </div>
       ))}
 
       {shouldShowReviewsEmpty ? (
-        <div className="bg-white rounded-xl border-2 border-dashed border-black/[0.06] p-10 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-[#E9EEF7] flex items-center justify-center mx-auto mb-3">
-            <Star className="w-7 h-7 text-[#2F6FED]" />
-          </div>
-          <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No reviews yet</h3>
-          <p className="text-[#1B2D45]/65 mt-1 max-w-[340px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.5 }}>
-            Reviews from students will appear here once they have completed a stay and left feedback.
-          </p>
-        </div>
+        <p className="text-[#1B2D45]/45" style={{ fontSize: "13px" }}>
+          No reviews yet — they appear here once students complete a stay and leave feedback.
+        </p>
       ) : showReviews && reviews.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {reviews.map((review) => {
             const reviewAvg = (
               (review.responsiveness +
@@ -1294,46 +955,36 @@ function ReviewsTab({ reviews, flags }: { reviews: ReviewResponse[]; flags: Land
             ).toFixed(1);
 
             return (
-              <div key={review.id} className="bg-white rounded-xl border border-black/[0.04] p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div key={review.id} className="rounded-xl border border-[#1B2D45]/[0.08] bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>
-                        Anonymous tenant review
-                      </span>
-                      <span className="rounded-md bg-[#E9EEF7] px-2 py-0.5 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
-                        Avg {reviewAvg}
-                      </span>
+                      <span className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 500 }}>Anonymous tenant review</span>
+                      <span className="text-[#1B2D45]/45" style={{ fontSize: "12px" }}>· avg {reviewAvg}</span>
                     </div>
-                    <p className="text-[#1B2D45]/58 mt-1" style={{ fontSize: "11px" }}>
+                    <p className="mt-0.5 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>
                       Property #{review.property_id} · {new Date(review.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     </p>
                   </div>
                   <span
-                    className={`rounded-full px-3 py-1.5 ${
-                      review.would_rent_again ? "bg-[#E8F7EF] text-[#16784F]" : "bg-[#FEECEC] text-[#B42318]"
-                    }`}
-                    style={{ fontSize: "11px", fontWeight: 700 }}
+                    className={`shrink-0 rounded-full px-2 py-0.5 ${review.would_rent_again ? "bg-[#239B55]/10 text-[#239B55]" : "bg-[#E71D36]/10 text-[#B42318]"}`}
+                    style={{ fontSize: "11px", fontWeight: 500 }}
                   >
                     {review.would_rent_again ? "Would rent again" : "Would not rent again"}
                   </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5">
                   {[
                     ["Responsiveness", review.responsiveness],
                     ["Maintenance", review.maintenance_speed],
                     ["Privacy", review.respect_privacy],
                     ["Charges", review.fairness_of_charges],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-lg bg-[#F7F9FC] px-3 py-2">
-                      <div className="text-[#1B2D45]/62" style={{ fontSize: "10px", fontWeight: 700 }}>
-                        {label}
-                      </div>
-                      <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 800 }}>
-                        {value}/5
-                      </div>
-                    </div>
+                    <span key={label} style={{ fontSize: "13px" }}>
+                      <span className="text-[#1B2D45]" style={{ fontWeight: 500 }}>{value}/5</span>{" "}
+                      <span className="text-[#1B2D45]/45">{label}</span>
+                    </span>
                   ))}
                 </div>
 
@@ -1370,6 +1021,7 @@ function MessagesTab({
   const [tenantCardOpen, setTenantCardOpen] = useState(false);
   const [threadFilter, setThreadFilter] = useState<"all" | "unread">("all");
   const [listingFilter, setListingFilter] = useState<number | "all">("all");
+  const [markingUnavailable, setMarkingUnavailable] = useState(false);
   const unreadTotal = conversations.reduce((sum, convo) => sum + convo.unread_count, 0);
   const uniqueStudents = new Set(conversations.map((convo) => convo.user_id)).size;
   const recentInquiry = conversations[0]?.last_message?.created_at;
@@ -1404,18 +1056,30 @@ function MessagesTab({
     };
   }, []);
 
-  const loadMessages = useCallback(async (convoId: number) => {
+  // `silent` background refreshes (WebSocket / poll) update the thread in place without
+  // flipping the loading spinner or clearing messages — so the view doesn't flicker while
+  // you're reading. Only an explicit open (silent=false) shows the spinner.
+  const loadMessages = useCallback(async (convoId: number, silent = false) => {
     setActiveConvo(convoId);
-    setLoadingMessages(true);
+    if (!silent) setLoadingMessages(true);
     try {
       const detail = await api.messages.getConversation(convoId);
-      setMessages(detail.messages);
+      setMessages((prev) => {
+        // Avoid a re-render (and scroll jump) when nothing actually changed.
+        if (prev.length === detail.messages.length && prev[prev.length - 1]?.id === detail.messages[detail.messages.length - 1]?.id) {
+          return prev;
+        }
+        return detail.messages;
+      });
+      // Opening the thread marks it read server-side — refresh the inbox so the
+      // unread badge clears immediately instead of waiting for the next poll.
+      void onRefreshConversations();
     } catch {
-      setMessages([]);
+      if (!silent) setMessages([]);
     } finally {
-      setLoadingMessages(false);
+      if (!silent) setLoadingMessages(false);
     }
-  }, []);
+  }, [onRefreshConversations]);
 
   useEffect(() => {
     if (filteredConversations.length === 0) {
@@ -1430,13 +1094,24 @@ function MessagesTab({
     }
   }, [activeConvo, filteredConversations, loadMessages]);
 
+  // Real-time: the backend pushes { type: "new_message", conversation_id } over the
+  // WebSocket. Refresh the inbox on any new message, and reload the open thread if it's
+  // the one that changed. The interval below stays only as a low-frequency safety net.
+  useMessagesSocket((event) => {
+    if (event.type !== "new_message") return;
+    void onRefreshConversations();
+    if (event.conversation_id != null && event.conversation_id === activeConvo) {
+      void loadMessages(activeConvo, true);
+    }
+  });
+
   useEffect(() => {
     if (!activeConvo) return;
 
     const interval = window.setInterval(() => {
-      void loadMessages(activeConvo);
+      void loadMessages(activeConvo, true);
       void onRefreshConversations();
-    }, 8000);
+    }, 30000);
 
     return () => window.clearInterval(interval);
   }, [activeConvo, loadMessages, onRefreshConversations]);
@@ -1472,39 +1147,50 @@ function MessagesTab({
     }
   }
 
+  async function handleMarkUnavailable() {
+    if (!activeConvoData) return;
+    if (!window.confirm("Take this listing down so students can no longer inquire? You can republish it anytime from the listing.")) return;
+    setMarkingUnavailable(true);
+    try {
+      await api.listings.unpublish(activeConvoData.listing_id);
+      window.alert("Listing taken down. Republish it from the listing's Manage page when it's available again.");
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Couldn't update the listing — it may already be inactive.");
+    } finally {
+      setMarkingUnavailable(false);
+    }
+  }
+
   const activeConvoData = conversations.find(c => c.id === activeConvo);
   const activeListingContext = getConversationListing(activeConvoData);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Messages</h2>
-          <p className="text-[#1B2D45]/62 mt-1 max-w-[520px]" style={{ fontSize: "12px", lineHeight: 1.55 }}>
-            Keep student inquiries moving without leaving your landlord workspace.
+          <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 600 }}>Messages</h2>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[#1B2D45]/50" style={{ fontSize: "13px" }}>
+            <span><span className="text-[#1B2D45]/80" style={{ fontWeight: 500 }}>{conversations.length}</span> thread{conversations.length === 1 ? "" : "s"}</span>
+            <span className="text-[#1B2D45]/25">·</span>
+            <span>{uniqueStudents} student{uniqueStudents === 1 ? "" : "s"}</span>
+            {unreadTotal > 0 && <><span className="text-[#1B2D45]/25">·</span><span className="text-[#E71D36]" style={{ fontWeight: 500 }}>{unreadTotal} unread</span></>}
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-2 md:w-[360px]">
-          <button
-            type="button"
-            onClick={() => setThreadFilter(threadFilter === "unread" ? "all" : "unread")}
-            className={`group rounded-xl border px-3 py-2.5 text-left transition-all hover:border-[#1B2D45]/20 hover:shadow-[0_8px_18px_rgba(27,45,69,0.06)] ${threadFilter === "unread" ? "border-[#1B2D45]/18 bg-[#F3F6FA]" : "border-black/[0.04] bg-white"}`}
-          >
-            <div className="text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>UNREAD</div>
-            <div className="mt-1 flex items-center justify-between text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>{unreadTotal}<ChevronRight className="h-3.5 w-3.5 text-[#1B2D45]/35 transition-transform group-hover:translate-x-0.5" /></div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setThreadFilter("all")}
-            className={`group rounded-xl border px-3 py-2.5 text-left transition-all hover:border-[#1B2D45]/20 hover:shadow-[0_8px_18px_rgba(27,45,69,0.06)] ${threadFilter === "all" ? "border-[#1B2D45]/18 bg-[#F3F6FA]" : "border-black/[0.04] bg-white"}`}
-          >
-            <div className="text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>THREADS</div>
-            <div className="mt-1 flex items-center justify-between text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>{conversations.length}<ChevronRight className="h-3.5 w-3.5 text-[#1B2D45]/35 transition-transform group-hover:translate-x-0.5" /></div>
-          </button>
-          <div className="rounded-xl border border-black/[0.04] bg-white px-3 py-2.5">
-            <div className="text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.05em" }}>STUDENTS</div>
-            <div className="mt-1 text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>{uniqueStudents}</div>
-          </div>
+        <div className="flex gap-1.5">
+          {([["all", "All"], ["unread", "Unread"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setThreadFilter(key)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors ${threadFilter === key ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:bg-[#1B2D45]/[0.05] hover:text-[#1B2D45]"}`}
+              style={{ fontSize: "12px", fontWeight: 500 }}
+            >
+              {label}
+              {key === "unread" && unreadTotal > 0 && (
+                <span className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 ${threadFilter === "unread" ? "bg-white/20 text-white" : "bg-[#E71D36] text-white"}`} style={{ fontSize: "9px", fontWeight: 600 }}>{unreadTotal}</span>
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1622,27 +1308,30 @@ function MessagesTab({
                             <img src={activeListingContext.image} alt="" className="h-full w-full object-cover" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="truncate text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 900 }}>{activeListingContext.title}</div>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[#1B2D45]/65" style={{ fontSize: "10px", fontWeight: 750 }}>
+                            <div className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{activeListingContext.title}</div>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 400 }}>
                               <span>{activeListingContext.room}</span>
                               {activeListingContext.address && <span className="truncate">{activeListingContext.address}</span>}
-                              <span className="rounded-full bg-[#E9EEF7] px-2 py-0.5 text-[#1B2D45]">{activeListingContext.status}</span>
+                              <span className="rounded-full bg-[#1B2D45]/[0.06] px-2 py-0.5 text-[#1B2D45]/70">{activeListingContext.status}</span>
                             </div>
                           </div>
                           <div className="flex shrink-0 flex-wrap gap-2">
                             <Link
                               href={activeListingContext.propertyId ? `/landlord/properties/${activeListingContext.propertyId}` : `/browse/${activeListingContext.id}`}
-                              className="inline-flex h-8 items-center justify-center rounded-lg bg-[#1B2D45] px-3 text-white transition-all hover:bg-[#152438]"
-                              style={{ fontSize: "11px", fontWeight: 850 }}
+                              className="inline-flex h-8 items-center justify-center rounded-lg bg-[#1B2D45] px-3 text-white transition-colors hover:bg-[#152438]"
+                              style={{ fontSize: "11px", fontWeight: 600 }}
                             >
                               View listing
                             </Link>
                             <button
                               type="button"
-                              className="inline-flex h-8 items-center justify-center rounded-lg border border-[#1B2D45]/12 bg-white px-3 text-[#1B2D45] transition-all hover:border-[#1B2D45]/25"
-                              style={{ fontSize: "11px", fontWeight: 850 }}
-                              title="Mark unavailable"
+                              onClick={handleMarkUnavailable}
+                              disabled={markingUnavailable}
+                              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-[#1B2D45]/12 bg-white px-3 text-[#1B2D45] transition-colors hover:border-[#1B2D45]/25 disabled:opacity-50"
+                              style={{ fontSize: "11px", fontWeight: 600 }}
+                              title="Take this listing down"
                             >
+                              {markingUnavailable && <Loader2 className="h-3 w-3 animate-spin" />}
                               Mark unavailable
                             </button>
                           </div>
@@ -1725,12 +1414,14 @@ function MessagesTab({
 
 function SettingsTab({ user }: { user: { email: string; first_name: string; last_name: string; identity_verified?: boolean; company_name?: string | null; phone?: string | null } }) {
   const router = useRouter();
-  const { logout } = useAuthStore();
+  const { logout, loadUser } = useAuthStore();
 
   // Contact info
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [firstName, setFirstName] = useState(user.first_name ?? "");
+  const [lastName, setLastName] = useState(user.last_name ?? "");
   const [companyName, setCompanyName] = useState(user.company_name ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
 
@@ -1760,9 +1451,12 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
     setSaving(true);
     try {
       await api.landlords.updateProfile({
+        first_name: firstName.trim() || undefined,
+        last_name: lastName.trim() || undefined,
         company_name: companyName.trim() || undefined,
         phone: phone.trim() || undefined,
       });
+      await loadUser(); // refresh navbar / header with the new name
       setSaved(true);
       setEditing(false);
       setTimeout(() => setSaved(false), 2000);
@@ -1828,7 +1522,7 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
             </button>
           ) : (
             <div className="flex items-center gap-1.5">
-              <button onClick={() => { setEditing(false); setCompanyName(user.company_name ?? ""); setPhone(user.phone ?? ""); }}
+              <button onClick={() => { setEditing(false); setFirstName(user.first_name ?? ""); setLastName(user.last_name ?? ""); setCompanyName(user.company_name ?? ""); setPhone(user.phone ?? ""); }}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[#1B2D45]/65 hover:bg-[#1B2D45]/[0.04] transition-colors" style={{ fontSize: "12px", fontWeight: 600 }}>
                 <X className="w-3 h-3" /> Cancel
               </button>
@@ -1841,6 +1535,28 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
         </div>
         <p className="text-[#1B2D45]/58 mb-4" style={{ fontSize: "11px" }}>Shown publicly on your listings so students can reach you.</p>
         <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[#1B2D45]/65 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>First Name</label>
+              {editing ? (
+                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" className={inputCls} style={{ fontSize: "13px" }} />
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FAF8F4]">
+                  <span className="text-[#1B2D45]" style={{ fontSize: "13px" }}>{user.first_name || "Not set"}</span>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="text-[#1B2D45]/65 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>Last Name</label>
+              {editing ? (
+                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" className={inputCls} style={{ fontSize: "13px" }} />
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#FAF8F4]">
+                  <span className="text-[#1B2D45]" style={{ fontSize: "13px" }}>{user.last_name || "Not set"}</span>
+                </div>
+              )}
+            </div>
+          </div>
           <div>
             <label className="text-[#1B2D45]/65 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>Company / Realtor Name</label>
             {editing ? (

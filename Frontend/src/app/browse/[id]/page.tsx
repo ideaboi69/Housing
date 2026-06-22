@@ -29,6 +29,8 @@ import { cloudinaryUrl } from "@/lib/cloudinary";
 import { CribbMap } from "@/components/ui/CribbMap";
 import { getProximityFromKm, getProximityLabel } from "@/lib/proximity";
 import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
+import { isSampleListing } from "@/lib/sample-data";
+import { SampleNote } from "@/components/ui/SampleBadge";
 
 /* ── Animation helpers ─────────────────────────── */
 
@@ -326,6 +328,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const tenantChecked = useRef(false);
 
   const user = useAuthStore((s) => s.user);
+  const isLandlord = user?.role === "landlord";
 
   // Saved store — syncs with PolaroidCard hearts
   const isSaved = useSavedStore((s) => s.savedIds.has(listingId));
@@ -592,12 +595,14 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
 
+              {isSampleListing(listingId) && <SampleNote className="mt-4" />}
+
               {/* Quick facts */}
               <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
                 {[
                   { label: "Type", value: formatPropertyType(listing.property_type), icon: Ruler },
                   { label: "Rooms", value: `${listing.total_rooms} bed · ${listing.bathrooms} bath`, icon: Bed },
-                  { label: "Lease", value: formatLeaseType(listing.lease_type), icon: Calendar },
+                  { label: "Lease", value: formatLeaseType(listing.lease_type, listing.custom_lease_type), icon: Calendar },
                   { label: "Move-in", value: listing.has_flexible_move_in ? "Any move-in date" : formatDate(listing.move_in_date), icon: Clock },
                 ].map((fact) => {
                   const Icon = fact.icon;
@@ -846,37 +851,52 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 </motion.div>
               )}
 
-              {/* Contact Landlord */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleContact} disabled={contactSending || contactSent}
-                className="relative w-full mt-5 py-3 rounded-xl bg-[#FF6B35] text-white overflow-hidden hover:bg-[#e55e2e] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
-                style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
-                {contactSent ? (
-                  <><Check className="w-4 h-4" /> Message Sent — Opening Chat...</>
-                ) : contactSending ? (
-                  "Sending..."
-                ) : (
-                  <><MessageCircle className="w-4 h-4" /> Contact Landlord</>
-                )}
-              </motion.button>
+              {isLandlord ? (
+                /* Landlords can browse read-only — student actions don't apply to them. */
+                <div className="mt-5 rounded-xl border border-[#1B2D45]/10 bg-[#1B2D45]/[0.03] px-4 py-3.5 text-center">
+                  <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>You&apos;re viewing as a landlord</p>
+                  <p className="mt-1 text-[#1B2D45]/55" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                    Saving, messaging, and booking viewings are student features.
+                  </p>
+                  <Link href="/landlord" className="mt-2 inline-block text-[#1B2D45] underline" style={{ fontSize: "12px", fontWeight: 600 }}>
+                    Back to your dashboard
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {/* Contact Landlord */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={handleContact} disabled={contactSending || contactSent}
+                    className="relative w-full mt-5 py-3 rounded-xl bg-[#FF6B35] text-white overflow-hidden hover:bg-[#e55e2e] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                    style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
+                    {contactSent ? (
+                      <><Check className="w-4 h-4" /> Message Sent — Opening Chat...</>
+                    ) : contactSending ? (
+                      "Sending..."
+                    ) : (
+                      <><MessageCircle className="w-4 h-4" /> Contact Landlord</>
+                    )}
+                  </motion.button>
 
-              {/* Book Showing */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleBookShowing}
-                className="w-full mt-2 py-3 rounded-xl border border-[#FF6B35]/20 text-[#FF6B35] bg-[#FF6B35]/[0.04] hover:bg-[#FF6B35]/[0.08] transition-all flex items-center justify-center gap-2"
-                style={{ fontSize: "14px", fontWeight: 600 }}>
-                <Calendar className="w-4 h-4" /> Book a Showing
-              </motion.button>
+                  {/* Book Showing */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={handleBookShowing}
+                    className="w-full mt-2 py-3 rounded-xl border border-[#FF6B35]/20 text-[#FF6B35] bg-[#FF6B35]/[0.04] hover:bg-[#FF6B35]/[0.08] transition-all flex items-center justify-center gap-2"
+                    style={{ fontSize: "14px", fontWeight: 600 }}>
+                    <Calendar className="w-4 h-4" /> Book a Showing
+                  </motion.button>
 
-              {/* Save */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave} disabled={saveBusy}
-                className={`w-full mt-2 py-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${
-                  isSaved
-                    ? "border-[#E71D36]/20 bg-[#E71D36]/[0.04] text-[#E71D36]"
-                    : "border-black/[0.06] text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.03]"
-                }`}
-                style={{ fontSize: "14px", fontWeight: 500 }}>
-                <Heart className={`w-4 h-4 ${isSaved ? "fill-[#E71D36]" : ""}`} />
-                {isSaved ? "Saved" : "Save Listing"}
-              </motion.button>
+                  {/* Save */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave} disabled={saveBusy}
+                    className={`w-full mt-2 py-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${
+                      isSaved
+                        ? "border-[#E71D36]/20 bg-[#E71D36]/[0.04] text-[#E71D36]"
+                        : "border-black/[0.06] text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.03]"
+                    }`}
+                    style={{ fontSize: "14px", fontWeight: 500 }}>
+                    <Heart className={`w-4 h-4 ${isSaved ? "fill-[#E71D36]" : ""}`} />
+                    {isSaved ? "Saved" : "Save Listing"}
+                  </motion.button>
+                </>
+              )}
 
               {/* Share + Report */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">

@@ -184,7 +184,7 @@ export default function ForgotPasswordPage() {
 
                     <button
                       type="submit"
-                      disabled={isLoading || !turnstileToken}
+                      disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
                       className="w-full rounded-2xl bg-[#FF6B35] py-3.5 text-white hover:bg-[#e55e2e] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
                       style={{ fontSize: "15px", fontWeight: 800, boxShadow: "0 10px 28px rgba(255,107,53,0.28)" }}
                     >

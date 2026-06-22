@@ -20,6 +20,7 @@ import { CompareModal } from "@/components/browse/CompareModal";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { BrowseGridSkeleton } from "@/components/ui/Skeletons";
+import { OnboardingBanner } from "@/components/ui/OnboardingBanner";
 import type { ListingDetailResponse, ListingFilters } from "@/types";
 
 type ViewMode = "board" | "grid" | "map";
@@ -233,6 +234,7 @@ export default function BrowsePage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F4] pb-[calc(env(safe-area-inset-bottom,0px)+24px)] md:pb-0">
+      <OnboardingBanner />
       {/* Hero + View toggle */}
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 pt-5 md:pt-8 pb-1 md:pb-2">
         <motion.div

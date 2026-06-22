@@ -100,6 +100,7 @@ class AdminStatsResponse(BaseModel):
     total_landlords: int
     total_properties: int
     total_listings: int
+    listings_under_review: int = 0
     total_reviews: int
     total_flags_pending: int
     total_marketplace_items: int = 0

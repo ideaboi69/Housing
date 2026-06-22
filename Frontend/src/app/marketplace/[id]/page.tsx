@@ -14,30 +14,12 @@ import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
 import { SmartBackLink } from "@/components/ui/SmartBackLink";
 import {
   MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo,
-  MOCK_MARKETPLACE_ITEMS,
 } from "@/components/marketplace/marketplace-data";
 import type { MarketplaceItemListResponse, MarketplaceItemResponse } from "@/types";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { toast } from "sonner";
-
-/* ════════════════════════════════════════════════════════
-   Mock detail data (fallback when API not connected)
-   ════════════════════════════════════════════════════════ */
-
-function getMockDetail(id: number): MarketplaceItemResponse | null {
-  const mock = MOCK_MARKETPLACE_ITEMS.find((m) => m.id === id);
-  if (!mock) return null;
-  return {
-    ...mock,
-    seller_id: 1,
-    description: "Great condition, barely used. Perfect for a student apartment. Need gone before I move out at the end of the semester. Pickup anytime — just message me!",
-    pickup_location: "Stone Road",
-    pickup_notes: "Available weekdays after 4pm, anytime on weekends.",
-    images: mock.primary_image ? [{ id: 1, image_url: mock.primary_image, is_primary: true }] : [],
-    primary_image: mock.primary_image || null,
-    updated_at: mock.created_at,
-  } as MarketplaceItemResponse;
-}
+import { isSampleMarketplaceItem } from "@/lib/sample-data";
+import { SampleNote } from "@/components/ui/SampleBadge";
 
 /* ════════════════════════════════════════════════════════
    Image Gallery
@@ -142,6 +124,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
   const { id } = use(params);
   const router = useRouter();
   const { user } = useAuthStore();
+  const isLandlord = user?.role === "landlord";
   const isSaved = useMarketplaceSavedStore((s) => s.isSaved);
   const isSaving = useMarketplaceSavedStore((s) => s.isToggling);
   const toggleSave = useMarketplaceSavedStore((s) => s.toggleSave);
@@ -160,7 +143,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
         const data = await api.marketplace.getItem(numId);
         setItem(data);
       } catch {
-        setItem(getMockDetail(numId));
+        setItem(null);
       } finally {
         setLoading(false);
       }
@@ -177,18 +160,10 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
         const filtered = liveItems
           .filter((candidate) => candidate.id !== item.id)
           .slice(0, 6);
-
-        if (filtered.length > 0) {
-          setSimilarItems(filtered);
-          return;
-        }
+        setSimilarItems(filtered);
       } catch {
-        // Fall through to mock recommendations
+        setSimilarItems([]);
       }
-
-      const categoryMatches = MOCK_MARKETPLACE_ITEMS.filter((m) => m.id !== item.id && m.category === item.category);
-      const fallbackMatches = MOCK_MARKETPLACE_ITEMS.filter((m) => m.id !== item.id && m.category !== item.category);
-      setSimilarItems([...categoryMatches, ...fallbackMatches].slice(0, 6));
     }
 
     fetchSimilar();
@@ -333,6 +308,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
               <p className="mt-2 text-[#1B2D45]/40" style={{ fontSize: "13px" }}>
                 Listed {timeAgo(item.created_at)} in Guelph, ON
               </p>
+              {isSampleMarketplaceItem(item.id) && <SampleNote className="mt-3" />}
 
               <div className="flex items-center gap-1.5 mt-3 flex-wrap">
                 <span className="px-2.5 py-1 rounded-full" style={{ fontSize: "11px", fontWeight: 700, color: condition.color, background: `${condition.color}15`, border: `1px solid ${condition.color}25` }}>
@@ -340,33 +316,48 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                 </span>
                 {category && (
                   <span className="px-2.5 py-1 rounded-full bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>
-                    {category.emoji} {category.label}
+                    {category.label}
                   </span>
                 )}
               </div>
 
+              {isLandlord && (
+                <div className="mt-5 rounded-xl border border-[#1B2D45]/10 bg-[#1B2D45]/[0.03] px-4 py-3.5 text-center">
+                  <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>You&apos;re viewing as a landlord</p>
+                  <p className="mt-1 text-[#1B2D45]/55" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                    Messaging sellers and saving items are student features.
+                  </p>
+                  <Link href="/landlord" className="mt-2 inline-block text-[#1B2D45] underline" style={{ fontSize: "12px", fontWeight: 600 }}>
+                    Back to your dashboard
+                  </Link>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-5">
-                <button
-                  onClick={handleOpenMessage}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
-                  style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}
-                >
-                  <MessageCircle className="w-4.5 h-4.5" />
-                  Message
-                </button>
-                <button
-                  onClick={handleToggleSave}
-                  className={`flex items-center justify-center gap-2 py-3 rounded-xl border transition-all ${
-                    isSaved(item.id)
-                      ? "border-[#E71D36]/18 bg-[#E71D36]/[0.05] text-[#E71D36]"
-                      : "border-black/[0.06] text-[#1B2D45]/60 hover:text-[#1B2D45] hover:border-[#1B2D45]/15"
-                  }`}
-                  style={{ fontSize: "14px", fontWeight: 700 }}
-                  disabled={isSaving(item.id)}
-                >
-                  <Heart className={`w-4 h-4 ${isSaved(item.id) ? "fill-[#E71D36]" : ""}`} />
-                  {isSaved(item.id) ? "Saved" : "Save Item"}
-                </button>
+                {!isLandlord && (
+                  <>
+                    <button
+                      onClick={handleOpenMessage}
+                      className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
+                      style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}
+                    >
+                      <MessageCircle className="w-4.5 h-4.5" />
+                      Message
+                    </button>
+                    <button
+                      onClick={handleToggleSave}
+                      className={`flex items-center justify-center gap-2 py-3 rounded-xl border transition-all ${
+                        isSaved(item.id)
+                          ? "border-[#E71D36]/18 bg-[#E71D36]/[0.05] text-[#E71D36]"
+                          : "border-black/[0.06] text-[#1B2D45]/60 hover:text-[#1B2D45] hover:border-[#1B2D45]/15"
+                      }`}
+                      style={{ fontSize: "14px", fontWeight: 700 }}
+                      disabled={isSaving(item.id)}
+                    >
+                      <Heart className={`w-4 h-4 ${isSaved(item.id) ? "fill-[#E71D36]" : ""}`} />
+                      {isSaved(item.id) ? "Saved" : "Save Item"}
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={handleShare}
                   className="flex items-center justify-center gap-2 py-3 rounded-xl border border-black/[0.06] text-[#1B2D45]/60 hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all"
@@ -470,7 +461,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                         </span>
                         {simCategory && (
                           <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>
-                            {simCategory.emoji} {simCategory.label}
+                            {simCategory.label}
                           </span>
                         )}
                       </div>

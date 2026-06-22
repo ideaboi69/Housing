@@ -57,7 +57,7 @@ function ListingRow({ item, onMarkSold, onPublish, onUnpublish, onDelete, onEdit
           </div>
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             <span className="px-2 py-0.5 rounded-full" style={{ fontSize: "9px", fontWeight: 700, color: condition.color, background: `${condition.color}15` }}>{condition.label}</span>
-            {category && <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/[0.04] text-[#1B2D45]/40" style={{ fontSize: "9px", fontWeight: 600 }}>{category.emoji} {category.label}</span>}
+            {category && <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/[0.04] text-[#1B2D45]/40" style={{ fontSize: "9px", fontWeight: 600 }}>{category.label}</span>}
           </div>
           <div className="flex items-center gap-3 mt-2 text-[#1B2D45]/30" style={{ fontSize: "10px" }}>
             <span className="flex items-center gap-0.5"><Eye className="w-3 h-3" /> {item.view_count} views</span>

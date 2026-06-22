@@ -22,6 +22,7 @@ export enum LeaseType {
   TEN_MONTH = "10_month",
   TWELVE_MONTH = "12_month",
   FLEXIBLE = "flexible",
+  CUSTOM = "custom",
 }
 
 export enum GenderPreference {
@@ -249,8 +250,15 @@ export interface PropertyResponse {
   nearest_bus_route: string;
   amenities?: SpaceAmenities;
   policies?: ListingPolicies;
+  images?: PropertyImageResponse[];
   created_at: string;
   updated_at: string;
+}
+
+export interface PropertyImageResponse {
+  id: number;
+  image_url: string;
+  display_order: number;
 }
 
 export interface PropertyCreate {
@@ -296,6 +304,7 @@ export interface ListingResponse {
   per_room_pricing: boolean;
   rooms: ListingRoomResponse[];
   lease_type: string;
+  custom_lease_type?: string | null;
   move_in_date: string | null;
   has_flexible_move_in?: boolean;
   is_sublet: boolean;
@@ -303,6 +312,7 @@ export interface ListingResponse {
   sublet_end_date: string | null;
   gender_preference: string | null;
   status: string;
+  rejection_reason?: string | null;
   view_count: number;
   images?: ListingImageResponse[];
   created_at: string;
@@ -338,6 +348,7 @@ export interface ListingDetailResponse {
   per_room_pricing: boolean;
   rooms: ListingRoomResponse[];
   lease_type: string;
+  custom_lease_type?: string | null;
   move_in_date: string | null;
   has_flexible_move_in?: boolean;
   is_sublet: boolean;
@@ -345,6 +356,7 @@ export interface ListingDetailResponse {
   sublet_end_date: string | null;
   gender_preference: string | null;
   status: string;
+  rejection_reason?: string | null;
   view_count: number;
   created_at: string;
   updated_at: string;
@@ -400,6 +412,7 @@ export interface ListingCreate {
   per_room_pricing: boolean;
   rooms?: ListingRoomCreate[];
   lease_type: LeaseType;
+  custom_lease_type?: string;
   move_in_date?: string | null;
   has_flexible_move_in?: boolean;
   is_sublet?: boolean;
@@ -497,6 +510,7 @@ export interface SavedListingDetailResponse {
   rent_per_room: number;
   rent_total: number;
   lease_type: string;
+  custom_lease_type?: string | null;
   move_in_date: string | null;
   is_sublet: boolean;
   status: string;
@@ -1252,6 +1266,7 @@ export interface AdminStatsResponse {
   total_landlords: number;
   total_properties: number;
   total_listings: number;
+  listings_under_review: number;
   total_reviews: number;
   total_flags_pending: number;
 }
@@ -1289,6 +1304,7 @@ export interface AdminListingResponse {
   rent_per_room: number;
   rent_total: number;
   lease_type: string;
+  custom_lease_type?: string | null;
   status: string;
   is_sublet: boolean;
   created_at: string;

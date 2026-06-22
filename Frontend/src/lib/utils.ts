@@ -29,7 +29,8 @@ export function formatPrice(price: number): string {
   }).format(price);
 }
 
-export function formatLeaseType(type: string): string {
+export function formatLeaseType(type: string, custom?: string | null): string {
+  if (type === "custom") return custom || "Custom";
   const labels: Record<string, string> = {
     "8_month": "8-month",
     "10_month": "10-month",

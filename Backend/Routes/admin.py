@@ -9,11 +9,12 @@ from Schemas.subletSchema import SubletStatus
 from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse
-from helpers import require_admin, cascade_delete_landlord, get_account_or_404
+from Schemas.listingSchema import ListingStatus, ListingReject, ListingResponse
+from helpers import require_admin, cascade_delete_landlord, get_account_or_404, build_listing_response
 from Utils.security import hash_password, create_access_token, verify_password, validate_password
 from Utils.cloudinary import delete_image_from_cloudinary
-from Utils.email import send_approval_email, send_rejection_email, send_revoked_email, send_sublet_onboarding_email, send_sublet_expired_email, send_listing_expired_email
-from Schemas.listingSchema import ListingStatus
+from Utils.email import send_approval_email, send_rejection_email, send_revoked_email, send_sublet_onboarding_email, send_sublet_expired_email, send_listing_expired_email, send_listing_approved_email, send_listing_rejected_email
+from Utils.cache import invalidate
 from Utils.rate_limit import limiter
 from config import settings
 
@@ -101,6 +102,7 @@ def get_website_stats(db: Session = Depends(get_db), admin: User = Depends(requi
         total_landlords=db.query(Landlord).count(),
         total_properties=db.query(Property).count(),
         total_listings=db.query(Listing).count(),
+        listings_under_review=db.query(Listing).filter(Listing.status == ListingStatus.UNDER_REVIEW).count(),
         total_reviews=db.query(Review).count(),
         total_flags_pending=db.query(Flag).filter(Flag.status == FlagStatus.PENDING).count(),
         total_marketplace_items=db.query(MarketplaceItem).count(),
@@ -353,6 +355,63 @@ def list_all_listings(db: Session = Depends(get_db), admin: User = Depends(requi
             data.address = l.property.address
         results.append(data)
     return results
+
+# Listings awaiting admin review (UNDER_REVIEW). Defined before any dynamic path.
+@admin_router.get("/listings/pending", response_model=list[AdminListingResponse])
+def list_pending_listings(db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    listings = db.query(Listing).filter(Listing.status == ListingStatus.UNDER_REVIEW).order_by(Listing.created_at.asc()).all()
+    results = []
+    for l in listings:
+        data = AdminListingResponse.model_validate(l)
+        if l.property:
+            data.property_title = l.property.title
+            data.address = l.property.address
+        results.append(data)
+    return results
+
+# Approve a listing under review -> ACTIVE (notifies the landlord)
+@admin_router.patch("/listings/{listing_id}/approve", response_model=ListingResponse)
+def approve_listing(listing_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found")
+    if listing.status != ListingStatus.UNDER_REVIEW:
+        raise HTTPException(status_code=400, detail="Only listings under review can be approved")
+
+    listing.status = ListingStatus.ACTIVE
+    listing.rejection_reason = None
+    db.commit()
+    db.refresh(listing)
+    invalidate("listings:list")
+
+    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+    landlord = db.query(Landlord).filter(Landlord.id == prop.landlord_id).first() if prop else None
+    if landlord:
+        background_tasks.add_task(send_listing_approved_email, landlord.email, landlord.first_name, prop.title)
+
+    return build_listing_response(listing)
+
+# Reject a listing under review -> DRAFT with a reason (notifies the landlord)
+@admin_router.patch("/listings/{listing_id}/reject", response_model=ListingResponse)
+def reject_listing(listing_id: int, payload: ListingReject, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found")
+    if listing.status != ListingStatus.UNDER_REVIEW:
+        raise HTTPException(status_code=400, detail="Only listings under review can be rejected")
+
+    listing.status = ListingStatus.DRAFT
+    listing.rejection_reason = payload.reason
+    db.commit()
+    db.refresh(listing)
+    invalidate("listings:list")
+
+    prop = db.query(Property).filter(Property.id == listing.property_id).first()
+    landlord = db.query(Landlord).filter(Landlord.id == prop.landlord_id).first() if prop else None
+    if landlord:
+        background_tasks.add_task(send_listing_rejected_email, landlord.email, landlord.first_name, prop.title, payload.reason)
+
+    return build_listing_response(listing)
 
 @admin_router.delete("/listings/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_listing(listing_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):

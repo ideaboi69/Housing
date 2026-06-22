@@ -7,7 +7,7 @@ import {
   Camera, Check, Eye, EyeOff, Trash2, Moon, Sun, X, LogOut,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { toast } from "sonner";
 import { PhotoCropper } from "@/components/PhotoCropper";
 
@@ -152,20 +152,8 @@ function ProfileTab() {
       });
       useAuthStore.setState({ user: updatedUser });
       toast.success("Profile updated");
-    } catch {
-      useAuthStore.setState((state) => ({
-        user: state.user
-          ? {
-              ...state.user,
-              first_name: firstName,
-              last_name: lastName,
-              program: program.trim() || null,
-              year: year || null,
-              bio: bio.trim() || null,
-            }
-          : state.user,
-      }));
-      toast.success("Profile updated"); // Mock fallback for demo
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : "Couldn’t save your profile — please try again.");
     } finally {
       setSaving(false);
     }
@@ -482,8 +470,8 @@ function RoommateTab() {
       }
 
       toast.success("Roommate profile saved");
-    } catch {
-      toast.success("Roommate profile saved");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : "Couldn’t save your roommate profile — please try again.");
     } finally {
       setSaving(false);
     }
@@ -647,8 +635,8 @@ function NotificationsTab() {
         cribb_news_updates: emailMarketing,
       });
       toast.success("Notification preferences saved");
-    } catch {
-      toast.success("Notification preferences saved");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : "Couldn’t save your notification preferences — please try again.");
     } finally {
       setSaving(false);
     }

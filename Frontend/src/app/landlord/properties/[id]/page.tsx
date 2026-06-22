@@ -4,38 +4,22 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
+import { useBack } from "@/lib/use-back";
 import { api } from "@/lib/api";
-import type { PropertyResponse, ListingDetailResponse, HealthScoreResponse } from "@/types";
+import type { PropertyResponse, ListingDetailResponse, HealthScoreResponse, ConversationResponse } from "@/types";
 import { formatPrice, formatDate, formatPropertyType } from "@/lib/utils";
 import { getListingImages, getMockHealthScore, mockListings } from "@/lib/mock-data";
 import {
-  ArrowLeft, Plus, Eye, Trash2, Edit3, Home, Calendar,
-  MapPin, Loader2, AlertTriangle,
-  Building2, Camera, ChevronDown, Clock, DoorOpen,
+  ArrowLeft, Plus, Eye, Trash2, Edit3, Calendar, Camera,
+  MapPin, Loader2, AlertTriangle, ChevronDown, Maximize2,
 } from "lucide-react";
+import { PhotoLightbox } from "@/components/ui/PhotoLightbox";
 import { EditPropertyModal } from "@/components/landlord/EditPropertyModal";
-import { SmartBackLink } from "@/components/ui/SmartBackLink";
-import { LandlordPropertyDetailSkeleton } from "@/components/ui/Skeletons";
-import { EditListingModal } from "@/components/landlord/EditListingModal";
-import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
 import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
+import { ListingMessagesCard } from "@/components/landlord/ListingMessagesCard";
+import { getListingStatusBucket, getListingStatusLabel, getListingStatusTone, isToggleableStatus } from "@/lib/listing-status";
 
-type ListingStatusFilter = "all" | "active" | "draft" | "archived";
-
-function getListingStatusBucket(status: string): Exclude<ListingStatusFilter, "all"> {
-  const normalized = status.toLowerCase();
-  if (normalized === "active") return "active";
-  if (normalized === "draft" || normalized === "pending") return "draft";
-  return "archived";
-}
-
-function getListingStatusLabel(status: string) {
-  const normalized = status.toLowerCase();
-  if (normalized === "active") return "Active";
-  if (normalized === "pending") return "Draft";
-  if (normalized === "draft") return "Draft";
-  return status.charAt(0).toUpperCase() + status.slice(1);
-}
+type ListingStatusFilter = "all" | "active" | "review" | "draft" | "archived";
 
 function getMoveInLabel(listing: ListingDetailResponse) {
   return listing.has_flexible_move_in ? "Any move-in date" : `Move-in ${formatDate(listing.move_in_date)}`;
@@ -114,6 +98,7 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const { id } = use(params);
   const propertyId = Number(id);
   const router = useRouter();
+  const goBack = useBack("/landlord?tab=properties");
   const { user } = useAuthStore();
   const [property, setProperty] = useState<PropertyResponse | null>(null);
   const [listings, setListings] = useState<ListingDetailResponse[]>([]);
@@ -123,11 +108,25 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const [deletingProperty, setDeletingProperty] = useState(false);
   const [confirmDeleteProperty, setConfirmDeleteProperty] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editTab, setEditTab] = useState<"basics" | "photos">("basics");
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<ListingStatusFilter>("all");
-  const [editingListing, setEditingListing] = useState<ListingDetailResponse | null>(null);
-  const [photosListing, setPhotosListing] = useState<ListingDetailResponse | null>(null);
   const [togglingListing, setTogglingListing] = useState<number | null>(null);
-  
+  const [conversations, setConversations] = useState<ConversationResponse[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const convos = await api.messages.getLandlordConversations();
+        if (!cancelled) setConversations(convos);
+      } catch {
+        // No inbox to show — section falls back to an empty state.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     async function load() {
       try {
@@ -219,16 +218,13 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   async function toggleListingVisibility(listing: ListingDetailResponse) {
     if (togglingListing === listing.id) return;
 
-    const status = listing.status.toLowerCase();
     setTogglingListing(listing.id);
     try {
-      if (status === "active") {
+      // Active → take down (unpublish). Otherwise → publish live.
+      if (listing.status.toLowerCase() === "active") {
         await api.listings.unpublish(listing.id);
-      } else if (status === "draft" || status === "expired") {
-        await api.listings.publish(listing.id);
       } else {
-        window.alert("This listing can't be toggled right now.");
-        return;
+        await api.listings.publish(listing.id);
       }
       await refreshListing(listing.id);
     } catch (err) {
@@ -252,7 +248,11 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   if (!user || user.role !== "landlord") return null;
 
   if (isLoading) {
-    return <LandlordPropertyDetailSkeleton />;
+    return (
+      <div className="min-h-screen bg-[#FAF8F4] flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-[#1B2D45] animate-spin" />
+      </div>
+    );
   }
 
   if (!property) {
@@ -270,12 +270,14 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const counts = {
     all: listings.length,
     active: listings.filter((listing) => getListingStatusBucket(listing.status) === "active").length,
+    review: listings.filter((listing) => getListingStatusBucket(listing.status) === "review").length,
     draft: listings.filter((listing) => getListingStatusBucket(listing.status) === "draft").length,
     archived: listings.filter((listing) => getListingStatusBucket(listing.status) === "archived").length,
   };
   const filterLabels: Record<ListingStatusFilter, string> = {
     all: `All listings (${counts.all})`,
     active: `Active (${counts.active})`,
+    review: `Under review (${counts.review})`,
     draft: `Draft (${counts.draft})`,
     archived: `Archived (${counts.archived})`,
   };
@@ -284,108 +286,131 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   ));
   const activeListings = counts.active;
 
+  // Inquiries scoped to this property's listings
+  const listingIds = new Set(listings.map((listing) => listing.id));
+  const propertyConversations = conversations.filter((c) => listingIds.has(c.listing_id));
+
+  // Photos: real property images, else demo placeholders so the gallery is previewable.
+  const realImages = property.images && property.images.length > 0;
+  const coverImages = realImages
+    ? property.images!.map((img) => ({ key: String(img.id), url: img.image_url }))
+    : ["/demo/listings/house.jpg", "/demo/listings/townhouse.jpg", "/demo/listings/apartment.jpg", "/demo/listings/studio.jpg"].map((url, i) => ({ key: `demo-${i}`, url }));
+
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[1100px] mx-auto px-4 md:px-6 py-6 md:py-10">
-        <div className="mb-5 rounded-[20px] border border-[#1B2D45]/[0.06] bg-white p-4 shadow-[0_12px_30px_rgba(27,45,69,0.04)] md:p-5">
+        <div className="mb-8">
+          <button type="button" onClick={goBack} className="mb-5 inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 400 }}>
+            <ArrowLeft className="h-4 w-4" /> Back
+          </button>
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
-              <SmartBackLink
-                fallback="/landlord"
-                iconClassName="h-3.5 w-3.5"
-                className="mb-4 inline-flex items-center gap-1.5 text-[#1B2D45]/70 hover:text-[#1B2D45]"
-                style={{ fontSize: "12px", fontWeight: 700 }}
-              >
-                Back to Properties
-              </SmartBackLink>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-[#1B2D45]" style={{ fontSize: "clamp(24px,4vw,32px)", lineHeight: 1.1, fontWeight: 900 }}>{property.title}</h1>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", lineHeight: 1.15, fontWeight: 600 }}>{property.title}</h1>
                 {activeListings > 0 && (
-                  <span className="rounded-full bg-[#4ADE80]/10 px-2.5 py-1 text-[#239B55]" style={{ fontSize: "10px", fontWeight: 800 }}>
+                  <span className="rounded-full bg-[#239B55]/10 px-2 py-0.5 text-[#239B55]" style={{ fontSize: "11px", fontWeight: 500 }}>
                     {activeListings} active
                   </span>
                 )}
               </div>
-              <p className="mt-2 flex items-center gap-1.5 text-[#1B2D45]/70" style={{ fontSize: "12px", fontWeight: 600 }}>
-                <MapPin className="h-3.5 w-3.5 shrink-0" /> {property.address}
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[#1B2D45]/75" style={{ fontSize: "14px", fontWeight: 500 }}>
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 shrink-0 text-[#1B2D45]/45" />
+                  {property.address}
+                </span>
+                <span className="text-[#1B2D45]/30">·</span>
+                <span>{formatPropertyType(property.property_type)} · {property.total_rooms} bed · {property.bathrooms} bath</span>
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex shrink-0 flex-wrap gap-2">
               <button
                 onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B2D45] px-3.5 py-2.5 text-white transition-all hover:bg-[#152438]"
-                style={{ fontSize: "12px", fontWeight: 800 }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#1B2D45] px-3.5 py-2 text-white transition-colors hover:bg-[#152438]"
+                style={{ fontSize: "13px", fontWeight: 600 }}
               >
-                <Edit3 className="h-3.5 w-3.5" /> Edit Property
+                <Edit3 className="h-3.5 w-3.5" /> Edit property
               </button>
               <Link
                 href={`/landlord/properties/${propertyId}/listings/new`}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#1B2D45]/10 px-3.5 py-2.5 text-[#1B2D45]/65 transition-all hover:border-[#1B2D45]/20 hover:text-[#1B2D45]"
-                style={{ fontSize: "12px", fontWeight: 800 }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#1B2D45]/12 px-3.5 py-2 text-[#1B2D45]/70 transition-colors hover:border-[#1B2D45]/25 hover:text-[#1B2D45]"
+                style={{ fontSize: "13px", fontWeight: 600 }}
               >
-                <Plus className="h-3.5 w-3.5" /> Add Listing
-              </Link>
-              <Link
-                href="/landlord?tab=messages"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#1B2D45]/10 px-3.5 py-2.5 text-[#1B2D45]/65 transition-all hover:border-[#1B2D45]/20 hover:text-[#1B2D45]"
-                style={{ fontSize: "12px", fontWeight: 800 }}
-              >
-                Messages
+                <Plus className="h-3.5 w-3.5" /> Add listing
               </Link>
             </div>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {[
-              { label: "Property Details", value: `${property.total_rooms} bed · ${property.bathrooms} bath`, sub: formatPropertyType(property.property_type), icon: Home, tone: "#1B2D45" },
-              { label: "Active Listings", value: String(counts.active), sub: `${counts.all} total listing${counts.all === 1 ? "" : "s"}`, icon: Building2, tone: "#2EC4B6" },
-              { label: "Draft Listings", value: String(counts.draft), sub: "Not currently visible", icon: Clock, tone: "#1B2D45" },
-            ].map((card) => {
-              const Icon = card.icon;
-              return (
-                <div key={card.label} className="rounded-xl border border-[#1B2D45]/[0.07] bg-[#FCFBF8] p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${card.tone}12`, color: card.tone }}>
-                      <Icon className="h-4 w-4" />
-                    </div>
-                      <div className="min-w-0">
-                      <div className="text-[#1B2D45]/65" style={{ fontSize: "10px", fontWeight: 900 }}>{card.label}</div>
-                      <div className="mt-1 truncate text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 900 }}>{card.value}</div>
-                      <div className="mt-0.5 truncate text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 750 }}>{card.sub}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
 
-        <section className="overflow-hidden rounded-[20px] border border-[#1B2D45]/[0.06] bg-white shadow-[0_12px_30px_rgba(27,45,69,0.04)]">
-          <div className="border-b border-black/[0.04] px-4 py-4 md:px-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 900 }}>Listings in this Property</h2>
-                <p className="mt-1 text-[#1B2D45]/62" style={{ fontSize: "12px", lineHeight: 1.5, fontWeight: 650 }}>
-                  Toggle rooms or units live, review status, and manage listing details from one place.
-                </p>
-              </div>
-              <label className="flex min-w-[220px] flex-col gap-1.5">
-                <span className="text-[#1B2D45]/70" style={{ fontSize: "10px", fontWeight: 900, letterSpacing: "0.08em" }}>STATUS</span>
-                <span className="relative">
-                  <select
-                    value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value as ListingStatusFilter)}
-                    className="h-10 w-full appearance-none rounded-xl border border-[#1B2D45]/12 bg-[#F7F9FC] px-3 pr-9 text-[#1B2D45] outline-none transition-all hover:border-[#1B2D45]/25 focus:border-[#1B2D45]/40 focus:bg-white"
-                    style={{ fontSize: "12px", fontWeight: 850 }}
-                  >
-                    {(Object.keys(filterLabels) as ListingStatusFilter[]).map((key) => (
-                      <option key={key} value={key}>{filterLabels[key]}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1B2D45]/55" />
+        <section className="mb-5 rounded-2xl border border-[#1B2D45]/[0.08] bg-white p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Photos</h2>
+            <button
+              type="button"
+              onClick={() => { setEditTab("photos"); setEditing(true); }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#1B2D45]/12 px-3 py-1.5 text-[#1B2D45]/70 transition-colors hover:border-[#1B2D45]/25 hover:text-[#1B2D45]"
+              style={{ fontSize: "13px", fontWeight: 500 }}
+            >
+              <Camera className="h-3.5 w-3.5" /> Manage photos
+            </button>
+          </div>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setLightboxIndex(0)}
+              className="group relative block h-44 w-full cursor-zoom-in overflow-hidden rounded-xl bg-[#FAF8F4] sm:h-52"
+            >
+              <img src={coverImages[0].url} alt="Property cover" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]" />
+              <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
+              {!realImages && (
+                <span className="absolute left-2 top-2 rounded-md bg-black/55 px-2 py-0.5 text-white" style={{ fontSize: "10px", fontWeight: 500 }}>
+                  Sample photos
                 </span>
-              </label>
-            </div>
+              )}
+              <span className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-white opacity-0 transition-opacity group-hover:opacity-100" style={{ fontSize: "11px", fontWeight: 500 }}>
+                <Maximize2 className="h-3 w-3" /> View {coverImages.length} photo{coverImages.length === 1 ? "" : "s"}
+              </span>
+            </button>
+            {coverImages.length > 1 && (
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                {coverImages.slice(1).map((img, i) => (
+                  <button
+                    key={img.key}
+                    type="button"
+                    onClick={() => setLightboxIndex(i + 1)}
+                    className="aspect-square cursor-zoom-in overflow-hidden rounded-lg bg-[#FAF8F4] transition-opacity hover:opacity-90"
+                  >
+                    <img src={img.url} alt="" className="h-full w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {!realImages && (
+              <p className="pt-1 text-[#1B2D45]/40" style={{ fontSize: "12px" }}>
+                These are sample photos — add your own with “Manage photos”.
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-[#1B2D45]/[0.08] bg-white p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Listings</h2>
+            <label className="flex min-w-[200px] flex-col gap-1.5">
+              <span className="text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 500 }}>Status</span>
+              <span className="relative">
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value as ListingStatusFilter)}
+                  className="h-9 w-full appearance-none rounded-lg border border-[#1B2D45]/12 bg-transparent px-3 pr-9 text-[#1B2D45] outline-none transition-colors hover:border-[#1B2D45]/25 focus:border-[#1B2D45]/40"
+                  style={{ fontSize: "13px", fontWeight: 400 }}
+                >
+                  {(Object.keys(filterLabels) as ListingStatusFilter[]).map((key) => (
+                    <option key={key} value={key}>{filterLabels[key]}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1B2D45]/55" />
+              </span>
+            </label>
           </div>
 
           {listings.length === 0 ? (
@@ -412,38 +437,32 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           ) : (
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[780px] table-fixed">
-                  <thead className="bg-[#F3F6FA]">
-                    <tr className="text-left text-[#1B2D45]/75" style={{ fontSize: "10px", fontWeight: 950 }}>
-                      <th className="w-[22%] px-4 py-3">LISTING / ROOM</th>
-                      <th className="w-[16%] px-4 py-3">TYPE</th>
-                      <th className="w-[15%] px-4 py-3">RENT</th>
-                      <th className="w-[15%] px-4 py-3">STATUS</th>
-                      <th className="w-[16%] px-4 py-3">ON / OFF LIST</th>
-                      <th className="w-[16%] px-4 py-3 text-right">ACTIONS</th>
+                  <thead>
+                    <tr className="border-y border-[#1B2D45]/[0.08] text-left text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 500 }}>
+                      <th className="w-[22%] px-4 py-2.5">Listing / room</th>
+                      <th className="w-[16%] px-4 py-2.5">Type</th>
+                      <th className="w-[15%] px-4 py-2.5">Rent</th>
+                      <th className="w-[15%] px-4 py-2.5">Status</th>
+                      <th className="w-[16%] px-4 py-2.5">On / off</th>
+                      <th className="w-[16%] px-4 py-2.5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-black/[0.04]">
+                  <tbody className="divide-y divide-[#1B2D45]/[0.05]">
                     {filteredListings.map((listing, index) => {
-                      const statusBucket = getListingStatusBucket(listing.status);
-                      const rawStatus = listing.status.toLowerCase();
-                      const isActive = rawStatus === "active";
-                      const isToggleable = rawStatus === "active" || rawStatus === "draft" || rawStatus === "expired";
+                      const isActive = listing.status.toLowerCase() === "active";
+                      const isToggleable = isToggleableStatus(listing.status);
                       return (
-                        <tr key={listing.id} className="transition-colors hover:bg-[#F7F9FC]">
+                        <tr key={listing.id} className="transition-colors hover:bg-[#1B2D45]/[0.02]">
                           <td className="px-4 py-3">
-                            <div className="text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 850 }}>{getListingRowLabel(listing, index)}</div>
-                            <div className="mt-0.5 text-[#1B2D45]/58" style={{ fontSize: "10px", fontWeight: 750 }}>{getMoveInLabel(listing)}</div>
+                            <Link href={`/landlord/properties/${propertyId}/listings/${listing.id}`} className="block text-[#1B2D45] hover:underline" style={{ fontSize: "13px", fontWeight: 500 }}>
+                              {getListingRowLabel(listing, index)}
+                            </Link>
+                            <div className="mt-0.5 text-[#1B2D45]/45" style={{ fontSize: "11px" }}>{getMoveInLabel(listing)}</div>
                           </td>
-                          <td className="px-4 py-3 text-[#1B2D45]/78" style={{ fontSize: "11px", fontWeight: 800 }}>{getListingTypeLabel(listing)}</td>
-                          <td className="px-4 py-3 text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 850 }}>{formatPrice(Number(listing.rent_per_room))}</td>
+                          <td className="px-4 py-3 text-[#1B2D45]/65" style={{ fontSize: "12px" }}>{getListingTypeLabel(listing)}</td>
+                          <td className="px-4 py-3 text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{formatPrice(Number(listing.rent_per_room))}</td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex rounded-full px-2.5 py-1 ${
-                              statusBucket === "active"
-                                ? "bg-[#4ADE80]/10 text-[#239B55]"
-                                : statusBucket === "draft"
-                                  ? "bg-[#E9EEF7] text-[#1B2D45]"
-                                  : "bg-[#1B2D45]/[0.06] text-[#1B2D45]/70"
-                            }`} style={{ fontSize: "10px", fontWeight: 850 }}>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 ${getListingStatusTone(listing.status)}`} style={{ fontSize: "11px", fontWeight: 500 }}>
                               {getListingStatusLabel(listing.status)}
                             </span>
                           </td>
@@ -457,12 +476,9 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center justify-end gap-1.5">
-                              <button type="button" onClick={() => setEditingListing(listing)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]" title="Edit listing">
-                                <Edit3 className="h-3.5 w-3.5" />
-                              </button>
-                              <button type="button" onClick={() => setPhotosListing(listing)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]" title="Manage photos">
-                                <Camera className="h-3.5 w-3.5" />
-                              </button>
+                              <Link href={`/landlord/properties/${propertyId}/listings/${listing.id}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#1B2D45]/12 px-2.5 text-[#1B2D45]/80 transition-all hover:border-[#1B2D45]/25 hover:text-[#1B2D45]" style={{ fontSize: "11px", fontWeight: 800 }} title="Manage listing">
+                                <Edit3 className="h-3.5 w-3.5" /> Manage
+                              </Link>
                               <Link href={`/browse/${listing.id}`} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#1B2D45]/70 transition-all hover:bg-[#1B2D45]/[0.06] hover:text-[#1B2D45]" title="Preview listing">
                                 <Eye className="h-3.5 w-3.5" />
                               </Link>
@@ -480,6 +496,11 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           )}
 
         </section>
+
+        {/* Messages & Inquiries — shared inline section, consistent across detail pages */}
+        <div className="mt-5 rounded-2xl border border-[#1B2D45]/[0.08] bg-white p-5">
+          <ListingMessagesCard conversations={propertyConversations} />
+        </div>
 
         {/* Danger zone */}
         <div className="mt-10 pt-6 border-t border-black/[0.06]">
@@ -517,28 +538,16 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
       {editing && property && (
         <EditPropertyModal
           property={property}
-          onClose={() => setEditing(false)}
+          initialTab={editTab}
+          onClose={() => { setEditing(false); setEditTab("basics"); }}
           onSaved={(updated) => setProperty(updated)}
         />
       )}
-      {editingListing && (
-        <EditListingModal
-          listing={editingListing}
-          onClose={() => setEditingListing(null)}
-          onSaved={(updated) => {
-            setListings((prev) => prev.map((listing) => (
-              listing.id === updated.id ? { ...listing, ...updated } : listing
-            )));
-            setEditingListing(null);
-          }}
-        />
-      )}
-      {photosListing && (
-        <ListingImageUpload
-          listingId={photosListing.id}
-          existingImages={photosListing.images}
-          onClose={() => setPhotosListing(null)}
-          onUploaded={() => void refreshListing(photosListing.id)}
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          images={coverImages.map((img) => img.url)}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
         />
       )}
     </div>

@@ -2,12 +2,13 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
+import { useBack } from "@/lib/use-back";
 import { api } from "@/lib/api";
 import type { PetPolicy, SmokingPolicy } from "@/types";
 import { PropertyType } from "@/types";
-import { ArrowLeft, MapPin, Home, Check } from "lucide-react";
+import { formatPropertyType } from "@/lib/utils";
+import { ArrowLeft, MapPin, Home, Check, X, Loader2 } from "lucide-react";
 
 const propertyTypes = [
   { value: PropertyType.HOUSE, label: "House", emoji: "🏠" },
@@ -32,8 +33,10 @@ const SMOKING_POLICY_OPTIONS: { value: SmokingPolicy; label: string }[] = [
 
 function NewPropertyPageContent() {
   const router = useRouter();
+  const goBack = useBack("/landlord?tab=properties");
   const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
@@ -69,13 +72,22 @@ function NewPropertyPageContent() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function validate(): boolean {
     if (!form.title || !form.address || !form.postal_code || !form.drive_time_minutes) {
       setError("Title, address, postal code, and drive time are required");
-      return;
+      return false;
     }
+    setError("");
+    return true;
+  }
 
+  function handleReview(e: React.FormEvent) {
+    e.preventDefault();
+    if (validate()) setShowPreview(true);
+  }
+
+  async function handleSubmit() {
+    if (!validate()) { setShowPreview(false); return; }
     setIsSubmitting(true);
     setError("");
 
@@ -124,21 +136,22 @@ function NewPropertyPageContent() {
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[640px] mx-auto px-4 md:px-6 py-6 md:py-10">
-        <Link
-          href="/landlord"
+        <button
+          type="button"
+          onClick={goBack}
           className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-6"
           style={{ fontSize: "13px", fontWeight: 500 }}
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Dashboard
-        </Link>
+          Back
+        </button>
 
         <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 800 }}>Add a Property</h1>
         <p className="text-[#1B2D45]/40 mt-1 mb-6" style={{ fontSize: "14px" }}>
           Enter your property details. You&apos;ll create a listing for it in the next step.
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleReview} className="space-y-6">
           {/* Basic Info */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
@@ -425,24 +438,82 @@ function NewPropertyPageContent() {
           )}
 
           <div className="flex items-center gap-3 pt-2">
-            <Link
-              href="/landlord"
+            <button
+              type="button"
+              onClick={goBack}
               className="px-6 py-3 rounded-xl border border-black/[0.08] text-[#1B2D45]/60 hover:bg-black/[0.02] transition-all"
               style={{ fontSize: "14px", fontWeight: 500 }}
             >
               Cancel
-            </Link>
+            </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="flex-1 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-60 transition-all"
-              style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}
+              className="flex-1 py-3 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] transition-all"
+              style={{ fontSize: "15px", fontWeight: 700 }}
             >
-              {isSubmitting ? "Creating..." : "Create Property & Add Listing →"}
+              Review &amp; continue →
             </button>
           </div>
         </form>
       </div>
+
+      {showPreview && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ backgroundColor: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) setShowPreview(false); }}>
+          <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white sm:max-w-[520px] sm:rounded-2xl" style={{ boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+            <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4">
+              <div>
+                <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Review property</h3>
+                <p className="text-[#1B2D45]/50" style={{ fontSize: "12px" }}>Check the details, then add a listing next.</p>
+              </div>
+              <button type="button" onClick={() => !isSubmitting && setShowPreview(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-[#1B2D45]/40 hover:bg-black/5 hover:text-[#1B2D45]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <dl className="divide-y divide-black/[0.05]">
+                {[
+                  { label: "Name", value: form.title || "—" },
+                  { label: "Address", value: [form.address, form.postal_code].filter(Boolean).join(", ") || "—" },
+                  { label: "Type", value: formatPropertyType(form.property_type) },
+                  { label: "Layout", value: `${form.total_rooms} bed · ${form.bathrooms} bath` },
+                  { label: "To campus", value: form.distance_to_campus_km ? `${form.distance_to_campus_km} km · ${form.drive_time_minutes} min drive` : `${form.drive_time_minutes} min drive` },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-4 py-2.5">
+                    <dt className="text-[#1B2D45]/50" style={{ fontSize: "13px" }}>{row.label}</dt>
+                    <dd className="text-right text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {(() => {
+                const amenities = [
+                  form.is_furnished && "Furnished", form.has_parking && "Parking", form.has_laundry && "Laundry",
+                  form.utilities_included && "Utilities", form.has_wifi && "WiFi", form.has_air_conditioning && "A/C",
+                  form.has_dishwasher && "Dishwasher", form.has_gym && "Gym", form.has_elevator && "Elevator",
+                  form.has_backyard && "Backyard", form.has_balcony && "Balcony", form.wheelchair_accessible && "Accessible",
+                ].filter(Boolean) as string[];
+                return amenities.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {amenities.map((a) => (
+                      <span key={a} className="rounded-full bg-[#1B2D45]/[0.06] px-2.5 py-1 text-[#1B2D45]/70" style={{ fontSize: "11px", fontWeight: 500 }}>{a}</span>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+              {error && <p className="mt-3 text-[#E71D36]" style={{ fontSize: "12px" }}>{error}</p>}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-black/[0.06] px-5 py-4">
+              <button type="button" onClick={() => setShowPreview(false)} disabled={isSubmitting} className="rounded-lg border border-[#1B2D45]/12 px-4 py-2 text-[#1B2D45]/70 transition-colors hover:border-[#1B2D45]/25 disabled:opacity-50" style={{ fontSize: "13px", fontWeight: 600 }}>
+                Back to edit
+              </button>
+              <button type="button" onClick={() => void handleSubmit()} disabled={isSubmitting} className="inline-flex items-center gap-1.5 rounded-lg bg-[#1B2D45] px-4 py-2 text-white transition-colors hover:bg-[#152438] disabled:opacity-50" style={{ fontSize: "13px", fontWeight: 600 }}>
+                {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {isSubmitting ? "Creating…" : "Create & add listing"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

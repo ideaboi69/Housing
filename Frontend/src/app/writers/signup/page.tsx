@@ -37,6 +37,7 @@ export default function WriterSignupPage() {
     phone: "",
     reason: "",
   });
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [step, setStep] = useState<WriterSignupStep>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -51,11 +52,13 @@ export default function WriterSignupPage() {
     return () => clearInterval(interval);
   }, []);
 
+  const passwordsMatch = form.password.length > 0 && form.password === confirmPassword;
   const canContinue =
     form.first_name.trim() &&
     form.last_name.trim() &&
     form.email.trim() &&
-    form.password.trim();
+    form.password.trim() &&
+    passwordsMatch;
 
   const canSubmit = canContinue && form.business_name.trim() && form.reason.trim();
 
@@ -360,6 +363,24 @@ export default function WriterSignupPage() {
                                 style={{ fontSize: "14px", fontWeight: 500 }}
                               />
                             </div>
+
+                            <div className="mt-4">
+                              <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                                Confirm password
+                              </label>
+                              <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="Re-enter your password"
+                                required
+                                className="mt-2 w-full rounded-2xl border border-[#FF6B35]/10 bg-[#FAFBFA] px-4 py-3.5 text-[#1B2D45] transition-all placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/25 focus:bg-white focus:outline-none"
+                                style={{ fontSize: "14px", fontWeight: 500 }}
+                              />
+                              {confirmPassword.length > 0 && !passwordsMatch && (
+                                <p className="mt-1.5 text-[#E71D36]" style={{ fontSize: "12px" }}>Passwords don&apos;t match</p>
+                              )}
+                            </div>
                           </div>
 
                           {error && (
@@ -520,7 +541,7 @@ export default function WriterSignupPage() {
 
                             <button
                               type="submit"
-                              disabled={isLoading || !canSubmit || !turnstileToken}
+                              disabled={isLoading || !canSubmit || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
                               className="rounded-2xl bg-[#FF6B35] px-4 py-3.5 text-white transition-all hover:bg-[#e55e2e] disabled:opacity-60 disabled:cursor-not-allowed"
                               style={{ fontSize: "15px", fontWeight: 800, boxShadow: "0 10px 24px rgba(255,107,53,0.24)" }}
                             >

@@ -11,6 +11,8 @@ import { DetailPageSkeleton } from "@/components/ui/Skeletons";
 import { getScoreColor } from "@/lib/utils";
 import { getAmenityChecklist } from "@/lib/amenities";
 import { getMockSublet } from "@/lib/mock-sublets";
+import { isSampleSublet } from "@/lib/sample-data";
+import { SampleNote } from "@/components/ui/SampleBadge";
 import { getMockReviews } from "@/lib/mock-data";
 import { useSavedStore } from "@/lib/saved-store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -251,6 +253,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   const tenantChecked = useRef(false);
 
   const user = useAuthStore((s) => s.user);
+  const isLandlord = user?.role === "landlord";
 
   // Mock IDs (s1, s2, ...) render synchronously above. Numeric IDs hydrate from the
   // backend — safe now that GET /api/sublets/{id} is N+1-free and responds quickly.
@@ -489,6 +492,8 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 {score > 0 && <div className="shrink-0 text-center"><ScoreRing score={score} size={56} /><p className="mt-1" style={{ fontSize: "9px", fontWeight: 700, color: scoreColor }}>{getScoreLabel(score)}</p></div>}
               </div>
 
+              {isSampleSublet(id) && <SampleNote className="mt-4" />}
+
               {/* Savings */}
               <motion.div className="mt-4 rounded-xl p-3 flex items-center gap-3" style={{ background: "linear-gradient(135deg, rgba(46,196,182,0.08), rgba(46,196,182,0.03))", border: "1px solid rgba(46,196,182,0.15)" }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                 <div className="w-10 h-10 rounded-xl bg-[#2EC4B6]/15 flex items-center justify-center shrink-0"><Tag className="w-5 h-5 text-[#2EC4B6]" /></div>
@@ -677,20 +682,34 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
 
               <div className="mt-4 flex items-center gap-2 text-[#1B2D45]/50"><Calendar className="w-3.5 h-3.5 text-[#FF6B35]/50" /><span style={{ fontSize: "12px" }}>{formatDateRange(sublet.subletStart, sublet.subletEnd)}</span></div>
 
-              {/* Message */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleMessage} disabled={messageSending || messageSent}
-                className="relative w-full mt-5 py-3 rounded-xl bg-[#FF6B35] text-white overflow-hidden hover:bg-[#e55e2e] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
-                style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
-                {messageSent ? <><Check className="w-4 h-4" /> Message Sent</> : messageSending ? "Sending..." : <><MessageCircle className="w-4 h-4" /> Message {sublet.posterName}</>}
-              </motion.button>
+              {isLandlord ? (
+                <div className="mt-5 rounded-xl border border-[#1B2D45]/10 bg-[#1B2D45]/[0.03] px-4 py-3.5 text-center">
+                  <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>You&apos;re viewing as a landlord</p>
+                  <p className="mt-1 text-[#1B2D45]/55" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                    Messaging and saving sublets are student features.
+                  </p>
+                  <Link href="/landlord" className="mt-2 inline-block text-[#1B2D45] underline" style={{ fontSize: "12px", fontWeight: 600 }}>
+                    Back to your dashboard
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {/* Message */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={handleMessage} disabled={messageSending || messageSent}
+                    className="relative w-full mt-5 py-3 rounded-xl bg-[#FF6B35] text-white overflow-hidden hover:bg-[#e55e2e] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                    style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
+                    {messageSent ? <><Check className="w-4 h-4" /> Message Sent</> : messageSending ? "Sending..." : <><MessageCircle className="w-4 h-4" /> Message {sublet.posterName}</>}
+                  </motion.button>
 
-              {/* Save */}
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave}
-                disabled={storeToggling}
-                className={`w-full mt-2 py-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${isSaved ? "border-[#E71D36]/20 bg-[#E71D36]/[0.04] text-[#E71D36]" : "border-black/[0.06] text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.03]"}`}
-                style={{ fontSize: "14px", fontWeight: 500 }}>
-                <Heart className={`w-4 h-4 ${isSaved ? "fill-[#E71D36]" : ""}`} /> {isSaved ? "Saved" : "Save Sublet"}
-              </motion.button>
+                  {/* Save */}
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={handleToggleSave}
+                    disabled={storeToggling}
+                    className={`w-full mt-2 py-3 rounded-xl border transition-all flex items-center justify-center gap-2 ${isSaved ? "border-[#E71D36]/20 bg-[#E71D36]/[0.04] text-[#E71D36]" : "border-black/[0.06] text-[#1B2D45]/60 hover:bg-[#1B2D45]/[0.03]"}`}
+                    style={{ fontSize: "14px", fontWeight: 500 }}>
+                    <Heart className={`w-4 h-4 ${isSaved ? "fill-[#E71D36]" : ""}`} /> {isSaved ? "Saved" : "Save Sublet"}
+                  </motion.button>
+                </>
+              )}
 
               {/* Share + Report */}
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">

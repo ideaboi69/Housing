@@ -1,28 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { X, Loader2, AlertCircle, Home, Sparkles, MapPin, Check } from "lucide-react";
+import { X, Loader2, AlertCircle, Home, Sparkles, MapPin, Check, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
 import { PropertyType } from "@/types";
 import type { PetPolicy, SmokingPolicy } from "@/types";
-import type { PropertyResponse } from "@/types";
+import type { PropertyResponse, PropertyImageResponse } from "@/types";
+import { PropertyImageManager } from "@/components/landlord/PropertyImageManager";
 
 const PET_POLICIES: PetPolicy[] = ["allowed", "not_allowed", "case_by_case", "unknown"];
 const SMOKING_POLICIES: SmokingPolicy[] = ["allowed", "not_allowed", "outside_only", "unknown"];
+
+type Tab = "basics" | "amenities" | "location" | "photos";
 
 interface EditPropertyModalProps {
   property: PropertyResponse;
   onClose: () => void;
   onSaved: (updated: PropertyResponse) => void;
+  initialTab?: Tab;
 }
 
-type Tab = "basics" | "amenities" | "location";
-
-export function EditPropertyModal({ property, onClose, onSaved }: EditPropertyModalProps) {
-  const [tab, setTab] = useState<Tab>("basics");
+export function EditPropertyModal({ property, onClose, onSaved, initialTab = "basics" }: EditPropertyModalProps) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [images, setImages] = useState<PropertyImageResponse[]>(property.images ?? []);
 
   // Basics
   const [title, setTitle] = useState(property.title);
@@ -105,6 +108,7 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
     { id: "basics", label: "Basics", icon: <Home className="w-3.5 h-3.5" /> },
     { id: "amenities", label: "Amenities", icon: <Sparkles className="w-3.5 h-3.5" /> },
     { id: "location", label: "Location", icon: <MapPin className="w-3.5 h-3.5" /> },
+    { id: "photos", label: "Photos", icon: <ImageIcon className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -358,6 +362,22 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
                 />
               </Field>
             </div>
+          )}
+
+          {tab === "photos" && (
+            <Field label="Property photos">
+              <PropertyImageManager
+                propertyId={property.id}
+                initialImages={images}
+                onChanged={(next) => {
+                  // Photos persist immediately on the server. Keep both the modal and
+                  // the parent property in sync so changes survive even if the landlord
+                  // closes without clicking "Save changes".
+                  setImages(next);
+                  onSaved({ ...property, images: next });
+                }}
+              />
+            </Field>
           )}
         </div>
 

@@ -79,6 +79,17 @@ class PropertyUpdate(BaseModel):
     bus_time_minutes: Optional[int] = None
     nearest_bus_route: Optional[str] = None
 
+class PropertyImageResponse(BaseModel):
+    id: int
+    image_url: str
+    display_order: int
+
+    class Config:
+        from_attributes = True
+
+class PropertyImageReorder(BaseModel):
+    image_ids: list[int]
+
 # Response
 class PropertyResponse(BaseModel):
     id: int
@@ -113,6 +124,7 @@ class PropertyResponse(BaseModel):
     nearest_bus_route: Optional[str] = None
     amenities: SpaceAmenities
     policies: ListingPolicies
+    images: list[PropertyImageResponse] = []
     created_at: datetime
     updated_at: datetime
 

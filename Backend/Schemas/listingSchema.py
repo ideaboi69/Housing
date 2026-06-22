@@ -11,6 +11,7 @@ class LeaseType(str, enum.Enum):
     TEN_MONTH = "10_month"
     TWELVE_MONTH = "12_month"
     FLEXIBLE = "flexible"
+    CUSTOM = "custom"
 
 class GenderPreference(str, enum.Enum):
     ANY = "any"
@@ -20,6 +21,7 @@ class GenderPreference(str, enum.Enum):
 
 class ListingStatus(str, enum.Enum):
     DRAFT = "draft"
+    UNDER_REVIEW = "under_review"
     ACTIVE = "active"
     RENTED = "rented"
     EXPIRED = "expired"
@@ -37,6 +39,7 @@ class ListingCreate(BaseModel):
     per_room_pricing: bool = False
     rooms: Optional[list[ListingRoomCreate]] = None
     lease_type: LeaseType
+    custom_lease_type: Optional[str] = None
     move_in_date: Optional[date] = None
     has_flexible_move_in: bool = False
     is_sublet: bool = False
@@ -54,6 +57,7 @@ class ListingUpdate(BaseModel):
     rent_per_room: Optional[Decimal] = None
     rent_total: Optional[Decimal] = None
     lease_type: Optional[str] = None
+    custom_lease_type: Optional[str] = None
     move_in_date: Optional[date] = None
     has_flexible_move_in: Optional[bool] = None
     is_sublet: Optional[bool] = None
@@ -66,6 +70,9 @@ class SubletConvert(BaseModel):
     sublet_start_date: date
     sublet_end_date: date
     gender_preference: Optional[str] = None
+
+class ListingReject(BaseModel):
+    reason: str
 
 # Response
 class ListingImageResponse(BaseModel):
@@ -99,6 +106,7 @@ class ListingResponse(BaseModel):
     per_room_pricing: bool
     rooms: list[ListingRoomResponse] = []
     lease_type: str
+    custom_lease_type: Optional[str] = None
     move_in_date: Optional[date] = None
     has_flexible_move_in: bool = False
     is_sublet: bool
@@ -106,6 +114,7 @@ class ListingResponse(BaseModel):
     sublet_end_date: Optional[date] = None
     gender_preference: Optional[str] = None
     status: str
+    rejection_reason: Optional[str] = None
     view_count: int
     images: list[ListingImageResponse] = []
     created_at: datetime
@@ -124,6 +133,7 @@ class ListingDetailResponse(BaseModel):
     per_room_pricing: bool
     rooms: list[ListingRoomResponse] = []
     lease_type: str
+    custom_lease_type: Optional[str] = None
     move_in_date: Optional[date] = None
     has_flexible_move_in: bool = False
     is_sublet: bool
@@ -131,6 +141,7 @@ class ListingDetailResponse(BaseModel):
     sublet_end_date: Optional[date] = None
     gender_preference: Optional[str] = None
     status: str
+    rejection_reason: Optional[str] = None
     view_count: int
     images: list[ListingImageResponse] = []
     created_at: datetime

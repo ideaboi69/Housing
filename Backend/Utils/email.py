@@ -1100,3 +1100,103 @@ def send_sublet_expired_email(to_email: str, first_name: str, sublet_title: str)
         "subject": f"Your sublet \"{sublet_title}\" was expired — FindYourCribb",
         "html": html_content,
     })
+
+
+def _listing_decision_email(to_email: str, name: str, listing_title: str, *, approved: bool, reason: str = None):
+    """Shared template for listing approval / rejection notifications to landlords."""
+    if approved:
+        badge_bg, badge_color, badge_text = "#dcfce7", "#166534", "Approved"
+        heading = f"Your listing is live, {name}!"
+        message = f"\"{listing_title}\" passed review and is now active and visible to students on Cribb."
+        cta_text = "View in Dashboard"
+    else:
+        badge_bg, badge_color, badge_text = "#fee2e2", "#991b1b", "Changes needed"
+        heading = f"Your listing needs a few changes, {name}"
+        message = f"\"{listing_title}\" wasn't approved yet. It's back in your drafts — update it and resubmit for review."
+        cta_text = "Edit Listing"
+
+    cta_url = f"{settings.FRONTEND_URL}/landlord?tab=listings"
+    reason_block = ""
+    if not approved and reason:
+        reason_block = f"""
+                                <div style="margin: 0 0 24px; padding: 14px 18px; background-color: #fef2f2; border-radius: 8px; border: 1px solid #fecaca;">
+                                    <p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.6;"><strong>Reviewer note:</strong> {reason}</p>
+                                </div>"""
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <tr>
+                            <td style="background-color: #F58259; padding: 24px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 24px;">
+                                    <span style="display: inline-block; background-color: {badge_bg}; color: {badge_color}; font-size: 14px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">
+                                        {badge_text}
+                                    </span>
+                                </div>
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    {heading}
+                                </h2>
+                                <p style="margin: 0 0 24px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    {message}
+                                </p>
+                                {reason_block}
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                    <tr>
+                                        <td align="center" style="padding: 4px 0 24px;">
+                                            <a href="{cta_url}"
+                                               style="display: inline-block; background-color: #18181b; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px;">
+                                                {cta_text}
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 24px 0;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px; line-height: 1.6; text-align: center;">
+                                    If you have any questions, reply to this email or reach out at support@findyourcribb.com
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="background-color: #fafafa; padding: 24px 40px; text-align: center; border-top: 1px solid #e4e4e7;">
+                                <p style="margin: 0; color: #a1a1aa; font-size: 12px;">&copy; 2026 FindYourCribb. All rights reserved.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    return resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": ("Your listing is live — FindYourCribb" if approved else "Your listing needs changes — FindYourCribb"),
+        "html": html_content,
+    })
+
+
+def send_listing_approved_email(to_email: str, name: str, listing_title: str):
+    """Notify a landlord that their listing passed review and is now active."""
+    return _listing_decision_email(to_email, name, listing_title, approved=True)
+
+
+def send_listing_rejected_email(to_email: str, name: str, listing_title: str, reason: str = None):
+    """Notify a landlord that their listing was sent back to drafts with a reason."""
+    return _listing_decision_email(to_email, name, listing_title, approved=False, reason=reason)

@@ -24,6 +24,7 @@ import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
+import { useMessagesSocket } from "@/lib/use-messages-socket";
 import { MessageListSkeleton, MessageThreadSkeleton } from "@/components/ui/Skeletons";
 import type {
   ConversationResponse,
@@ -387,9 +388,18 @@ function ChatThread({
   useEffect(() => {
     setLoading(true);
     fetchConversation();
-    const interval = setInterval(fetchConversation, 8000);
+    // Housing threads get live WebSocket updates, so they only need a slow safety-net
+    // poll. Sublet/marketplace have no WS yet, so keep their faster poll.
+    const interval = setInterval(fetchConversation, conversation.type === "housing" ? 30000 : 8000);
     return () => clearInterval(interval);
-  }, [fetchConversation]);
+  }, [fetchConversation, conversation.type]);
+
+  // Live-update the open housing thread when the backend pushes a new message for it.
+  useMessagesSocket((event) => {
+    if (event.type === "new_message" && conversation.type === "housing" && event.conversation_id === conversation.id) {
+      void fetchConversation();
+    }
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -559,6 +569,11 @@ export default function MessagesPage() {
     const interval = setInterval(() => void fetchConversations(), 10000);
     return () => clearInterval(interval);
   }, [fetchConversations]);
+
+  // Refresh the inbox instantly when a new housing message arrives over the WebSocket.
+  useMessagesSocket((event) => {
+    if (event.type === "new_message") void fetchConversations();
+  });
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

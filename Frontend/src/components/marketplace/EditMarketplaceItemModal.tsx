@@ -250,7 +250,7 @@ export function EditMarketplaceItemModal({ itemId, onClose, onSaved }: EditMarke
                   <label className={labelClass} style={labelStyle}>Category</label>
                   <select value={category} onChange={(e) => setCategory(e.target.value as MarketplaceCategory)} className={inputClass} style={{ fontSize: "13px" }}>
                     {MARKETPLACE_CATEGORIES.map((c) => (
-                      <option key={c.key} value={c.key}>{c.emoji} {c.label}</option>
+                      <option key={c.key} value={c.key}>{c.label}</option>
                     ))}
                   </select>
                 </div>

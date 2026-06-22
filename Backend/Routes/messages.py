@@ -296,8 +296,11 @@ def get_specific_conversation( conversation_id: int, db: Session = Depends(get_d
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    is_user = conversation.user_id == current_user.id
+    # Landlords and students live in separate tables with independent IDs, so an
+    # identity check must be scoped by type — otherwise an ID collision misclassifies
+    # the viewer and the wrong side's messages get marked read (badge never clears).
     is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id == current_user.id
+    is_user = not isinstance(current_user, Landlord) and conversation.user_id == current_user.id
     if not is_user and not is_landlord:
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -378,9 +381,10 @@ def delete_message(conversation_id: int, message_id: int, db: Session = Depends(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Verify access
-    is_user = conversation.user_id == current_user.id
+    # Verify access — scope identity by type so a landlord/student ID collision
+    # can't misclassify the viewer (separate tables, independent IDs).
     is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id == current_user.id
+    is_user = not isinstance(current_user, Landlord) and conversation.user_id == current_user.id
     if not is_user and not is_landlord:
         raise HTTPException(status_code=403, detail="Access denied")
 

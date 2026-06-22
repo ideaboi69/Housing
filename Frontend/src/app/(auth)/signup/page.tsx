@@ -74,10 +74,14 @@ export default function SignupPage() {
     email: "",
     password: "",
   });
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showVerification, setShowVerification] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rotatingIndex, setRotatingIndex] = useState(0);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // Only require the captcha when it's actually configured (otherwise the widget
+  // renders nothing, never issues a token, and the button would stay disabled).
+  const captchaEnabled = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -90,6 +94,7 @@ export default function SignupPage() {
     () => PASSWORD_RULES.every((rule) => rule.test(form.password)),
     [form.password]
   );
+  const passwordsMatch = form.password.length > 0 && form.password === confirmPassword;
 
   function update(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -98,7 +103,7 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     clearError();
-    if (!allPasswordRulesPassed) return;
+    if (!allPasswordRulesPassed || !passwordsMatch) return;
 
     try {
       await register({ ...form, turnstile_token: turnstileToken });
@@ -319,6 +324,24 @@ export default function SignupPage() {
                       </AnimatePresence>
                     </div>
 
+                    <div>
+                      <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
+                        Confirm password
+                      </label>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Re-enter your password"
+                        required
+                        className="mt-2 w-full rounded-2xl border border-[#1B2D45]/8 bg-[#FCFAF6] px-4 py-3.5 text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                        style={{ fontSize: "14px", fontWeight: 500 }}
+                      />
+                      {confirmPassword.length > 0 && !passwordsMatch && (
+                        <p className="mt-1.5 text-[#E71D36]" style={{ fontSize: "12px" }}>Passwords don&apos;t match</p>
+                      )}
+                    </div>
+
                     {error && (
                       <div className="rounded-2xl bg-[#E71D36]/[0.06] px-4 py-3 text-[#E71D36]" style={{ fontSize: "13px", lineHeight: 1.5 }}>
                         {error}
@@ -336,7 +359,7 @@ export default function SignupPage() {
 
                     <button
                       type="submit"
-                      disabled={isLoading || !allPasswordRulesPassed || !turnstileToken}
+                      disabled={isLoading || !allPasswordRulesPassed || !passwordsMatch || (captchaEnabled && !turnstileToken)}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#FF6B35] py-3.5 text-white hover:bg-[#e55e2e] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                       style={{ fontSize: "15px", fontWeight: 800, boxShadow: allPasswordRulesPassed ? "0 10px 28px rgba(255,107,53,0.28)" : "none" }}
                     >

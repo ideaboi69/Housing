@@ -2,8 +2,8 @@
 
 import { Suspense, useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
+import { useBack } from "@/lib/use-back";
 import { api } from "@/lib/api";
 import { LeaseType, GenderPreference, ListingCreate } from "@/types";
 import type { PropertyResponse } from "@/types";
@@ -14,15 +14,18 @@ const leaseTypes = [
   { value: LeaseType.TEN_MONTH, label: "10-month", desc: "Sep – Jun", emoji: "📅" },
   { value: LeaseType.TWELVE_MONTH, label: "12-month", desc: "Full year", emoji: "🏠" },
   { value: LeaseType.FLEXIBLE, label: "Flexible", desc: "Flexible lease timing", emoji: "🔄" },
+  { value: LeaseType.CUSTOM, label: "Custom", desc: "Set your own term", emoji: "✏️" },
 ];
 
 function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const propertyId = Number(id);
   const router = useRouter();
+  const goBack = useBack(`/landlord/properties/${propertyId}`);
   const { user } = useAuthStore();
   const [property, setProperty] = useState<PropertyResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [error, setError] = useState("");
   const [loadingProperty, setLoadingProperty] = useState(true);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -34,6 +37,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     rent_per_room: "",
     rent_total: "",
     lease_type: LeaseType.TWELVE_MONTH,
+    custom_lease_type: "",
     move_in_date: "",
     has_flexible_move_in: false,
     is_sublet: false,
@@ -196,33 +200,27 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    // Validate based on pricing mode
+  function validate(): boolean {
     if (perRoomPricing) {
-      const allFilled = rooms.every((r) => r.rent && Number(r.rent) > 0);
-      if (!allFilled) {
-        setError("Set a rent for every room");
-        return;
-      }
-    } else {
-      if (!form.rent_per_room) {
-        setError("Rent per room is required");
-        return;
-      }
+      if (!rooms.every((r) => r.rent && Number(r.rent) > 0)) { setError("Set a rent for every room"); return false; }
+    } else if (!form.rent_per_room) {
+      setError("Rent per room is required"); return false;
     }
+    if (!form.has_flexible_move_in && !form.move_in_date) { setError("Move-in date is required"); return false; }
+    if (imageFiles.length < 1) { setError("At least 1 image is required"); return false; }
+    if (form.lease_type === LeaseType.CUSTOM && !form.custom_lease_type.trim()) { setError("Describe your custom lease term"); return false; }
+    setError("");
+    return true;
+  }
 
-    if (!form.has_flexible_move_in && !form.move_in_date) {
-      setError("Move-in date is required");
-      return;
-    }
+  // Submitting the form opens the review step instead of creating immediately.
+  function handleReview(e: React.FormEvent) {
+    e.preventDefault();
+    if (validate()) setShowPreview(true);
+  }
 
-    if (imageFiles.length < 1) {
-      setError("At least 1 image is required");
-      return;
-    }
-
+  async function handleSubmit() {
+    if (!validate()) { setShowPreview(false); return; }
     setIsSubmitting(true);
     setError("");
 
@@ -231,6 +229,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
         property_id: propertyId,
         per_room_pricing: perRoomPricing,
         lease_type: form.lease_type,
+        custom_lease_type: form.lease_type === LeaseType.CUSTOM ? form.custom_lease_type.trim() : undefined,
         move_in_date: form.has_flexible_move_in ? null : form.move_in_date,
         has_flexible_move_in: form.has_flexible_move_in,
         is_sublet: form.is_sublet,
@@ -270,7 +269,13 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
         await api.healthScores.compute(createdListing.id);
       } catch { /* score computation is optional */ }
 
-      router.push("/landlord");
+      // Publish the listing so it goes live immediately. If this fails, it stays a
+      // draft the landlord can publish later from the manage page.
+      try {
+        await api.listings.publish(createdListing.id);
+      } catch { /* leave as draft; manage page can publish */ }
+
+      router.push(`/landlord/properties/${propertyId}/listings/${createdListing.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create listing");
       setIsSubmitting(false);
@@ -290,14 +295,15 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <div className="max-w-[640px] mx-auto px-4 md:px-6 py-6 md:py-10">
-        <Link
-          href="/landlord"
+        <button
+          type="button"
+          onClick={goBack}
           className="inline-flex items-center gap-1.5 text-[#1B2D45]/50 hover:text-[#1B2D45] transition-colors mb-6"
           style={{ fontSize: "13px", fontWeight: 500 }}
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Dashboard
-        </Link>
+          Back
+        </button>
 
         <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 800 }}>Create a Listing</h1>
         {property && (
@@ -313,7 +319,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleReview} className="space-y-6">
           {/* Pricing */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <div className="flex items-start justify-between gap-4">
@@ -442,6 +448,17 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                   </button>
                 ))}
               </div>
+              {form.lease_type === LeaseType.CUSTOM && (
+                <input
+                  type="text"
+                  value={form.custom_lease_type}
+                  onChange={(e) => update("custom_lease_type", e.target.value)}
+                  placeholder="Describe the lease term (e.g. 4-month summer, 16-month)"
+                  maxLength={80}
+                  className="mt-2 w-full rounded-lg border border-[#1B2D45]/15 px-3.5 py-2.5 focus:border-[#1B2D45]/45 focus:outline-none focus:ring-2 focus:ring-[#1B2D45]/10 transition-all"
+                  style={{ fontSize: "14px" }}
+                />
+              )}
             </div>
 
             <div>
@@ -469,48 +486,6 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                 Any move-in date
               </label>
             </div>
-          </div>
-
-          {/* Sublet toggle */}
-          <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>☀️ Summer Sublet?</h2>
-                <p className="text-[#1B2D45]/30 mt-0.5" style={{ fontSize: "12px" }}>Mark this as a sublet listing on the sublet marketplace</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => update("is_sublet", !form.is_sublet)}
-                className={`w-12 h-7 rounded-full transition-all ${form.is_sublet ? "bg-[#1B2D45]" : "bg-[#1B2D45]/10"}`}
-              >
-                <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${form.is_sublet ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
-            </div>
-
-            {form.is_sublet && (
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-black/[0.04]">
-                <div>
-                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Sublet start</label>
-                  <input
-                    type="date"
-                    value={form.sublet_start_date}
-                    onChange={(e) => update("sublet_start_date", e.target.value)}
-                    className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all"
-                    style={{ fontSize: "14px" }}
-                  />
-                </div>
-                <div>
-                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Sublet end</label>
-                  <input
-                    type="date"
-                    value={form.sublet_end_date}
-                    onChange={(e) => update("sublet_end_date", e.target.value)}
-                    className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all"
-                    style={{ fontSize: "14px" }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Gender preference */}
@@ -631,31 +606,86 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
           </div>
 
           <div className="flex items-center gap-3 pt-2">
-            <Link
-              href="/landlord"
+            <button
+              type="button"
+              onClick={goBack}
               className="px-6 py-3 rounded-xl border border-black/[0.08] text-[#1B2D45]/60 hover:bg-black/[0.02] transition-all"
               style={{ fontSize: "14px", fontWeight: 500 }}
             >
               Cancel
-            </Link>
+            </button>
             <button
               type="submit"
-              disabled={isSubmitting || imageFiles.length < 1}
+              disabled={imageFiles.length < 1}
               className="flex-1 py-3 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
               style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(27,45,69,0.2)" }}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Publishing...
-                </>
-              ) : (
-                "Publish Listing →"
-              )}
+              Review &amp; publish →
             </button>
           </div>
         </form>
       </div>
+
+      {showPreview && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ backgroundColor: "rgba(0,0,0,0.45)" }} onClick={(e) => { if (e.target === e.currentTarget && !isSubmitting) setShowPreview(false); }}>
+          <div className="flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-white sm:max-w-[520px] sm:rounded-2xl" style={{ boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+            <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4">
+              <div>
+                <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Review listing</h3>
+                <p className="text-[#1B2D45]/50" style={{ fontSize: "12px" }}>Check the details before it goes live.</p>
+              </div>
+              <button type="button" onClick={() => !isSubmitting && setShowPreview(false)} className="flex h-8 w-8 items-center justify-center rounded-full text-[#1B2D45]/40 hover:bg-black/5 hover:text-[#1B2D45]">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {imagePreviews.length > 0 && (
+                <div className="mb-4 flex gap-2 overflow-x-auto">
+                  {imagePreviews.map((src, i) => (
+                    <img key={i} src={src} alt="" className="h-20 w-28 shrink-0 rounded-lg object-cover" />
+                  ))}
+                </div>
+              )}
+              <dl className="divide-y divide-black/[0.05]">
+                {[
+                  { label: "Property", value: property?.title ?? "—" },
+                  { label: "Pricing", value: perRoomPricing ? `Per room · ${rooms.length} room${rooms.length === 1 ? "" : "s"}` : `$${form.rent_per_room || 0}/room` },
+                  { label: "Lease type", value: form.lease_type === LeaseType.CUSTOM ? (form.custom_lease_type || "Custom") : (leaseTypes.find((t) => t.value === form.lease_type)?.label ?? form.lease_type) },
+                  { label: "Move-in", value: form.has_flexible_move_in ? "Flexible" : (form.move_in_date || "—") },
+                  { label: "Gender preference", value: form.gender_preference === GenderPreference.ANY ? "Any" : form.gender_preference },
+                  { label: "Photos", value: `${imageFiles.length} photo${imageFiles.length === 1 ? "" : "s"}` },
+                ].map((row) => (
+                  <div key={row.label} className="flex items-center justify-between gap-4 py-2.5">
+                    <dt className="text-[#1B2D45]/50" style={{ fontSize: "13px" }}>{row.label}</dt>
+                    <dd className="text-right text-[#1B2D45] capitalize" style={{ fontSize: "13px", fontWeight: 500 }}>{row.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              {perRoomPricing && (
+                <div className="mt-3 rounded-lg bg-[#FAF8F4] px-3 py-2.5">
+                  {rooms.map((r, i) => (
+                    <div key={i} className="flex justify-between py-0.5 text-[#1B2D45]/70" style={{ fontSize: "12px" }}>
+                      <span>{r.label || `Room ${i + 1}`}</span>
+                      <span>${r.rent || 0}/mo</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {error && <p className="mt-3 text-[#E71D36]" style={{ fontSize: "12px" }}>{error}</p>}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-black/[0.06] px-5 py-4">
+              <button type="button" onClick={() => setShowPreview(false)} disabled={isSubmitting} className="rounded-lg border border-[#1B2D45]/12 px-4 py-2 text-[#1B2D45]/70 transition-colors hover:border-[#1B2D45]/25 disabled:opacity-50" style={{ fontSize: "13px", fontWeight: 600 }}>
+                Back to edit
+              </button>
+              <button type="button" onClick={() => void handleSubmit()} disabled={isSubmitting} className="inline-flex items-center gap-1.5 rounded-lg bg-[#1B2D45] px-4 py-2 text-white transition-colors hover:bg-[#152438] disabled:opacity-50" style={{ fontSize: "13px", fontWeight: 600 }}>
+                {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />} {isSubmitting ? "Publishing…" : "Confirm & publish"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

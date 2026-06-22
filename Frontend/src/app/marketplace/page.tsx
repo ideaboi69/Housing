@@ -8,7 +8,10 @@ import { Plus, Search, X, Eye, Clock, MapPin, Package, SlidersHorizontal, Heart 
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
-import { MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo, MOCK_ITEMS_WITH_ZONES } from "@/components/marketplace/marketplace-data";
+import { MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo } from "@/components/marketplace/marketplace-data";
+import { isSampleMarketplaceItem } from "@/lib/sample-data";
+import { SampleBadge } from "@/components/ui/SampleBadge";
+import { OnboardingBanner } from "@/components/ui/OnboardingBanner";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import type { MarketplaceItemListResponse, MarketplaceCategory, ItemCondition } from "@/types";
 import { toast } from "sonner";
@@ -28,39 +31,43 @@ function ItemCard({
 }) {
   const price = getPriceLabel(item.pricing_type, item.price);
   const condition = CONDITION_LABELS[item.condition];
+  const isLandlord = useAuthStore((s) => s.user?.role === "landlord");
   return (
     <Link href={`/marketplace/${item.id}`}>
       <motion.div className="bg-white rounded-2xl overflow-hidden cursor-pointer group" style={{ border: "1px solid rgba(27,45,69,0.06)", boxShadow: "0 2px 8px rgba(27,45,69,0.04)" }} whileHover={{ y: -4, boxShadow: "0 8px 24px rgba(27,45,69,0.08)" }} transition={{ type: "spring", stiffness: 400, damping: 25 }}>
         <div className="relative aspect-[4/3] bg-[#FAF8F4] overflow-hidden">
           {item.primary_image ? (<img src={cloudinaryUrl(item.primary_image, { w: 500 })} alt={item.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />) : (<div className="w-full h-full flex items-center justify-center"><Package className="w-10 h-10 text-[#1B2D45]/10" /></div>)}
+          {isSampleMarketplaceItem(item.id) && (<div className="absolute bottom-3 left-3 z-[2]"><SampleBadge /></div>)}
           <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-white/95 backdrop-blur-sm" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}>
             <span style={{ fontSize: "14px", fontWeight: 800, color: price.color }}>{price.text}</span>
             {price.badge && <span className="ml-1.5 text-[#FF6B35]" style={{ fontSize: "10px", fontWeight: 700 }}>{price.badge}</span>}
           </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onToggleSave(item.id);
-            }}
-            aria-label={isSaved ? "Unsave item" : "Save item"}
-            className={`absolute top-3 right-3 w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition-all ${
-              isSaved
-                ? "bg-white text-[#E71D36]"
-                : "bg-white/92 text-[#1B2D45]/45 hover:text-[#1B2D45]"
-            }`}
-            style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.12)" }}
-            disabled={isSaving}
-          >
-            <Heart className={`w-4.5 h-4.5 ${isSaved ? "fill-[#E71D36]" : ""}`} />
-          </button>
+          {!isLandlord && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleSave(item.id);
+              }}
+              aria-label={isSaved ? "Unsave item" : "Save item"}
+              className={`absolute top-3 right-3 w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition-all ${
+                isSaved
+                  ? "bg-white text-[#E71D36]"
+                  : "bg-white/92 text-[#1B2D45]/45 hover:text-[#1B2D45]"
+              }`}
+              style={{ boxShadow: "0 2px 10px rgba(0,0,0,0.12)" }}
+              disabled={isSaving}
+            >
+              <Heart className={`w-4.5 h-4.5 ${isSaved ? "fill-[#E71D36]" : ""}`} />
+            </button>
+          )}
         </div>
         <div className="p-3.5">
           <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{item.title}</h3>
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             <span className="px-2 py-0.5 rounded-full" style={{ fontSize: "10px", fontWeight: 700, color: condition.color, background: condition.color + "15", border: "1px solid " + condition.color + "25" }}>{condition.label}</span>
-            <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>{MARKETPLACE_CATEGORIES.find((c) => c.key === item.category)?.emoji} {MARKETPLACE_CATEGORIES.find((c) => c.key === item.category)?.label}</span>
+            <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>{MARKETPLACE_CATEGORIES.find((c) => c.key === item.category)?.label}</span>
           </div>
           <div className="flex items-center justify-between mt-2.5">
             {pickupZone && <span className="flex items-center gap-1 text-[#1B2D45]/40" style={{ fontSize: "10px", fontWeight: 500 }}><MapPin className="w-3 h-3" /> {pickupZone}</span>}
@@ -149,7 +156,7 @@ export default function MarketplacePage() {
   const isSaving = useMarketplaceSavedStore((s) => s.isToggling);
   const toggleSave = useMarketplaceSavedStore((s) => s.toggleSave);
   const isLandlord = user?.role === "landlord";
-  const [items, setItems] = useState<(MarketplaceItemListResponse & { pickup_zone?: string })[]>(MOCK_ITEMS_WITH_ZONES);
+  const [items, setItems] = useState<(MarketplaceItemListResponse & { pickup_zone?: string })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [useMock, setUseMock] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -169,8 +176,8 @@ export default function MarketplacePage() {
       if (searchQuery.trim()) filters.search = searchQuery.trim();
       const data = await api.marketplace.getItems(filters);
       if (data && data.length > 0) { setItems(data.map((item) => ({ ...item, pickup_zone: undefined }))); setUseMock(false); }
-      else { setItems(MOCK_ITEMS_WITH_ZONES); setUseMock(true); }
-    } catch { setItems(MOCK_ITEMS_WITH_ZONES); setUseMock(true); }
+      else { setItems([]); setUseMock(false); }
+    } catch { setItems([]); setUseMock(false); }
     finally { setIsLoading(false); }
   }, [activeCategory, searchQuery]);
 
@@ -229,6 +236,7 @@ export default function MarketplacePage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
+      <OnboardingBanner />
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6 md:py-8">
         <div className="flex flex-col gap-3 mb-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -251,9 +259,9 @@ export default function MarketplacePage() {
           </div>
         )}
         <AnimatePresence>{showBanner && <SeasonalBanner onDismiss={dismissBanner} canSell={!isLandlord} />}</AnimatePresence>
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 md:mx-0 md:px-0 mb-4">
+        <div className="flex md:hidden items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 mb-4">
           <button onClick={() => setActiveCategory("all")} className={`px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === "all" ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === "all" ? 700 : 500 }}>All</button>
-          {MARKETPLACE_CATEGORIES.map((cat) => (<button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === cat.key ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === cat.key ? 700 : 500 }}><span style={{ fontSize: "14px" }}>{cat.emoji}</span> {cat.label}</button>))}
+          {MARKETPLACE_CATEGORIES.map((cat) => (<button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === cat.key ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === cat.key ? 700 : 500 }}>{cat.label}</button>))}
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
           <div className="relative flex-1">
@@ -298,6 +306,15 @@ export default function MarketplacePage() {
           </div>
         )}
         <p className="text-[#1B2D45]/35 mb-4" style={{ fontSize: "12px", fontWeight: 500 }}>{filteredItems.length} item{filteredItems.length !== 1 ? "s" : ""} found</p>
+        <div className="flex flex-col md:flex-row md:gap-6">
+        <aside className="hidden md:block w-[176px] shrink-0">
+          <div className="sticky top-[80px] flex flex-col gap-0.5">
+            <p className="px-3 mb-1 text-[#1B2D45]/35" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Categories</p>
+            <button onClick={() => setActiveCategory("all")} className={`text-left px-3 py-2 rounded-lg transition-all ${activeCategory === "all" ? "bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "text-[#1B2D45]/55 hover:bg-[#1B2D45]/[0.04] hover:text-[#1B2D45]"}`} style={{ fontSize: "13px", fontWeight: activeCategory === "all" ? 700 : 500 }}>All</button>
+            {MARKETPLACE_CATEGORIES.map((cat) => (<button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`text-left px-3 py-2 rounded-lg transition-all ${activeCategory === cat.key ? "bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "text-[#1B2D45]/55 hover:bg-[#1B2D45]/[0.04] hover:text-[#1B2D45]"}`} style={{ fontSize: "13px", fontWeight: activeCategory === cat.key ? 700 : 500 }}>{cat.label}</button>))}
+          </div>
+        </aside>
+        <div className="flex-1 min-w-0">
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{Array.from({ length: 8 }, (_, i) => (<div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse" style={{ border: "1px solid rgba(27,45,69,0.04)" }}><div className="aspect-[4/3] bg-[#1B2D45]/[0.04]" /><div className="p-3.5 space-y-2"><div className="h-4 bg-[#1B2D45]/[0.06] rounded w-3/4" /><div className="h-3 bg-[#1B2D45]/[0.04] rounded w-1/2" /></div></div>))}</div>
         ) : filteredItems.length === 0 ? (
@@ -305,6 +322,8 @@ export default function MarketplacePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{filteredItems.map((item, i) => (<motion.div key={item.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}><ItemCard item={item} pickupZone={(item as typeof item & { pickup_zone?: string }).pickup_zone} isSaved={isSaved(item.id)} isSaving={isSaving(item.id)} onToggleSave={handleToggleSave} /></motion.div>))}</div>
         )}
+        </div>
+        </div>
       </div>
       <AnimatePresence>{showFilters && <FilterModal isOpen={showFilters} onClose={() => setShowFilters(false)} filters={advancedFilters} onApply={setAdvancedFilters} />}</AnimatePresence>
     </div>

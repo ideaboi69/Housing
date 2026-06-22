@@ -11,8 +11,11 @@ import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
 import { formatPrice, formatPropertyType, formatLeaseType } from "@/lib/utils";
 import { useSavedStore } from "@/lib/saved-store";
+import { useAuthStore } from "@/lib/auth-store";
 import type { ListingDetailResponse } from "@/types";
 import { getProximityLabel } from "@/lib/proximity";
+import { isSampleListing } from "@/lib/sample-data";
+import { SampleBadge } from "@/components/ui/SampleBadge";
 
 interface PolaroidCardProps {
   listing: ListingDetailResponse;
@@ -37,6 +40,7 @@ export function PolaroidCard({
   const saved = useSavedStore((s) => s.savedIds.has(listing.id));
   const toggling = useSavedStore((s) => s.togglingIds.has(listing.id));
   const toggleSave = useSavedStore((s) => s.toggleSave);
+  const isLandlord = useAuthStore((s) => s.user?.role === "landlord");
   const [isHovered, setIsHovered] = useState(false);
 
   const handleSaveClick = useCallback(async (e: React.MouseEvent) => {
@@ -189,6 +193,13 @@ export function PolaroidCard({
               </div>
             )}
 
+            {/* Sample badge */}
+            {isSampleListing(listing.id) && (
+              <div className="absolute bottom-2 left-2 z-[2]">
+                <SampleBadge />
+              </div>
+            )}
+
             {/* Save button + Popular badge */}
             <div className="absolute top-2 right-2 flex items-center gap-1.5">
               {listing.view_count > 100 && (
@@ -202,25 +213,27 @@ export function PolaroidCard({
                   🔥 Popular
                 </motion.div>
               )}
-              <motion.button
-                onClick={handleSaveClick}
-                disabled={toggling}
-                className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm disabled:opacity-50"
-                whileTap={{ scale: 0.85 }}
-              >
-                <motion.div
-                  animate={saved ? { scale: [1, 1.3, 1] } : {}}
-                  transition={{ duration: 0.3 }}
+              {!isLandlord && (
+                <motion.button
+                  onClick={handleSaveClick}
+                  disabled={toggling}
+                  className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm disabled:opacity-50"
+                  whileTap={{ scale: 0.85 }}
                 >
-                  <Heart
-                    className={`w-3.5 h-3.5 ${
-                      saved
-                        ? "fill-[#E71D36] text-[#E71D36]"
-                        : "text-[#1B2D45]/40"
-                    }`}
-                  />
-                </motion.div>
-              </motion.button>
+                  <motion.div
+                    animate={saved ? { scale: [1, 1.3, 1] } : {}}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Heart
+                      className={`w-3.5 h-3.5 ${
+                        saved
+                          ? "fill-[#E71D36] text-[#E71D36]"
+                          : "text-[#1B2D45]/40"
+                      }`}
+                    />
+                  </motion.div>
+                </motion.button>
+              )}
             </div>
 
             {/* Walk time pill */}

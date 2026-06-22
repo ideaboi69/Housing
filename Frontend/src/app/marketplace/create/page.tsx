@@ -289,14 +289,13 @@ export default function CreateListingPage() {
                       <button
                         key={cat.key}
                         onClick={() => setCategory(cat.key)}
-                        className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border transition-all ${
+                        className={`flex items-center justify-center px-3 py-3 rounded-xl border transition-all ${
                           category === cat.key
                             ? "border-[#FF6B35] bg-[#FF6B35]/[0.06] text-[#FF6B35]"
                             : "border-black/[0.06] bg-white text-[#1B2D45]/50 hover:border-[#1B2D45]/15"
                         }`}
                       >
-                        <span style={{ fontSize: "20px" }}>{cat.emoji}</span>
-                        <span style={{ fontSize: "10px", fontWeight: 600 }}>{cat.label}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 600 }}>{cat.label}</span>
                       </button>
                     ))}
                   </div>
@@ -441,7 +440,7 @@ export default function CreateListingPage() {
                     )}
                     {category && (
                       <span className="px-2 py-0.5 rounded-full bg-[#1B2D45]/[0.04] text-[#1B2D45]/50" style={{ fontSize: "10px", fontWeight: 600 }}>
-                        {MARKETPLACE_CATEGORIES.find((c) => c.key === category)?.emoji} {MARKETPLACE_CATEGORIES.find((c) => c.key === category)?.label}
+                        {MARKETPLACE_CATEGORIES.find((c) => c.key === category)?.label}
                       </span>
                     )}
                   </div>

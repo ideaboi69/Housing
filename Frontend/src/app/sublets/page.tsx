@@ -19,6 +19,9 @@ import {
 } from "@/lib/proximity";
 import { buildStaticMapUrl, GUELPH_CENTER, projectLngLatToContainer } from "@/lib/mapbox";
 import { cloudinaryUrl } from "@/lib/cloudinary";
+import { isSampleSublet } from "@/lib/sample-data";
+import { SampleBadge } from "@/components/ui/SampleBadge";
+import { OnboardingBanner } from "@/components/ui/OnboardingBanner";
 import {
   DEFAULT_MAP_VIEW_LANDMARKS,
   GUELPH_LANDMARKS,
@@ -872,6 +875,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
   const saved = useSavedStore((s) => hasListingId ? s.savedIds.has(listing.listing_id!) : false);
   const toggling = useSavedStore((s) => hasListingId ? s.togglingIds.has(listing.listing_id!) : false);
   const toggleSave = useSavedStore((s) => s.toggleSave);
+  const isLandlord = useAuthStore((s) => s.user?.role === "landlord");
   const discount = Math.round(((listing.originalPrice - listing.subletPrice) / listing.originalPrice) * 100);
   const scoreColor = getScoreColor(listing.healthScore);
   const scoreLabel = getScoreLabel(listing.healthScore);
@@ -933,11 +937,13 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
           </div>
 
           {/* Save */}
-          <div className="absolute top-2 right-2">
-            <motion.button onClick={handleSaveClick} disabled={toggling} className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm disabled:opacity-50" whileTap={{ scale: 0.85 }}>
-              <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-[#E71D36] text-[#E71D36]" : "text-[#1B2D45]/40"}`} />
-            </motion.button>
-          </div>
+          {!isLandlord && (
+            <div className="absolute top-2 right-2">
+              <motion.button onClick={handleSaveClick} disabled={toggling} className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors shadow-sm disabled:opacity-50" whileTap={{ scale: 0.85 }}>
+                <Heart className={`w-3.5 h-3.5 ${isSaved ? "fill-[#E71D36] text-[#E71D36]" : "text-[#1B2D45]/40"}`} />
+              </motion.button>
+            </div>
+          )}
 
           {/* Bottom badges */}
           <div className="absolute bottom-2 left-2 flex flex-col gap-1">
@@ -953,6 +959,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
 
         {/* Content */}
         <div className="px-3 pt-4 pb-3">
+          {isSampleSublet(listing.id) && <div className="mb-1.5"><SampleBadge /></div>}
           <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "15px", fontWeight: 700 }}>{listing.title}</h3>
           <p className="text-[#1B2D45]/40 truncate mt-1" style={{ fontSize: "11px", fontWeight: 400 }}>{listing.street}</p>
 
@@ -1507,6 +1514,7 @@ function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { lis
         )}
       </div>
       <div className="p-4">
+        {isSampleSublet(listing.id) && <div className="mb-1.5"><SampleBadge /></div>}
         <h4 className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.title}</h4>
         <p className="text-[#1B2D45]/30 truncate mt-0.5" style={{ fontSize: "11px" }}>{listing.street} · {listing.neighborhood}</p>
         <div className="flex items-baseline gap-1.5 mt-2">
@@ -2105,6 +2113,7 @@ function SubletsContent() {
 
   return (
       <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
+      <OnboardingBanner />
       <PromoBanner />
       <SubletHero onListClick={handleListClick} canList={!isLandlord} />
       <InsightStats listings={listings} />

@@ -169,6 +169,7 @@ class Property(Base):
     landlord = relationship("Landlord", back_populates="properties")
     listings = relationship("Listing", back_populates="property")
     reviews = relationship("Review", back_populates="property")
+    images = relationship("PropertyImage", back_populates="property", cascade="all, delete-orphan", order_by="PropertyImage.display_order")
 
     __table_args__ = (
         Index("ix_properties_location", "latitude", "longitude"),
@@ -184,6 +185,7 @@ class Listing(Base):
     rent_total = Column(Numeric(8, 2), nullable=False)
     per_room_pricing = Column(Boolean, default=False, nullable=False)
     lease_type = Column(Enum(LeaseType), nullable=False)
+    custom_lease_type = Column(String(80), nullable=True)
     move_in_date = Column(Date, nullable=True)
     has_flexible_move_in = Column(Boolean, default=False, nullable=False)
     is_sublet = Column(Boolean, default=False, nullable=False)
@@ -191,6 +193,7 @@ class Listing(Base):
     sublet_end_date = Column(Date, nullable=True)
     gender_preference = Column(Enum(GenderPreference), nullable=True)
     status = Column(Enum(ListingStatus), default=ListingStatus.DRAFT, nullable=False)
+    rejection_reason = Column(String(500), nullable=True)
     view_count = Column(Integer, default=0, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -223,6 +226,16 @@ class ListingImage(Base):
     display_order = Column(Integer, default=0, nullable=False)
 
     listing = relationship("Listing", back_populates="images")
+
+class PropertyImage(Base):
+    __tablename__ = "property_images"
+
+    id = Column(Integer, primary_key=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    image_url = Column(String(500), nullable=False)
+    display_order = Column(Integer, default=0, nullable=False)
+
+    property = relationship("Property", back_populates="images")
 
 class ListingRoom(Base):
     __tablename__ = "listing_rooms"
@@ -997,12 +1010,34 @@ def ensure_listing_schema_compatibility():
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE listings ADD COLUMN IF NOT EXISTS has_flexible_move_in BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE listings ALTER COLUMN move_in_date DROP NOT NULL"))
+        conn.execute(text("ALTER TABLE listings ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR(500)"))
+        conn.execute(text("ALTER TABLE listings ADD COLUMN IF NOT EXISTS custom_lease_type VARCHAR(80)"))
         conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS student_archived_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS landlord_archived_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE marketplace_conversations ADD COLUMN IF NOT EXISTS buyer_archived_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE marketplace_conversations ADD COLUMN IF NOT EXISTS seller_archived_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE sublet_conversations ADD COLUMN IF NOT EXISTS poster_archived_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE sublet_conversations ADD COLUMN IF NOT EXISTS inquirer_archived_at TIMESTAMP WITH TIME ZONE"))
+
+    # Add the UNDER_REVIEW value to the listings.status enum. ALTER TYPE ... ADD VALUE
+    # cannot run inside a transaction block, so use an AUTOCOMMIT connection. Discover
+    # the enum type name from the column itself so this is robust to SQLAlchemy naming.
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        status_enum = conn.execute(text(
+            "SELECT t.typname FROM pg_attribute a "
+            "JOIN pg_type t ON a.atttypid = t.oid "
+            "WHERE a.attrelid = 'listings'::regclass AND a.attname = 'status'"
+        )).scalar()
+        if status_enum:
+            conn.execute(text(f'ALTER TYPE "{status_enum}" ADD VALUE IF NOT EXISTS \'UNDER_REVIEW\''))
+
+        lease_enum = conn.execute(text(
+            "SELECT t.typname FROM pg_attribute a "
+            "JOIN pg_type t ON a.atttypid = t.oid "
+            "WHERE a.attrelid = 'listings'::regclass AND a.attname = 'lease_type'"
+        )).scalar()
+        if lease_enum:
+            conn.execute(text(f'ALTER TYPE "{lease_enum}" ADD VALUE IF NOT EXISTS \'CUSTOM\''))
 
 ensure_listing_schema_compatibility()
 

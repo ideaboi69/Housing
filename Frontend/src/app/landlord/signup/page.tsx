@@ -467,7 +467,7 @@ function LandlordSignupPageContent() {
                     Continue <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
-                  <button onClick={handleSubmit} disabled={isLoading || !turnstileToken}
+                  <button onClick={handleSubmit} disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
                     className="flex-1 py-3 rounded-xl bg-[#1B2D45] text-white hover:bg-[#152438] disabled:opacity-60 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                     style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(27,45,69,0.2)" }}>
                     {isLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating account...</> : <>Create Landlord Account <ArrowRight className="w-4 h-4" /></>}

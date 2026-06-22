@@ -12,6 +12,7 @@ import type {
   ListingDetailResponse,
   ListingResponse,
   ListingImageResponse,
+  PropertyImageResponse,
   ListingCreate,
   ListingRoomCreate,
   ListingRoomResponse,
@@ -423,6 +424,14 @@ export const listings = {
   unpublish: (id: number) =>
     request<ListingResponse>(`/api/listings/${id}/unpublish`, { method: "PATCH" }),
 
+  // Submit a draft for admin review (draft → under_review)
+  submitForReview: (id: number) =>
+    request<ListingResponse>(`/api/listings/${id}/submit-review`, { method: "PATCH" }),
+
+  // Withdraw from review back to draft (under_review → draft)
+  withdrawReview: (id: number) =>
+    request<ListingResponse>(`/api/listings/${id}/withdraw-review`, { method: "PATCH" }),
+
   delete: (id: number) =>
     request<null>(`/api/listings/${id}`, { method: "DELETE" }),
 
@@ -602,6 +611,37 @@ export const properties = {
 
   delete: (id: number) =>
     request<null>(`/api/properties/${id}`, { method: "DELETE" }),
+
+  uploadImages: async (propertyId: number, files: File[]) => {
+    const token = getToken();
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+
+    const res = await fetch(`${API_URL}/api/properties/${propertyId}/images`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new ApiError(res.status, body.detail || "Upload failed");
+    }
+
+    return res.json() as Promise<PropertyImageResponse[]>;
+  },
+
+  deleteImage: (propertyId: number, imageId: number) =>
+    request<null>(`/api/properties/${propertyId}/images/${imageId}`, {
+      method: "DELETE",
+    }),
+
+  // Reorder images — pass image IDs in the new desired order
+  reorderImages: (propertyId: number, imageIds: number[]) =>
+    request<PropertyImageResponse[]>(`/api/properties/${propertyId}/images/reorder`, {
+      method: "PATCH",
+      body: JSON.stringify({ image_ids: imageIds }),
+    }),
 };
 
 // ── Reviews ─────────────────────────────────────────────
@@ -693,7 +733,7 @@ export const landlords = {
       identity_verified: boolean;
     }>("/api/landlords/me"),
 
-  updateProfile: (data: { company_name?: string; phone?: string }) =>
+  updateProfile: (data: { first_name?: string; last_name?: string; company_name?: string; phone?: string }) =>
     request<{ id: number; user_id: number; identity_verified: boolean; company_name: string | null; phone: string | null }>("/api/landlords/me", {
       method: "PATCH",
       body: JSON.stringify(data),
@@ -1212,6 +1252,14 @@ export const admin = {
 
   // Listings
   getListings: () => request<AdminListingResponse[]>("/api/admin/listings"),
+  getPendingListings: () => request<AdminListingResponse[]>("/api/admin/listings/pending"),
+  approveListing: (id: number) =>
+    request<ListingResponse>(`/api/admin/listings/${id}/approve`, { method: "PATCH" }),
+  rejectListing: (id: number, reason: string) =>
+    request<ListingResponse>(`/api/admin/listings/${id}/reject`, {
+      method: "PATCH",
+      body: JSON.stringify({ reason }),
+    }),
   deleteListing: (id: number) => request<null>(`/api/admin/listings/${id}`, { method: "DELETE" }),
   expireListing: (id: number) =>
     request<{ message: string; listing_id: number; status: string }>(`/api/admin/listings/${id}/expire`, { method: "PATCH" }),

@@ -10,7 +10,7 @@ from Utils.security import get_current_user, decode_access_token
 from fastapi import Depends, HTTPException, status
 from Schemas.featureSchema import AmenityValue, ListingPolicies, ListingTerms, PetPolicy, SmokingPolicy, SpaceAmenities, SubletTerms
 from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse, ListingRoomResponse, ListingResponse
-from Schemas.propertySchema import PropertyResponse
+from Schemas.propertySchema import PropertyResponse, PropertyImageResponse
 from Schemas.adminSchema import AccountType
 from Schemas.subletSchema import SubletListResponse, SubletResponse, SubletImageResponse
 from Utils.cloudinary import delete_image_from_cloudinary
@@ -359,6 +359,7 @@ def build_property_response(prop: Property) -> PropertyResponse:
             pet_policy=prop.pet_policy,
             smoking_policy=prop.smoking_policy,
         ),
+        images=[PropertyImageResponse.model_validate(img) for img in prop.images],
         created_at=prop.created_at,
         updated_at=prop.updated_at,
     )
@@ -538,6 +539,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         per_room_pricing=listing.per_room_pricing,
         rooms=[ListingRoomResponse.model_validate(r) for r in listing.rooms],
         lease_type=lease_type,
+        custom_lease_type=listing.custom_lease_type,
         move_in_date=listing.move_in_date,
         has_flexible_move_in=listing.has_flexible_move_in,
         is_sublet=listing.is_sublet,
@@ -545,6 +547,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         sublet_end_date=listing.sublet_end_date,
         gender_preference=gender_preference,
         status=listing.status if isinstance(listing.status, str) else listing.status.value,
+        rejection_reason=listing.rejection_reason,
         view_count=listing.view_count,
         images=[ListingImageResponse.model_validate(img) for img in listing.images],
         created_at=listing.created_at,
@@ -620,6 +623,7 @@ def build_listing_response(listing: Listing) -> ListingResponse:
         per_room_pricing=listing.per_room_pricing,
         rooms=[ListingRoomResponse.model_validate(r) for r in listing.rooms],
         lease_type=listing.lease_type if isinstance(listing.lease_type, str) else listing.lease_type.value,
+        custom_lease_type=listing.custom_lease_type,
         move_in_date=listing.move_in_date,
         has_flexible_move_in=listing.has_flexible_move_in,
         is_sublet=listing.is_sublet,
@@ -627,6 +631,7 @@ def build_listing_response(listing: Listing) -> ListingResponse:
         sublet_end_date=listing.sublet_end_date,
         gender_preference=listing.gender_preference if isinstance(listing.gender_preference, str) else (listing.gender_preference.value if listing.gender_preference else None),
         status=listing.status if isinstance(listing.status, str) else listing.status.value,
+        rejection_reason=listing.rejection_reason,
         view_count=listing.view_count,
         images=[ListingImageResponse.model_validate(img) for img in listing.images],
         created_at=listing.created_at,

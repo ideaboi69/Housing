@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { useIsMobile } from "@/hooks";
 import { EarlyAdopterBadge } from "@/components/ui/Badges";
 import { useAuthStore } from "@/lib/auth-store";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import { IndividualDetailModal } from "@/components/roommates/IndividualDetailModal";
 import { RoommateGridSkeleton } from "@/components/ui/Skeletons";
@@ -1081,6 +1081,19 @@ export default function RoommatesPage() {
     };
   }, [tenantGender, tenantValues]);
 
+  // Turn a failed quiz save into a clear, actionable message. The backend rejects
+  // the quiz with a 400 until the student has set their year + program, so call that
+  // out explicitly instead of showing a raw error (or worse, nothing).
+  const quizSaveErrorMessage = (err: unknown): string => {
+    if (err instanceof ApiError) {
+      if (err.status === 400 && /profile|year|program/i.test(err.detail)) {
+        return "Add your year and program in Settings, then finish the quiz so we can save it.";
+      }
+      return err.detail || "Couldn't save your quiz — please try again.";
+    }
+    return "Couldn't save your quiz — please try again.";
+  };
+
   const handleQuizComplete = useCallback(async (tags: Record<string, string>, budget: [number, number], moveIn: string, genderHousing: string) => {
     setMyTags(tags);
     setMyBudget(budget);
@@ -1105,7 +1118,11 @@ export default function RoommatesPage() {
       if (payload) {
         try {
           await api.roommates.submitQuiz(payload);
-        } catch { /* API failed — quiz still works locally */ }
+        } catch (err) {
+          toast.error(quizSaveErrorMessage(err));
+        }
+      } else {
+        toast.error("We couldn't read all your answers — go back and make sure every step is filled in so we can save your quiz.");
       }
     }
   }, [buildRoommateQuizPayload, user]);
@@ -1136,9 +1153,11 @@ export default function RoommatesPage() {
         mode === "solo" ? need : undefined,
       );
       if (payload) {
-        api.roommates.submitQuiz(payload).catch(() => {
-          /* keep local flow usable if persistence fails */
+        api.roommates.submitQuiz(payload).catch((err) => {
+          toast.error(quizSaveErrorMessage(err));
         });
+      } else {
+        toast.error("We couldn't read all your answers — please retake the quiz so we can save it.");
       }
     }
 

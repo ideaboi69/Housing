@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   Menu, X, Settings, Bookmark, Heart, LogOut, ChevronDown,
   User, Shield, LayoutDashboard, MessageCircle, ShoppingBag, Home, PenLine,
+  Building2,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { useWriterStore } from "@/lib/store";
@@ -191,7 +192,7 @@ export function Navbar() {
     return (
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
         <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[64px] md:h-[72px]">
-          <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.04em" }}>
+          <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.04em" }}>
             cribb
           </Link>
           <div className="h-10 w-24 rounded-xl bg-[#1B2D45]/[0.04]" />
@@ -204,7 +205,7 @@ export function Navbar() {
     return (
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
         <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[64px] md:h-[72px]">
-          <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.04em" }}>
+          <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.04em" }}>
             cribb
           </Link>
           <div className="flex items-center gap-3">
@@ -244,6 +245,7 @@ export function Navbar() {
     : isLandlord
     ? [
         { label: "Dashboard", href: "/landlord", icon: LayoutDashboard },
+        { label: "Browse Listings", href: "/browse", icon: Building2 },
         { label: "Messages", href: "/landlord?tab=messages", icon: MessageCircle },
         { label: "Settings", href: "/landlord?tab=settings", icon: Settings },
       ]
@@ -284,7 +286,7 @@ export function Navbar() {
         {/* Logo */}
         <Link
           href="/"
-          className={isLandlord ? "text-[#1B2D45]" : "text-[#FF6B35]"}
+          className="text-[#FF6B35]"
           style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.04em" }}
         >
           cribb
@@ -331,13 +333,18 @@ export function Navbar() {
             <div className="h-9 w-28 rounded-xl bg-[#1B2D45]/[0.04]" />
           ) : displayUser ? (
             <>
+              {/* Landlord: browse the live site */}
               {isLandlord && (
                 <Link
-                  href="/"
-                  className="inline-flex h-9 items-center justify-center rounded-xl border border-[#1B2D45]/12 px-3 text-[#1B2D45] transition-all hover:border-[#1B2D45]/25 hover:bg-[#1B2D45]/[0.03]"
-                  style={{ fontSize: "12px", fontWeight: 800 }}
+                  href="/browse"
+                  className={`flex items-center gap-1.5 px-3.5 py-2 mr-1 rounded-xl border transition-all ${
+                    isNavItemActive("/browse")
+                      ? "border-[#1B2D45]/20 bg-[#1B2D45]/10 text-[#1B2D45]"
+                      : "border-[#1B2D45]/12 text-[#1B2D45]/70 hover:text-[#1B2D45] hover:border-[#1B2D45]/25 hover:bg-[#1B2D45]/5"
+                  }`}
+                  style={{ fontSize: "13px", fontWeight: 600 }}
                 >
-                  View as Student
+                  <Building2 className="h-4 w-4" /> Browse listings
                 </Link>
               )}
               {/* Message icon */}
@@ -538,17 +545,6 @@ export function Navbar() {
                 </Link>
               );
             })}
-
-            {isLandlord && (
-              <Link
-                href="/"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-4 py-2.5 rounded-xl text-[#1B2D45]/70 hover:bg-[#1B2D45]/5"
-                style={{ fontSize: "15px", fontWeight: 700 }}
-              >
-                View as Student
-              </Link>
-            )}
 
             {/* User-specific links on mobile */}
             {displayUser && (
