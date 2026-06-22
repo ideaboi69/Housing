@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Loader2, Upload, Save, GripVertical } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
+import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
 import { toast } from "sonner";
 import type {
   SubletResponse,
@@ -189,6 +190,7 @@ export function EditSubletModal({ subletId, onClose, onSaved }: EditSubletModalP
       setError("End date must be after start date");
       return;
     }
+    if (findBlockedField({ Title: title, Description: description, Address: address })) { setError(BLOCKED_CONTENT_MESSAGE); return; }
     setSaving(true);
     setError("");
     try {

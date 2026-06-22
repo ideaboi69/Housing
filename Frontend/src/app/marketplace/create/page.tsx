@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
 import { MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel } from "@/components/marketplace/marketplace-data";
 import type { MarketplaceCategory, ItemCondition, PricingType } from "@/types";
 import { toast } from "sonner";
@@ -104,6 +105,10 @@ export default function CreateListingPage() {
 
   const handleSubmit = async () => {
     if (!user) { router.push("/login"); return; }
+    if (findBlockedField({ Title: title, Description: description, "Pickup notes": pickupNotes })) {
+      toast.error(BLOCKED_CONTENT_MESSAGE);
+      return;
+    }
     setSubmitting(true);
 
     try {

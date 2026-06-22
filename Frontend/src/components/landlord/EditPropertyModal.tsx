@@ -4,6 +4,7 @@ import { useState } from "react";
 import { X, Loader2, AlertCircle, Home, Sparkles, MapPin, Check, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
+import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
 import { PropertyType } from "@/types";
 import type { PetPolicy, SmokingPolicy } from "@/types";
 import type { PropertyResponse, PropertyImageResponse } from "@/types";
@@ -64,6 +65,7 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
   const [nearestBusRoute, setNearestBusRoute] = useState(property.nearest_bus_route || "");
 
   const handleSave = async () => {
+    if (findBlockedField({ Title: title, Address: address })) { setError(BLOCKED_CONTENT_MESSAGE); return; }
     setSaving(true);
     setError("");
     try {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { useBack } from "@/lib/use-back";
 import { api } from "@/lib/api";
+import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
 import type { PetPolicy, SmokingPolicy } from "@/types";
 import { PropertyType } from "@/types";
 import { formatPropertyType } from "@/lib/utils";
@@ -75,6 +76,10 @@ function NewPropertyPageContent() {
   function validate(): boolean {
     if (!form.title || !form.address || !form.postal_code || !form.drive_time_minutes) {
       setError("Title, address, postal code, and drive time are required");
+      return false;
+    }
+    if (findBlockedField({ Title: form.title, Address: form.address })) {
+      setError(BLOCKED_CONTENT_MESSAGE);
       return false;
     }
     setError("");

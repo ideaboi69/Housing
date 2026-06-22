@@ -499,14 +499,6 @@ export const listings = {
   unpublish: (id: number) =>
     request<ListingResponse>(`/api/listings/${id}/unpublish`, { method: "PATCH" }),
 
-  // Submit a draft for admin review (draft → under_review)
-  submitForReview: (id: number) =>
-    request<ListingResponse>(`/api/listings/${id}/submit-review`, { method: "PATCH" }),
-
-  // Withdraw from review back to draft (under_review → draft)
-  withdrawReview: (id: number) =>
-    request<ListingResponse>(`/api/listings/${id}/withdraw-review`, { method: "PATCH" }),
-
   delete: (id: number) =>
     request<null>(`/api/listings/${id}`, { method: "DELETE" }),
 
@@ -1407,14 +1399,6 @@ export const admin = {
 
   // Listings
   getListings: () => request<AdminListingResponse[]>("/api/admin/listings"),
-  getPendingListings: () => request<AdminListingResponse[]>("/api/admin/listings/pending"),
-  approveListing: (id: number) =>
-    request<ListingResponse>(`/api/admin/listings/${id}/approve`, { method: "PATCH" }),
-  rejectListing: (id: number, reason: string) =>
-    request<ListingResponse>(`/api/admin/listings/${id}/reject`, {
-      method: "PATCH",
-      body: JSON.stringify({ reason }),
-    }),
   deleteListing: (id: number) => request<null>(`/api/admin/listings/${id}`, { method: "DELETE" }),
   expireListing: (id: number) =>
     request<{ message: string; listing_id: number; status: string }>(`/api/admin/listings/${id}/expire`, { method: "PATCH" }),

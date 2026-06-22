@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Loader2, Upload, Save } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
+import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
 import { toast } from "sonner";
 import type {
   MarketplaceItemUpdate,
@@ -111,6 +112,7 @@ export function EditMarketplaceItemModal({ itemId, onClose, onSaved }: EditMarke
 
   const handleSave = async () => {
     if (!title.trim()) { setError("Title is required"); return; }
+    if (findBlockedField({ Title: title, Description: description, "Pickup notes": pickupNotes })) { setError(BLOCKED_CONTENT_MESSAGE); return; }
     if (!pickupLocation.trim()) { setError("Pickup location is required"); return; }
     if (pricingType !== "free" && (price === "" || Number(price) < 0)) {
       setError("Please enter a valid price");

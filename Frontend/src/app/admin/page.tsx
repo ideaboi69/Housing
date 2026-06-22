@@ -7,7 +7,7 @@ import {
   Shield, ShieldCheck, ShieldX, Trash2, Check, X, Search,
   LogOut, ChevronDown, Eye, Ban, UserCheck, UserX, Loader2,
   Mail, Calendar, TrendingUp, AlertCircle, CheckCircle2, Star,
-  UsersRound, ShoppingBag, CalendarX, BedDouble, Clock,
+  UsersRound, ShoppingBag, CalendarX, BedDouble,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
@@ -229,7 +229,6 @@ function OverviewTab({ stats }: { stats: AdminStatsResponse | null }) {
         <StatCard label="Total Landlords" value={stats.total_landlords} icon={Building2} color="#2EC4B6" />
         <StatCard label="Properties" value={stats.total_properties} icon={Home} color="#FFB627" />
         <StatCard label="Listings" value={stats.total_listings} icon={FileText} color="#FF6B35" />
-        <StatCard label="Pending Review" value={stats.listings_under_review} icon={Clock} color={stats.listings_under_review > 0 ? "#FFB627" : "#4ADE80"} />
         <StatCard label="Reviews" value={stats.total_reviews} icon={CheckCircle2} color="#A78BFA" />
         <StatCard label="Pending Flags" value={stats.total_flags_pending} icon={Flag} color={stats.total_flags_pending > 0 ? "#E71D36" : "#4ADE80"} />
       </div>
@@ -410,7 +409,6 @@ function listingStatusLabel(status: string): string {
 
 function ListingsTab({ listings, onRefresh }: { listings: AdminListingResponse[]; onRefresh: () => void }) {
   const router = useRouter();
-  const pending = listings.filter((l) => l.status === "under_review");
 
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this listing?")) return;
@@ -423,55 +421,8 @@ function ListingsTab({ listings, onRefresh }: { listings: AdminListingResponse[]
     catch (e) { toast.error(e instanceof ApiError ? e.detail : "Failed to expire"); }
   };
 
-  const handleApprove = async (id: number) => {
-    try { await api.admin.approveListing(id); toast.success("Listing approved — now live"); onRefresh(); } catch { toast.error("Failed to approve"); }
-  };
-
-  const handleReject = async (id: number) => {
-    const reason = window.prompt("Reason for rejection (shown to the landlord):");
-    if (reason === null) return;
-    if (!reason.trim()) { toast.error("A reason is required"); return; }
-    try { await api.admin.rejectListing(id, reason.trim()); toast.success("Listing sent back to the landlord"); onRefresh(); } catch { toast.error("Failed to reject"); }
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Pending review queue */}
-      <div>
-        <h2 className="text-white mb-3 flex items-center gap-2" style={{ fontSize: "20px", fontWeight: 800 }}>
-          Pending Review
-          {pending.length > 0 && <Badge label={String(pending.length)} color="#FFB627" />}
-        </h2>
-        {pending.length === 0 ? (
-          <div className="rounded-xl border border-white/[0.04] bg-[#1B2D45] px-4 py-6 text-center text-white/30" style={{ fontSize: "13px" }}>
-            No listings awaiting review.
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {pending.map((l) => (
-              <div key={l.id} className="bg-[#1B2D45] rounded-xl border border-[#FFB627]/20 px-4 py-3 flex items-center gap-4">
-                <div className="flex-1">
-                  <div className="text-white flex items-center gap-2" style={{ fontSize: "13px", fontWeight: 600 }}>
-                    <button onClick={() => router.push(`/browse/${l.id}`)} className="hover:text-[#FF6B35] transition-colors text-left">
-                      {l.property_title || `Listing #${l.id}`}
-                    </button>
-                    {l.is_sublet && <Badge label="Sublet" color="#2EC4B6" />}
-                  </div>
-                  <div className="text-white/30" style={{ fontSize: "11px" }}>
-                    {l.address ? `${l.address} · ` : ""}${l.rent_per_room}/room · ${l.rent_total} total · {l.lease_type} · {timeAgo(l.created_at)}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <ActionButton onClick={() => router.push(`/browse/${l.id}`)} icon={Eye} label="Preview" color="#60A5FA" />
-                  <ActionButton onClick={() => handleApprove(l.id)} icon={CheckCircle2} label="Approve" color="#4ADE80" />
-                  <ActionButton onClick={() => handleReject(l.id)} icon={X} label="Reject" danger />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
+    <div>
       {/* All listings */}
       <div>
         <h2 className="text-white mb-4" style={{ fontSize: "20px", fontWeight: 800 }}>All Listings ({listings.length})</h2>
@@ -491,7 +442,6 @@ function ListingsTab({ listings, onRefresh }: { listings: AdminListingResponse[]
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {l.status === "under_review" && <ActionButton onClick={() => handleApprove(l.id)} icon={CheckCircle2} label="Approve" color="#4ADE80" />}
                 <ActionButton onClick={() => router.push(`/browse/${l.id}`)} icon={Eye} label="View" color="#60A5FA" />
                 {l.status !== "expired" && <ActionButton onClick={() => handleExpire(l.id)} icon={CalendarX} label="Expire" color="#FFB627" />}
                 <ActionButton onClick={() => handleDelete(l.id)} icon={Trash2} label="Delete" danger />

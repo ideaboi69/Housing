@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useIsMobile } from "@/hooks";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
 import type { GenderPreference, PetPolicy, SmokingPolicy } from "@/types";
 import { MONTHS, type SubletListing } from "@/components/sublets/sublet-data";
 
@@ -249,6 +250,11 @@ export function CreateSubletForm({
 
     if ([rent, distance, walk, drive, bus, rooms, baths, bedsAvailable].some((n) => Number.isNaN(n))) {
       toast.error("Please make sure all required numbers are filled in.");
+      return;
+    }
+
+    if (findBlockedField({ Title: form.title, Description: form.description, Address: form.address })) {
+      toast.error(BLOCKED_CONTENT_MESSAGE);
       return;
     }
 
