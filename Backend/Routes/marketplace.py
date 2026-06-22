@@ -9,6 +9,7 @@ from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloud
 from Utils.email import send_message_notification
 from Utils.websocket import connection_manager
 from Utils.rate_limit import limiter
+from helpers import should_notify_student
 
 marketplace_router = APIRouter()
 
@@ -281,15 +282,16 @@ def start_marketplace_conversation(payload: StartMarketplaceConversation, backgr
     db.refresh(message)
 
     seller = db.query(User).filter(User.id == item.seller_id).first()
-    background_tasks.add_task(
-        send_message_notification,
-        to_email=seller.email,
-        recipient_name=seller.first_name,
-        sender_name=f"{current_user.first_name} {current_user.last_name}",
-        message_preview=payload.content,
-        conversation_id=conversation.id,
-        property_title=item.title,
-    )
+    if should_notify_student(db, seller.id, "notify_new_messages"):
+        background_tasks.add_task(
+            send_message_notification,
+            to_email=seller.email,
+            recipient_name=seller.first_name,
+            sender_name=f"{current_user.first_name} {current_user.last_name}",
+            message_preview=payload.content,
+            conversation_id=conversation.id,
+            property_title=item.title,
+        )
 
     # Notify the seller in real time
     background_tasks.add_task(
@@ -328,15 +330,16 @@ def send_marketplace_message(request: Request, conversation_id: int, payload: Ma
     other_user_id = conversation.seller_id if is_buyer else conversation.buyer_id
     other_user = db.query(User).filter(User.id == other_user_id).first()
 
-    background_tasks.add_task(
-        send_message_notification,
-        to_email=other_user.email,
-        recipient_name=other_user.first_name,
-        sender_name=f"{current_user.first_name} {current_user.last_name}",
-        message_preview=payload.content,
-        conversation_id=conversation.id,
-        property_title=item.title,
-    )
+    if should_notify_student(db, other_user_id, "notify_new_messages"):
+        background_tasks.add_task(
+            send_message_notification,
+            to_email=other_user.email,
+            recipient_name=other_user.first_name,
+            sender_name=f"{current_user.first_name} {current_user.last_name}",
+            message_preview=payload.content,
+            conversation_id=conversation.id,
+            property_title=item.title,
+        )
 
     # Notify the other party in real time
     background_tasks.add_task(

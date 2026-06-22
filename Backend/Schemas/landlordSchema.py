@@ -59,6 +59,7 @@ class LandlordResponse(BaseModel):
 
 class LandlordTokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     landlord: LandlordResponse
 
 class LandlordPublicResponse(BaseModel):
@@ -114,6 +115,23 @@ class LandlordFlagResponse(BaseModel):
     reason: str
     status: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Landlord notification preferences
+class LandlordNotificationPreferencesUpdate(BaseModel):
+    notify_new_messages: Optional[bool] = None
+    notify_new_reviews: Optional[bool] = None
+    notify_new_flags: Optional[bool] = None
+
+class LandlordNotificationPreferencesResponse(BaseModel):
+    id: int
+    landlord_id: int
+    notify_new_messages: bool
+    notify_new_reviews: bool
+    notify_new_flags: bool
+    updated_at: datetime
 
     class Config:
         from_attributes = True

@@ -23,9 +23,11 @@ from Routes.viewing import viewing_router
 from Routes.landlord_invite import landlord_invite_router
 from Routes.ai import ai_router
 from Routes.group_chat import group_chat_router
+from Routes.auth import auth_router
 from dataclasses import dataclass
 from apscheduler.schedulers.background import BackgroundScheduler
 from Utils.scheduler import send_viewing_reminders
+from Utils.ai_content.pipeline import run_biweekly_generation
 from Utils.websocket import connection_manager
 from Utils.security import decode_access_token
 from slowapi import _rate_limit_exceeded_handler
@@ -101,6 +103,7 @@ app.include_router(viewing_router, prefix="/api/viewings", tags=["Viewings"])
 app.include_router(landlord_invite_router, prefix="/api/roommates", tags=["Landlord Invites"])
 app.include_router(group_chat_router, prefix="/api/roommates", tags=["Group Chat"])
 app.include_router(ai_router, prefix="/api/ai", tags=["AI"])
+app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str):
@@ -127,6 +130,9 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
 # Email scheduler
 scheduler = BackgroundScheduler()
 scheduler.add_job(send_viewing_reminders, "cron", hour=9, minute=0)
+# Cribb AI bi-weekly content drafts — every other Sunday at 9am UTC (~5am ET)
+# week=1,3 covers ISO weeks 1,3,5,...,53 which gives a stable bi-weekly cadence
+scheduler.add_job(run_biweekly_generation, "cron", day_of_week="sun", hour=9, minute=0, week="1-53/2")
 scheduler.start()
 
 @app.on_event("shutdown")

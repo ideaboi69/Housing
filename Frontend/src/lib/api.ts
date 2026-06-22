@@ -93,6 +93,13 @@ import type {
   MarketplaceMessageResponse,
   //landlord-invite
   LandlordInvitePreview,
+  // Security
+  SecurityEvent,
+  // Landlord notifications
+  LandlordNotificationPreferencesResponse,
+  LandlordNotificationPreferencesUpdate,
+  // Starred authors
+  StarredAuthor,
 } from "@/types";
 
 // ── Base ────────────────────────────────────────────────
@@ -126,28 +133,67 @@ function setToken(token: string) {
   }
 }
 
-/** Try to refresh the access token silently. Returns true if successful. */
-async function tryRefreshToken(): Promise<boolean> {
-  const token = getToken();
-  if (!token) return false;
+// ── Refresh token helpers ──────────────────────────────────
+
+function getRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("cribb_refresh_token");
+}
+
+function getWriterRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("cribb_writer_refresh_token");
+}
+
+function setRefreshToken(token: string, key = "cribb_refresh_token") {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(key, token);
+  }
+}
+
+function clearRefreshToken(key = "cribb_refresh_token") {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(key);
+  }
+}
+
+// Mutex: prevent multiple concurrent refresh requests
+let refreshPromise: Promise<boolean> | null = null;
+
+/** Try to silently refresh the access token using the refresh token. */
+async function tryRefreshToken(refreshKey = "cribb_refresh_token", tokenKey = "cribb_token"): Promise<boolean> {
+  // If a refresh is already in flight, wait for it
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    const rt = typeof window !== "undefined" ? localStorage.getItem(refreshKey) : null;
+    if (!rt) return false;
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: rt }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.access_token && data.refresh_token) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(tokenKey, data.access_token);
+          localStorage.setItem(refreshKey, data.refresh_token);
+        }
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  })();
 
   try {
-    const res = await fetch(`${API_URL}/api/users/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    if (data.access_token) {
-      setToken(data.access_token);
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
   }
 }
 
@@ -170,12 +216,16 @@ async function request<T>(
     headers,
   });
 
-  // If 401 and we have a token, try refreshing once
+  // If 401 and we have a refresh token, try refreshing once
   if (res.status === 401 && token && !endpoint.includes("/login") && !endpoint.includes("/refresh")) {
-    const refreshed = await tryRefreshToken();
+    // Determine which refresh key to use based on which token was active
+    const isWriter = token === getWriterToken() && !localStorage.getItem("cribb_token");
+    const refreshKey = isWriter ? "cribb_writer_refresh_token" : "cribb_refresh_token";
+    const tokenKey = isWriter ? "cribb_writer_token" : "cribb_token";
+
+    const refreshed = await tryRefreshToken(refreshKey, tokenKey);
     if (refreshed) {
-      // Retry the original request with the new token
-      const newToken = getToken();
+      const newToken = typeof window !== "undefined" ? localStorage.getItem(tokenKey) : null;
       if (newToken) {
         headers["Authorization"] = `Bearer ${newToken}`;
       }
@@ -197,6 +247,9 @@ async function request<T>(
   return res.json();
 }
 
+// Writer-specific mutex
+let writerRefreshPromise: Promise<boolean> | null = null;
+
 async function writerRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -211,10 +264,25 @@ async function writerRequest<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  let res = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
   });
+
+  // If 401, try refresh with writer refresh token
+  if (res.status === 401 && token && !endpoint.includes("/login") && !endpoint.includes("/refresh")) {
+    const refreshed = await tryRefreshToken("cribb_writer_refresh_token", "cribb_writer_token");
+    if (refreshed) {
+      const newToken = getWriterToken();
+      if (newToken) {
+        headers["Authorization"] = `Bearer ${newToken}`;
+      }
+      res = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    }
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: "Request failed" }));
@@ -336,6 +404,9 @@ export const auth = {
   logoutAll: () =>
     request<{ message: string }>("/api/users/me/logout-all", { method: "POST" }),
 
+  getSecurityLog: (limit = 50, offset = 0) =>
+    request<SecurityEvent[]>(`/api/users/me/security-log?limit=${limit}&offset=${offset}`),
+
   getUserById: (id: number) =>
     request<UserResponse>(`/api/users/${id}`),
 
@@ -351,10 +422,14 @@ export const auth = {
       body: JSON.stringify({ token, new_password }),
     }),
 
-  refreshToken: () =>
-    request<{ access_token: string; token_type: string }>("/api/users/refresh", {
+  refreshToken: async () => {
+    const rt = getRefreshToken();
+    if (!rt) throw new ApiError(401, "No refresh token");
+    return request<{ access_token: string; refresh_token: string; token_type: string }>("/api/auth/refresh", {
       method: "POST",
-    }),
+      body: JSON.stringify({ refresh_token: rt }),
+    });
+  },
 
   requestWriteAccess: async (reason: string) => {
     const token = getToken();
@@ -709,6 +784,18 @@ export const landlords = {
 
   logoutAll: () =>
     request<{ message: string }>("/api/landlords/me/logout-all", { method: "POST" }),
+
+  getSecurityLog: (limit = 50, offset = 0) =>
+    request<SecurityEvent[]>(`/api/landlords/me/security-log?limit=${limit}&offset=${offset}`),
+
+  getNotificationPreferences: () =>
+    request<LandlordNotificationPreferencesResponse>("/api/landlords/me/notifications"),
+
+  updateNotificationPreferences: (data: LandlordNotificationPreferencesUpdate) =>
+    request<LandlordNotificationPreferencesResponse>("/api/landlords/me/notifications", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
 };
 
 // ── Writers ─────────────────────────────────────────────
@@ -857,6 +944,74 @@ export const posts = {
     request<{ post_id: number; upvote_count: number; user_has_upvoted: boolean }>(
       `/api/posts/${postId}/upvote`, { method: "DELETE" }
     ),
+
+  getByStudentAuthor: (userId: number) =>
+    request<PostListResponse[]>(`/api/posts/author/student/${userId}`),
+
+  getByWriterAuthor: (writerId: number) =>
+    request<PostListResponse[]>(`/api/posts/author/writer/${writerId}`),
+
+  starAuthor: (authorType: "student" | "writer", authorId: number) =>
+    request<{ message: string }>(`/api/posts/authors/${authorType}/${authorId}/star`, { method: "POST" }),
+
+  unstarAuthor: (authorType: "student" | "writer", authorId: number) =>
+    request<{ message: string }>(`/api/posts/authors/${authorType}/${authorId}/star`, { method: "DELETE" }),
+
+  getStarredAuthors: () =>
+    request<StarredAuthor[]>("/api/posts/authors/starred"),
+
+  // Writer-specific versions (use writer token instead of student token)
+  writerGetMyPosts: () =>
+    writerRequest<PostListResponse[]>("/api/posts/my/posts"),
+
+  writerGetMyStats: () =>
+    writerRequest<{ total_posts: number; published: number; drafts: number; archived: number; total_views: number; avg_views: number }>("/api/posts/my/stats"),
+
+  writerCreate: (data: PostCreate) =>
+    writerRequest<PostResponse>("/api/posts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  writerUpdate: (id: number, data: PostUpdate) =>
+    writerRequest<PostResponse>(`/api/posts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  writerDelete: (id: number) =>
+    writerRequest<null>(`/api/posts/${id}`, { method: "DELETE" }),
+
+  writerPublish: (id: number) =>
+    writerRequest<PostResponse>(`/api/posts/${id}/publish`, { method: "PATCH" }),
+
+  writerUnpublish: (id: number) =>
+    writerRequest<PostResponse>(`/api/posts/${id}/unpublish`, { method: "PATCH" }),
+
+  writerArchive: (id: number) =>
+    writerRequest<PostResponse>(`/api/posts/${id}/archive`, { method: "PATCH" }),
+
+  writerUnarchive: (id: number) =>
+    writerRequest<PostResponse>(`/api/posts/${id}/unarchive`, { method: "PATCH" }),
+
+  writerUploadCoverImage: async (postId: number, file: File) => {
+    const token = getWriterToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/posts/${postId}/cover-image`,
+      {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new ApiError(res.status, body.detail || "Upload failed");
+    }
+    return res.json() as Promise<PostResponse>;
+  },
 };
 
 // ── Messages / Conversations ────────────────────────────
@@ -1180,7 +1335,7 @@ export const admin = {
     const formData = new URLSearchParams();
     formData.append("username", data.username);
     formData.append("password", data.password);
-    return request<{ access_token: string; token_type: string; admin: { id: number; email: string; first_name: string; last_name: string; is_active: boolean } }>("/api/admin/login", {
+    return request<{ access_token: string; refresh_token: string; token_type: string; admin: { id: number; email: string; first_name: string; last_name: string; is_active: boolean } }>("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formData.toString(),
@@ -1364,4 +1519,4 @@ export const api = {
   landlordInvites,
 };
 
-export { ApiError };
+export { ApiError, setRefreshToken, clearRefreshToken, getRefreshToken, getWriterRefreshToken };

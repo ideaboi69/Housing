@@ -98,6 +98,7 @@ class Landlord(Base):
     conversations = relationship("Conversation", back_populates="landlord")
     viewing_availabilities = relationship("ViewingAvailability", back_populates="landlord")
     viewing_bookings = relationship("ViewingBooking", back_populates="landlord")
+    notification_preferences = relationship("LandlordNotificationPreferences", back_populates="landlord", uselist=False, cascade="all, delete-orphan")
 
 class LandlordDocuments(Base):
     __tablename__ = "landlord_documents"
@@ -462,6 +463,7 @@ class Writer(Base):
     reason = Column(Text, nullable=False)
     status = Column(Enum(WriterStatus), default=WriterStatus.PENDING, nullable=False)
     is_early_adopter = Column(Boolean, default=False, nullable=False)
+    is_official = Column(Boolean, default=False, nullable=False, server_default="false")
     profile_photo_url = Column(String(500), nullable=True)
     token_version = Column(Integer, nullable=False, server_default="0", default=0)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
@@ -487,6 +489,7 @@ class Post(Base):
     event_location = Column(String(500), nullable=True)
     event_link = Column(String(500), nullable=True)
     deal_expires = Column(Date, nullable=True)
+    is_ai_draft = Column(Boolean, default=False, nullable=False, server_default="false")
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -517,7 +520,27 @@ class Post(Base):
         if self.user_id:
             return "student"
         return "writer"
-    
+
+    @property
+    def author_id(self):
+        return self.user_id if self.user_id else self.writer_id
+
+    @property
+    def author_photo_url(self):
+        if self.user and self.user.profile_photo_url:
+            return self.user.profile_photo_url
+        if self.writer and self.writer.profile_photo_url:
+            return self.writer.profile_photo_url
+        return None
+
+    @property
+    def upvote_count(self):
+        return len(self.votes) if self.votes else 0
+
+    @property
+    def author_is_official(self):
+        return bool(self.writer and self.writer.is_official)
+
 class MarketplaceItem(Base):
     __tablename__ = "marketplace_items"
 
@@ -661,15 +684,56 @@ class NotificationPreferences(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    # Legacy columns kept in DB but no longer exposed
     new_listings_matching = Column(Boolean, default=True, nullable=False)
     price_drops_saved = Column(Boolean, default=True, nullable=False)
     new_roommate_matches = Column(Boolean, default=True, nullable=False)
     weekly_bubble_digest = Column(Boolean, default=False, nullable=False)
     cribb_news_updates = Column(Boolean, default=False, nullable=False)
+    # Active notification toggles
+    notify_new_messages = Column(Boolean, default=True, nullable=False)
+    notify_roommate_updates = Column(Boolean, default=True, nullable=False)
+    notify_viewing_updates = Column(Boolean, default=True, nullable=False)
+    notify_bubble_posts = Column(Boolean, default=True, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="notification_preferences")
+
+class StarredAuthor(Base):
+    __tablename__ = "starred_authors"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    author_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    author_writer_id = Column(Integer, ForeignKey("writers.id", ondelete="CASCADE"), nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    user = relationship("User", foreign_keys=[user_id], backref="starred_authors")
+    author_user = relationship("User", foreign_keys=[author_user_id])
+    author_writer = relationship("Writer", foreign_keys=[author_writer_id])
+
+    __table_args__ = (
+        CheckConstraint(
+            "(author_user_id IS NOT NULL AND author_writer_id IS NULL) OR (author_user_id IS NULL AND author_writer_id IS NOT NULL)",
+            name="ck_starred_single_author",
+        ),
+        UniqueConstraint("user_id", "author_user_id", name="uq_starred_user_author"),
+        UniqueConstraint("user_id", "author_writer_id", name="uq_starred_writer_author"),
+    )
+
+class LandlordNotificationPreferences(Base):
+    __tablename__ = "landlord_notification_preferences"
+
+    id = Column(Integer, primary_key=True)
+    landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=False, unique=True)
+    notify_new_messages = Column(Boolean, default=True, nullable=False)
+    notify_new_reviews = Column(Boolean, default=True, nullable=False)
+    notify_new_flags = Column(Boolean, default=True, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    landlord = relationship("Landlord", back_populates="notification_preferences")
 
 class RoommateProfile(Base):
     __tablename__ = "roommate_profiles"
@@ -987,6 +1051,40 @@ class PostVote(Base):
         UniqueConstraint("post_id", "user_id", name="uq_post_vote_user"),
     )
  
+class SecurityEvent(Base):
+    __tablename__ = "security_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False)
+    role = Column(String(20), nullable=False)
+    event_type = Column(String(40), nullable=False)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    metadata_ = Column("metadata", JSON, nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_security_events_user_role", "user_id", "role"),
+        Index("ix_security_events_created", "created_at"),
+    )
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, nullable=False)
+    role = Column(String(20), nullable=False)
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    is_revoked = Column(Boolean, default=False, nullable=False)
+    replaced_by = Column(String(64), nullable=True)
+    family_id = Column(String(43), nullable=False, index=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_refresh_tokens_user_role", "user_id", "role"),
+    )
+
 Base.metadata.create_all(engine)
 
 def ensure_listing_schema_compatibility():
@@ -1003,6 +1101,11 @@ def ensure_listing_schema_compatibility():
         conn.execute(text("ALTER TABLE marketplace_conversations ADD COLUMN IF NOT EXISTS seller_archived_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE sublet_conversations ADD COLUMN IF NOT EXISTS poster_archived_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE sublet_conversations ADD COLUMN IF NOT EXISTS inquirer_archived_at TIMESTAMP WITH TIME ZONE"))
+        # Notification preference columns for students
+        conn.execute(text("ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS notify_new_messages BOOLEAN NOT NULL DEFAULT TRUE"))
+        conn.execute(text("ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS notify_roommate_updates BOOLEAN NOT NULL DEFAULT TRUE"))
+        conn.execute(text("ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS notify_viewing_updates BOOLEAN NOT NULL DEFAULT TRUE"))
+        conn.execute(text("ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS notify_bubble_posts BOOLEAN NOT NULL DEFAULT TRUE"))
 
 ensure_listing_schema_compatibility()
 

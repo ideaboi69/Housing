@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, Form, Uploa
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, LandlordDocuments
-from Schemas.landlordSchema import LandlordLogin, LandlordUpdate, LandlordResponse, LandlordPublicResponse, LandlordPropertyResponse, LandlordReviewResponse, LandlordFlagResponse, PropertyRange, IDType, DocumentType, LandlordVerification, LandlordTokenResponse
+from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, LandlordDocuments, LandlordNotificationPreferences
+from Schemas.landlordSchema import LandlordLogin, LandlordUpdate, LandlordResponse, LandlordPublicResponse, LandlordPropertyResponse, LandlordReviewResponse, LandlordFlagResponse, PropertyRange, IDType, DocumentType, LandlordVerification, LandlordTokenResponse, LandlordNotificationPreferencesUpdate, LandlordNotificationPreferencesResponse
 from Schemas.userSchema import UserRole, TokenResponse
-from Utils.security import get_current_landlord, hash_password, verify_password, create_access_token, validate_password
+from Utils.security import get_current_landlord, hash_password, verify_password, create_access_token, validate_password, create_refresh_token_for_user, revoke_all_refresh_tokens
 from Utils.textract import extract_document_data
 from Utils.verification import compare_landlord_data
-from helpers import require_landlord, get_landlord_profile, compute_landlord_stats, upload_to_s3, BUCKET_NAME
+from helpers import require_landlord, get_landlord_profile, compute_landlord_stats, upload_to_s3, BUCKET_NAME, log_security_event
+from Schemas.authSchema import SecurityEventType, SecurityEventResponse
 from typing import Optional
 from pydantic import EmailStr
 from Utils.rate_limit import limiter
@@ -88,9 +89,13 @@ def register_landlord(request: Request, email: EmailStr = Form(...), password: s
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
     token = create_access_token({"user_id": landlord.id, "role": landlord.role.value, "verified": verification_status == LandlordVerification.VERIFIED, "tv": landlord.token_version})
+    refresh_token = create_refresh_token_for_user(landlord.id, landlord.role.value, db)
+    log_security_event(db, landlord.id, landlord.role.value, SecurityEventType.ACCOUNT_CREATED, request)
+    db.commit()
 
     return LandlordTokenResponse(
         access_token=token,
+        refresh_token=refresh_token,
         landlord=LandlordResponse.model_validate(landlord),
     )
 
@@ -101,12 +106,19 @@ def login_landlord(request: Request, payload: OAuth2PasswordRequestForm = Depend
     landlord = db.query(Landlord).filter(Landlord.email == payload.username).first()
 
     if not landlord or not verify_password(payload.password, landlord.password_hash):
+        if landlord:
+            log_security_event(db, landlord.id, landlord.role.value, SecurityEventType.SIGN_IN_FAILED, request)
+            db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password", headers={"WWW-Authenticate": "Bearer"})
 
     token = create_access_token({"user_id": landlord.id, "role": landlord.role.value, "verified": landlord.identity_verified, "tv": landlord.token_version})
+    refresh_token = create_refresh_token_for_user(landlord.id, landlord.role.value, db)
+    log_security_event(db, landlord.id, landlord.role.value, SecurityEventType.SIGN_IN, request)
+    db.commit()
 
     return {
-        "access_token": token, 
+        "access_token": token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "landlord": {
             "id": landlord.id,
@@ -120,10 +132,32 @@ def login_landlord(request: Request, payload: OAuth2PasswordRequestForm = Depend
     }
 
 @landlord_router.post("/me/logout-all", status_code=status.HTTP_200_OK)
-def logout_all_landlord_sessions(db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+def logout_all_landlord_sessions(request: Request, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
     current_landlord.token_version = (current_landlord.token_version or 0) + 1
+    revoke_all_refresh_tokens(current_landlord.id, current_landlord.role.value, db)
+    log_security_event(db, current_landlord.id, current_landlord.role.value, SecurityEventType.SIGN_OUT_ALL, request)
     db.commit()
     return {"message": "Signed out of all sessions."}
+
+# Security event log
+@landlord_router.get("/me/security-log", response_model=list[SecurityEventResponse])
+def get_landlord_security_log(limit: int = 50, offset: int = 0, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    from tables import SecurityEvent
+    events = (
+        db.query(SecurityEvent)
+        .filter(SecurityEvent.user_id == current_landlord.id, SecurityEvent.role == current_landlord.role.value)
+        .order_by(SecurityEvent.created_at.desc())
+        .offset(offset)
+        .limit(min(limit, 100))
+        .all()
+    )
+    return [
+        SecurityEventResponse(
+            id=e.id, event_type=e.event_type, ip_address=e.ip_address,
+            user_agent=e.user_agent, metadata=e.metadata_, created_at=e.created_at,
+        )
+        for e in events
+    ]
 
 # Private Landlord Profile
 @landlord_router.get("/me", response_model=LandlordResponse)
@@ -274,3 +308,38 @@ def get_my_listing_flags(current_landlord: Landlord = Depends(get_current_landlo
         )
         for flag, listing, property in rows
     ]
+
+# Get landlord notification preferences
+@landlord_router.get("/me/notifications", response_model=LandlordNotificationPreferencesResponse)
+def get_landlord_notifications(db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    prefs = db.query(LandlordNotificationPreferences).filter(LandlordNotificationPreferences.landlord_id == current_landlord.id).first()
+
+    if not prefs:
+        prefs = LandlordNotificationPreferences(landlord_id=current_landlord.id)
+        db.add(prefs)
+        db.commit()
+        db.refresh(prefs)
+
+    return LandlordNotificationPreferencesResponse.model_validate(prefs)
+
+# Update landlord notification preferences
+@landlord_router.patch("/me/notifications", response_model=LandlordNotificationPreferencesResponse)
+def update_landlord_notifications(payload: LandlordNotificationPreferencesUpdate, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    prefs = db.query(LandlordNotificationPreferences).filter(LandlordNotificationPreferences.landlord_id == current_landlord.id).first()
+
+    if not prefs:
+        prefs = LandlordNotificationPreferences(landlord_id=current_landlord.id)
+        db.add(prefs)
+        db.flush()
+
+    if payload.notify_new_messages is not None:
+        prefs.notify_new_messages = payload.notify_new_messages
+    if payload.notify_new_reviews is not None:
+        prefs.notify_new_reviews = payload.notify_new_reviews
+    if payload.notify_new_flags is not None:
+        prefs.notify_new_flags = payload.notify_new_flags
+
+    db.commit()
+    db.refresh(prefs)
+
+    return LandlordNotificationPreferencesResponse.model_validate(prefs)

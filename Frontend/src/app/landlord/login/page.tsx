@@ -13,8 +13,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const rotatingLines = ["direct student messages", "verified listings", "faster replies"];
 
-function persistLandlordSession(token: string, landlord: UserResponse) {
+function persistLandlordSession(token: string, landlord: UserResponse, refreshToken?: string) {
   localStorage.setItem("cribb_token", token);
+  if (refreshToken) localStorage.setItem("cribb_refresh_token", refreshToken);
   localStorage.setItem("cribb_landlord_profile", JSON.stringify(landlord));
   useAuthStore.setState({
     user: landlord,
@@ -78,7 +79,7 @@ function LandlordLoginPageContent() {
         phone: data.landlord.phone,
       };
 
-      persistLandlordSession(data.access_token, landlordUser);
+      persistLandlordSession(data.access_token, landlordUser, data.refresh_token);
       router.push(nextPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChevronUp, Bookmark, Share2, MoreHorizontal, X, ImagePlus,
-  Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag,
+  Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag, Star, ArrowLeft, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
@@ -20,15 +20,19 @@ import { toast } from "sonner";
    ═══════════════════════════════════════════════════════ */
 
 type Category = "event" | "deal" | "news" | "lifestyle" | "food" | "other";
-type SortMode = "trending" | "new" | "top";
+type SortMode = "trending" | "latest";
 
 interface Post {
   id: string;
   sourcePostId?: number;
   author: string;
+  authorType?: "student" | "writer";
+  authorId?: number;
+  authorPhotoUrl?: string;
   initial: string;
   avatarGradient: string;
   verified: boolean;
+  isOfficial?: boolean;
   timestamp: string;
   category: Category;
   title: string;
@@ -55,18 +59,34 @@ function formatRelativeTimestamp(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
 }
 
+// Stable color per author name (not per category)
+const AUTHOR_COLORS = ["#6C5CE7", "#2EC4B6", "#E84393", "#FFB627", "#0984e3", "#00b894", "#d63031", "#e17055"];
+function authorColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AUTHOR_COLORS[Math.abs(hash) % AUTHOR_COLORS.length];
+}
+
 function buildLivePost(post: PostListResponse): Post {
   const category = (post.category || "other") as Category;
-  const meta = getCategoryMeta(category);
-  const authorName = post.author_name || "Writer";
+  const isOfficial = Boolean(post.author_is_official);
+  const authorName = isOfficial ? "Cribb" : (post.author_name || "Writer");
+  const initial = isOfficial ? "C" : (authorName[0]?.toUpperCase() || "W");
+  const avatarGradient = isOfficial
+    ? "linear-gradient(135deg, #FF6B35, #1B2D45)"
+    : `linear-gradient(135deg, ${authorColor(authorName)}, #1B2D45)`;
 
   return {
     id: `live-${post.id}`,
     sourcePostId: post.id,
     author: authorName,
-    initial: authorName[0]?.toUpperCase() || "W",
-    avatarGradient: `linear-gradient(135deg, ${meta.color}, #1B2D45)`,
+    authorType: post.author_type as "student" | "writer",
+    authorId: post.author_id,
+    authorPhotoUrl: post.author_photo_url || undefined,
+    initial,
+    avatarGradient,
     verified: true,
+    isOfficial,
     timestamp: formatRelativeTimestamp(post.created_at),
     category,
     title: post.title,
@@ -156,7 +176,13 @@ const WEEKLY_HIGHLIGHTS = [
    AVATAR
    ═══════════════════════════════════════════════════════ */
 
-function Avatar({ initial, gradient, size = 32 }: { initial: string; gradient: string; size?: number }) {
+function Avatar({ initial, gradient, size = 32, photoUrl }: { initial: string; gradient: string; size?: number; photoUrl?: string }) {
+  if (photoUrl) {
+    return (
+      <img src={photoUrl} alt={initial} className="rounded-full shrink-0 object-cover"
+        style={{ width: size, height: size }} />
+    );
+  }
   return (
     <div className="rounded-full flex items-center justify-center shrink-0 text-white"
       style={{ width: size, height: size, background: gradient, fontSize: `${size * 0.4}px`, fontWeight: 700 }}>
@@ -200,10 +226,16 @@ function PostCard({
   post,
   index,
   onPostUpdated,
+  isStarred,
+  onToggleStar,
+  onAuthorClick,
 }: {
   post: Post;
   index: number;
   onPostUpdated?: (postId: string, updates: Partial<Post>) => void;
+  isStarred?: boolean;
+  onToggleStar?: (authorType: "student" | "writer", authorId: number) => void;
+  onAuthorClick?: (authorType: "student" | "writer", authorId: number, authorName: string) => void;
 }) {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -268,10 +300,32 @@ function PostCard({
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2.5">
-            <Avatar initial={post.initial} gradient={post.avatarGradient} />
-            <div className="flex items-center gap-1.5">
-              <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{post.author}</span>
-              {post.verified && <VerifiedBadge />}
+            {post.authorType && post.authorId && !post.isOfficial ? (
+              <button onClick={() => onAuthorClick?.(post.authorType!, post.authorId!, post.author)} className="cursor-pointer">
+                <Avatar initial={post.initial} gradient={post.avatarGradient} photoUrl={post.authorPhotoUrl} />
+              </button>
+            ) : (
+              <Avatar initial={post.initial} gradient={post.avatarGradient} photoUrl={post.authorPhotoUrl} />
+            )}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {post.authorType && post.authorId && !post.isOfficial ? (
+                <button onClick={() => onAuthorClick?.(post.authorType!, post.authorId!, post.author)}
+                  className="text-[#1B2D45] hover:text-[#FF6B35] transition-colors" style={{ fontSize: "13px", fontWeight: 700 }}>
+                  {post.author}
+                </button>
+              ) : (
+                <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{post.author}</span>
+              )}
+              {post.isOfficial ? (
+                <span
+                  className="inline-flex items-center rounded-full bg-[#FF6B35] text-white"
+                  style={{ fontSize: "9px", fontWeight: 800, letterSpacing: "0.06em", padding: "2px 7px" }}
+                >
+                  OFFICIAL
+                </span>
+              ) : (
+                post.verified && <VerifiedBadge />
+              )}
               <span className="text-[#98A3B0]" style={{ fontSize: "11px" }}>· {post.timestamp}</span>
             </div>
           </div>
@@ -370,6 +424,16 @@ function PostCard({
             </AnimatePresence>
           </div>
           <div className="flex items-center gap-0.5">
+            {post.authorType && post.authorId && user?.role === "student" && !post.isOfficial && (
+              <motion.button
+                onClick={() => onToggleStar?.(post.authorType!, post.authorId!)}
+                whileTap={{ scale: 1.3 }}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${isStarred ? "text-[#FFB627] bg-[#FFB627]/10" : "text-[#98A3B0] hover:bg-[#1B2D45]/5"}`}
+                title={isStarred ? "Unstar author" : "Star author for notifications"}
+              >
+                <Star className={`w-3.5 h-3.5 ${isStarred ? "fill-[#FFB627]" : ""}`} />
+              </motion.button>
+            )}
             <motion.button onClick={() => setSaved(!saved)} whileTap={{ scale: 1.3 }}
               className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${saved ? "text-[#FF6B35] bg-[#FF6B35]/10" : "text-[#98A3B0] hover:bg-[#1B2D45]/5"}`}>
               <Bookmark className={`w-3.5 h-3.5 ${saved ? "fill-[#FF6B35]" : ""}`} />
@@ -880,7 +944,7 @@ function FilterBar({ activeCategory, onSelectCategory, sortMode, onSelectSort, i
           {/* Sort toggle */}
           {!isMobile && (
             <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 shrink-0">
-              {(["trending", "new", "top"] as const).map((s) => (
+              {(["trending", "latest"] as const).map((s) => (
                 <button key={s} onClick={() => onSelectSort(s)}
                   className={`px-2.5 py-1.5 rounded-md transition-all ${sortMode === s ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/60"}`}
                   style={{ fontSize: "11px", fontWeight: 600, textTransform: "capitalize" }}>
@@ -974,6 +1038,182 @@ function EmptyState({ onReset }: { onReset: () => void }) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   AUTHOR PANEL (slide-out over feed)
+   ═══════════════════════════════════════════════════════ */
+
+function AuthorPanel({
+  authorType,
+  authorId,
+  authorName,
+  onClose,
+  isStarred,
+  onToggleStar,
+  onPostUpdated,
+  starredKeys,
+  handleToggleStar,
+}: {
+  authorType: "student" | "writer";
+  authorId: number;
+  authorName: string;
+  onClose: () => void;
+  isStarred: boolean;
+  onToggleStar: (authorType: "student" | "writer", authorId: number) => void;
+  onPostUpdated: (postId: string, updates: Partial<Post>) => void;
+  starredKeys: Set<string>;
+  handleToggleStar: (authorType: "student" | "writer", authorId: number) => void;
+}) {
+  const { user } = useAuthStore();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    const fetcher = authorType === "student"
+      ? api.posts.getByStudentAuthor(authorId)
+      : api.posts.getByWriterAuthor(authorId);
+
+    fetcher
+      .then((data) => {
+        if (cancelled) return;
+        setPosts(
+          data
+            .filter((p) => p.status === "published")
+            .map(buildLivePost)
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setPosts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [authorType, authorId]);
+
+  const gradient = `linear-gradient(135deg, ${authorColor(authorName)}, #1B2D45)`;
+  const initial = authorName[0]?.toUpperCase() || "?";
+  // try to get photo from first post
+  const photoUrl = posts[0]?.authorPhotoUrl;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className="flex-1 min-w-0 space-y-4"
+    >
+      {/* Author header card */}
+      <div className="bg-white rounded-2xl border border-black/[0.04] overflow-hidden" style={{ boxShadow: "0 2px 12px rgba(27,45,69,0.06)" }}>
+        {/* Banner — light gradient tint of author color */}
+        <div className="relative h-20">
+          <div className="absolute inset-0" style={{
+            background: `linear-gradient(135deg, ${authorColor(authorName)}20 0%, ${authorColor(authorName)}10 35%, #FAF8F4 100%)`,
+          }} />
+          {/* Back button */}
+          <button
+            onClick={onClose}
+            className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/70 backdrop-blur-sm text-[#5C6B7A] hover:text-[#1B2D45] hover:bg-white transition-colors"
+            style={{ fontSize: "12px", fontWeight: 600 }}
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Feed
+          </button>
+        </div>
+
+        {/* Profile section — avatar overlaps the banner */}
+        <div className="px-5 pb-5 -mt-7">
+          <div className="flex items-end gap-4 mb-4">
+            <div className="rounded-full border-[3px] border-white shrink-0" style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
+              <Avatar initial={initial} gradient={gradient} size={52} photoUrl={photoUrl} />
+            </div>
+            <div className="flex-1 min-w-0 pb-0.5">
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-[#1B2D45] truncate" style={{ fontSize: "17px", fontWeight: 800 }}>{authorName}</h2>
+                <VerifiedBadge />
+              </div>
+              <p className="text-[#98A3B0] mt-0.5" style={{ fontSize: "12px", fontWeight: 500 }}>
+                {authorType === "writer" ? "Verified Writer" : "Student Writer"}
+              </p>
+            </div>
+          </div>
+
+          {/* Stats row + star button */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <p className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>
+                  {loading ? "-" : posts.length}
+                </p>
+                <p className="text-[#98A3B0]" style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Posts
+                </p>
+              </div>
+              <div className="w-px h-8 bg-black/[0.06]" />
+              <div className="text-center">
+                <p className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>
+                  {loading ? "-" : posts.reduce((sum, p) => sum + p.upvotes, 0)}
+                </p>
+                <p className="text-[#98A3B0]" style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Upvotes
+                </p>
+              </div>
+            </div>
+
+            {user?.role === "student" && (
+              <motion.button
+                onClick={() => onToggleStar(authorType, authorId)}
+                whileTap={{ scale: 1.1 }}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl border transition-all ${
+                  isStarred
+                    ? "border-[#FFB627]/30 bg-[#FFB627]/10 text-[#B8860B]"
+                    : "border-black/[0.08] text-[#5C6B7A] hover:border-[#FFB627]/30 hover:bg-[#FFB627]/5"
+                }`}
+                style={{ fontSize: "12px", fontWeight: 700 }}
+              >
+                <Star className={`w-3.5 h-3.5 ${isStarred ? "fill-[#FFB627] text-[#FFB627]" : ""}`} />
+                {isStarred ? "Starred" : "Star"}
+              </motion.button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Posts section */}
+      {!loading && posts.length > 0 && (
+        <p className="text-[#98A3B0] pt-1" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Published posts
+        </p>
+      )}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 text-[#FF6B35] animate-spin" />
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 px-4">
+          <span style={{ fontSize: "40px" }}>📭</span>
+          <h3 className="text-[#1B2D45] mt-3" style={{ fontSize: "16px", fontWeight: 700 }}>No published posts yet</h3>
+          <p className="text-[#5C6B7A] mt-1 text-center" style={{ fontSize: "13px" }}>When {authorName} publishes, their posts will appear here.</p>
+        </div>
+      ) : (
+        posts.map((post, i) => (
+          <PostCard
+            key={post.id}
+            post={post}
+            index={i}
+            onPostUpdated={onPostUpdated}
+            isStarred={post.authorType && post.authorId ? starredKeys.has(`${post.authorType}:${post.authorId}`) : false}
+            onToggleStar={handleToggleStar}
+          />
+        ))
+      )}
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════
    MAIN PAGE
    ═══════════════════════════════════════════════════════ */
 
@@ -987,6 +1227,8 @@ export default function TheBubblePage() {
   const [isWriter, setIsWriter] = useState(false);
   const [livePosts, setLivePosts] = useState<Post[]>([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [starredKeys, setStarredKeys] = useState<Set<string>>(new Set());
+  const [authorPanel, setAuthorPanel] = useState<{ type: "student" | "writer"; id: number; name: string } | null>(null);
   const { user } = useAuthStore();
   const isMobile = useIsMobile();
   const isLandlord = user?.role === "landlord";
@@ -1028,6 +1270,52 @@ export default function TheBubblePage() {
 
     setIsWriter(false);
   }, [user]);
+
+  // Load starred authors for the current student
+  useEffect(() => {
+    if (!user || user.role !== "student") {
+      setStarredKeys(new Set());
+      return;
+    }
+    let cancelled = false;
+    api.posts.getStarredAuthors().then((stars) => {
+      if (cancelled) return;
+      setStarredKeys(new Set(stars.map((s) => `${s.author_type}:${s.author_id}`)));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [user]);
+
+  const handleToggleStar = useCallback(async (authorType: "student" | "writer", authorId: number) => {
+    const key = `${authorType}:${authorId}`;
+    const wasStarred = starredKeys.has(key);
+    // Optimistic update
+    setStarredKeys((prev) => {
+      const next = new Set(prev);
+      if (wasStarred) next.delete(key); else next.add(key);
+      return next;
+    });
+    try {
+      if (wasStarred) {
+        await api.posts.unstarAuthor(authorType, authorId);
+        toast.success("Author unstarred");
+      } else {
+        await api.posts.starAuthor(authorType, authorId);
+        toast.success("Author starred — you'll get notified when they post");
+      }
+    } catch (err) {
+      // Revert
+      setStarredKeys((prev) => {
+        const next = new Set(prev);
+        if (wasStarred) next.add(key); else next.delete(key);
+        return next;
+      });
+      toast.error(err instanceof ApiError ? err.detail : "Could not update star");
+    }
+  }, [starredKeys]);
+
+  const handleAuthorClick = useCallback((authorType: "student" | "writer", authorId: number, authorName: string) => {
+    setAuthorPanel({ type: authorType, id: authorId, name: authorName });
+  }, []);
 
   const loadPublishedPosts = useCallback(async () => {
     try {
@@ -1071,16 +1359,19 @@ export default function TheBubblePage() {
     let posts = activeCategory === "all" ? [...feedPosts] : feedPosts.filter((p) => p.category === activeCategory);
 
     // Sort comparator for the chosen mode
+    const currentTime = Date.now();
     const compare = (a: Post, b: Post): number => {
       if (sortMode === "trending") {
-        const ageA = (now - a.postedAt) / HOUR;
-        const ageB = (now - b.postedAt) / HOUR;
-        const scoreA = a.upvotes / Math.pow(ageA + 2, 1.5);
-        const scoreB = b.upvotes / Math.pow(ageB + 2, 1.5);
+        const ageA = Math.max(0, (currentTime - a.postedAt) / HOUR);
+        const ageB = Math.max(0, (currentTime - b.postedAt) / HOUR);
+        // +1 base so 0-upvote posts don't score 0; recency boost for posts < 6h old
+        const freshA = ageA < 6 ? 3 * (1 - ageA / 6) : 0;
+        const freshB = ageB < 6 ? 3 * (1 - ageB / 6) : 0;
+        const scoreA = (a.upvotes + 1 + freshA) / Math.pow(ageA + 2, 1.3);
+        const scoreB = (b.upvotes + 1 + freshB) / Math.pow(ageB + 2, 1.3);
         return scoreB - scoreA;
       }
-      if (sortMode === "new") return b.postedAt - a.postedAt;
-      return b.upvotes - a.upvotes; // "top"
+      return b.postedAt - a.postedAt; // "latest"
     };
 
     // Split into real posts (have sourcePostId) and mock posts, sort each, concat
@@ -1218,32 +1509,66 @@ export default function TheBubblePage() {
 
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6 md:py-8">
         <div className={isMobile ? "" : "grid grid-cols-[minmax(0,1fr)_280px] gap-8 items-start"}>
-          {/* Feed */}
-          <div className="flex-1 min-w-0 space-y-4">
-            {activeCategory === "all" && <WeeklyHighlightsCard />}
-            {isMobile && renderWriterCard(true)}
-
-            {/* Mobile sort toggle */}
-            {isMobile && (
-              <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 w-fit">
-                {(["trending", "new", "top"] as const).map((s) => (
-                  <button key={s} onClick={() => setSortMode(s)}
-                    className={`px-3 py-1.5 rounded-md transition-all ${sortMode === s ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40"}`}
-                    style={{ fontSize: "11px", fontWeight: 600, textTransform: "capitalize" }}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {isLoadingPosts && filteredAndSorted.length === 0 ? (
-              <BubbleFeedSkeleton />
-            ) : filteredAndSorted.length > 0 ? (
-              filteredAndSorted.map((post, i) => <PostCard key={post.id} post={post} index={i} onPostUpdated={handlePostUpdated} />)
+          {/* Feed or Author Panel */}
+          <AnimatePresence mode="wait">
+            {authorPanel ? (
+              <AuthorPanel
+                key={`author-${authorPanel.type}-${authorPanel.id}`}
+                authorType={authorPanel.type}
+                authorId={authorPanel.id}
+                authorName={authorPanel.name}
+                onClose={() => setAuthorPanel(null)}
+                isStarred={starredKeys.has(`${authorPanel.type}:${authorPanel.id}`)}
+                onToggleStar={handleToggleStar}
+                onPostUpdated={handlePostUpdated}
+                starredKeys={starredKeys}
+                handleToggleStar={handleToggleStar}
+              />
             ) : (
-              <EmptyState onReset={() => setActiveCategory("all")} />
+              <motion.div
+                key="feed"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex-1 min-w-0 space-y-4"
+              >
+                {activeCategory === "all" && <WeeklyHighlightsCard />}
+                {isMobile && renderWriterCard(true)}
+
+                {/* Mobile sort toggle */}
+                {isMobile && (
+                  <div className="flex items-center bg-white rounded-lg border border-black/[0.06] p-0.5 w-fit">
+                    {(["trending", "latest"] as const).map((s) => (
+                      <button key={s} onClick={() => setSortMode(s)}
+                        className={`px-3 py-1.5 rounded-md transition-all ${sortMode === s ? "bg-[#FF6B35] text-white" : "text-[#1B2D45]/40"}`}
+                        style={{ fontSize: "11px", fontWeight: 600, textTransform: "capitalize" }}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {isLoadingPosts && filteredAndSorted.length === 0 ? (
+                  <BubbleFeedSkeleton />
+                ) : filteredAndSorted.length > 0 ? (
+                  filteredAndSorted.map((post, i) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      index={i}
+                      onPostUpdated={handlePostUpdated}
+                      isStarred={post.authorType && post.authorId ? starredKeys.has(`${post.authorType}:${post.authorId}`) : false}
+                      onToggleStar={handleToggleStar}
+                      onAuthorClick={handleAuthorClick}
+                    />
+                  ))
+                ) : (
+                  <EmptyState onReset={() => setActiveCategory("all")} />
+                )}
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
 
           {!isMobile && (
             <div className="shrink-0 pl-1 pr-1 space-y-4">

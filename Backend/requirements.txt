@@ -17,5 +17,7 @@ cloudinary
 apscheduler
 slowapi
 anthropic
+firecrawl-py
 sentry-sdk[fastapi]
 upstash-redis
+firecrawl-py

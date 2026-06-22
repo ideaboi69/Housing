@@ -22,6 +22,7 @@ export default function AdminLoginPage() {
     try {
       const res = await api.admin.login({ username: email, password });
       localStorage.setItem("cribb_admin_token", res.access_token);
+      if (res.refresh_token) localStorage.setItem("cribb_admin_refresh_token", res.refresh_token);
       localStorage.setItem("cribb_admin_profile", JSON.stringify(res.admin));
       router.push("/admin");
     } catch {

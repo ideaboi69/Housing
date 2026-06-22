@@ -3,9 +3,11 @@ from fastapi import Depends, HTTPException, status, Security
 from fastapi.security import OAuth2PasswordBearer, HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt, ExpiredSignatureError
 import bcrypt
+import secrets
+import hashlib
 from sqlalchemy.orm import Session
 from config import settings
-from tables import get_db, User, Landlord, Admin, Writer
+from tables import get_db, User, Landlord, Admin, Writer, RefreshToken
 from Schemas.writerSchema import WriterStatus
 from Schemas.userSchema import UserRole
 import re
@@ -260,3 +262,124 @@ def require_role(required_role: str):
         return current_user
 
     return role_checker
+
+# ── Refresh Token helpers ──────────────────────────────────
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+def _get_user_by_role(user_id: int, role: str, db: Session):
+    if role == UserRole.STUDENT.value:
+        return db.query(User).get(user_id)
+    elif role == UserRole.LANDLORD.value:
+        return db.query(Landlord).get(user_id)
+    elif role == UserRole.WRITER.value:
+        return db.query(Writer).get(user_id)
+    elif role == UserRole.ADMIN.value:
+        return db.query(Admin).get(user_id)
+    return None
+
+def create_refresh_token_for_user(user_id: int, role: str, db: Session) -> str:
+    """Create a refresh token, store its SHA-256 hash in DB, return the raw token."""
+    raw_token = secrets.token_urlsafe(64)
+    token_hash = _hash_token(raw_token)
+    family_id = secrets.token_urlsafe(32)
+
+    refresh = RefreshToken(
+        token_hash=token_hash,
+        user_id=user_id,
+        role=role,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        family_id=family_id,
+    )
+    db.add(refresh)
+    db.flush()
+    return raw_token
+
+def rotate_refresh_token(raw_token: str, db: Session):
+    """
+    Validate a refresh token, revoke it, issue a new access + refresh pair.
+
+    Stolen-token detection: if a *revoked* token is presented, the entire
+    token family is nuked — every session spawned from the same login is
+    invalidated, forcing a fresh login on all devices.
+
+    Returns (new_access_token, new_refresh_token, role, user).
+    """
+    token_hash = _hash_token(raw_token)
+    stored = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
+
+    if not stored:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    # ── Stolen-token detection ──
+    if stored.is_revoked:
+        db.query(RefreshToken).filter(
+            RefreshToken.family_id == stored.family_id
+        ).update({"is_revoked": True}, synchronize_session=False)
+        db.commit()
+        raise HTTPException(
+            status_code=401,
+            detail="Token reuse detected. All sessions revoked. Please log in again.",
+        )
+
+    # ── Expiry check ──
+    stored_exp = stored.expires_at
+    if stored_exp.tzinfo is None:
+        stored_exp = stored_exp.replace(tzinfo=timezone.utc)
+    if stored_exp < datetime.now(timezone.utc):
+        stored.is_revoked = True
+        db.commit()
+        raise HTTPException(status_code=401, detail="Refresh token expired. Please log in again.")
+
+    # ── Look up user ──
+    user = _get_user_by_role(stored.user_id, stored.role, db)
+    if not user:
+        stored.is_revoked = True
+        db.commit()
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # ── Revoke old, issue new (rotation) ──
+    stored.is_revoked = True
+    new_raw_token = secrets.token_urlsafe(64)
+    new_token_hash = _hash_token(new_raw_token)
+    stored.replaced_by = new_token_hash
+
+    new_refresh = RefreshToken(
+        token_hash=new_token_hash,
+        user_id=stored.user_id,
+        role=stored.role,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        family_id=stored.family_id,
+    )
+    db.add(new_refresh)
+
+    # ── Build new access token ──
+    token_data = {
+        "user_id": stored.user_id,
+        "role": stored.role,
+        "tv": getattr(user, "token_version", 0),
+    }
+    if stored.role == UserRole.LANDLORD.value:
+        token_data["verified"] = getattr(user, "identity_verified", False)
+
+    new_access_token = create_access_token(token_data)
+    db.commit()
+
+    return new_access_token, new_raw_token, stored.role, user
+
+def revoke_refresh_token(raw_token: str, db: Session) -> None:
+    """Revoke a single refresh token (regular logout)."""
+    token_hash = _hash_token(raw_token)
+    db.query(RefreshToken).filter(
+        RefreshToken.token_hash == token_hash
+    ).update({"is_revoked": True}, synchronize_session=False)
+    db.commit()
+
+def revoke_all_refresh_tokens(user_id: int, role: str, db: Session) -> None:
+    """Revoke every active refresh token for a user (logout-all, password change/reset)."""
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user_id,
+        RefreshToken.role == role,
+        RefreshToken.is_revoked == False,
+    ).update({"is_revoked": True}, synchronize_session=False)

@@ -50,6 +50,9 @@ class PostResponse(BaseModel):
     category: PostCategory
     author_name: str
     author_type: str
+    author_id: Optional[int] = None
+    author_photo_url: Optional[str] = None
+    author_is_official: bool = False
     status: PostStatus
     view_count: int
     upvote_count: int = 0
@@ -74,6 +77,9 @@ class PostListResponse(BaseModel):
     category: PostCategory
     author_name: str
     author_type: str
+    author_id: Optional[int] = None
+    author_photo_url: Optional[str] = None
+    author_is_official: bool = False
     status: PostStatus
     view_count: int
     upvote_count: int = 0

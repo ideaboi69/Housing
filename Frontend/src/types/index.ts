@@ -191,26 +191,50 @@ export interface RoleSwitch {
 
 export interface TokenResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
   user: UserResponse;
 }
 
+export interface SecurityEvent {
+  id: number;
+  event_type: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface NotificationPreferencesUpdate {
-  new_listings_matching?: boolean;
-  price_drops_saved?: boolean;
-  new_roommate_matches?: boolean;
-  weekly_bubble_digest?: boolean;
-  cribb_news_updates?: boolean;
+  notify_new_messages?: boolean;
+  notify_roommate_updates?: boolean;
+  notify_viewing_updates?: boolean;
+  notify_bubble_posts?: boolean;
 }
 
 export interface NotificationPreferencesResponse {
   id: number;
   user_id: number;
-  new_listings_matching: boolean;
-  price_drops_saved: boolean;
-  new_roommate_matches: boolean;
-  weekly_bubble_digest: boolean;
-  cribb_news_updates: boolean;
+  notify_new_messages: boolean;
+  notify_roommate_updates: boolean;
+  notify_viewing_updates: boolean;
+  notify_bubble_posts: boolean;
+  updated_at: string;
+}
+
+// Landlord notification preferences
+export interface LandlordNotificationPreferencesUpdate {
+  notify_new_messages?: boolean;
+  notify_new_reviews?: boolean;
+  notify_new_flags?: boolean;
+}
+
+export interface LandlordNotificationPreferencesResponse {
+  id: number;
+  landlord_id: number;
+  notify_new_messages: boolean;
+  notify_new_reviews: boolean;
+  notify_new_flags: boolean;
   updated_at: string;
 }
 
@@ -799,6 +823,7 @@ export interface WriterResponse {
 
 export interface WriterTokenResponse {
   access_token: string;
+  refresh_token: string;
   writer: WriterResponse;
 }
 
@@ -852,6 +877,9 @@ export interface PostResponse {
   category: PostCategory;
   author_name: string;
   author_type: string;
+  author_id?: number;
+  author_photo_url?: string;
+  author_is_official?: boolean;
   status: PostStatus;
   view_count: number;
   upvote_count: number;
@@ -874,6 +902,9 @@ export interface PostListResponse {
   category: PostCategory;
   author_name: string;
   author_type: string;
+  author_id?: number;
+  author_photo_url?: string;
+  author_is_official?: boolean;
   status: PostStatus;
   view_count: number;
   upvote_count: number;
@@ -881,6 +912,19 @@ export interface PostListResponse {
   event_date?: string;
   deal_expires?: string;
   created_at: string;
+}
+
+// ── Starred Authors ────────────────────────────────────
+
+export interface StarredAuthor {
+  id: number;
+  author_type: "student" | "writer";
+  author_id: number;
+  author_name: string;
+  business_name?: string;
+  profile_photo_url?: string;
+  is_official?: boolean;
+  starred_at?: string;
 }
 
 // ── Messages / Conversations ───────────────────────────

@@ -6,7 +6,7 @@ from tables import get_db, Listing, Property, Landlord, User, ViewingAvailabilit
 from Schemas.viewingSchema import AvailabilityCreate, BulkAvailabilityCreate, BookingCreate, AvailabilityResponse, ViewingSlotResponse, BookingResponse
 from Utils.security import get_current_user, get_current_student
 from Utils.email import send_booking_confirmed_email, send_booking_cancelled_email
-from helpers import require_landlord, generate_hourly_slots, build_booking_response, get_booking_details, get_host_info
+from helpers import require_landlord, generate_hourly_slots, build_booking_response, get_booking_details, get_host_info, should_notify_student, should_notify_landlord
 from Utils.rate_limit import limiter
 
 viewing_router = APIRouter()
@@ -269,20 +269,34 @@ def book_viewing(request: Request, payload: BookingCreate, background_tasks: Bac
         "start_time": str(slot.start_time),
         "end_time": str(slot.end_time),
     }
-    background_tasks.add_task(
-        send_booking_confirmed_email,
-        to_email=current_user.email,
-        name=current_user.first_name,
-        role="student",
-        booking_details={**booking_details, "other_party_name": host_full},
-    )
-    background_tasks.add_task(
-        send_booking_confirmed_email,
-        to_email=host_email,
-        name=host_name,
-        role="landlord",
-        booking_details={**booking_details, "other_party_name": f"{current_user.first_name} {current_user.last_name}"},
-    )
+    # Notify student (if viewing updates enabled)
+    if should_notify_student(db, current_user.id, "notify_viewing_updates"):
+        background_tasks.add_task(
+            send_booking_confirmed_email,
+            to_email=current_user.email,
+            name=current_user.first_name,
+            role="student",
+            booking_details={**booking_details, "other_party_name": host_full},
+        )
+    # Notify host (landlord or sublet owner)
+    if slot.listing_id:
+        if should_notify_landlord(db, landlord.id, "notify_new_messages"):
+            background_tasks.add_task(
+                send_booking_confirmed_email,
+                to_email=host_email,
+                name=host_name,
+                role="landlord",
+                booking_details={**booking_details, "other_party_name": f"{current_user.first_name} {current_user.last_name}"},
+            )
+    else:
+        if should_notify_student(db, owner.id, "notify_viewing_updates"):
+            background_tasks.add_task(
+                send_booking_confirmed_email,
+                to_email=host_email,
+                name=host_name,
+                role="landlord",
+                booking_details={**booking_details, "other_party_name": f"{current_user.first_name} {current_user.last_name}"},
+            )
     return build_booking_response(booking, db)
 
 # USER - Cancel booking
@@ -311,21 +325,33 @@ def student_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, d
     details = get_booking_details(booking, db)
     host_email, host_name, _ = get_host_info(booking, db)
 
-    background_tasks.add_task(
-        send_booking_cancelled_email,
-        to_email=current_user.email,
-        name=current_user.first_name,
-        cancelled_by="student",
-        booking_details=details,
-    )
+    if should_notify_student(db, current_user.id, "notify_viewing_updates"):
+        background_tasks.add_task(
+            send_booking_cancelled_email,
+            to_email=current_user.email,
+            name=current_user.first_name,
+            cancelled_by="student",
+            booking_details=details,
+        )
 
-    background_tasks.add_task(
-        send_booking_cancelled_email,
-        to_email=host_email,
-        name=host_name,
-        cancelled_by="student",
-        booking_details=details,
-    )
+    if booking.landlord_id:
+        if should_notify_landlord(db, booking.landlord_id, "notify_new_messages"):
+            background_tasks.add_task(
+                send_booking_cancelled_email,
+                to_email=host_email,
+                name=host_name,
+                cancelled_by="student",
+                booking_details=details,
+            )
+    elif booking.owner_id:
+        if should_notify_student(db, booking.owner_id, "notify_viewing_updates"):
+            background_tasks.add_task(
+                send_booking_cancelled_email,
+                to_email=host_email,
+                name=host_name,
+                cancelled_by="student",
+                booking_details=details,
+            )
 
     return build_booking_response(booking, db)
 
@@ -365,21 +391,33 @@ def host_cancel_booking(booking_id: int, background_tasks: BackgroundTasks, db: 
     student = db.query(User).filter(User.id == booking.student_id).first()
     host_email, host_name, _ = get_host_info(booking, db)
 
-    background_tasks.add_task(
-        send_booking_cancelled_email,
-        to_email=student.email,
-        name=student.first_name,
-        cancelled_by="host",
-        booking_details=details,
-    )
+    if should_notify_student(db, student.id, "notify_viewing_updates"):
+        background_tasks.add_task(
+            send_booking_cancelled_email,
+            to_email=student.email,
+            name=student.first_name,
+            cancelled_by="host",
+            booking_details=details,
+        )
 
-    background_tasks.add_task(
-        send_booking_cancelled_email,
-        to_email=host_email,
-        name=host_name,
-        cancelled_by="host",
-        booking_details=details,
-    )
+    if booking.landlord_id:
+        if should_notify_landlord(db, booking.landlord_id, "notify_new_messages"):
+            background_tasks.add_task(
+                send_booking_cancelled_email,
+                to_email=host_email,
+                name=host_name,
+                cancelled_by="host",
+                booking_details=details,
+            )
+    elif booking.owner_id:
+        if should_notify_student(db, booking.owner_id, "notify_viewing_updates"):
+            background_tasks.add_task(
+                send_booking_cancelled_email,
+                to_email=host_email,
+                name=host_name,
+                cancelled_by="host",
+                booking_details=details,
+            )
 
     return build_booking_response(booking, db)
 

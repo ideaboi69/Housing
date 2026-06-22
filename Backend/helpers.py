@@ -29,6 +29,44 @@ load_dotenv()
 landlord_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/landlords/login", scheme_name="LandlordAuth")
 admin_oauth2 = OAuth2PasswordBearer(tokenUrl="/api/admin/login", scheme_name="AdminAuth")
 
+# ── Security event logging ──────────────────────────────
+def log_security_event(
+    db: Session,
+    user_id: int,
+    role: str,
+    event_type: str,
+    request=None,
+    metadata: dict | None = None,
+):
+    """Append a row to security_events. Does NOT commit — caller is responsible."""
+    from tables import SecurityEvent
+    event = SecurityEvent(
+        user_id=user_id,
+        role=role,
+        event_type=event_type,
+        ip_address=request.client.host if request and getattr(request, "client", None) else None,
+        user_agent=(request.headers.get("user-agent", "")[:500]) if request and hasattr(request, "headers") else None,
+        metadata_=metadata,
+    )
+    db.add(event)
+
+# ── Notification preference checks ──────────────────────
+def should_notify_student(db: Session, user_id: int, field: str) -> bool:
+    """Check if a student has a notification toggle enabled. Defaults to True if no prefs row."""
+    from tables import NotificationPreferences
+    prefs = db.query(NotificationPreferences).filter(NotificationPreferences.user_id == user_id).first()
+    if not prefs:
+        return True
+    return getattr(prefs, field, True)
+
+def should_notify_landlord(db: Session, landlord_id: int, field: str) -> bool:
+    """Check if a landlord has a notification toggle enabled. Defaults to True if no prefs row."""
+    from tables import LandlordNotificationPreferences
+    prefs = db.query(LandlordNotificationPreferences).filter(LandlordNotificationPreferences.landlord_id == landlord_id).first()
+    if not prefs:
+        return True
+    return getattr(prefs, field, True)
+
 # UofG Email checker helper
 def check_uoguelph_email(email: str) -> bool:
     return email.lower().endswith("@uoguelph.ca")
@@ -414,8 +452,8 @@ def build_sublet_response(sublet: Sublet) -> SubletResponse:
         has_backyard=sublet.has_backyard,
         has_balcony=sublet.has_balcony,
         wheelchair_accessible=sublet.wheelchair_accessible,
-        pet_policy=sublet.pet_policy,
-        smoking_policy=sublet.smoking_policy,
+        pet_policy=PetPolicy(sublet.pet_policy) if sublet.pet_policy in PetPolicy._value2member_map_ else PetPolicy.UNKNOWN,
+        smoking_policy=SmokingPolicy(sublet.smoking_policy) if sublet.smoking_policy in SmokingPolicy._value2member_map_ else SmokingPolicy.UNKNOWN,
         estimated_utility_cost=sublet.estimated_utility_cost,
         rent_per_month=sublet.rent_per_month,
         sublet_start_date=sublet.sublet_start_date,
@@ -466,8 +504,8 @@ def build_sublet_list_response(sublet: Sublet) -> SubletListResponse:
         has_laundry=sublet.has_laundry,
         utilities_included=sublet.utilities_included,
         has_wifi=sublet.has_wifi,
-        pet_policy=sublet.pet_policy,
-        smoking_policy=sublet.smoking_policy,
+        pet_policy=PetPolicy(sublet.pet_policy) if sublet.pet_policy in PetPolicy._value2member_map_ else PetPolicy.UNKNOWN,
+        smoking_policy=SmokingPolicy(sublet.smoking_policy) if sublet.smoking_policy in SmokingPolicy._value2member_map_ else SmokingPolicy.UNKNOWN,
         distance_to_campus_km=sublet.distance_to_campus_km,
         walk_time_minutes=sublet.walk_time_minutes,
         drive_time_minutes=sublet.drive_time_minutes,

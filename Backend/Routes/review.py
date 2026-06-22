@@ -1,11 +1,12 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, BackgroundTasks
 from sqlalchemy.orm import Session
-from tables import get_db, User, Property, Review, Flag
+from tables import get_db, User, Landlord, Property, Review, Flag
 from Schemas.reviewSchema import ReviewCreate, ReviewUpdate, ReviewResponse
 from Utils.security import get_current_student
 from Utils.review import recompute_landlord_scores
-from helpers import require_verified_student
+from Utils.email import send_new_review_email
+from helpers import require_verified_student, should_notify_landlord
 
 review_router = APIRouter()
 
@@ -40,7 +41,20 @@ def create_review(payload: ReviewCreate, background_tasks: BackgroundTasks, db: 
     db.refresh(review)
 
     background_tasks.add_task(recompute_landlord_scores, prop.landlord_id)
-    
+
+    # Notify landlord of new review (if enabled)
+    if should_notify_landlord(db, prop.landlord_id, "notify_new_reviews"):
+        landlord = db.query(Landlord).filter(Landlord.id == prop.landlord_id).first()
+        if landlord:
+            background_tasks.add_task(
+                send_new_review_email,
+                to_email=landlord.email,
+                landlord_name=landlord.first_name,
+                student_name=f"{current_user.first_name} {current_user.last_name}",
+                property_title=prop.title,
+                property_id=prop.id,
+            )
+
     return ReviewResponse.model_validate(review)
 
 # Browse Reviews (public)
