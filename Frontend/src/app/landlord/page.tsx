@@ -30,6 +30,8 @@ import {
 } from "@/lib/mock-data";
 import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
+import { PrivateNotesPanel } from "@/components/landlord/PrivateNotesPanel";
+import { hasNote } from "@/lib/landlord-notes";
 import { LandlordOverviewSkeleton } from "@/components/ui/Skeletons";
 import { TenantCardModal } from "@/components/ui/TenantCardModal";
 
@@ -1020,6 +1022,7 @@ function MessagesTab({
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
   const [tenantCardOpen, setTenantCardOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [threadFilter, setThreadFilter] = useState<"all" | "unread">("all");
   const [listingFilter, setListingFilter] = useState<number | "all">("all");
   const [markingUnavailable, setMarkingUnavailable] = useState(false);
@@ -1340,6 +1343,17 @@ function MessagesTab({
                       )}
                     </div>
                     <button
+                      onClick={() => setNotesOpen((v) => !v)}
+                      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 transition-all ${notesOpen ? "border-[#FFB627]/40 bg-[#FFFBEB] text-[#A66A00]" : "border-black/[0.04] bg-white text-[#1B2D45]/70 hover:border-[#1B2D45]/10 hover:text-[#1B2D45]"}`}
+                      style={{ fontSize: "11px", fontWeight: 700 }}
+                      title="Private notes — only you can see these"
+                      aria-label="Private notes"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Notes</span>
+                      {activeConvo != null && !notesOpen && hasNote(activeConvo) && <span className="h-1.5 w-1.5 rounded-full bg-[#FFB627]" />}
+                    </button>
+                    <button
                       onClick={handleArchiveActiveConversation}
                       className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-black/[0.04] bg-white px-2.5 text-[#1B2D45]/70 transition-all hover:border-[#1B2D45]/10 hover:text-[#1B2D45]"
                       style={{ fontSize: "11px", fontWeight: 700 }}
@@ -1351,6 +1365,11 @@ function MessagesTab({
                     </button>
                   </div>
                 </div>
+
+                {/* Private notes — scoped to this conversation, never shown to the student */}
+                {notesOpen && activeConvo != null && (
+                  <PrivateNotesPanel conversationId={activeConvo} studentName={activeConvoData?.user_name ?? undefined} />
+                )}
 
                 {/* Tenant Card Modal */}
                 {activeConvoData && (

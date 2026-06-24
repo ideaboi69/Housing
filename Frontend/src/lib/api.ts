@@ -1103,6 +1103,15 @@ export const messages = {
   // Remove conversation from inbox (landlord)
   landlordDeleteConversation: (id: number) =>
     request<null>(`/api/messages/landlord/conversations/${id}`, { method: "DELETE" }),
+
+  // Private landlord notes for a conversation (landlord-only, never shown to the student)
+  getConversationNotes: (conversationId: number) =>
+    request<{ notes: string }>(`/api/messages/conversations/${conversationId}/notes`),
+  saveConversationNotes: (conversationId: number, notes: string) =>
+    request<{ notes: string }>(`/api/messages/conversations/${conversationId}/notes`, {
+      method: "PUT",
+      body: JSON.stringify({ notes }),
+    }),
 };
 
 // ── Roommates ──────────────────────────────────────────

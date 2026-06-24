@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
-from tables import Listing, Conversation, User, get_db, Landlord, Message, Property
+from tables import Listing, Conversation, User, get_db, Landlord, Message, Property, ConversationNote
 from Schemas.convoSchema import SenderType
-from Schemas.convoSchema import ConversationDetailResponse, StartConversation, MessageCreate, MessageResponse, ConversationResponse
+from Schemas.convoSchema import ConversationDetailResponse, StartConversation, MessageCreate, MessageResponse, ConversationResponse, ConversationNoteUpdate, ConversationNoteResponse
 from Utils.security import get_current_user, get_current_student
 from helpers import require_landlord, should_notify_student, should_notify_landlord
 from Utils.email import send_message_notification
@@ -421,3 +421,31 @@ def landlord_delete_conversation(conversation_id: int, db: Session = Depends(get
 
     conversation.landlord_archived_at = func.now()
     db.commit()
+
+
+# ── Private landlord notes (landlord-only, scoped to their own conversation) ──
+# These notes are never returned on any student-facing endpoint.
+@message_router.get("/conversations/{conversation_id}/notes", response_model=ConversationNoteResponse)
+def get_conversation_notes(conversation_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.landlord_id == landlord.id).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    note = db.query(ConversationNote).filter(ConversationNote.conversation_id == conversation_id).first()
+    return ConversationNoteResponse(notes=note.notes if note else "")
+
+
+@message_router.put("/conversations/{conversation_id}/notes", response_model=ConversationNoteResponse)
+def save_conversation_notes(conversation_id: int, payload: ConversationNoteUpdate, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.landlord_id == landlord.id).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    note = db.query(ConversationNote).filter(ConversationNote.conversation_id == conversation_id).first()
+    if note:
+        note.notes = payload.notes
+    else:
+        note = ConversationNote(conversation_id=conversation_id, landlord_id=landlord.id, notes=payload.notes)
+        db.add(note)
+    db.commit()
+    return ConversationNoteResponse(notes=payload.notes)

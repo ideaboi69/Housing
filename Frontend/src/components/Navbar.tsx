@@ -20,6 +20,12 @@ const navItems = [
   { label: "The Bubble", path: "/the-bubble" },
 ];
 
+// Standalone Writer accounts get a content-focused nav, not the student one.
+const writerNavItems = [
+  { label: "Dashboard", path: "/writer" },
+  { label: "The Bubble", path: "/the-bubble" },
+];
+
 /* ── Avatar helper ── */
 function UserAvatar({
   firstName,
@@ -108,7 +114,7 @@ export function Navbar() {
   const isLandlord = displayUser?.role === "landlord";
   const landlordTab = searchParams.get("tab");
 
-  const allNavItems = isLandlord ? [] : navItems;
+  const allNavItems = isLandlord ? [] : writerSessionActive ? writerNavItems : navItems;
 
   // Poll unread message count
   const fetchUnread = useCallback(async () => {
@@ -239,8 +245,7 @@ export function Navbar() {
   const dropdownLinks = writerSessionActive
     ? [
         { label: "Writer Dashboard", href: "/writer", icon: PenLine },
-        { label: "Profile", href: "/writer?profile=1", icon: User },
-        { label: "The Bubble", href: "/the-bubble", icon: LayoutDashboard },
+        { label: "Edit Profile", href: "/writer?profile=1", icon: User },
       ]
     : isLandlord
     ? [
@@ -345,6 +350,16 @@ export function Navbar() {
                   style={{ fontSize: "13px", fontWeight: 600 }}
                 >
                   <Building2 className="h-4 w-4" /> Browse listings
+                </Link>
+              )}
+              {/* Writer: compose a new Bubble post */}
+              {writerSessionActive && (
+                <Link
+                  href="/writer?compose=1"
+                  className="flex items-center gap-1.5 px-3.5 py-2 mr-1 rounded-xl bg-[#FF6B35] text-white transition-all hover:bg-[#e55e2e]"
+                  style={{ fontSize: "13px", fontWeight: 600, boxShadow: "0 2px 12px rgba(255,107,53,0.25)" }}
+                >
+                  <PenLine className="h-4 w-4" /> New post
                 </Link>
               )}
               {/* Message icon */}

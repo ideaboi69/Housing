@@ -364,6 +364,18 @@ class Message(Base):
 
     conversation = relationship("Conversation", back_populates="messages")
 
+class ConversationNote(Base):
+    # Private landlord notes for a conversation. Landlord-only — never returned on any
+    # student-facing endpoint. One note record per conversation.
+    __tablename__ = "conversation_notes"
+
+    id = Column(Integer, primary_key=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), unique=True, nullable=False)
+    landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=False)
+    notes = Column(Text, nullable=False, default="")
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
 class Sublet(Base):
     __tablename__ = "sublets"
 

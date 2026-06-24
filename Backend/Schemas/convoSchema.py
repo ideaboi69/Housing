@@ -8,6 +8,12 @@ class SenderType(str, enum.Enum):
     STUDENT = "student"
     LANDLORD = "landlord"
 
+class ConversationNoteUpdate(BaseModel):
+    notes: str
+
+class ConversationNoteResponse(BaseModel):
+    notes: str
+
 class MessageCreate(BaseModel):
     content: str
 

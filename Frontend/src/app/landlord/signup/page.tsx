@@ -89,6 +89,60 @@ function FileUploadBox({
    Main Page
    ════════════════════════════════════════════════════════ */
 
+const PASSWORD_RULES = [
+  { key: "length", label: "At least 8 characters", test: (pw: string) => pw.length >= 8 },
+  { key: "uppercase", label: "One uppercase letter", test: (pw: string) => /[A-Z]/.test(pw) },
+  { key: "lowercase", label: "One lowercase letter", test: (pw: string) => /[a-z]/.test(pw) },
+  { key: "number", label: "One number", test: (pw: string) => /\d/.test(pw) },
+  { key: "special", label: "One special character", test: (pw: string) => /[^A-Za-z0-9]/.test(pw) },
+];
+
+function PasswordChecklist({ password }: { password: string }) {
+  if (password.length === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.2 }}
+      className="mt-3 grid gap-2"
+    >
+      {PASSWORD_RULES.map((rule) => {
+        const passed = rule.test(password);
+        return (
+          <motion.div
+            key={rule.key}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2"
+          >
+            <div
+              className="flex h-4 w-4 items-center justify-center rounded-full"
+              style={{
+                background: passed ? "rgba(74,222,128,0.14)" : "rgba(27,45,69,0.05)",
+                border: passed ? "1.5px solid rgba(74,222,128,0.38)" : "1.5px solid rgba(27,45,69,0.08)",
+              }}
+            >
+              {passed ? <Check className="h-2.5 w-2.5 text-[#4ADE80]" /> : <X className="h-2.5 w-2.5 text-[#1B2D45]/20" />}
+            </div>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: passed ? "#2A9F63" : "#1B2D45",
+                opacity: passed ? 1 : 0.42,
+              }}
+            >
+              {rule.label}
+            </span>
+          </motion.div>
+        );
+      })}
+    </motion.div>
+  );
+}
+
 function LandlordSignupPageContent() {
   const router = useRouter();
   const setAuthState = useAuthStore.setState;
@@ -107,7 +161,7 @@ function LandlordSignupPageContent() {
   function validateStep0() {
     if (!account.first_name || !account.last_name || !account.email || !account.password) { setError("All fields are required"); return false; }
     if (account.email.endsWith("@uoguelph.ca") || account.email.endsWith("@mail.uoguelph.ca")) { setError("Student emails are for student accounts. Use a personal or business email."); return false; }
-    if (account.password.length < 8) { setError("Password must be at least 8 characters"); return false; }
+    if (!PASSWORD_RULES.every((rule) => rule.test(account.password))) { setError("Password doesn't meet all the requirements listed below."); return false; }
     if (account.password !== account.confirm_password) { setError("Passwords don't match"); return false; }
     return true;
   }
@@ -326,8 +380,8 @@ function LandlordSignupPageContent() {
               <label htmlFor="landlord-password" className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
                 <Lock className="w-3.5 h-3.5 text-[#1B2D45]/40" /> Password
               </label>
-              <input id="landlord-password" type="password" value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="Min 8 characters" required className={inputCls} style={{ fontSize: "14px" }} />
-              <p className="text-[#1B2D45]/55 mt-1" style={{ fontSize: "11px" }}>Password must be at least 8 characters.</p>
+              <input id="landlord-password" type="password" value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="Create a strong password" required className={inputCls} style={{ fontSize: "14px" }} />
+              <PasswordChecklist password={account.password} />
             </div>
 
             <div>

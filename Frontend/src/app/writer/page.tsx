@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Eye, FileText, PenLine, Trash2, MoreHorizontal, Plus,
-  Clock, CheckCircle2, Archive, LogOut, AlertCircle, X,
-  Send, Shield, Loader2, ImagePlus, Camera, Save, User,
+  Eye, FileText, PenLine, Trash2, Plus,
+  Clock, CheckCircle2, Archive, AlertCircle, X,
+  Send, Shield, Loader2, ImagePlus, Camera, Save,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -536,13 +536,13 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
   onStatusChange: (status: string) => void;
   onDelete: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const catMeta = CATEGORY_META[post.category] || CATEGORY_META.other;
   const statusMeta = STATUS_META[post.status] || STATUS_META.draft;
   const StatusIcon = statusMeta.icon;
+  const actionBtn = "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition-all";
 
   return (
-    <div className="flex items-center gap-4 px-4 md:px-5 py-4 bg-white rounded-xl border border-black/[0.04] hover:border-black/[0.08] transition-all"
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 px-4 md:px-5 py-4 bg-white rounded-xl border border-black/[0.04] hover:border-black/[0.08] transition-all"
       style={{ boxShadow: "0 1px 3px rgba(27,45,69,0.03)" }}>
 
       {post.cover_image_url && (
@@ -551,7 +551,7 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
         </div>
       )}
 
-      {/* Category + title */}
+      {/* Category + title + meta */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="px-2 py-0.5 rounded-full text-white shrink-0" style={{ fontSize: "9px", fontWeight: 700, backgroundColor: catMeta.color }}>
@@ -563,6 +563,11 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
         </div>
         <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>{post.title}</p>
         <p className="text-[#98A3B0] truncate mt-0.5" style={{ fontSize: "11px" }}>{post.preview || "No preview"}</p>
+        <div className="mt-1.5 flex items-center gap-1.5 text-[#98A3B0]" style={{ fontSize: "11px", fontWeight: 500 }}>
+          <span>{post.view_count} view{post.view_count === 1 ? "" : "s"}</span>
+          <span>·</span>
+          <span>{timeAgo(post.created_at)}</span>
+        </div>
         {post.cover_image_url && (
           <div className="md:hidden mt-3 overflow-hidden rounded-xl border border-black/[0.04] bg-[#FAF8F4]">
             <img src={post.cover_image_url} alt={post.title} className="w-full h-[168px] object-cover" />
@@ -570,68 +575,37 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
         )}
       </div>
 
-      {/* Stats */}
-      <div className="hidden md:flex items-center gap-5 shrink-0">
-        <div className="text-center">
-          <p className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 800 }}>{post.view_count}</p>
-          <p className="text-[#98A3B0]" style={{ fontSize: "9px", fontWeight: 600, textTransform: "uppercase" }}>Views</p>
-        </div>
-        <div className="text-center">
-          <p className="text-[#98A3B0]" style={{ fontSize: "11px" }}>{timeAgo(post.created_at)}</p>
-        </div>
-      </div>
-
-      {/* Actions menu */}
-      <div className="relative shrink-0">
-        <button onClick={() => setMenuOpen(!menuOpen)}
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-[#98A3B0] hover:bg-[#1B2D45]/5 transition-colors">
-          <MoreHorizontal className="w-4 h-4" />
+      {/* Actions — all visible, no hidden menu */}
+      <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+        <button onClick={onEdit} className={`${actionBtn} border-[#1B2D45]/12 text-[#1B2D45]/70 hover:border-[#1B2D45]/25 hover:text-[#1B2D45]`} style={{ fontSize: "11px", fontWeight: 600 }}>
+          <PenLine className="w-3.5 h-3.5" /> Edit
         </button>
 
-        {menuOpen && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-0 top-full mt-1 w-[180px] bg-white rounded-xl border border-black/[0.06] overflow-hidden z-50"
-              style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
-              <button onClick={() => { onEdit(); setMenuOpen(false); }}
-                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-left text-[#1B2D45]/70 hover:bg-[#1B2D45]/[0.03] transition-colors"
-                style={{ fontSize: "12px", fontWeight: 500 }}>
-                <PenLine className="w-3.5 h-3.5" /> Edit Post
-              </button>
-
-              {post.status === "draft" && (
-                <button onClick={() => { onStatusChange("published"); setMenuOpen(false); }}
-                  className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-left text-[#4ADE80] hover:bg-[#4ADE80]/5 transition-colors"
-                  style={{ fontSize: "12px", fontWeight: 500 }}>
-                  <Send className="w-3.5 h-3.5" /> Publish
-                </button>
-              )}
-
-              {post.status === "published" && (
-                <button onClick={() => { onStatusChange("archived"); setMenuOpen(false); }}
-                  className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-left text-[#FFB627] hover:bg-[#FFB627]/5 transition-colors"
-                  style={{ fontSize: "12px", fontWeight: 500 }}>
-                  <Archive className="w-3.5 h-3.5" /> Archive
-                </button>
-              )}
-
-              {post.status === "archived" && (
-                <button onClick={() => { onStatusChange("published"); setMenuOpen(false); }}
-                  className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-left text-[#4ADE80] hover:bg-[#4ADE80]/5 transition-colors"
-                  style={{ fontSize: "12px", fontWeight: 500 }}>
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Republish
-                </button>
-              )}
-
-              <div className="border-t border-black/[0.04]" />
-              <button onClick={() => { onDelete(); setMenuOpen(false); }}
-                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-left text-[#E71D36]/70 hover:bg-[#E71D36]/5 transition-colors"
-                style={{ fontSize: "12px", fontWeight: 500 }}>
-                <Trash2 className="w-3.5 h-3.5" /> Delete
-              </button>
-            </div>
-          </>
+        {post.status === "published" && (
+          <a href={`/the-bubble/${post.slug}`} target="_blank" rel="noopener noreferrer" className={`${actionBtn} border-[#1B2D45]/12 text-[#1B2D45]/70 hover:border-[#1B2D45]/25 hover:text-[#1B2D45]`} style={{ fontSize: "11px", fontWeight: 600 }}>
+            <Eye className="w-3.5 h-3.5" /> Preview
+          </a>
         )}
+
+        {post.status === "draft" && (
+          <button onClick={() => onStatusChange("published")} className={`${actionBtn} border-[#4ADE80]/30 text-[#239B55] hover:bg-[#4ADE80]/5`} style={{ fontSize: "11px", fontWeight: 600 }}>
+            <Send className="w-3.5 h-3.5" /> Publish
+          </button>
+        )}
+        {post.status === "published" && (
+          <button onClick={() => onStatusChange("archived")} className={`${actionBtn} border-[#FFB627]/30 text-[#A66A00] hover:bg-[#FFB627]/5`} style={{ fontSize: "11px", fontWeight: 600 }}>
+            <Archive className="w-3.5 h-3.5" /> Archive
+          </button>
+        )}
+        {post.status === "archived" && (
+          <button onClick={() => onStatusChange("published")} className={`${actionBtn} border-[#4ADE80]/30 text-[#239B55] hover:bg-[#4ADE80]/5`} style={{ fontSize: "11px", fontWeight: 600 }}>
+            <CheckCircle2 className="w-3.5 h-3.5" /> Republish
+          </button>
+        )}
+
+        <button onClick={() => { if (window.confirm("Delete this post? This can't be undone.")) onDelete(); }} className={`${actionBtn} border-[#E71D36]/20 text-[#E71D36]/80 hover:bg-[#E71D36]/5`} style={{ fontSize: "11px", fontWeight: 600 }}>
+          <Trash2 className="w-3.5 h-3.5" /> Delete
+        </button>
       </div>
     </div>
   );
@@ -642,12 +616,13 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
    ═══════════════════════════════════════════════════════ */
 
 function Dashboard() {
-  const { writer, logout, updateWriter } = useWriterStore();
+  const { writer, updateWriter } = useWriterStore();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [posts, setPosts] = useState<PostListResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "draft" | "published" | "archived">("all");
+  const [timeRange, setTimeRange] = useState<"all" | "week" | "month" | "3months">("all");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PostResponse | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -671,6 +646,15 @@ function Dashboard() {
     }
   }, [searchParams]);
 
+  // Deep-link: /writer?compose=1 opens a fresh post editor (used by the navbar "New Post" button).
+  useEffect(() => {
+    if (searchParams.get("compose") === "1") {
+      setEditingPost(null);
+      setEditorOpen(true);
+      router.replace("/writer");
+    }
+  }, [searchParams, router]);
+
   // Deep-link: /writer?edit={postId} auto-opens the edit modal for that post.
   // Used by the Cribb AI draft review email.
   useEffect(() => {
@@ -692,7 +676,11 @@ function Dashboard() {
     }
   }, [router, searchParams]);
 
-  const filtered = filter === "all" ? posts : posts.filter((p) => p.status === filter);
+  const statusFiltered = filter === "all" ? posts : posts.filter((p) => p.status === filter);
+  const filtered = timeRange === "all" ? statusFiltered : statusFiltered.filter((p) => {
+    const days = timeRange === "week" ? 7 : timeRange === "month" ? 30 : 90;
+    return new Date(p.created_at).getTime() >= Date.now() - days * 86400000;
+  });
   const totalViews = posts.reduce((sum, p) => sum + p.view_count, 0);
   const publishedCount = posts.filter((p) => p.status === "published").length;
   const draftCount = posts.filter((p) => p.status === "draft").length;
@@ -728,41 +716,20 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
-      <div className="max-w-[960px] mx-auto px-4 md:px-6 py-6 md:py-8">
+      <div className="max-w-[1120px] mx-auto px-4 md:px-6 py-6 md:py-8">
 
         {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.5px" }}>
-              Writer Dashboard
-            </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <div className="flex items-center gap-1">
-                <Shield className="w-3 h-3 text-[#FF6B35]" />
-                <span className="text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 700 }}>Verified Writer</span>
-              </div>
-              <span className="text-[#98A3B0]" style={{ fontSize: "11px" }}>·</span>
-              <span className="text-[#98A3B0]" style={{ fontSize: "11px" }}>{writer?.first_name} {writer?.last_name}</span>
+        <div className="mb-6">
+          <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.5px" }}>
+            Writer Dashboard
+          </h1>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-1">
+              <Shield className="w-3 h-3 text-[#FF6B35]" />
+              <span className="text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 700 }}>Verified Writer</span>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <motion.button whileTap={{ scale: 0.95 }} onClick={() => { setEditingPost(null); setEditorOpen(true); }}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#FF6B35] px-4 py-2.5 text-white transition-all hover:bg-[#e55e2e] sm:flex-none"
-              style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}>
-              <Plus className="w-4 h-4" /> New Post
-            </motion.button>
-            <button
-              onClick={() => setProfileOpen(true)}
-              className="w-9 h-9 rounded-xl border border-[#E8E4DC] flex items-center justify-center text-[#98A3B0] hover:text-[#1B2D45] hover:border-[#1B2D45]/15 transition-all"
-              aria-label="Edit writer profile"
-              title="Edit writer profile"
-            >
-              <User className="w-4 h-4" />
-            </button>
-            <button onClick={() => logout()}
-              className="w-9 h-9 rounded-xl border border-[#E8E4DC] flex items-center justify-center text-[#98A3B0] hover:text-[#E71D36] hover:border-[#E71D36]/20 transition-all">
-              <LogOut className="w-4 h-4" />
-            </button>
+            <span className="text-[#98A3B0]" style={{ fontSize: "11px" }}>·</span>
+            <span className="text-[#98A3B0]" style={{ fontSize: "11px" }}>{writer?.first_name} {writer?.last_name}</span>
           </div>
         </div>
 
@@ -775,28 +742,39 @@ function Dashboard() {
           ].map((stat) => {
             const Icon = stat.icon;
             return (
-              <div key={stat.label} className="bg-white rounded-xl border border-black/[0.04] p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.03)" }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${stat.color}15` }}>
-                    <Icon className="w-3.5 h-3.5" style={{ color: stat.color }} />
-                  </div>
-                  <span className="text-[#98A3B0]" style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase" }}>{stat.label}</span>
+              <div key={stat.label} className="rounded-2xl border border-black/[0.04] bg-white p-4 md:p-5" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+                <div className="mb-3 flex items-center gap-2 text-[#5C6B7A]">
+                  <Icon className="h-4 w-4" style={{ color: stat.color }} />
+                  <span style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>{stat.label}</span>
                 </div>
-                <p className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900 }}>{stat.value}</p>
+                <div className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.03em" }}>{stat.value}</div>
               </div>
             );
           })}
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex items-center gap-2 mb-4">
-          {(["all", "published", "draft", "archived"] as const).map((f) => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg transition-all ${filter === f ? "bg-[#FF6B35] text-white" : "bg-white border border-black/[0.04] text-[#5C6B7A] hover:text-[#1B2D45]"}`}
-              style={{ fontSize: "12px", fontWeight: 600, textTransform: "capitalize" }}>
-              {f === "all" ? `All (${posts.length})` : `${f} (${posts.filter(p => p.status === f).length})`}
-            </button>
-          ))}
+        {/* Status tabs (primary) + time range (secondary) */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {(["all", "published", "draft", "archived"] as const).map((f) => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-lg transition-all ${filter === f ? "bg-[#FF6B35] text-white" : "bg-white border border-black/[0.04] text-[#5C6B7A] hover:text-[#1B2D45]"}`}
+                style={{ fontSize: "12px", fontWeight: 600, textTransform: "capitalize" }}>
+                {f === "all" ? `All (${posts.length})` : `${f} (${posts.filter(p => p.status === f).length})`}
+              </button>
+            ))}
+          </div>
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value as typeof timeRange)}
+            className="rounded-lg border border-black/[0.06] bg-white px-3 py-1.5 text-[#5C6B7A] focus:border-[#FF6B35]/30 focus:outline-none transition-all"
+            style={{ fontSize: "12px", fontWeight: 600 }}
+          >
+            <option value="all">All time</option>
+            <option value="week">This week</option>
+            <option value="month">This month</option>
+            <option value="3months">Last 3 months</option>
+          </select>
         </div>
 
         {/* Posts list */}
@@ -810,6 +788,13 @@ function Dashboard() {
             <p className="text-[#98A3B0]" style={{ fontSize: "14px", fontWeight: 600 }}>
               {filter === "all" ? "No posts yet — create your first one!" : `No ${filter} posts`}
             </p>
+            {filter === "all" && (
+              <button onClick={() => { setEditingPost(null); setEditorOpen(true); }}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#FF6B35] px-4 py-2.5 text-white transition-all hover:bg-[#e55e2e]"
+                style={{ fontSize: "13px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.3)" }}>
+                <Plus className="w-4 h-4" /> New Post
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
