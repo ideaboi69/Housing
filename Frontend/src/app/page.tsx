@@ -391,10 +391,10 @@ function ShowcaseVisual({ featureId }: { featureId: (typeof showcaseFeatures)[nu
               { label: "Walk Time", a: "5 min", b: "6 min", best: "a" },
               { label: "Type", a: "townhouse", b: "apartment", best: "" },
             ].map((row) => (
-              <div key={row.label} className="grid grid-cols-[190px_1fr_1fr] border-t border-black/[0.04] first:border-t-0">
-                <div className="bg-[#FCFBF8] px-5 py-4 text-[#7E8896]" style={{ fontSize: "12px", fontWeight: 700 }}>{row.label}</div>
-                <div className="px-5 py-4 text-center" style={{ fontSize: "14px", fontWeight: 700, color: row.best === "a" ? "#4ADE80" : "#1B2D45" }}>{row.a}</div>
-                <div className="px-5 py-4 text-center" style={{ fontSize: "14px", fontWeight: 700, color: row.best === "b" ? "#4ADE80" : row.label === "Cribb Score" ? "#FFB627" : "#1B2D45" }}>{row.b}</div>
+              <div key={row.label} className="grid grid-cols-[100px_1fr_1fr] sm:grid-cols-[190px_1fr_1fr] border-t border-black/[0.04] first:border-t-0">
+                <div className="bg-[#FCFBF8] px-3 py-4 sm:px-5 text-[#7E8896]" style={{ fontSize: "12px", fontWeight: 700 }}>{row.label}</div>
+                <div className="px-3 py-4 sm:px-5 text-center" style={{ fontSize: "14px", fontWeight: 700, color: row.best === "a" ? "#4ADE80" : "#1B2D45" }}>{row.a}</div>
+                <div className="px-3 py-4 sm:px-5 text-center" style={{ fontSize: "14px", fontWeight: 700, color: row.best === "b" ? "#4ADE80" : row.label === "Cribb Score" ? "#FFB627" : "#1B2D45" }}>{row.b}</div>
               </div>
             ))}
           </div>
@@ -887,11 +887,11 @@ export default function HomePage() {
       />
       {/* ═══ 1. HERO ═══════════════════════════════════════ */}
       <section className="relative overflow-hidden">
-        <div className="max-w-[1200px] mx-auto px-6 pt-16 pb-20 relative z-10">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 pt-10 md:pt-16 pb-12 md:pb-20 relative z-10">
           <div className="flex items-center gap-12 lg:gap-16">
             {/* Left — copy */}
-            <div className="max-w-[520px] shrink-0">
-              <h1 className="text-[#1B2D45]" style={{ fontSize: "48px", fontWeight: 900, lineHeight: 1.1, letterSpacing: "-0.02em" }}>
+            <div className="w-full min-w-0 max-w-[520px] lg:shrink-0">
+              <h1 className="text-[#1B2D45]" style={{ fontSize: "clamp(30px, 8.5vw, 48px)", fontWeight: 900, lineHeight: 1.1, letterSpacing: "-0.02em" }}>
                 <RotatingHeadline /><br />finally done right.
               </h1>
               <motion.p
@@ -904,15 +904,15 @@ export default function HomePage() {
                 Find trusted, verified listings in Guelph. Real reviews, transparent pricing, and a Cribb Score on every listing so you never rent blind.
               </motion.p>
               <motion.div
-                className="flex items-center gap-3 mt-8"
+                className="flex flex-col sm:flex-row sm:items-center gap-3 mt-8"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.5 }}
               >
-                <Link href="/browse" className="px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.35)" }}>
+                <Link href="/browse" className="px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all inline-block text-center" style={{ fontSize: "16px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.35)" }}>
                   Browse Listings →
                 </Link>
-                <Link href="/landlord/login" className="px-7 py-3.5 rounded-xl border-2 border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all inline-block" style={{ fontSize: "16px", fontWeight: 600 }}>
+                <Link href="/landlord/login" className="px-7 py-3.5 rounded-xl border-2 border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all inline-block text-center" style={{ fontSize: "16px", fontWeight: 600 }}>
                   I&apos;m a Landlord →
                 </Link>
               </motion.div>
@@ -1008,8 +1008,8 @@ export default function HomePage() {
             </p>
           </FadeUp>
 
-          <div className="mt-14 grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
               {showcaseFeatures.map((feature) => {
                 const isActive = feature.id === activeFeature.id;
                 return (

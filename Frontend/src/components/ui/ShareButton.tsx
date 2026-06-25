@@ -11,10 +11,12 @@ interface ShareButtonProps {
   /** Optional description for native share */
   description?: string;
   /** Visual style variant */
-  variant?: "inline" | "sidebar";
+  variant?: "inline" | "sidebar" | "primary" | "outline";
+  /** Override the button label (e.g. "Share with your parents") */
+  label?: string;
 }
 
-export function ShareButton({ path, title, description, variant = "sidebar" }: ShareButtonProps) {
+export function ShareButton({ path, title, description, variant = "sidebar", label }: ShareButtonProps) {
   const [showToast, setShowToast] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -69,6 +71,32 @@ export function ShareButton({ path, title, description, variant = "sidebar" }: S
     }
   }, [handleNativeShare, handleCopyLink]);
 
+  if (variant === "primary") {
+    return (
+      <button
+        onClick={handleClick}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all"
+        style={{ fontSize: "14px", fontWeight: 700, boxShadow: "0 4px 16px rgba(255,107,53,0.25)" }}
+      >
+        {showToast ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+        {showToast ? "Link copied!" : (label ?? "Share")}
+      </button>
+    );
+  }
+
+  if (variant === "outline") {
+    return (
+      <button
+        onClick={handleClick}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-[#FF6B35]/25 bg-[#FF6B35]/[0.04] text-[#FF6B35] hover:bg-[#FF6B35]/[0.08] transition-all"
+        style={{ fontSize: "14px", fontWeight: 600 }}
+      >
+        {showToast ? <Check className="w-4 h-4 text-[#4ADE80]" /> : <Share2 className="w-4 h-4" />}
+        {showToast ? "Link copied!" : (label ?? "Share")}
+      </button>
+    );
+  }
+
   if (variant === "inline") {
     return (
       <div className="relative">
@@ -78,7 +106,7 @@ export function ShareButton({ path, title, description, variant = "sidebar" }: S
           style={{ fontSize: "11px", fontWeight: 500 }}
         >
           {showToast ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Share2 className="w-3 h-3" />}
-          {showToast ? "Copied!" : "Share"}
+          {showToast ? "Copied!" : (label ?? "Share")}
         </button>
       </div>
     );

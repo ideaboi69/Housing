@@ -23,7 +23,6 @@ import {
   type LandlordAnalyticsPeriod,
   mockListings,
   mockLandlordAnalyticsUpdatedAt,
-  mockLandlordAttention,
   mockLandlordDailyMetrics,
   mockLandlordListingDailyMetrics,
   mockLandlordListingPerformance,
@@ -32,6 +31,7 @@ import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibility
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
 import { PrivateNotesPanel } from "@/components/landlord/PrivateNotesPanel";
 import { hasNote } from "@/lib/landlord-notes";
+import { UpcomingShowings } from "@/components/landlord/UpcomingShowings";
 import { LandlordOverviewSkeleton } from "@/components/ui/Skeletons";
 import { TenantCardModal } from "@/components/ui/TenantCardModal";
 
@@ -179,11 +179,13 @@ function OverviewTab({
   conversations,
   unreadCount,
   onSwitchTab,
+  properties,
 }: {
   user: { first_name: string; identity_verified?: boolean; company_name?: string | null };
   conversations: ConversationResponse[];
   unreadCount: number;
   onSwitchTab: (t: Tab) => void;
+  properties: PropertyWithListings[];
 }) {
   type SortKey = "listing" | "status" | "views" | "saves" | "inquiries" | "daysListed" | "lastActivity";
 
@@ -217,7 +219,6 @@ function OverviewTab({
     return Math.round(((current - previous) / previous) * 100);
   };
   const daysBetween = (date: string) => Math.max(0, Math.ceil((now.getTime() - new Date(date).getTime()) / 86400000));
-  const daysUntil = (date: string) => Math.ceil((new Date(`${date}T12:00:00-04:00`).getTime() - now.getTime()) / 86400000);
   const relativeTime = (date: string) => {
     const minutes = Math.max(1, Math.round((now.getTime() - new Date(date).getTime()) / 60000));
     if (minutes < 60) return `${minutes} min ago`;
@@ -226,9 +227,10 @@ function OverviewTab({
     return `${Math.round(hours / 24)} days ago`;
   };
 
-  const activeListings = mockLandlordListingPerformance.filter((listing) => listing.status === "active").length;
-  const draftListings = mockLandlordListingPerformance.filter((listing) => listing.status === "draft").length;
-  const totalListings = mockLandlordListingPerformance.length;
+  const overviewListings = properties.flatMap((p) => p.listings);
+  const activeListings = overviewListings.filter((l) => getListingStatusBucket(l.status) === "active").length;
+  const draftListings = overviewListings.filter((l) => getListingStatusBucket(l.status) === "draft").length;
+  const totalListings = overviewListings.length;
   const currentViews = total(chartSeries, "views");
   const previousViews = total(previousSeries, "views");
   const currentInquiries = total(chartSeries, "inquiries");
@@ -236,23 +238,12 @@ function OverviewTab({
   const currentResponseRate = Math.round(avg(responseSeries, "responseRate"));
   const currentResponseMinutes = Math.round(avg(responseSeries, "responseMinutes"));
 
-  const approachingMoveIns = mockLandlordListingPerformance.filter((listing) => {
-    const remaining = daysUntil(listing.moveInDate);
-    return listing.status === "active" && remaining >= 0 && remaining <= 45;
-  });
-
   const attentionItems = [
     unreadCount > 0
       ? { key: "messages", label: `${unreadCount} unread message${unreadCount === 1 ? "" : "s"}`, sub: "Reply while students are still warm", tab: "messages" as Tab }
       : null,
     draftListings > 0
       ? { key: "drafts", label: `${draftListings} draft listing${draftListings === 1 ? "" : "s"}`, sub: "Publish or clean up inactive rooms", tab: "listings" as Tab }
-      : null,
-    mockLandlordAttention.viewingsThisWeek > 0
-      ? { key: "viewings", label: `${mockLandlordAttention.viewingsThisWeek} viewing${mockLandlordAttention.viewingsThisWeek === 1 ? "" : "s"} this week`, sub: "Confirm times and prep instructions", tab: "listings" as Tab }
-      : null,
-    approachingMoveIns.length > 0
-      ? { key: "moveins", label: `${approachingMoveIns.length} move-in date approaching`, sub: `${approachingMoveIns[0].room} is ${daysUntil(approachingMoveIns[0].moveInDate)} days out`, tab: "listings" as Tab }
       : null,
   ].filter(Boolean) as Array<{ key: string; label: string; sub: string; tab: Tab }>;
 
@@ -325,6 +316,8 @@ function OverviewTab({
           <Plus className="h-4 w-4" /> Add property
         </Link>
       </div>
+
+      <UpcomingShowings />
 
       {(unreadCount > 0 || draftListings > 0) && (
         <button
@@ -547,7 +540,7 @@ function ListingsTab({
   onListingDeleted?: (listingId: number) => void;
 }) {
   const router = useRouter();
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "review" | "draft" | "archived">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
   const [deletingListingId, setDeletingListingId] = useState<number | null>(null);
   const [togglingListingId, setTogglingListingId] = useState<number | null>(null);
   const [showCreatePicker, setShowCreatePicker] = useState(false);
@@ -566,14 +559,12 @@ function ListingsTab({
   const counts = {
     all: allListings.length,
     active: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "active").length,
-    review: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "review").length,
     draft: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "draft").length,
     archived: allListings.filter(({ listing }) => getListingStatusBucket(listing.status) === "archived").length,
   };
   const filterLabels: Record<typeof statusFilter, string> = {
     all: `All listings (${counts.all})`,
     active: `Active (${counts.active})`,
-    review: `Under review (${counts.review})`,
     draft: `Draft (${counts.draft})`,
     archived: `Archived (${counts.archived})`,
   };
@@ -2210,6 +2201,7 @@ function LandlordDashboardContent() {
                     conversations={conversations}
                     unreadCount={unreadCount}
                     onSwitchTab={handleTabChange}
+                    properties={properties}
                   />
                 )}
                 {tab === "properties" && <PropertiesTab properties={properties} />}

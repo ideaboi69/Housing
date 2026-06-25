@@ -48,10 +48,19 @@ export function ShowingsManager({ listingId, listingTitle, onClose }: ShowingsMa
   useEffect(() => {
     async function fetchSlots() {
       try {
-        const availability = await api.viewings.getListingAvailability(listingId);
+        // Availability gives us the slots; bookings give us who booked each one.
+        const [availability, bookings] = await Promise.all([
+          api.viewings.getListingAvailability(listingId),
+          api.viewings.getLandlordBookings(listingId).catch(() => []),
+        ]);
+        const bookedBySlot = new Map<number, { id: number; name: string }>();
+        for (const b of bookings) {
+          if (b.status === "confirmed") bookedBySlot.set(b.slot_id, { id: b.student_id, name: b.student_name });
+        }
         const allSlots: ShowingSlot[] = [];
         for (const avail of availability) {
           for (const slot of avail.slots) {
+            const booker = bookedBySlot.get(slot.id);
             allSlots.push({
               id: slot.id,
               listing_id: listingId,
@@ -59,7 +68,7 @@ export function ShowingsManager({ listingId, listingTitle, onClose }: ShowingsMa
               start_time: slot.start_time,
               end_time: slot.end_time,
               status: slot.status,
-              booked_by: slot.status === "booked" ? { student_id: 0, student_name: "Booked" } : null,
+              booked_by: slot.status === "booked" ? { student_id: booker?.id ?? 0, student_name: booker?.name ?? "Booked" } : null,
             });
           }
         }

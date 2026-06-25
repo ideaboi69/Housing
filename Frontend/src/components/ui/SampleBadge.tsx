@@ -24,7 +24,7 @@ export function SampleNote({ className = "" }: { className?: string }) {
     >
       <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-[#1B2D45]" />
       <p className="text-[#1B2D45]/75" style={{ fontSize: "12.5px", lineHeight: 1.5, fontWeight: 500 }}>
-        <span style={{ fontWeight: 700 }}>This is a sample.</span> It&apos;s here to show how listings look on Cribb while we onboard founding landlords ahead of our September launch.
+        <span style={{ fontWeight: 700 }}>This is a sample.</span> It&apos;s here to show how listings look on Cribb while we onboard founding landlords ahead of our launch.
       </p>
     </div>
   );

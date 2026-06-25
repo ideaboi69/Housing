@@ -862,7 +862,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                     Back to your dashboard
                   </Link>
                 </div>
-              ) : (
+              ) : user ? (
                 <>
                   {/* Contact Landlord */}
                   <motion.button whileTap={{ scale: 0.97 }} onClick={handleContact} disabled={contactSending || contactSent}
@@ -895,15 +895,36 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                     <Heart className={`w-4 h-4 ${isSaved ? "fill-[#E71D36]" : ""}`} />
                     {isSaved ? "Saved" : "Save Listing"}
                   </motion.button>
+
+                  {/* Sharing a place to vet with parents or potential roommates */}
+                  <div className="mt-2">
+                    <ShareButton path={`/browse/${listingId}`} title={listing.title} variant="outline" label="Share listing" />
+                    <p className="mt-1.5 text-center text-[#1B2D45]/40" style={{ fontSize: "11px", fontWeight: 500 }}>
+                      Send it to your parents or roommates
+                    </p>
+                  </div>
                 </>
+              ) : (
+                /* Logged-out — often a parent the student sent the link to. Clean read, no dead-end CTAs. */
+                <div className="mt-5 rounded-xl border border-[#FF6B35]/15 bg-[#FF6B35]/[0.04] px-4 py-4">
+                  <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>Helping someone find a place?</p>
+                  <p className="mt-1 text-[#1B2D45]/60" style={{ fontSize: "12px", lineHeight: 1.55 }}>
+                    See the full listing here — no account needed. Cribb only lets <strong>verified Guelph students</strong> and <strong>verified landlords</strong> in, so what you&apos;re looking at is real.
+                  </p>
+                  <div className="mt-3">
+                    <ShareButton path={`/browse/${listingId}`} title={listing.title} variant="primary" label="Share this place" />
+                  </div>
+                  <Link href="/login" className="mt-3 block text-center text-[#1B2D45]/55 hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 600 }}>
+                    Students: sign in to message the landlord →
+                  </Link>
+                </div>
               )}
 
-              {/* Share + Report */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">
-                <ShareButton path={`/browse/${listingId}`} title={listing.title} variant="inline" />
+              {/* Report (sharing lives in the prominent contextual button above) */}
+              <div className="mt-3">
                 <button
                   onClick={() => setReportOpen(true)}
-                  className="flex-1 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[#1B2D45]/30 hover:text-[#E71D36]/50 hover:bg-[#E71D36]/[0.03] transition-all"
                   style={{ fontSize: "11px", fontWeight: 500 }}
                 >
                   <Flag className="w-3 h-3" /> Report

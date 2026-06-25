@@ -18,7 +18,7 @@ export function OnboardingBanner() {
             Cribb
           </p>
           <p className="text-[#1B2D45]/75 mt-0.5" style={{ fontSize: "13px", lineHeight: 1.55, fontWeight: 500 }}>
-            We are currently onboarding founding landlords and early student listings ahead of our September launch. New listings are being added daily.
+            We are currently onboarding founding landlords and early student listings ahead of our launch. New listings are being added daily.
           </p>
         </div>
       </div>

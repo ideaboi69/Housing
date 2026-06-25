@@ -99,6 +99,7 @@ export default function ManageListingPage({ params }: { params: Promise<{ id: st
   const [editOpen, setEditOpen] = useState(false);
   const [photosOpen, setPhotosOpen] = useState(false);
   const [showingsOpen, setShowingsOpen] = useState(false);
+  const [hasShowingTimes, setHasShowingTimes] = useState<boolean | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const refreshListing = useCallback(async () => {
@@ -118,15 +119,17 @@ export default function ManageListingPage({ params }: { params: Promise<{ id: st
         if (cancelled) return;
         setListing(l);
 
-        const [s, b, c] = await Promise.allSettled([
+        const [s, b, c, a] = await Promise.allSettled([
           api.healthScores.get(listingId),
           api.viewings.getLandlordBookings(listingId),
           api.messages.getLandlordConversations(),
+          api.viewings.getListingAvailability(listingId),
         ]);
         if (cancelled) return;
         setScore(s.status === "fulfilled" ? s.value : (getMockHealthScore(listingId) ?? null));
         setBookings(b.status === "fulfilled" ? b.value : []);
         setConversations(c.status === "fulfilled" ? c.value : []);
+        setHasShowingTimes(a.status === "fulfilled" ? a.value.length > 0 : null);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -321,6 +324,19 @@ export default function ManageListingPage({ params }: { params: Promise<{ id: st
               </button>
             }
           >
+            {hasShowingTimes === false && listing.status?.toLowerCase() === "active" && (
+              <div className="mb-4 flex flex-col gap-2 rounded-xl border border-[#FFB627]/35 bg-[#FFFBEB] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#A66A00]" />
+                  <p className="text-[#1B2D45]/80" style={{ fontSize: "12.5px", lineHeight: 1.5, fontWeight: 500 }}>
+                    No showing times set yet — students can&apos;t book a viewing until you add availability.
+                  </p>
+                </div>
+                <button onClick={() => setShowingsOpen(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#1B2D45] px-3 py-1.5 text-white transition-colors hover:bg-[#152438]" style={{ fontSize: "12px", fontWeight: 600 }}>
+                  <CalendarDays className="h-3.5 w-3.5" /> Set showing times
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-10 gap-y-3">
               <div>
                 <div className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 600, lineHeight: 1 }}>{upcomingViewings}</div>
@@ -417,7 +433,10 @@ export default function ManageListingPage({ params }: { params: Promise<{ id: st
         <ShowingsManager
           listingId={listingId}
           listingTitle={listing.title}
-          onClose={() => setShowingsOpen(false)}
+          onClose={() => {
+            setShowingsOpen(false);
+            api.viewings.getListingAvailability(listingId).then((a) => setHasShowingTimes(a.length > 0)).catch(() => {});
+          }}
         />
       )}
     </div>
