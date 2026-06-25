@@ -941,6 +941,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               landlordId={listing.landlord_id}
               landlordName={listing.landlord_name}
               landlordVerified={listing.landlord_verified}
+              landlordIsEarlyAdopter={listing.landlord_is_early_adopter}
             />
 
             {/* Map */}

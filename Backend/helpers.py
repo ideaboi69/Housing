@@ -643,6 +643,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         landlord_id=landlord.id,
         landlord_name=f"{landlord.first_name} {landlord.last_name}",
         landlord_verified=landlord.identity_verified,
+        landlord_is_early_adopter=landlord.is_early_adopter,
     )
 
 def build_listing_response(listing: Listing) -> ListingResponse:

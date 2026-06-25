@@ -29,6 +29,7 @@ import {
 } from "@/lib/mock-data";
 import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
+import { FoundingLandlordBadge } from "@/components/ui/Badges";
 import { PrivateNotesPanel } from "@/components/landlord/PrivateNotesPanel";
 import { hasNote } from "@/lib/landlord-notes";
 import { UpcomingShowings } from "@/components/landlord/UpcomingShowings";
@@ -181,7 +182,7 @@ function OverviewTab({
   onSwitchTab,
   properties,
 }: {
-  user: { first_name: string; identity_verified?: boolean; company_name?: string | null };
+  user: { first_name: string; identity_verified?: boolean; company_name?: string | null; is_early_adopter?: boolean };
   conversations: ConversationResponse[];
   unreadCount: number;
   onSwitchTab: (t: Tab) => void;
@@ -299,9 +300,12 @@ function OverviewTab({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="text-[#1B2D45]/45" style={{ fontSize: "12px", fontWeight: 500 }}>Landlord</p>
-          <h1 className="mt-1 text-[#1B2D45]" style={{ fontSize: "24px", lineHeight: 1.15, fontWeight: 600 }}>
-            {user.company_name ?? `${user.first_name}'s portfolio`}
-          </h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", lineHeight: 1.15, fontWeight: 600 }}>
+              {user.company_name ?? `${user.first_name}'s portfolio`}
+            </h1>
+            {user.is_early_adopter && <FoundingLandlordBadge size="md" />}
+          </div>
           <p className="mt-2 flex flex-wrap items-center gap-x-2 text-[#1B2D45]/50" style={{ fontSize: "13px", fontWeight: 400 }}>
             <span><span className="text-[#1B2D45]/80" style={{ fontWeight: 500 }}>{totalListings}</span> listing{totalListings === 1 ? "" : "s"}</span>
             <span className="text-[#1B2D45]/25">·</span>

@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Eye, FileText, PenLine, Trash2, Plus,
   Clock, CheckCircle2, Archive, AlertCircle, X,
-  Send, Shield, Loader2, ImagePlus, Camera, Save,
+  Send, Loader2, ImagePlus, Camera, Save,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWriterStore } from "@/lib/store";
 import { api, ApiError } from "@/lib/api";
+import { VerifiedWriterBadge } from "@/components/ui/Badges";
 import type { PostListResponse, PostResponse, PostCategory, WriterResponse } from "@/types";
 
 /* ═══════════════════════════════════════════════════════
@@ -723,13 +724,9 @@ function Dashboard() {
           <h1 className="text-[#1B2D45]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.5px" }}>
             Writer Dashboard
           </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex items-center gap-1">
-              <Shield className="w-3 h-3 text-[#FF6B35]" />
-              <span className="text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 700 }}>Verified Writer</span>
-            </div>
-            <span className="text-[#98A3B0]" style={{ fontSize: "11px" }}>·</span>
-            <span className="text-[#98A3B0]" style={{ fontSize: "11px" }}>{writer?.first_name} {writer?.last_name}</span>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>{writer?.first_name} {writer?.last_name}</span>
+            <VerifiedWriterBadge size="md" />
           </div>
         </div>
 

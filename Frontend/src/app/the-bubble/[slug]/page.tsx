@@ -2,8 +2,9 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, Calendar, MapPin, ExternalLink, BadgeCheck } from "lucide-react";
+import { ArrowLeft, Eye, Calendar, MapPin, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
+import { VerifiedWriterBadge } from "@/components/ui/Badges";
 import type { PostResponse } from "@/types";
 
 function formatDate(iso: string) {
@@ -88,7 +89,7 @@ export default function BubblePostPage({ params }: { params: Promise<{ slug: str
             )}
             <div className="flex items-center gap-1.5">
               <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{post.author_name}</span>
-              {post.author_is_official && <BadgeCheck className="w-4 h-4 text-[#FF6B35]" />}
+              {post.author_type === "writer" && <VerifiedWriterBadge />}
             </div>
           </div>
           <span className="text-[#1B2D45]/20">·</span>

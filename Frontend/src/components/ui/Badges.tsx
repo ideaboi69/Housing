@@ -44,6 +44,74 @@ export function EarlyAdopterBadge({ size = "sm" }: { size?: "sm" | "md" }) {
 }
 
 /**
+ * FoundingLandlordBadge — gold "founding member" badge for the first landlords on Cribb
+ * (Landlord.is_early_adopter). Render beside the landlord's name.
+ */
+export function FoundingLandlordBadge({ size = "sm" }: { size?: "sm" | "md" }) {
+  const isSm = size === "sm";
+  return (
+    <motion.span
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
+      className="inline-flex items-center gap-1 shrink-0 align-middle"
+      title="Founding landlord — one of the first on Cribb"
+      style={{
+        padding: isSm ? "1px 7px" : "2px 9px",
+        borderRadius: "6px",
+        background: "linear-gradient(135deg, #FFB627 0%, #E08A00 100%)",
+        boxShadow: "0 2px 6px rgba(224,138,0,0.28)",
+        fontSize: isSm ? "8px" : "10px",
+        fontWeight: 800,
+        color: "white",
+        letterSpacing: "0.03em",
+        lineHeight: 1.5,
+        textTransform: "uppercase" as const,
+      }}
+    >
+      <svg width={isSm ? "8" : "10"} height={isSm ? "8" : "10"} viewBox="0 0 16 16" fill="none">
+        <path d="M4 1.5V15" stroke="white" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M4 2.6h8.6L10 5.4l2.6 2.8H4z" fill="white" />
+      </svg>
+      Founding
+    </motion.span>
+  );
+}
+
+/**
+ * VerifiedWriterBadge — for approved Cribb writers. Render beside the writer's name.
+ */
+export function VerifiedWriterBadge({ size = "sm" }: { size?: "sm" | "md" }) {
+  const isSm = size === "sm";
+  return (
+    <motion.span
+      initial={{ scale: 0 }}
+      animate={{ scale: 1 }}
+      transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
+      className="inline-flex items-center gap-1 shrink-0 align-middle"
+      title="Verified Cribb writer"
+      style={{
+        padding: isSm ? "1px 7px" : "2px 9px",
+        borderRadius: "6px",
+        background: "linear-gradient(135deg, #FF6B35 0%, #E8552A 100%)",
+        boxShadow: "0 2px 6px rgba(255,107,53,0.28)",
+        fontSize: isSm ? "8px" : "10px",
+        fontWeight: 800,
+        color: "white",
+        letterSpacing: "0.03em",
+        lineHeight: 1.5,
+        textTransform: "uppercase" as const,
+      }}
+    >
+      <svg width={isSm ? "8" : "10"} height={isSm ? "8" : "10"} viewBox="0 0 16 16" fill="none">
+        <path d="M11.4 1.7l2.9 2.9-8 8L3 13l.4-3.3 8-8z" fill="white" />
+      </svg>
+      Writer
+    </motion.span>
+  );
+}
+
+/**
  * VerifiedStudentBadge — shown for all verified @uoguelph.ca students.
  * Green checkmark badge.
  */

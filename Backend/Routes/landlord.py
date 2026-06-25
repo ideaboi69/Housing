@@ -18,6 +18,10 @@ from Utils.turnstile import verify_turnstile
 import uuid
 import json
 
+# The first N landlords to register earn the founding-landlord badge (is_early_adopter).
+# Adjust this number to change how many founding spots exist.
+FOUNDING_LANDLORD_CAP = 50
+
 landlord_router = APIRouter()
 
 # Register a Landlord Profile
@@ -33,6 +37,8 @@ def register_landlord(request: Request, email: EmailStr = Form(...), password: s
             detail="An account with this email already exists",
         )
     validate_password(password)
+    # Founding-landlord badge: auto-granted to the first FOUNDING_LANDLORD_CAP landlords.
+    is_founding = db.query(Landlord).count() < FOUNDING_LANDLORD_CAP
     try:
         landlord = Landlord(
             email=email,
@@ -42,7 +48,8 @@ def register_landlord(request: Request, email: EmailStr = Form(...), password: s
             phone=phone,
             no_of_property=no_of_property,
             company_name=company_name,
-            identity_verified=False
+            identity_verified=False,
+            is_early_adopter=is_founding,
         )
         db.add(landlord)
         db.flush()

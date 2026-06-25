@@ -424,6 +424,7 @@ export interface ListingDetailResponse {
   landlord_id: number;
   landlord_name: string;
   landlord_verified: boolean;
+  landlord_is_early_adopter?: boolean;
   images?: ListingImageResponse[];
   // engagement
   save_count?: number;

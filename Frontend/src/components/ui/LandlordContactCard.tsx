@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { LandlordPublicResponse } from "@/types";
+import { FoundingLandlordBadge } from "@/components/ui/Badges";
 
 /* ── Mock landlord profiles for demo ───────────── */
 
@@ -63,12 +64,14 @@ interface LandlordContactCardProps {
   landlordId: number;
   landlordName: string;
   landlordVerified: boolean;
+  landlordIsEarlyAdopter?: boolean;
 }
 
 export function LandlordContactCard({
   landlordId,
   landlordName,
   landlordVerified,
+  landlordIsEarlyAdopter,
 }: LandlordContactCardProps) {
   const [profile, setProfile] = useState<LandlordPublicResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,9 +171,12 @@ export function LandlordContactCard({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
-            {displayName}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
+              {displayName}
+            </p>
+            {landlordIsEarlyAdopter && <FoundingLandlordBadge />}
+          </div>
           {companyName ? (
             <p className="text-[#1B2D45]/40 truncate flex items-center gap-1" style={{ fontSize: "11px" }}>
               <Building2 className="w-3 h-3 shrink-0" />

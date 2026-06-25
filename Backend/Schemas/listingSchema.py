@@ -172,3 +172,4 @@ class ListingDetailResponse(BaseModel):
     landlord_id: int
     landlord_name: str
     landlord_verified: bool
+    landlord_is_early_adopter: bool = False
