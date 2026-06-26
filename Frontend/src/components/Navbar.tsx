@@ -197,7 +197,7 @@ export function Navbar() {
   if (pathname === "/" && !authHydrated) {
     return (
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[64px] md:h-[72px]">
+        <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[56px] md:h-[64px]">
           <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.04em" }}>
             cribb
           </Link>
@@ -210,7 +210,7 @@ export function Navbar() {
   if (pathname === "/" && !displayUser) {
     return (
       <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-xl border-b border-black/5">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[64px] md:h-[72px]">
+        <div className="max-w-[1200px] mx-auto flex items-center justify-between px-4 md:px-6 h-[56px] md:h-[64px]">
           <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "24px", fontWeight: 900, letterSpacing: "-0.04em" }}>
             cribb
           </Link>

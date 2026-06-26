@@ -1,19 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Pin, ZoomIn, ZoomOut, Bed, Bath, Clock, MapPin, ChevronDown } from "lucide-react";
+import { Pin, ZoomIn, ZoomOut, Bed, Bath, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { formatPrice, formatPropertyType } from "@/lib/utils";
 import { getProximityLabel } from "@/lib/proximity";
-import { buildStaticMapUrl, GUELPH_CENTER, projectLngLatToContainer } from "@/lib/mapbox";
 import {
-  DEFAULT_MAP_VIEW_LANDMARKS,
-  GUELPH_LANDMARKS,
-  LANDMARK_TYPES,
-  MAP_VIEW_LANDMARK_ORDER,
-  type LandmarkType,
-} from "@/lib/guelph-landmarks";
+  GOOGLE_MAPS_KEY,
+  GUELPH_CENTER,
+  loadGoogleMaps,
+  projectLngLatToContainer,
+} from "@/lib/google-maps";
 import type { ListingDetailResponse } from "@/types";
 
 type SortKey = "recommended" | "price_low" | "price_high" | "closest";
@@ -23,60 +21,6 @@ interface MapViewProps {
   healthScores: Record<number, number>;
   pinnedIds: number[];
   onTogglePin: (id: number) => void;
-}
-
-function MapNearbyFilters({
-  activeTypes,
-  onToggle,
-}: {
-  activeTypes: Set<LandmarkType>;
-  onToggle: (type: LandmarkType) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-
-  return (
-    <div className="absolute bottom-4 left-4 z-[10] overflow-hidden rounded-2xl bg-white/92 shadow-md backdrop-blur-sm">
-      <button
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-        className="flex items-center gap-2 px-3 py-2.5 text-[#1B2D45] transition-colors hover:bg-black/[0.02]"
-        style={{ fontSize: "11px", fontWeight: 800 }}
-      >
-        <span>📍</span>
-        Nearby places
-        <ChevronDown className={`h-3.5 w-3.5 text-[#1B2D45]/40 transition-transform ${expanded ? "rotate-180" : ""}`} />
-      </button>
-      {expanded && (
-        <div className="border-t border-black/[0.06] px-3 pb-3 pt-2">
-          <div className="flex flex-wrap gap-1.5">
-            {MAP_VIEW_LANDMARK_ORDER.map((type) => {
-              const config = LANDMARK_TYPES[type];
-              const isActive = activeTypes.has(type);
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onToggle(type)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 transition-all ${
-                    isActive ? "bg-white shadow-sm" : "bg-black/[0.03] opacity-45"
-                  }`}
-                  style={{
-                    borderColor: isActive ? `${config.color}30` : "transparent",
-                    color: "#1B2D45",
-                    fontSize: "10px",
-                    fontWeight: 700,
-                  }}
-                >
-                  <span>{config.emoji}</span>
-                  <span>{config.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 function MapScoreLegend() {
@@ -100,24 +44,6 @@ function MapHintCard({ text }: { text: string }) {
       </p>
     </div>
   );
-}
-
-function poiPointSize(type: LandmarkType) {
-  if (type === "campus") return { size: 34, fontSize: "16px" };
-  if (type === "park") return { size: 26, fontSize: "12px" };
-  return { size: 24, fontSize: "11px" };
-}
-
-function poiPointStyle(type: LandmarkType) {
-  const config = LANDMARK_TYPES[type];
-  return {
-    background: `${config.color}E8`,
-    borderColor: "rgba(255,255,255,0.95)",
-  };
-}
-
-function poiZIndex(type: LandmarkType) {
-  return type === "campus" ? 4 : 3;
 }
 
 function BrowseMapSummary({ listings, avgRent }: { listings: ListingDetailResponse[]; avgRent: number }) {
@@ -261,14 +187,14 @@ function ListingRailCard({
 }
 
 export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapViewProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mapZoom, setMapZoom] = useState(13.8);
+  const [mapCenter, setMapCenter] = useState(GUELPH_CENTER);
   const [mapSize, setMapSize] = useState({ width: 960, height: 720 });
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
-  const [activePoiTypes, setActivePoiTypes] = useState<Set<LandmarkType>>(
-    () => new Set(DEFAULT_MAP_VIEW_LANDMARKS)
-  );
 
   const avgRent = listings.length > 0
     ? Math.round(listings.reduce((total, listing) => total + Number(listing.rent_per_room), 0) / listings.length)
@@ -301,7 +227,7 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
   }, [selectedId, sortedListings]);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapContainerRef.current) return;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
@@ -310,16 +236,58 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
         height: entry.contentRect.height,
       });
     });
-    observer.observe(mapRef.current);
+    observer.observe(mapContainerRef.current);
     return () => observer.disconnect();
   }, []);
 
-  const staticMapUrl = useMemo(() => buildStaticMapUrl({
-    center: GUELPH_CENTER,
-    zoom: mapZoom,
-    width: mapSize.width,
-    height: mapSize.height,
-  }), [mapZoom, mapSize.height, mapSize.width]);
+  // Initialize Google Map
+  useEffect(() => {
+    if (typeof window === "undefined" || !mapContainerRef.current || !GOOGLE_MAPS_KEY) return;
+    let cancelled = false;
+
+    async function init() {
+      try {
+        const google = await loadGoogleMaps();
+        if (cancelled || !mapContainerRef.current || mapInstanceRef.current) return;
+
+        const map = new google.maps.Map(mapContainerRef.current, {
+          center: mapCenter,
+          zoom: Math.round(mapZoom),
+          disableDefaultUI: true,
+          gestureHandling: "greedy",
+          clickableIcons: false,
+          backgroundColor: "#EDF2EF",
+        });
+        mapInstanceRef.current = map;
+
+        map.addListener("idle", () => {
+          const c = map.getCenter();
+          const z = map.getZoom();
+          if (c) setMapCenter({ lat: c.lat(), lng: c.lng() });
+          if (z != null) setMapZoom(z);
+        });
+      } catch (err) {
+        console.error("Google Maps init failed:", err);
+      }
+    }
+    init();
+
+    return () => {
+      cancelled = true;
+      mapInstanceRef.current = null;
+    };
+    // intentionally only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync external zoom changes (from our buttons) into the map.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const current = map.getZoom();
+    const rounded = Math.round(mapZoom);
+    if (current !== rounded) map.setZoom(rounded);
+  }, [mapZoom]);
 
   const markerPoints = useMemo(() => {
     return sortedListings.map((listing) => {
@@ -328,47 +296,14 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
       const point = projectLngLatToContainer({
         lat: coords.lat,
         lng: coords.lng,
-        center: GUELPH_CENTER,
+        center: mapCenter,
         zoom: mapZoom,
         width: mapSize.width,
         height: mapSize.height,
       });
       return { listing, point };
     }).filter(Boolean) as { listing: ListingDetailResponse; point: { x: number; y: number } }[];
-  }, [mapSize.height, mapSize.width, mapZoom, sortedListings]);
-
-  const poiPoints = useMemo(() => {
-    return GUELPH_LANDMARKS.filter((landmark) => activePoiTypes.has(landmark.type))
-      .map((landmark) => {
-        const point = projectLngLatToContainer({
-          lat: landmark.lat,
-          lng: landmark.lng,
-          center: GUELPH_CENTER,
-          zoom: mapZoom,
-          width: mapSize.width,
-          height: mapSize.height,
-        });
-
-        if (point.x < -24 || point.x > mapSize.width + 24 || point.y < -24 || point.y > mapSize.height + 24) {
-          return null;
-        }
-
-        return { landmark, point };
-      })
-      .filter(Boolean) as { landmark: (typeof GUELPH_LANDMARKS)[number]; point: { x: number; y: number } }[];
-  }, [activePoiTypes, mapSize.height, mapSize.width, mapZoom]);
-
-  const togglePoiType = useCallback((type: LandmarkType) => {
-    setActivePoiTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) {
-        next.delete(type);
-      } else {
-        next.add(type);
-      }
-      return next;
-    });
-  }, []);
+  }, [mapCenter, mapSize.height, mapSize.width, mapZoom, sortedListings]);
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 md:px-6 py-4 md:py-5">
@@ -378,45 +313,16 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
       >
         <div className="grid xl:h-full xl:grid-cols-[minmax(0,1.18fr)_430px]">
           <div className="relative min-h-[54vh] bg-[#EDF2EF] xl:h-full">
-            <div ref={mapRef} className="absolute inset-0" />
-            {staticMapUrl ? (
-              <img src={staticMapUrl} alt="Guelph rental map" className="absolute inset-0 h-full w-full object-cover" />
-            ) : (
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,#EEF4F0_0%,#E2ECE7_100%)]" />
-            )}
+            <div ref={mapContainerRef} className="absolute inset-0" />
 
             <BrowseMapSummary listings={listings} avgRent={avgRent} />
             <MapControls
-              onZoomIn={() => setMapZoom((value) => Math.min(16.5, value + 0.8))}
-              onZoomOut={() => setMapZoom((value) => Math.max(11.5, value - 0.8))}
+              onZoomIn={() => setMapZoom((value) => Math.min(20, Math.round(value) + 1))}
+              onZoomOut={() => setMapZoom((value) => Math.max(8, Math.round(value) - 1))}
             />
-            <MapNearbyFilters activeTypes={activePoiTypes} onToggle={togglePoiType} />
-            <MapHintCard text="Toggle nearby groceries, gyms, trails, and transit without losing the listing view." />
+            <MapHintCard text="Tap a price pin to preview that listing in the panel beside the map." />
 
-            <div className="absolute inset-0 z-[5]">
-              {poiPoints.map(({ landmark, point }) => {
-                const { size, fontSize } = poiPointSize(landmark.type);
-                return (
-                  <div
-                    key={landmark.name}
-                    title={landmark.name}
-                    className="absolute flex items-center justify-center rounded-full border-2 border-white shadow-[0_3px_12px_rgba(0,0,0,0.14)]"
-                    style={{
-                      width: size,
-                      height: size,
-                      left: point.x,
-                      top: point.y,
-                      transform: "translate(-50%, -50%)",
-                      ...poiPointStyle(landmark.type),
-                      zIndex: poiZIndex(landmark.type),
-                      fontSize,
-                    }}
-                  >
-                    <span>{landmark.emoji}</span>
-                  </div>
-                );
-              })}
-
+            <div className="pointer-events-none absolute inset-0 z-[5]">
               {markerPoints.map(({ listing, point }) => {
                 const score = healthScores[listing.id] ?? 0;
                 const color = score >= 85 ? "#4ADE80" : score >= 65 ? "#FFB627" : "#E71D36";
@@ -425,7 +331,7 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
                   <button
                     key={listing.id}
                     onClick={() => focusListing(listing.id)}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
+                    className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
                     style={{
                       left: point.x,
                       top: point.y,

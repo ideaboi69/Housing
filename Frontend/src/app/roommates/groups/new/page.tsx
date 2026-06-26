@@ -15,6 +15,7 @@ import {
   GENDER_HOUSING_OPTIONS,
   upsertStoredRoommateGroup,
 } from "@/components/roommates/roommate-data";
+import { AddressAutocomplete } from "@/components/ui/AddressAutocomplete";
 
 const STEP_DETAILS = [
   {
@@ -839,10 +840,10 @@ function CreateGroupContent() {
                       </div>
 
                       <label className="text-[#1B2D45] block mb-2" style={{ fontSize: "12px", fontWeight: 600 }}>Home address</label>
-                      <input
-                        type="text"
+                      <AddressAutocomplete
                         value={address}
-                        onChange={(e) => setAddress(e.target.value)}
+                        onChange={setAddress}
+                        onSelect={(selection) => setAddress(selection.address)}
                         placeholder="e.g. 12 Wilson St, Guelph, ON"
                         className="w-full rounded-[20px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3.5 outline-none transition-all focus:border-[#FF6B35]/30 focus:bg-white"
                         style={{ fontSize: "14px" }}

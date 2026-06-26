@@ -17,7 +17,7 @@ import {
   getMaxWalkForProximityFilter,
   getProximityLabel,
 } from "@/lib/proximity";
-import { buildStaticMapUrl, GUELPH_CENTER, projectLngLatToContainer } from "@/lib/mapbox";
+import { GOOGLE_MAPS_KEY, GUELPH_CENTER, loadGoogleMaps, projectLngLatToContainer } from "@/lib/google-maps";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { isSampleSublet } from "@/lib/sample-data";
 import { SampleBadge } from "@/components/ui/SampleBadge";
@@ -1683,8 +1683,10 @@ function SubletMapHint() {
 
 function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { listings: SubletListing[]; pinnedIds: string[]; onTogglePin: (id: string) => void; selectedRange: [number, number] }) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mapZoom, setMapZoom] = useState(13.8);
+  const [mapCenter, setMapCenter] = useState(GUELPH_CENTER);
   const [mapSize, setMapSize] = useState({ width: 960, height: 720 });
   const [activePoiTypes, setActivePoiTypes] = useState<Set<LandmarkType>>(
     () => new Set(DEFAULT_MAP_VIEW_LANDMARKS)
@@ -1723,12 +1725,53 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
     }
   }, [listings, selectedId]);
 
-  const staticMapUrl = useMemo(() => buildStaticMapUrl({
-    center: GUELPH_CENTER,
-    zoom: mapZoom,
-    width: mapSize.width,
-    height: mapSize.height,
-  }), [mapSize.height, mapSize.width, mapZoom]);
+  // Initialize Google Map
+  useEffect(() => {
+    if (typeof window === "undefined" || !mapRef.current || !GOOGLE_MAPS_KEY) return;
+    let cancelled = false;
+
+    async function init() {
+      try {
+        const google = await loadGoogleMaps();
+        if (cancelled || !mapRef.current || mapInstanceRef.current) return;
+
+        const map = new google.maps.Map(mapRef.current, {
+          center: mapCenter,
+          zoom: Math.round(mapZoom),
+          disableDefaultUI: true,
+          gestureHandling: "greedy",
+          clickableIcons: false,
+          backgroundColor: "#EEF5F4",
+        });
+        mapInstanceRef.current = map;
+
+        map.addListener("idle", () => {
+          const c = map.getCenter();
+          const z = map.getZoom();
+          if (c) setMapCenter({ lat: c.lat(), lng: c.lng() });
+          if (z != null) setMapZoom(z);
+        });
+      } catch (err) {
+        console.error("Google Maps init failed:", err);
+      }
+    }
+    init();
+
+    return () => {
+      cancelled = true;
+      mapInstanceRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync zoom button changes into the map
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const current = map.getZoom();
+    const rounded = Math.round(mapZoom);
+    if (current !== rounded) map.setZoom(rounded);
+  }, [mapZoom]);
 
   const markerPoints = useMemo(() => {
     return listings.map((sublet) => {
@@ -1737,14 +1780,14 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
       const point = projectLngLatToContainer({
         lat: coords.lat,
         lng: coords.lng,
-        center: GUELPH_CENTER,
+        center: mapCenter,
         zoom: mapZoom,
         width: mapSize.width,
         height: mapSize.height,
       });
       return { sublet, point };
     }).filter(Boolean) as { sublet: SubletListing; point: { x: number; y: number } }[];
-  }, [listings, mapSize.height, mapSize.width, mapZoom]);
+  }, [listings, mapCenter, mapSize.height, mapSize.width, mapZoom]);
 
   const poiPoints = useMemo(() => {
     return GUELPH_LANDMARKS.filter((landmark) => activePoiTypes.has(landmark.type))
@@ -1752,7 +1795,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
         const point = projectLngLatToContainer({
           lat: landmark.lat,
           lng: landmark.lng,
-          center: GUELPH_CENTER,
+          center: mapCenter,
           zoom: mapZoom,
           width: mapSize.width,
           height: mapSize.height,
@@ -1765,7 +1808,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
         return { landmark, point };
       })
       .filter(Boolean) as { landmark: (typeof GUELPH_LANDMARKS)[number]; point: { x: number; y: number } }[];
-  }, [activePoiTypes, mapSize.height, mapSize.width, mapZoom]);
+  }, [activePoiTypes, mapCenter, mapSize.height, mapSize.width, mapZoom]);
 
   const togglePoiType = useCallback((type: LandmarkType) => {
     setActivePoiTypes((prev) => {
@@ -1788,21 +1831,16 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
         <div className="grid xl:h-full xl:grid-cols-[minmax(0,1.18fr)_430px]">
           <div className="relative min-h-[54vh] bg-[#EEF5F4] xl:h-full">
             <div ref={mapRef} className="absolute inset-0" />
-            {staticMapUrl ? (
-              <img src={staticMapUrl} alt="Guelph sublet map" className="absolute inset-0 h-full w-full object-cover" />
-            ) : (
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,#EEF5F4_0%,#E4EFED_100%)]" />
-            )}
 
             <SubletMapSummary listings={listings} selectedRange={selectedRange} />
             <SubletMapControls
-              onZoomIn={() => setMapZoom((value) => Math.min(16.5, value + 0.8))}
-              onZoomOut={() => setMapZoom((value) => Math.max(11.5, value - 0.8))}
+              onZoomIn={() => setMapZoom((value) => Math.min(20, Math.round(value) + 1))}
+              onZoomOut={() => setMapZoom((value) => Math.max(8, Math.round(value) - 1))}
             />
             <SubletMapNearbyFilters activeTypes={activePoiTypes} onToggle={togglePoiType} />
             <SubletMapHint />
 
-            <div className="absolute inset-0 z-[5]">
+            <div className="pointer-events-none absolute inset-0 z-[5]">
               {poiPoints.map(({ landmark, point }) => {
                 const config = LANDMARK_TYPES[landmark.type];
                 const isCampus = landmark.type === "campus";
@@ -1833,7 +1871,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
                   <button
                     key={sublet.id}
                     onClick={() => setSelectedId(sublet.id)}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#2EC4B6] bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
+                    className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#2EC4B6] bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
                     style={{
                       left: point.x,
                       top: point.y,

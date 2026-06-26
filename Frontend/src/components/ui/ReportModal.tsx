@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Flag, X, AlertTriangle, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
@@ -51,6 +51,12 @@ export function ReportModal({
   const router = useRouter();
   const { user } = useAuthStore();
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  useEffect(() => {
+    if (isOpen && !user) {
+      onClose();
+      router.push("/login");
+    }
+  }, [isOpen, user, onClose, router]);
   const [customReason, setCustomReason] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error" | "duplicate">("idle");
   const [errorMessage, setErrorMessage] = useState("");

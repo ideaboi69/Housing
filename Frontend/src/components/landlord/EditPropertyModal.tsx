@@ -9,6 +9,8 @@ import { PropertyType } from "@/types";
 import type { PetPolicy, SmokingPolicy } from "@/types";
 import type { PropertyResponse, PropertyImageResponse } from "@/types";
 import { PropertyImageManager } from "@/components/landlord/PropertyImageManager";
+import { AddressAutocomplete, type AddressSelection } from "@/components/ui/AddressAutocomplete";
+import { fetchProximityToUC } from "@/lib/proximity-google";
 
 const PET_POLICIES: PetPolicy[] = ["allowed", "not_allowed", "case_by_case", "unknown"];
 const SMOKING_POLICIES: SmokingPolicy[] = ["allowed", "not_allowed", "outside_only", "unknown"];
@@ -63,6 +65,31 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
   const [busTime, setBusTime] = useState(String(property.bus_time_minutes || 0));
   const [driveTime, setDriveTime] = useState(String(property.drive_time_minutes || 0));
   const [nearestBusRoute, setNearestBusRoute] = useState(property.nearest_bus_route || "");
+  const [latLng, setLatLng] = useState<{ lat: number; lng: number } | null>(
+    property.latitude != null && property.longitude != null
+      ? { lat: Number(property.latitude), lng: Number(property.longitude) }
+      : null
+  );
+  const [proximityStatus, setProximityStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  async function handleAddressSelect(selection: AddressSelection) {
+    setLatLng({ lat: selection.lat, lng: selection.lng });
+    setAddress(selection.address);
+    if (selection.postalCode) setPostalCode(selection.postalCode.toUpperCase());
+
+    setProximityStatus("loading");
+    try {
+      const proximity = await fetchProximityToUC({ lat: selection.lat, lng: selection.lng });
+      if (proximity.distance_to_campus_km) setDistanceToCampus(String(proximity.distance_to_campus_km));
+      if (proximity.walk_time_minutes) setWalkTime(String(proximity.walk_time_minutes));
+      if (proximity.bus_time_minutes) setBusTime(String(proximity.bus_time_minutes));
+      if (proximity.drive_time_minutes) setDriveTime(String(proximity.drive_time_minutes));
+      setProximityStatus("done");
+    } catch (err) {
+      console.error("Proximity lookup failed:", err);
+      setProximityStatus("error");
+    }
+  }
 
   const handleSave = async () => {
     if (findBlockedField({ Title: title, Address: address })) { setError(BLOCKED_CONTENT_MESSAGE); return; }
@@ -96,6 +123,7 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
         bus_time_minutes: Number(busTime),
         drive_time_minutes: Number(driveTime),
         nearest_bus_route: nearestBusRoute.trim() || undefined,
+        ...(latLng ? { latitude: latLng.lat, longitude: latLng.lng } : {}),
       });
       onSaved(updated);
       onClose();
@@ -285,16 +313,40 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
           {tab === "location" && (
             <div className="space-y-4">
               <Field label="Address">
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(text) => {
+                    setAddress(text);
+                    if (latLng) {
+                      setLatLng(null);
+                      setProximityStatus("idle");
+                    }
+                  }}
+                  onSelect={handleAddressSelect}
+                  placeholder="Start typing, then pick your address"
                   className="w-full px-3 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
                   style={{ fontSize: "13px" }}
                 />
-                <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "10px" }}>
-                  Map coordinates re-geocode automatically.
-                </p>
+                {proximityStatus === "loading" && (
+                  <p className="mt-1 flex items-center gap-1.5 text-[#1B2D45]/45" style={{ fontSize: "10px" }}>
+                    <Loader2 className="w-3 h-3 animate-spin" /> Recalculating commute times…
+                  </p>
+                )}
+                {proximityStatus === "done" && (
+                  <p className="mt-1 flex items-center gap-1.5 text-[#4ADE80]" style={{ fontSize: "10px", fontWeight: 600 }}>
+                    <Check className="w-3 h-3" /> Commute times updated below.
+                  </p>
+                )}
+                {proximityStatus === "error" && (
+                  <p className="mt-1 text-[#FFB627]" style={{ fontSize: "10px" }}>
+                    Couldn&apos;t auto-calculate — adjust the values manually.
+                  </p>
+                )}
+                {proximityStatus === "idle" && (
+                  <p className="text-[#1B2D45]/30 mt-1" style={{ fontSize: "10px" }}>
+                    Pick a suggestion to auto-fill commute times to campus.
+                  </p>
+                )}
               </Field>
 
               <Field label="Postal code">

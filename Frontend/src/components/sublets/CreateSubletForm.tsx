@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Check, X, GripVertical } from "lucide-react";
+import { Check, X, GripVertical, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -11,6 +11,8 @@ import { api } from "@/lib/api";
 import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
 import type { GenderPreference, PetPolicy, SmokingPolicy } from "@/types";
 import { MONTHS, type SubletListing } from "@/components/sublets/sublet-data";
+import { AddressAutocomplete, type AddressSelection } from "@/components/ui/AddressAutocomplete";
+import { fetchProximityToUC } from "@/lib/proximity-google";
 
 const PET_POLICY_OPTIONS: { value: PetPolicy; label: string }[] = [
   { value: "allowed", label: "Allowed" },
@@ -80,6 +82,8 @@ export function CreateSubletForm({
   const [form, setForm] = useState(INITIAL_SUBLET_FORM);
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [latLng, setLatLng] = useState<{ lat: number; lng: number } | null>(null);
+  const [proximityStatus, setProximityStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
@@ -88,6 +92,31 @@ export function CreateSubletForm({
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleAddressSelect(selection: AddressSelection) {
+    setLatLng({ lat: selection.lat, lng: selection.lng });
+    setForm((prev) => ({
+      ...prev,
+      address: selection.address,
+      postal_code: selection.postalCode || prev.postal_code,
+    }));
+
+    setProximityStatus("loading");
+    try {
+      const proximity = await fetchProximityToUC({ lat: selection.lat, lng: selection.lng });
+      setForm((prev) => ({
+        ...prev,
+        distance_to_campus_km: proximity.distance_to_campus_km ? String(proximity.distance_to_campus_km) : prev.distance_to_campus_km,
+        walk_time_minutes: proximity.walk_time_minutes ? String(proximity.walk_time_minutes) : prev.walk_time_minutes,
+        bus_time_minutes: proximity.bus_time_minutes ? String(proximity.bus_time_minutes) : prev.bus_time_minutes,
+        drive_time_minutes: proximity.drive_time_minutes ? String(proximity.drive_time_minutes) : prev.drive_time_minutes,
+      }));
+      setProximityStatus("done");
+    } catch (err) {
+      console.error("Proximity lookup failed:", err);
+      setProximityStatus("error");
+    }
   }
 
   function addPhotos(files: FileList | null) {
@@ -266,8 +295,8 @@ export function CreateSubletForm({
         title: form.title.trim(),
         address: form.address.trim(),
         postal_code: form.postal_code.trim(),
-        latitude: null,
-        longitude: null,
+        latitude: latLng?.lat ?? null,
+        longitude: latLng?.lng ?? null,
         distance_to_campus_km: distance,
         walk_time_minutes: walk,
         drive_time_minutes: drive,
@@ -451,7 +480,35 @@ export function CreateSubletForm({
               </div>
               <div>
                 <label className={labelClass} style={labelStyle}>Address *</label>
-                <input type="text" value={form.address} onChange={(e) => update("address", e.target.value)} placeholder="e.g. 78 College Ave W, Guelph" className={inputClass} style={{ fontSize: "13px" }} />
+                <AddressAutocomplete
+                  value={form.address}
+                  onChange={(text) => {
+                    update("address", text);
+                    if (latLng) {
+                      setLatLng(null);
+                      setProximityStatus("idle");
+                    }
+                  }}
+                  onSelect={handleAddressSelect}
+                  placeholder="Start typing, then pick your address"
+                  className={inputClass}
+                  style={{ fontSize: "13px" }}
+                />
+                {proximityStatus === "loading" && (
+                  <p className="mt-1 flex items-center gap-1.5 text-[#1B2D45]/45" style={{ fontSize: "11px" }}>
+                    <Loader2 className="w-3 h-3 animate-spin" /> Calculating commute to campus…
+                  </p>
+                )}
+                {proximityStatus === "done" && (
+                  <p className="mt-1 flex items-center gap-1.5 text-[#2EC4B6]" style={{ fontSize: "11px", fontWeight: 600 }}>
+                    <Check className="w-3 h-3" /> Commute times filled in below.
+                  </p>
+                )}
+                {proximityStatus === "error" && (
+                  <p className="mt-1 text-[#FFB627]" style={{ fontSize: "11px" }}>
+                    Couldn&apos;t auto-calculate — enter the times manually below.
+                  </p>
+                )}
               </div>
               <div>
                 <label className={labelClass} style={labelStyle}>Postal code *</label>

@@ -29,7 +29,7 @@ The AI listing comparison feature sends listing data (rent, amenities, location,
 
 ## Service providers
 
-Neon (database), Render (hosting), Cloudinary (images), AWS S3 and Textract (verification documents), Resend (email), Cloudflare (Turnstile bot protection), Sentry (error monitoring), Anthropic (AI compare), Upstash (caching), Mapbox (maps).
+Neon (database), Render (hosting), Cloudinary (images), AWS S3 and Textract (verification documents), Resend (email), Cloudflare (Turnstile bot protection), Sentry (error monitoring), Anthropic (AI compare), Upstash (caching), Google Maps (maps).
 
 ## Your rights
 

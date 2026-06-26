@@ -98,8 +98,8 @@ export default function PrivacyPage() {
               Neon (database), Render (hosting), Resend (email), Cloudinary and
               Amazon Web Services (image and document storage), Anthropic (AI
               features), Cloudflare (security and Turnstile bot protection),
-              Sentry (error monitoring), Upstash (caching), Mapbox (maps and
-              address lookup).
+              Sentry (error monitoring), Upstash (caching), Google Maps (maps
+              and address lookup).
             </Item>
             <Item label="Other users, only where you choose">
               landlords see your name and program when you message them; group

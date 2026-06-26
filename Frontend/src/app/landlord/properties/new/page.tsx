@@ -10,6 +10,8 @@ import type { PetPolicy, SmokingPolicy } from "@/types";
 import { PropertyType } from "@/types";
 import { formatPropertyType } from "@/lib/utils";
 import { ArrowLeft, MapPin, Home, Check, X, Loader2 } from "lucide-react";
+import { AddressAutocomplete, type AddressSelection } from "@/components/ui/AddressAutocomplete";
+import { fetchProximityToUC } from "@/lib/proximity-google";
 
 const propertyTypes = [
   { value: PropertyType.HOUSE, label: "House", emoji: "🏠" },
@@ -39,6 +41,9 @@ function NewPropertyPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [error, setError] = useState("");
+
+  const [latLng, setLatLng] = useState<{ lat: number; lng: number } | null>(null);
+  const [proximityStatus, setProximityStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
   const [form, setForm] = useState({
     title: "",
@@ -71,6 +76,32 @@ function NewPropertyPageContent() {
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleAddressSelect(selection: AddressSelection) {
+    setLatLng({ lat: selection.lat, lng: selection.lng });
+    // Auto-fill postal code from the picked place when available.
+    setForm((prev) => ({
+      ...prev,
+      address: selection.address,
+      postal_code: selection.postalCode || prev.postal_code,
+    }));
+
+    setProximityStatus("loading");
+    try {
+      const proximity = await fetchProximityToUC({ lat: selection.lat, lng: selection.lng });
+      setForm((prev) => ({
+        ...prev,
+        distance_to_campus_km: proximity.distance_to_campus_km ? String(proximity.distance_to_campus_km) : prev.distance_to_campus_km,
+        walk_time_minutes: proximity.walk_time_minutes ? String(proximity.walk_time_minutes) : prev.walk_time_minutes,
+        bus_time_minutes: proximity.bus_time_minutes ? String(proximity.bus_time_minutes) : prev.bus_time_minutes,
+        drive_time_minutes: proximity.drive_time_minutes ? String(proximity.drive_time_minutes) : prev.drive_time_minutes,
+      }));
+      setProximityStatus("done");
+    } catch (err) {
+      console.error("Proximity lookup failed:", err);
+      setProximityStatus("error");
+    }
   }
 
   function validate(): boolean {
@@ -124,6 +155,7 @@ function NewPropertyPageContent() {
         drive_time_minutes: Number(form.drive_time_minutes),
         bus_time_minutes: form.bus_time_minutes ? Number(form.bus_time_minutes) : 0,
         nearest_bus_route: form.nearest_bus_route || "",
+        ...(latLng ? { latitude: latLng.lat, longitude: latLng.lng } : {}),
       };
 
       const property = await api.properties.create(payload);
@@ -180,15 +212,37 @@ function NewPropertyPageContent() {
               <label className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
                 <MapPin className="w-3.5 h-3.5 text-[#1B2D45]/40" /> Address
               </label>
-              <input
-                type="text"
+              <AddressAutocomplete
                 value={form.address}
-                onChange={(e) => update("address", e.target.value)}
-                placeholder="e.g. 78 College Ave W, Guelph, ON"
+                onChange={(text) => {
+                  update("address", text);
+                  // If they edit the text after picking, the stored coords are stale.
+                  if (latLng) {
+                    setLatLng(null);
+                    setProximityStatus("idle");
+                  }
+                }}
+                onSelect={handleAddressSelect}
+                placeholder="Start typing, then pick your address"
                 required
                 className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
                 style={{ fontSize: "14px" }}
               />
+              {proximityStatus === "loading" && (
+                <p className="mt-1.5 flex items-center gap-1.5 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>
+                  <Loader2 className="w-3 h-3 animate-spin" /> Calculating commute times to campus…
+                </p>
+              )}
+              {proximityStatus === "done" && (
+                <p className="mt-1.5 flex items-center gap-1.5 text-[#4ADE80]" style={{ fontSize: "12px", fontWeight: 600 }}>
+                  <Check className="w-3 h-3" /> Commute times to campus filled in below — edit if needed.
+                </p>
+              )}
+              {proximityStatus === "error" && (
+                <p className="mt-1.5 text-[#FFB627]" style={{ fontSize: "12px" }}>
+                  Couldn&apos;t auto-calculate commute times. Enter them manually below.
+                </p>
+              )}
             </div>
 
             <div>
@@ -372,7 +426,7 @@ function NewPropertyPageContent() {
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <h2 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Getting to Campus</h2>
             <p className="text-[#1B2D45]/30" style={{ fontSize: "12px" }}>
-              Helps students compare commute times. Drive time is required by the current backend; others can be left blank.
+              Pick your address above and we&apos;ll auto-fill these from Google Maps (measured to the University Centre). Adjust any value if you like.
             </p>
 
             <div className="grid grid-cols-2 gap-4">

@@ -604,7 +604,7 @@ function PostRow({ post, onEdit, onStatusChange, onDelete }: {
           </button>
         )}
 
-        <button onClick={() => { if (window.confirm("Delete this post? This can't be undone.")) onDelete(); }} className={`${actionBtn} border-[#E71D36]/20 text-[#E71D36]/80 hover:bg-[#E71D36]/5`} style={{ fontSize: "11px", fontWeight: 600 }}>
+<button onClick={onDelete} className={`${actionBtn} border-[#E71D36]/20 text-[#E71D36]/80 hover:bg-[#E71D36]/5`} style={{ fontSize: "11px", fontWeight: 600 }}>
           <Trash2 className="w-3.5 h-3.5" /> Delete
         </button>
       </div>

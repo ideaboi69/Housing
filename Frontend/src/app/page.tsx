@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion, useInView, useAnimation } from "framer-motion";
 import Link from "next/link";
 import { Heart } from "lucide-react";
+import { LandlordHeroCTA } from "@/components/landing/LandlordHeroCTA";
 
 /* ════════════════════════════════════════════════════════
    Images / Data
@@ -912,9 +913,7 @@ export default function HomePage() {
                 <Link href="/browse" className="px-7 py-3.5 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] transition-all inline-block text-center" style={{ fontSize: "16px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.35)" }}>
                   Browse Listings →
                 </Link>
-                <Link href="/landlord/login" className="px-7 py-3.5 rounded-xl border-2 border-[#1B2D45]/15 text-[#1B2D45] hover:border-[#1B2D45]/30 hover:bg-[#1B2D45]/[0.03] transition-all inline-block text-center" style={{ fontSize: "16px", fontWeight: 600 }}>
-                  I&apos;m a Landlord →
-                </Link>
+                <LandlordHeroCTA />
               </motion.div>
               {/* Honest tagline */}
               <motion.div

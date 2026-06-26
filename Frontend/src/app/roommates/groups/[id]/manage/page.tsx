@@ -20,6 +20,7 @@ import {
 } from "@/components/roommates/roommate-data";
 import type { RoommateRequestResponse } from "@/types";
 import { PhotoCropper } from "@/components/PhotoCropper";
+import { AddressAutocomplete } from "@/components/ui/AddressAutocomplete";
 /* ── Components ── */
 
 function ApiRequestCard({
@@ -846,10 +847,10 @@ export default function ManageGroupPage({ params }: { params: Promise<{ id: stri
                                 <label className="text-[#1B2D45]/38 block mb-1.5" style={{ fontSize: "10px", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                                   Home Address
                                 </label>
-                                <input
-                                  type="text"
+                                <AddressAutocomplete
                                   value={editAddress}
-                                  onChange={(e) => setEditAddress(e.target.value)}
+                                  onChange={setEditAddress}
+                                  onSelect={(selection) => setEditAddress(selection.address)}
                                   disabled={!editing}
                                   placeholder="e.g. 19 Kathleen St, Guelph, ON"
                                   className="w-full rounded-[18px] border border-black/[0.07] bg-[#FCFBF8] px-4 py-3 text-[#1B2D45] outline-none transition-all focus:border-[#FF6B35]/24 focus:bg-white disabled:cursor-not-allowed disabled:text-[#1B2D45]/55"
