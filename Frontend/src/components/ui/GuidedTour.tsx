@@ -94,6 +94,17 @@ export function GuidedTour() {
     return () => clearTimeout(timer);
   }, [shouldStart]);
 
+  // Manual replay from a "Take the tour" button — restarts regardless of seen-state.
+  useEffect(() => {
+    const start = () => {
+      setStep(0);
+      setActive(true);
+      document.body.style.overflow = "hidden";
+    };
+    window.addEventListener("cribb:start-tour", start);
+    return () => window.removeEventListener("cribb:start-tour", start);
+  }, []);
+
   // Measure target element
   const measure = useCallback(() => {
     if (!active) return;

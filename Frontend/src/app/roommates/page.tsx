@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, useInView } from "framer-motion";
-import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin, SlidersHorizontal, Check, DollarSign, Calendar } from "lucide-react";
+import { Plus, Users, User, Shield, ChevronRight, MessageCircle, Sparkles, MapPin, SlidersHorizontal, Check, DollarSign, Calendar, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { useIsMobile } from "@/hooks";
 import { EarlyAdopterBadge } from "@/components/ui/Badges";
@@ -13,6 +13,7 @@ import { api, ApiError } from "@/lib/api";
 import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-claim";
 import { IndividualDetailModal } from "@/components/roommates/IndividualDetailModal";
 import { RoommateGridSkeleton } from "@/components/ui/Skeletons";
+import { FirstVisitTip } from "@/components/ui/FirstVisitTip";
 import type { GroupCardResponse, GroupDetailResponse } from "@/types";
 import {
   type LifestyleProfile, type RoommateGroup,
@@ -773,6 +774,7 @@ export default function RoommatesPage() {
   const [myGenderHousing, setMyGenderHousing] = useState("");
   const [tab, setTab] = useState<"groups" | "individuals">("groups");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [individualSearch, setIndividualSearch] = useState("");
   const [apiGroups, setApiGroups] = useState<RoommateGroup[] | null>(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(true);
   const [apiIndividuals, setApiIndividuals] = useState<LifestyleProfile[] | null>(null);
@@ -1207,6 +1209,21 @@ export default function RoommatesPage() {
     return MOCK_PROFILES.map((p) => ({ ...p, compatibility: computeCompatibility(myTags, p.tags, myBudget, p.budget) })).sort((a, b) => (b.compatibility ?? 0) - (a.compatibility ?? 0));
   }, [hasProfile, myTags, myBudget, apiIndividuals]);
 
+  // One search box across name, program, year and lifestyle traits — so a group
+  // looking for an extra person can find, e.g., "clean engineering" or "3rd year".
+  const filteredIndividuals = useMemo(() => {
+    const q = individualSearch.trim().toLowerCase();
+    if (!q) return individualsWithCompat;
+    return individualsWithCompat.filter((p) => {
+      const hay = [
+        p.firstName, p.program, p.year, p.moveIn,
+        ...Object.values(p.tags || {}),
+        ...(p.cardCategoryTags || []).map((t) => t.label),
+      ].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }, [individualsWithCompat, individualSearch]);
+
   const myIndividualPills = useMemo(() => {
     const categoryKeyMap: Record<string, string> = {
       sleep: "sleep_schedule",
@@ -1373,6 +1390,11 @@ export default function RoommatesPage() {
           </div>
         )}
 
+        {!isLandlord && (
+          <FirstVisitTip tipKey="roommates-intro" title="Finding roommates">
+            Browse <strong>Groups</strong> with open spots, or switch to <strong>Individuals</strong> to find someone looking on their own — then search by program, year, or vibe. Everyone’s ranked by how compatible your quiz answers are.
+          </FirstVisitTip>
+        )}
         <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1 bg-white rounded-xl p-1 border border-black/[0.08]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
@@ -1383,7 +1405,7 @@ export default function RoommatesPage() {
             </div>
             <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 border border-black/[0.06]" style={{ boxShadow: "0 10px 22px rgba(27,45,69,0.04)" }}>
               <span className="text-[#1B2D45]/42" style={{ fontSize: "11px", fontWeight: 700 }}>
-                {tab === "groups" ? `${groupsWithCompat.length} groups` : `${individualsWithCompat.length} people`}
+                {tab === "groups" ? `${groupsWithCompat.length} groups` : `${filteredIndividuals.length} people`}
               </span>
             </div>
           </div>
@@ -1423,6 +1445,22 @@ export default function RoommatesPage() {
                   categoryPills={myIndividualPills}
                 />
               </div>
+              {individualsWithCompat.length > 0 && (
+                <div className="relative mb-4">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#1B2D45]/25" />
+                  <input
+                    type="text"
+                    value={individualSearch}
+                    onChange={(e) => setIndividualSearch(e.target.value)}
+                    placeholder="Search by program, year, name, or vibe — e.g. clean, non-smoker"
+                    className="w-full pl-10 pr-9 py-2.5 rounded-xl bg-white border border-black/[0.06] text-[#1B2D45] placeholder:text-[#1B2D45]/30 focus:border-[#FF6B35]/30 focus:outline-none transition-all"
+                    style={{ fontSize: "13px" }}
+                  />
+                  {individualSearch && (
+                    <button onClick={() => setIndividualSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B2D45]/25 hover:text-[#1B2D45]/50" aria-label="Clear search"><X className="w-4 h-4" /></button>
+                  )}
+                </div>
+              )}
               {individualsWithCompat.length === 0 ? (
                 <div className="bg-white rounded-2xl p-10 text-center" style={{ border: "2.5px dashed rgba(27,45,69,0.12)" }}>
                   <User className="w-10 h-10 text-[#1B2D45]/10 mx-auto mb-2" />
@@ -1433,9 +1471,19 @@ export default function RoommatesPage() {
                     Your profile is live in matching. As more students choose “on my own,” they’ll show up here and the invite flow will work normally.
                   </p>
                 </div>
+              ) : filteredIndividuals.length === 0 ? (
+                <div className="bg-white rounded-2xl p-10 text-center" style={{ border: "2.5px dashed rgba(27,45,69,0.12)" }}>
+                  <Search className="w-10 h-10 text-[#1B2D45]/10 mx-auto mb-2" />
+                  <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>
+                    No one matches “{individualSearch}”
+                  </h3>
+                  <p className="text-[#1B2D45]/50 mt-1" style={{ fontSize: "12px" }}>
+                    Try a different program, year, or trait — or clear the search.
+                  </p>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {individualsWithCompat.map((p) => {
+                  {filteredIndividuals.map((p) => {
                     const numId = parseInt(p.id, 10);
                     return (
                       <IndividualCard
