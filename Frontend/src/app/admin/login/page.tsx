@@ -57,7 +57,7 @@ export default function AdminLoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(""); }}
-                placeholder="admin@findyourcribb.com"
+                placeholder="admin@cribb.com"
                 required
                 className="w-full mt-1.5 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white placeholder:text-white/20 focus:border-[#FF6B35]/40 focus:outline-none transition-all"
                 style={{ fontSize: "14px" }}
