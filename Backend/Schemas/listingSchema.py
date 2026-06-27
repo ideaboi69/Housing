@@ -173,3 +173,11 @@ class ListingDetailResponse(BaseModel):
     landlord_name: str
     landlord_verified: bool
     landlord_is_early_adopter: bool = False
+
+
+class PopularListingResponse(ListingDetailResponse):
+    """ListingDetailResponse + Cribb Score, used by GET /api/listings/popular.
+
+    `overall_score` is null when no HousingHealthScore row exists yet for the listing.
+    """
+    overall_score: Optional[float] = None

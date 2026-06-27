@@ -5,6 +5,9 @@ import { AnimatePresence, motion, useInView, useAnimation } from "framer-motion"
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import { LandlordHeroCTA } from "@/components/landing/LandlordHeroCTA";
+import { api } from "@/lib/api";
+import { formatPropertyType } from "@/lib/utils";
+import type { ListingDetailResponse, SubletListResponse } from "@/types";
 
 /* ════════════════════════════════════════════════════════
    Images / Data
@@ -63,7 +66,7 @@ const popularListings = [
 ];
 
 const footerColumns = [
-  { title: "Browse", links: [{ label: "All Listings", to: "/browse" }, { label: "Sublets", to: "/sublets" }, { label: "Near Campus", to: "/browse" }, { label: "Downtown", to: "/browse" }] },
+  { title: "Browse", links: [{ label: "All Listings", to: "/browse" }, { label: "Sublets", to: "/sublets" }] },
   { title: "Community", links: [{ label: "Roommates", to: "/roommates" }, { label: "The Bubble", to: "/the-bubble" }] },
   { title: "For Landlords", links: [{ label: "List a Property", to: "/landlord/login" }, { label: "Dashboard", to: "/landlord" }, { label: "How It Works", to: "/landlord/login" }] },
   { title: "cribb", links: [{ label: "Sign Up", to: "/signup" }, { label: "Log In", to: "/login" }] },
@@ -289,7 +292,7 @@ function ListingPreviewCard({ listing }: { listing: typeof popularListings[0] })
 function SubletPreviewCard({ sublet }: { sublet: typeof featuredSublets[0] }) {
   return (
     <Link
-      href="/sublets"
+      href={`/sublets/${sublet.id}`}
       className="group block overflow-hidden rounded-[24px] border border-black/[0.06] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_10px_30px_rgba(27,45,69,0.10)]"
     >
       <div className="relative h-[180px] overflow-hidden">
@@ -876,12 +879,128 @@ const structuredData = {
   ],
 };
 
+// ── Adapters: turn backend responses into the shape the existing cards use ──
+
+function termLabel(startISO: string, endISO: string) {
+  const fmt = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString("en-CA", { month: "short", year: "numeric" });
+  return `${fmt(startISO)} – ${fmt(endISO)}`;
+}
+
+function subletTags(s: SubletListResponse): string[] {
+  const tags: string[] = [];
+  if (s.is_furnished) tags.push("Furnished");
+  if (s.utilities_included) tags.push("Utilities incl.");
+  if (s.has_laundry) tags.push("Laundry");
+  if (s.walk_time_minutes != null && s.walk_time_minutes <= 12) tags.push("Near campus");
+  if (s.terms?.flexible_dates) tags.push("Flexible dates");
+  if (s.terms?.entire_place) tags.push("Entire place");
+  else if (s.room_type === "private") tags.push("Private room");
+  else if (s.room_type === "shared") tags.push("Shared room");
+  return tags.slice(0, 3);
+}
+
+function subletToCard(s: SubletListResponse) {
+  return {
+    id: String(s.id),
+    title: s.title,
+    street: s.address?.split(",")[0] ?? s.address ?? "",
+    price: Math.round(Number(s.rent_per_month)),
+    term: termLabel(s.sublet_start_date, s.sublet_end_date),
+    tags: subletTags(s),
+    note: `${s.total_rooms ?? 1}-room sublet in Guelph. Walk to campus in ${s.walk_time_minutes ?? "—"} min.`,
+    image: s.primary_image || s.images?.[0]?.image_url || "/demo/listings/apartment.jpg",
+  };
+}
+
+function listingToCard(l: ListingDetailResponse, score: number | null) {
+  return {
+    id: String(l.id),
+    title: l.title,
+    street: l.address?.split(",")[0] ?? l.address ?? "",
+    price: Math.round(Number(l.rent_per_room)),
+    propertyType: formatPropertyType(l.property_type),
+    beds: l.total_rooms,
+    walkTime: l.walk_time_minutes ?? 0,
+    healthScore: score ?? 0,
+    views: l.view_count,
+    popular: (score ?? 0) >= 85,
+    image:
+      (l as ListingDetailResponse & { images?: Array<{ image_url: string }> }).images?.[0]?.image_url ??
+      "/demo/listings/apartment.jpg",
+  };
+}
+
 export default function HomePage() {
   const [activeShowcase, setActiveShowcase] = useState<(typeof showcaseFeatures)[number]["id"]>("compare");
   const activeFeature = showcaseFeatures.find((feature) => feature.id === activeShowcase) ?? showcaseFeatures[0];
 
+  // Live data from backend — falls back to the mocks so the landing page is
+  // never empty during local dev or a backend outage.
+  const [liveSublets, setLiveSublets] = useState<typeof featuredSublets | null>(null);
+  const [liveListings, setLiveListings] = useState<typeof popularListings | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const sublets = await api.sublets.browse();
+        if (cancelled) return;
+        const top = [...sublets]
+          .filter((s) => s.status === "active")
+          .sort((a, b) => new Date(a.sublet_start_date).getTime() - new Date(b.sublet_start_date).getTime())
+          .slice(0, 3)
+          .map(subletToCard);
+        if (top.length > 0) setLiveSublets(top);
+      } catch { /* keep mock fallback */ }
+    })();
+
+    (async () => {
+      // Preferred: single round trip to /api/listings/popular (server joins score + sorts).
+      // Fallback: legacy N+1 path (browse + per-listing healthScore) so the section
+      // keeps working until the backend ships the new endpoint.
+      // Final fallback: hardcoded mocks via liveListings staying null.
+      try {
+        const top = await api.listings.popular(4);
+        if (cancelled) return;
+        const ranked = top.map((l) => listingToCard(l, l.overall_score));
+        if (ranked.length > 0) {
+          setLiveListings(ranked);
+          return;
+        }
+      } catch { /* fall through to legacy path */ }
+
+      try {
+        const listings = await api.listings.browse();
+        if (cancelled) return;
+        const candidates = listings.filter((l) => l.status === "active").slice(0, 12);
+        const scores = await Promise.all(
+          candidates.map((l) =>
+            api.healthScores.get(l.id).then((s) => s.overall_score ?? null).catch(() => null)
+          )
+        );
+        const ranked = candidates
+          .map((l, i) => ({ listing: l, score: scores[i] }))
+          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+          .slice(0, 4)
+          .map(({ listing, score }) => listingToCard(listing, score));
+        if (ranked.length > 0) setLiveListings(ranked);
+      } catch { /* keep mock fallback */ }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  const sublets = liveSublets ?? featuredSublets;
+  const popular = liveListings ?? popularListings;
+
   return (
     <>
+      {/* Match overscroll bg to the dark footer so iOS Safari rubber-band
+          (and Android stretch glow) doesn't expose white below the footer.
+          Scoped via the page mount — internal pages keep their own footer color. */}
+      <style>{`html { background-color: #1B2D45; }`}</style>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
@@ -1153,7 +1272,7 @@ export default function HomePage() {
           </p>
         </FadeUp>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {featuredSublets.map((sublet, i) => (
+          {sublets.map((sublet, i) => (
             <FadeUp key={sublet.id} delay={i * 0.1}>
               <SubletPreviewCard sublet={sublet} />
             </FadeUp>
@@ -1203,12 +1322,12 @@ export default function HomePage() {
         <div className="max-w-[1200px] mx-auto px-6 py-20">
           <FadeUp>
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800 }}>Popular near campus 🔥</h2>
+              <h2 className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 800 }}>Popular Listings 🔥</h2>
               <Link href="/browse" className="text-[#FF6B35] hover:underline" style={{ fontSize: "14px", fontWeight: 600 }}>See all →</Link>
             </div>
           </FadeUp>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {popularListings.map((listing, i) => (
+            {popular.map((listing, i) => (
               <FadeUp key={listing.id} delay={i * 0.1}>
                 <ListingPreviewCard listing={listing} />
               </FadeUp>

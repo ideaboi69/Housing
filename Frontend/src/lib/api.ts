@@ -478,6 +478,11 @@ export const listings = {
       `/api/listings${toQueryString(filters || {})}`
     ),
 
+  popular: (limit = 4) =>
+    request<Array<ListingDetailResponse & { overall_score: number | null }>>(
+      `/api/listings/popular?limit=${limit}`
+    ),
+
   getById: (id: number) =>
     request<ListingDetailResponse>(`/api/listings/${id}`),
 

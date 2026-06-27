@@ -2017,16 +2017,6 @@ function SubletsContent() {
 
   useEffect(() => { setHydrated(true); }, []);
 
-  if (!hydrated) {
-    return (
-      <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
-        <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-12">
-          <BrowseGridSkeleton count={6} />
-        </div>
-      </div>
-    );
-  }
-
   return (
       <div className="min-h-screen" style={{ background: "#FFFCF5" }}>
       <OnboardingBanner />
@@ -2088,8 +2078,14 @@ function SubletsContent() {
         onCloseSheet={() => setShowPicksSheet(false)}
       />
 
-      {/* Content */}
-      {filteredListings.length === 0 ? (
+      {/* Content — only the results area swaps to a skeleton while hydrating;
+          the hero, stats, date selector, search/filters, and view toggle stay put
+          to match the /browse pattern. */}
+      {!hydrated ? (
+        <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6">
+          <BrowseGridSkeleton count={6} />
+        </div>
+      ) : filteredListings.length === 0 ? (
         <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-10">
           <div className="flex flex-col items-center justify-center py-14 px-6 bg-white rounded-2xl border-2 border-dashed border-black/[0.06]">
             <span style={{ fontSize: "40px" }}>🔍</span>

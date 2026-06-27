@@ -2,7 +2,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
-from sqlalchemy import or_
+from sqlalchemy import or_, nulls_last
 from sqlalchemy.orm import Session, selectinload
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation, ListingRoom
 from Schemas.listingSchema import *
@@ -84,6 +84,7 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
     db.refresh(listing)
 
     invalidate("listings:list")
+    invalidate("listings:popular")
     return build_listing_response(listing)
 
 @listing_router.post("/{listing_id}/images", status_code=status.HTTP_201_CREATED)
@@ -123,6 +124,7 @@ async def upload_listing_images(listing_id: int, files: list[UploadFile] = File(
         db.refresh(img)
 
     invalidate("listings:list")
+    invalidate("listings:popular")
     return [ListingImageResponse.model_validate(img) for img in images]
 
 # Reorder listing images
@@ -148,6 +150,7 @@ def reorder_listing_images(listing_id: int, payload: ListingImageReorder, db: Se
     db.commit()
 
     invalidate("listings:list")
+    invalidate("listings:popular")
     ordered = sorted(images, key=lambda img: img.display_order)
     return [ListingImageResponse.model_validate(img) for img in ordered]
  
@@ -278,6 +281,7 @@ def publish_listing(listing_id: int, db: Session = Depends(get_db),landlord: Lan
     db.refresh(listing)
 
     invalidate("listings:list")
+    invalidate("listings:popular")
     return build_listing_response(listing)
 
 @listing_router.patch("/{listing_id}/unpublish", response_model=ListingResponse)
@@ -298,7 +302,31 @@ def unpublish_listing(listing_id: int, db: Session = Depends(get_db), landlord: 
     db.refresh(listing)
 
     invalidate("listings:list")
+    invalidate("listings:popular")
     return build_listing_response(listing)
+
+# Popular listings — top N active listings ranked by Cribb Score in a single round trip.
+@listing_router.get("/popular", response_model=list[PopularListingResponse])
+@cached("listings:popular", ttl=180)
+def list_popular_listings(db: Session = Depends(get_db), limit: int = Query(4, ge=1, le=20, description="Number of listings to return (max 20)")):
+    results = (
+        db.query(Listing, Property, Landlord, HousingHealthScore.overall_score)
+        .join(Property, Listing.property_id == Property.id)
+        .join(Landlord, Property.landlord_id == Landlord.id)
+        .outerjoin(HousingHealthScore, HousingHealthScore.listing_id == Listing.id)
+        .options(selectinload(Listing.rooms), selectinload(Listing.images))
+        .filter(Listing.status == ListingStatus.ACTIVE)
+        .order_by(nulls_last(HousingHealthScore.overall_score.desc()))
+        .limit(limit)
+        .all()
+    )
+    return [
+        PopularListingResponse(
+            **build_listing_detail(listing, prop, landlord).model_dump(),
+            overall_score=float(score) if score is not None else None,
+        )
+        for listing, prop, landlord, score in results
+    ]
 
 # Get Single Listings (public, increments view count)
 @listing_router.get("/{listing_id}", response_model=ListingDetailResponse)
@@ -326,12 +354,7 @@ def get_listing(listing_id: int, db: Session = Depends(get_db)):
 
 # Update Listings (landlord only, must own it)
 @listing_router.patch("/{listing_id}", response_model=ListingResponse)
-def update_listing(
-    listing_id: int,
-    payload: ListingUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_landlord),
-):
+def update_listing(listing_id: int, payload: ListingUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
     landlord = get_landlord_for_user(current_user, db)
     listing = get_listing_owned_by(listing_id, landlord.id, db)
 
@@ -350,6 +373,7 @@ def update_listing(
     db.refresh(listing)
 
     invalidate("listings:list")
+    invalidate("listings:popular")
     return build_listing_response(listing)
 
 # Convert to sublet (landlord only)
@@ -373,6 +397,7 @@ def convert_to_sublet(
     db.refresh(listing)
 
     invalidate("listings:list")
+    invalidate("listings:popular")
     return build_listing_response(listing)
 
 # Delete Listing (landlord only, must own it)
@@ -405,6 +430,7 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db), landlord: Lan
     db.delete(listing)
     db.commit()
     invalidate("listings:list")
+    invalidate("listings:popular")
 
 # delete a specific image in a listing
 @listing_router.delete("/{listing_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -422,6 +448,7 @@ def delete_a_listing_image(listing_id: int, image_id: int, db: Session = Depends
     db.delete(image)
     db.commit()
     invalidate("listings:list")
+    invalidate("listings:popular")
 
 # Dynamic room pricing
 @listing_router.patch("/{listing_id}/rooms/{room_id}", response_model=ListingRoomResponse)
@@ -448,6 +475,7 @@ def update_listing_room(listing_id: int, room_id: int, payload: ListingRoomUpdat
     db.commit()
     db.refresh(room)
     invalidate("listings:list")
+    invalidate("listings:popular")
     return ListingRoomResponse.model_validate(room)
 
 
@@ -474,6 +502,7 @@ def add_listing_room(listing_id: int, payload: ListingRoomCreate, db: Session = 
     db.commit()
     db.refresh(room)
     invalidate("listings:list")
+    invalidate("listings:popular")
     return ListingRoomResponse.model_validate(room)
 
 
@@ -498,3 +527,4 @@ def delete_listing_room(listing_id: int, room_id: int, db: Session = Depends(get
 
     db.commit()
     invalidate("listings:list")
+    invalidate("listings:popular")
