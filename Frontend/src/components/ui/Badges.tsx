@@ -3,42 +3,34 @@
 import { motion } from "framer-motion";
 
 /**
- * EarlyAdopterBadge — shown next to user's name across the platform.
- * Blue badge for the first 100 users who signed up.
- * 
- * Usage: <EarlyAdopterBadge /> next to any user name display.
- * Only render if user.is_early_adopter is true.
- * 
- * Backend: OJ needs to add `is_early_adopter = Column(Boolean, default=False)` 
- * to the User table, and set it to True for the first 100 signups.
+ * EarlyAdopterBadge — the blue "OG" medallion for the first 100 users
+ * (User.is_early_adopter, auto-granted on signup). Render beside the student's name.
  */
-
 export function EarlyAdopterBadge({ size = "sm" }: { size?: "sm" | "md" }) {
   const isSm = size === "sm";
-
+  const coin = isSm ? 14 : 16;
   return (
     <motion.span
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
-      className="inline-flex items-center gap-0.5 shrink-0"
+      className="inline-flex items-center shrink-0 align-middle"
+      title="OG — one of the first 100 students on Cribb"
       style={{
-        padding: isSm ? "1px 6px" : "2px 8px",
-        borderRadius: "6px",
-        background: "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
-        boxShadow: "0 2px 6px rgba(37,99,235,0.25)",
-        fontSize: isSm ? "8px" : "10px",
-        fontWeight: 800,
-        color: "white",
-        letterSpacing: "0.02em",
-        lineHeight: 1.5,
-        textTransform: "uppercase" as const,
+        gap: isSm ? "4px" : "5px",
+        padding: isSm ? "1px 8px 1px 3px" : "2px 10px 2px 4px",
+        borderRadius: "999px",
+        background: "#E8F0FE",
+        border: "1px solid #AEC9F5",
       }}
     >
-      <svg width={isSm ? "8" : "10"} height={isSm ? "8" : "10"} viewBox="0 0 16 16" fill="none">
-        <path d="M8 1L10.2 5.5L15 6.2L11.5 9.6L12.3 14.4L8 12.1L3.7 14.4L4.5 9.6L1 6.2L5.8 5.5L8 1Z" fill="white" />
+      <svg width={coin} height={coin} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="11" fill="#2F6FED" />
+        <path d="M12 6.6 L13.6 10.4 L17.7 10.7 L14.5 13.3 L15.6 17.4 L12 15.1 L8.4 17.4 L9.5 13.3 L6.3 10.7 L10.4 10.4 Z" fill="#fff" />
       </svg>
-      OG
+      <span style={{ fontSize: isSm ? "8px" : "10px", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: "#1D4ED8", lineHeight: 1.5 }}>
+        OG
+      </span>
     </motion.span>
   );
 }
@@ -49,31 +41,29 @@ export function EarlyAdopterBadge({ size = "sm" }: { size?: "sm" | "md" }) {
  */
 export function FoundingLandlordBadge({ size = "sm" }: { size?: "sm" | "md" }) {
   const isSm = size === "sm";
+  const coin = isSm ? 14 : 16;
   return (
     <motion.span
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
-      className="inline-flex items-center gap-1 shrink-0 align-middle"
+      className="inline-flex items-center shrink-0 align-middle"
       title="Founding landlord — one of the first on Cribb"
       style={{
-        padding: isSm ? "1px 7px" : "2px 9px",
-        borderRadius: "6px",
-        background: "linear-gradient(135deg, #FFB627 0%, #E08A00 100%)",
-        boxShadow: "0 2px 6px rgba(224,138,0,0.28)",
-        fontSize: isSm ? "8px" : "10px",
-        fontWeight: 800,
-        color: "white",
-        letterSpacing: "0.03em",
-        lineHeight: 1.5,
-        textTransform: "uppercase" as const,
+        gap: isSm ? "4px" : "5px",
+        padding: isSm ? "1px 8px 1px 3px" : "2px 10px 2px 4px",
+        borderRadius: "999px",
+        background: "#FFF4DC",
+        border: "1px solid #F0C766",
       }}
     >
-      <svg width={isSm ? "8" : "10"} height={isSm ? "8" : "10"} viewBox="0 0 16 16" fill="none">
-        <path d="M4 1.5V15" stroke="white" strokeWidth="1.7" strokeLinecap="round" />
-        <path d="M4 2.6h8.6L10 5.4l2.6 2.8H4z" fill="white" />
+      <svg width={coin} height={coin} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="11" fill="#EDA01A" />
+        <path d="M12 6.6 L13.6 10.4 L17.7 10.7 L14.5 13.3 L15.6 17.4 L12 15.1 L8.4 17.4 L9.5 13.3 L6.3 10.7 L10.4 10.4 Z" fill="#fff" />
       </svg>
-      Founding
+      <span style={{ fontSize: isSm ? "8px" : "10px", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: "#A06800", lineHeight: 1.5 }}>
+        Founding
+      </span>
     </motion.span>
   );
 }
@@ -83,30 +73,29 @@ export function FoundingLandlordBadge({ size = "sm" }: { size?: "sm" | "md" }) {
  */
 export function VerifiedWriterBadge({ size = "sm" }: { size?: "sm" | "md" }) {
   const isSm = size === "sm";
+  const coin = isSm ? 14 : 16;
   return (
     <motion.span
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
-      className="inline-flex items-center gap-1 shrink-0 align-middle"
+      className="inline-flex items-center shrink-0 align-middle"
       title="Verified Cribb writer"
       style={{
-        padding: isSm ? "1px 7px" : "2px 9px",
-        borderRadius: "6px",
-        background: "linear-gradient(135deg, #FF6B35 0%, #E8552A 100%)",
-        boxShadow: "0 2px 6px rgba(255,107,53,0.28)",
-        fontSize: isSm ? "8px" : "10px",
-        fontWeight: 800,
-        color: "white",
-        letterSpacing: "0.03em",
-        lineHeight: 1.5,
-        textTransform: "uppercase" as const,
+        gap: isSm ? "4px" : "5px",
+        padding: isSm ? "1px 8px 1px 3px" : "2px 10px 2px 4px",
+        borderRadius: "999px",
+        background: "#FFEAE0",
+        border: "1px solid #F3AE91",
       }}
     >
-      <svg width={isSm ? "8" : "10"} height={isSm ? "8" : "10"} viewBox="0 0 16 16" fill="none">
-        <path d="M11.4 1.7l2.9 2.9-8 8L3 13l.4-3.3 8-8z" fill="white" />
+      <svg width={coin} height={coin} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="11" fill="#F2622C" />
+        <path d="M15.9 6.3 l1.8 1.8 -7.4 7.4 -2.6 0.8 0.8-2.6 7.4-7.4 z" fill="#fff" />
       </svg>
-      Writer
+      <span style={{ fontSize: isSm ? "8px" : "10px", fontWeight: 800, letterSpacing: "0.04em", textTransform: "uppercase", color: "#B8431A", lineHeight: 1.5 }}>
+        Writer
+      </span>
     </motion.span>
   );
 }

@@ -583,6 +583,10 @@ class MarketplaceItem(Base):
         return "Unknown"
 
     @property
+    def seller_is_early_adopter(self):
+        return bool(self.seller and self.seller.is_early_adopter)
+
+    @property
     def primary_image(self):
         primary = next((img.image_url for img in self.images if img.is_primary), None)
         if not primary and self.images:

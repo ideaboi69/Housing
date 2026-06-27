@@ -80,6 +80,7 @@ class MarketplaceItemResponse(BaseModel):
     id: int
     seller_id: int
     seller_name: str
+    seller_is_early_adopter: bool = False
     title: str
     description: Optional[str] = None
     category: MarketplaceCategory
@@ -108,6 +109,7 @@ class MarketplaceItemListResponse(BaseModel):
     price: Optional[Decimal] = None
     status: ItemStatus
     seller_name: str
+    seller_is_early_adopter: bool = False
     primary_image: Optional[str] = None
     view_count: int
     created_at: datetime

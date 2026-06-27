@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
+import { EarlyAdopterBadge } from "@/components/ui/Badges";
 import { useMarketplaceSavedStore } from "@/lib/marketplace-saved-store";
 import { SmartBackLink } from "@/components/ui/SmartBackLink";
 import {
@@ -284,6 +285,7 @@ export default function MarketplaceItemPage({ params }: { params: Promise<{ id: 
                       <div className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "14px", fontWeight: 700 }}>
                         {item.seller_name}
                         <ShieldCheck className="w-3.5 h-3.5 text-[#4ADE80]" />
+                        {item.seller_is_early_adopter && <EarlyAdopterBadge />}
                       </div>
                       <div className="text-[#1B2D45]/35 mt-1" style={{ fontSize: "11px" }}>Verified Guelph student</div>
                     </div>

@@ -1404,6 +1404,7 @@ export interface MarketplaceItemResponse {
   id: number;
   seller_id: number;
   seller_name: string;
+  seller_is_early_adopter?: boolean;
   title: string;
   description?: string;
   category: MarketplaceCategory;
@@ -1429,6 +1430,7 @@ export interface MarketplaceItemListResponse {
   price?: number;
   status: ItemStatus;
   seller_name: string;
+  seller_is_early_adopter?: boolean;
   primary_image?: string;
   view_count: number;
   created_at: string;
