@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ChevronUp, Bookmark, Share2, MoreHorizontal, X, ImagePlus,
+  ChevronUp, Bookmark, MoreHorizontal, X, ImagePlus,
   Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag, Star, ArrowLeft, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,6 +13,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
 import { RequestWriterAccessModal } from "@/components/ui/RequestWriterAccessModal";
 import { BubbleFeedSkeleton } from "@/components/ui/Skeletons";
+import { BubbleShareMenu } from "@/components/ui/BubbleShareMenu";
 import type { PostListResponse, PostCategory as PostCategoryType } from "@/types";
 import { toast } from "sonner";
 
@@ -386,9 +387,14 @@ function PostCard({
               className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${saved ? "text-[#FF6B35] bg-[#FF6B35]/10" : "text-[#98A3B0] hover:bg-[#1B2D45]/5"}`}>
               <Bookmark className={`w-3.5 h-3.5 ${saved ? "fill-[#FF6B35]" : ""}`} />
             </motion.button>
-            <button className="w-8 h-8 flex items-center justify-center rounded-lg text-[#98A3B0] hover:bg-[#1B2D45]/5 transition-colors">
-              <Share2 className="w-3.5 h-3.5" />
-            </button>
+            <BubbleShareMenu
+              path={post.slug ? `/the-bubble/${post.slug}` : "/the-bubble"}
+              title={post.title}
+              description={post.body}
+              author={post.author}
+              categoryLabel={getCategoryMeta(post.category).label}
+              timestamp={post.timestamp}
+            />
           </div>
         </div>
       </div>

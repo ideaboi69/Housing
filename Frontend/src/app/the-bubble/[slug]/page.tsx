@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Eye, Calendar, MapPin, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { VerifiedWriterBadge } from "@/components/ui/Badges";
+import { BubbleShareMenu } from "@/components/ui/BubbleShareMenu";
 import type { PostResponse } from "@/types";
 
 function formatDate(iso: string) {
@@ -63,9 +64,20 @@ export default function BubblePostPage({ params }: { params: Promise<{ slug: str
   return (
     <div className="min-h-screen bg-[#FAF8F4]">
       <article className="max-w-[760px] mx-auto px-4 md:px-6 py-6 md:py-10">
-        <Link href="/the-bubble" className="inline-flex items-center gap-1.5 text-[#1B2D45]/55 hover:text-[#1B2D45] transition-colors" style={{ fontSize: "13px", fontWeight: 600 }}>
-          <ArrowLeft className="w-4 h-4" /> The Bubble
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link href="/the-bubble" className="inline-flex items-center gap-1.5 text-[#1B2D45]/55 hover:text-[#1B2D45] transition-colors" style={{ fontSize: "13px", fontWeight: 600 }}>
+            <ArrowLeft className="w-4 h-4" /> The Bubble
+          </Link>
+          <BubbleShareMenu
+            path={`/the-bubble/${post.slug}`}
+            title={post.title}
+            description={post.preview || post.content.slice(0, 140)}
+            author={post.author_name}
+            categoryLabel={category}
+            timestamp={formatDate(post.created_at)}
+            variant="button"
+          />
+        </div>
 
         <div className="mt-5">
           <span className="inline-block rounded-full bg-[#FF6B35]/10 px-3 py-1 text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.02em" }}>
