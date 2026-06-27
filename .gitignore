@@ -1,3 +1,5 @@
 .DS_Store
 .agents
 .claude
+.env.local
+.pytest_cache

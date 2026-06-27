@@ -5,5 +5,4 @@ venv/
 .venv/
 .DS_Store
 .env
-.env.local
 .pytest_cache
