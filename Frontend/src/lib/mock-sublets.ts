@@ -3,6 +3,12 @@
  * Every sublet is evaluated against the exact same amenity checklist.
  */
 
+import {
+  computeAmenityScore,
+  computeLocationScore,
+  computeOverallScore,
+} from "@/lib/cribb-score";
+
 export interface SubletDetail {
   id: string;
   listing_id?: number;
@@ -10,6 +16,8 @@ export interface SubletDetail {
   street: string;
   address: string;
   postalCode: string;
+  latitude?: number;
+  longitude?: number;
   description: string;
   subletPrice: number;
   originalPrice: number;
@@ -58,6 +66,8 @@ export interface SubletDetail {
   estimated_utility_cost: number | null;
   // ── Health Score Breakdown ──
   price_vs_market_score: number;
+  location_score: number;
+  amenity_score: number;
   landlord_reputation_score: number;
   maintenance_score: number;
   lease_clarity_score: number;
@@ -96,9 +106,12 @@ const SUBLET_IMAGES: Record<string, string[]> = {
   ],
 };
 
-export const mockSubletDetails: SubletDetail[] = [
+/** Seed data — Location & Amenity sub-scores are derived in getMockSublet(). */
+type SubletSeed = Omit<SubletDetail, "location_score" | "amenity_score">;
+
+export const mockSubletDetails: SubletSeed[] = [
   {
-    id: "s1", listing_id: 1001, title: "Furnished Room in 4BR House", street: "78 College Ave W", address: "78 College Ave W, Guelph, ON", postalCode: "N1G 1S4",
+    id: "s1", listing_id: 1001, title: "Furnished Room in 4BR House", street: "78 College Ave W", address: "78 College Ave W, Guelph, ON", postalCode: "N1G 1S4", latitude: 43.5310, longitude: -80.2240,
     description: "Leaving for a summer co-op in Toronto. Room is fully furnished — queen bed, desk, dresser, and a mini fridge. The house is super clean and quiet. Two roommates staying are both upper-year science students, really chill people. Backyard is great for BBQs. 5 min walk to campus.",
     subletPrice: 550, originalPrice: 720, healthScore: 91, verified: true,
     posterName: "Alex", posterType: "4th year, Engineering", posterIsStudent: true, posterYear: "4th", posterProgram: "Engineering",
@@ -115,7 +128,7 @@ export const mockSubletDetails: SubletDetail[] = [
     price_vs_market_score: 90, landlord_reputation_score: 94, maintenance_score: 88, lease_clarity_score: 92,
   },
   {
-    id: "s2", listing_id: 1002, title: "Entire 2BR Apartment", street: "155 Gordon St", address: "155 Gordon St, Unit 405, Guelph, ON", postalCode: "N1G 4Y2",
+    id: "s2", listing_id: 1002, title: "Entire 2BR Apartment", street: "155 Gordon St", address: "155 Gordon St, Unit 405, Guelph, ON", postalCode: "N1G 4Y2", latitude: 43.5220, longitude: -80.2450,
     description: "Taking both rooms for the summer — great deal. The whole apartment is yours. Modern building with A/C, underground parking, and a dishwasher. Quiet floor. Close to Stone Rd Mall for groceries.",
     subletPrice: 1100, originalPrice: 1400, healthScore: 86, verified: true,
     posterName: "Jordan", posterType: "Property Manager", posterIsStudent: false,
@@ -132,7 +145,7 @@ export const mockSubletDetails: SubletDetail[] = [
     price_vs_market_score: 88, landlord_reputation_score: 84, maintenance_score: 82, lease_clarity_score: 90,
   },
   {
-    id: "s3", listing_id: 1003, title: "Private Room near Campus", street: "42 Suffolk St W", address: "42 Suffolk St W, Guelph, ON", postalCode: "N1H 2J2",
+    id: "s3", listing_id: 1003, title: "Private Room near Campus", street: "42 Suffolk St W", address: "42 Suffolk St W, Guelph, ON", postalCode: "N1H 2J2", latitude: 43.5290, longitude: -80.2210,
     description: "Room is unfurnished but spacious. One grad student staying for a summer research term — very quiet and keeps to herself. House has laundry in the basement and good WiFi. Short walk to campus.",
     subletPrice: 480, originalPrice: 680, healthScore: 68, verified: false,
     posterName: "Priya", posterType: "3rd year, Arts", posterIsStudent: true, posterYear: "3rd", posterProgram: "Arts",
@@ -151,5 +164,24 @@ export const mockSubletDetails: SubletDetail[] = [
 ];
 
 export function getMockSublet(id: string): SubletDetail | undefined {
-  return mockSubletDetails.find((s) => s.id === id);
+  const base = mockSubletDetails.find((s) => s.id === id);
+  if (!base) return undefined;
+
+  // Derive Location & Amenity sub-scores from real data, then recompute the
+  // overall Cribb Score with the v3 weights (Price 30 / Location 40 / Amenities 20 / Completeness 10).
+  const location_score = computeLocationScore({
+    lat: base.latitude,
+    lng: base.longitude,
+    walkMinutes: base.walkTime,
+    distanceKm: base.distanceKm,
+  });
+  const amenity_score = computeAmenityScore(base, base.pet_friendly);
+  const healthScore = computeOverallScore({
+    price: base.price_vs_market_score,
+    location: location_score,
+    amenity: amenity_score,
+    completeness: base.lease_clarity_score,
+  });
+
+  return { ...base, location_score, amenity_score, healthScore };
 }

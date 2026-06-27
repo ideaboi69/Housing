@@ -366,6 +366,7 @@ export function Navbar() {
               {!writerSessionActive && (
                 <Link
                   href={isLandlord ? "/landlord?tab=messages" : "/messages"}
+                  aria-label={unreadCount > 0 ? `Messages, ${unreadCount} unread` : "Messages"}
                   className={`relative w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                     (!isLandlord && pathname === "/messages") || (isLandlord && pathname === "/landlord" && landlordTab === "messages")
                       ? isLandlord
@@ -374,7 +375,7 @@ export function Navbar() {
                       : "text-[#1B2D45]/40 hover:bg-[#1B2D45]/5 hover:text-[#1B2D45]/60"
                   }`}
                 >
-                  <MessageCircle className="w-[18px] h-[18px]" />
+                  <MessageCircle className="w-[18px] h-[18px]" aria-hidden />
                   {unreadCount > 0 && (
                     <span
                       className={`absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-white flex items-center justify-center ${isLandlord ? "bg-[#1B2D45]" : "bg-[#FF6B35]"}`}
@@ -515,8 +516,10 @@ export function Navbar() {
         <button
           className="md:hidden w-9 h-9 flex items-center justify-center rounded-lg text-[#1B2D45]/60 hover:bg-[#1B2D45]/5 transition-colors"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileMenuOpen}
         >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          {mobileMenuOpen ? <X className="w-5 h-5" aria-hidden /> : <Menu className="w-5 h-5" aria-hidden />}
         </button>
       </div>
 

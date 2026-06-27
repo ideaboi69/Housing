@@ -138,3 +138,13 @@ scheduler.start()
 @app.on_event("shutdown")
 def shutdown_scheduler():
     scheduler.shutdown()
+
+
+if __name__ == "__main__":
+    # Render (and most PaaS) inject the port to bind via the PORT env var.
+    # Binding to 0.0.0.0:$PORT is what lets Render's port scan detect the service.
+    import os
+    import uvicorn
+
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)

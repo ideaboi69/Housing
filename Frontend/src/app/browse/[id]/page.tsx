@@ -714,25 +714,31 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   </h3>
                   <div className="space-y-3 mt-3">
                     {[
-                      { label: "Price", score: healthScore.price_vs_market_score, emoji: "📊" },
-                      { label: "Location", score: (healthScore as any).proximity_score ?? healthScore.lease_clarity_score, emoji: "📍" },
-                      { label: "Amenities", score: (healthScore as any).amenity_score ?? 50, emoji: "🏠" },
-                      { label: "Tenant Reviews", score: healthScore.landlord_reputation_score, emoji: "⭐" },
+                      { label: "Price", score: healthScore.price_vs_market_score, emoji: "📊", pending: false },
+                      { label: "Location", score: healthScore.proximity_score ?? healthScore.lease_clarity_score, emoji: "📍", pending: false },
+                      { label: "Amenities", score: healthScore.amenity_score ?? 50, emoji: "🏠", pending: false },
+                      { label: "Tenant Reviews", score: healthScore.landlord_reputation_score, emoji: "⭐", pending: (healthScore.review_count ?? 0) === 0 },
                     ].map((item, i) => (
                       <motion.div key={item.label} className="flex items-center gap-3"
                         initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }} transition={{ delay: i * 0.1, type: "spring", stiffness: 200 }}>
                         <span style={{ fontSize: "14px" }}>{item.emoji}</span>
                         <span className="text-[#1B2D45]/60 w-[120px] shrink-0" style={{ fontSize: "12px", fontWeight: 500 }}>{item.label}</span>
-                        <AnimatedBar score={item.score ?? 0} color={getScoreColor(item.score ?? 0)} />
-                        <span className="w-8 text-right shrink-0" style={{ fontSize: "13px", fontWeight: 800, color: getScoreColor(item.score ?? 0) }}>
-                          {item.score ?? "—"}
-                        </span>
+                        {item.pending ? (
+                          <span className="flex-1 text-[#1B2D45]/35" style={{ fontSize: "11px", fontWeight: 600 }}>No reviews yet</span>
+                        ) : (
+                          <>
+                            <AnimatedBar score={item.score ?? 0} color={getScoreColor(item.score ?? 0)} />
+                            <span className="w-8 text-right shrink-0" style={{ fontSize: "13px", fontWeight: 800, color: getScoreColor(item.score ?? 0) }}>
+                              {item.score ?? "—"}
+                            </span>
+                          </>
+                        )}
                       </motion.div>
                     ))}
                   </div>
-                  {healthScore.landlord_reputation_score === 50 && (
-                    <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>New listing — review score will update as tenants leave ratings.</p>
+                  {(healthScore.review_count ?? 0) === 0 && (
+                    <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>Tenant reviews don&apos;t count toward the score until students start rating — the score above is based on price, location & amenities.</p>
                   )}
                 </motion.div>
               )}

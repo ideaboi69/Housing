@@ -1,3 +1,4 @@
+import math
 from fastapi import HTTPException, Depends, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -760,10 +761,11 @@ def compute_lease_clarity(listing: Listing, prop: Property) -> float:
 def compute_amenity_score(prop: Property) -> float:
     """Score based on how many amenities the property offers. 0-100.
     Base score of 20 (having a roof counts for something)."""
+    # Gym is intentionally excluded from the Cribb Score (informational only).
     amenity_fields = [
         "is_furnished", "has_parking", "has_laundry",
         "utilities_included", "has_wifi", "has_air_conditioning",
-        "has_dishwasher", "has_gym", "has_elevator",
+        "has_dishwasher", "has_elevator",
         "has_backyard", "has_balcony", "wheelchair_accessible",
     ]
  
@@ -780,55 +782,108 @@ def compute_amenity_score(prop: Property) -> float:
     score = 20 + (count / total) * 80
     return round(score, 1)
 
-def compute_proximity_score(prop: Property) -> float:
-    """Score based on distance to campus. 0-100.
-    Uses walk_time_minutes primarily, falls back to distance_to_campus_km."""
+# Fixed Guelph reference points for the composite Location score.
+_GUELPH_DOWNTOWN = (43.5448, -80.2482)
+_GUELPH_CAMPUS = (43.5327, -80.2261)  # University Centre
+_GUELPH_GROCERIES = [
+    (43.5185, -80.2523),  # Zehrs (Stone Road)
+    (43.5148, -80.2560),  # Walmart Supercentre
+    (43.5460, -80.2310),  # FreshCo (Eramosa)
+    (43.5420, -80.2710),  # Metro (Paisley)
+    (43.5580, -80.2530),  # Food Basics (Speedvale)
+]
+
+
+def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Great-circle distance in km."""
+    r = 6371.0
+    d_lat = math.radians(lat2 - lat1)
+    d_lng = math.radians(lng2 - lng1)
+    a = (
+        math.sin(d_lat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(d_lng / 2) ** 2
+    )
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def _distance_score_km(km: float) -> float:
+    """Map a distance (km) to a 0-100 walkability score."""
+    if km <= 0.5:
+        return 100.0
+    elif km <= 1.0:
+        return 90.0
+    elif km <= 2.0:
+        return 75.0
+    elif km <= 3.0:
+        return 60.0
+    elif km <= 5.0:
+        return 40.0
+    return 20.0
+
+
+def _campus_score(prop: Property) -> float:
+    """Campus access — walk_time first, then stored distance, then haversine."""
     if prop.walk_time_minutes is not None:
         walk = prop.walk_time_minutes
         if walk <= 10:
-            score = 100
+            return 100.0
         elif walk <= 15:
-            score = 90
+            return 90.0
         elif walk <= 20:
-            score = 75
+            return 75.0
         elif walk <= 30:
-            score = 60
+            return 60.0
         elif walk <= 45:
-            score = 40
-        else:
-            score = 20
-        return float(score)
- 
+            return 40.0
+        return 20.0
     if prop.distance_to_campus_km is not None:
-        km = float(prop.distance_to_campus_km)
-        if km <= 0.5:
-            score = 100
-        elif km <= 1.0:
-            score = 90
-        elif km <= 2.0:
-            score = 75
-        elif km <= 3.0:
-            score = 60
-        elif km <= 5.0:
-            score = 40
-        else:
-            score = 20
-        return float(score)
- 
+        return _distance_score_km(float(prop.distance_to_campus_km))
+    if prop.latitude is not None and prop.longitude is not None:
+        return _distance_score_km(
+            _haversine_km(float(prop.latitude), float(prop.longitude), *_GUELPH_CAMPUS)
+        )
     return 50.0
 
+
+def compute_proximity_score(prop: Property) -> float:
+    """Composite Location score. 0-100.
+
+    Location = Campus (60%) + Groceries (25%) + Downtown (15%).
+    Campus uses walk_time / stored distance / haversine (in that order).
+    Groceries (nearest of a curated set) and Downtown are computed via
+    haversine from the property's lat/lng — no external API calls. Gym is
+    intentionally NOT a factor (it stays informational only).
+    """
+    campus = _campus_score(prop)
+
+    if prop.latitude is not None and prop.longitude is not None:
+        lat, lng = float(prop.latitude), float(prop.longitude)
+        nearest_grocery_km = min(
+            _haversine_km(lat, lng, g_lat, g_lng) for g_lat, g_lng in _GUELPH_GROCERIES
+        )
+        grocery = _distance_score_km(nearest_grocery_km)
+        downtown = _distance_score_km(_haversine_km(lat, lng, *_GUELPH_DOWNTOWN))
+    else:
+        # No coordinates — fall back to neutral for the location extras.
+        grocery = 50.0
+        downtown = 50.0
+
+    location = campus * 0.60 + grocery * 0.25 + downtown * 0.15
+    return round(location, 1)
+
 def compute_overall_score(price: float, reputation: float, maintenance: float, clarity: float, amenity: float, proximity: float, review_count: int) -> float:
-    """Cribb Score v2 — dynamic weighting based on review count.
- 
-    Property Score = Price (30%) + Proximity (25%) + Listing Completeness (25%) + Amenities (20%)
+    """Cribb Score v3 — dynamic weighting based on review count.
+
+    Property Score = Price (30%) + Location (40%) + Amenities (20%) + Listing Completeness (10%)
+      ("proximity" here is the composite Location score: campus 50% / groceries 25% / downtown 25%)
     Landlord Score = Reputation (50%) + Maintenance (50%)
- 
+
     0-2 reviews: 100% Property Score
     3-4 reviews: 70% Property + 30% Landlord
     5+ reviews:  50% Property + 50% Landlord
     """
 
-    property_score = (price * 0.30 + proximity * 0.25 + clarity * 0.25 + amenity * 0.20)
+    property_score = (price * 0.30 + proximity * 0.40 + amenity * 0.20 + clarity * 0.10)
  
     landlord_score = (reputation * 0.50 + maintenance * 0.50)
  

@@ -26,6 +26,15 @@ import {
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { CribbMap } from "@/components/ui/CribbMap";
+import {
+  blendWithReviews,
+  computeAmenityScore,
+  computeCompletenessScore,
+  computeLocationScore,
+  computeOverallScore,
+  computePriceScore,
+  computeReviewScore,
+} from "@/lib/cribb-score";
 import { getProximityLabel } from "@/lib/proximity";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import type { ReviewResponse, SubletResponse } from "@/types";
@@ -73,15 +82,33 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
   const walk = safeNumber(sublet.walk_time_minutes, 15);
   const price = safeNumber(sublet.rent_per_month, 0);
   const totalRooms = Math.max(1, safeNumber(sublet.total_rooms, 1));
-  const score = Math.min(
-    96,
-    72
-      + (walk <= 5 ? 14 : walk <= 10 ? 10 : walk <= 15 ? 6 : 2)
-      + (sublet.is_furnished ? 3 : 0)
-      + (sublet.utilities_included ? 3 : 0)
-      + (sublet.has_laundry ? 2 : 0)
-      + (sublet.has_parking ? 1 : 0)
-  );
+
+  // Cribb Score v3 (mirror of backend): Price 30 / Location 40 / Amenities 20 / Completeness 10.
+  const petFriendly = sublet.pet_policy === "allowed" || sublet.pet_policy === "case_by_case";
+  const priceScore = computePriceScore(price);
+  const locationScore = computeLocationScore({
+    lat: sublet.latitude,
+    lng: sublet.longitude,
+    walkMinutes: walk,
+    distanceKm: distance,
+  });
+  const amenityScore = computeAmenityScore(sublet, petFriendly);
+  const completenessScore = computeCompletenessScore([
+    Boolean(sublet.address),
+    Boolean(sublet.sublet_start_date && sublet.sublet_end_date),
+    price > 0,
+    walk > 0 || distance > 0,
+    Boolean(sublet.utilities_included || sublet.estimated_utility_cost),
+    Boolean(sublet.room_type),
+    Boolean(sublet.postal_code),
+    Boolean(sublet.nearest_bus_route),
+  ]);
+  const score = computeOverallScore({
+    price: priceScore,
+    location: locationScore,
+    amenity: amenityScore,
+    completeness: completenessScore,
+  });
   const termSummary = sublet.terms;
   const linkedListingId = (sublet as SubletResponse & { listing_id?: number | null }).listing_id ?? undefined;
   const isEntirePlace = Boolean(termSummary?.entire_place);
@@ -99,6 +126,8 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
     street: address.split(",")[0] ?? address,
     address,
     postalCode: sublet.postal_code || "",
+    latitude: sublet.latitude ?? undefined,
+    longitude: sublet.longitude ?? undefined,
     description: sublet.description || "Posted directly through Cribb.",
     subletPrice: price,
     originalPrice: Math.max(price, Math.round(price * 1.22)),
@@ -142,10 +171,12 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
     smoking_allowed: sublet.smoking_policy === "allowed" || sublet.smoking_policy === "outside_only",
     wheelchair_accessible: sublet.wheelchair_accessible,
     estimated_utility_cost: safeNumber(sublet.estimated_utility_cost, 0),
-    price_vs_market_score: score,
-    landlord_reputation_score: score,
-    maintenance_score: score,
-    lease_clarity_score: score,
+    price_vs_market_score: priceScore,
+    location_score: locationScore,
+    amenity_score: amenityScore,
+    landlord_reputation_score: 50, // neutral until tenant reviews exist
+    maintenance_score: 50,
+    lease_clarity_score: completenessScore,
   };
 }
 
@@ -449,7 +480,12 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
   const discount = sublet.originalPrice > 0
     ? Math.max(0, Math.round(((sublet.originalPrice - sublet.subletPrice) / sublet.originalPrice) * 100))
     : 0;
-  const score = Number.isFinite(sublet.healthScore) ? sublet.healthScore : 0;
+  // Property-only score, then blend in tenant reviews with the same dynamic
+  // weighting as the backend (reviews only start counting at 3+).
+  const propertyScore = Number.isFinite(sublet.healthScore) ? sublet.healthScore : 0;
+  const reviewCount = reviews.length;
+  const reviewScore = computeReviewScore(reviews);
+  const score = blendWithReviews(propertyScore, reviewScore, reviewCount);
   const scoreColor = getScoreColor(score);
   const campusAccess = getProximityLabel(sublet.walkTime);
 
@@ -560,7 +596,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               </p>
               <div className="flex items-center gap-4 mt-3 flex-wrap">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚶</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.walkTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p></div></div>
-                {sublet.busTime && <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚌</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.busTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p></div></div>}
+                {sublet.busTime ? <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚌</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.busTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p></div></div> : null}
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>📍</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.distanceKm} km</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to campus</p></div></div>
               </div>
 
@@ -597,21 +633,31 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 </h3>
                 <div className="space-y-3 mt-3">
                   {[
-                    { label: "Price", score: sublet.price_vs_market_score, emoji: "📊" },
-                    { label: "Location", score: sublet.lease_clarity_score, emoji: "📍" },
-                    { label: "Amenities", score: 50, emoji: "🏠" },
-                    { label: "Tenant Reviews", score: sublet.landlord_reputation_score, emoji: "⭐" },
+                    { label: "Price", score: sublet.price_vs_market_score, emoji: "📊", pending: false },
+                    { label: "Location", score: sublet.location_score, emoji: "📍", pending: false },
+                    { label: "Amenities", score: sublet.amenity_score, emoji: "🏠", pending: false },
+                    { label: "Tenant Reviews", score: reviewScore ?? 0, emoji: "⭐", pending: reviewCount === 0 },
                   ].map((item, i) => (
                     <motion.div key={item.label} className="flex items-center gap-3" initial={{ opacity: 0, x: -12 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1, type: "spring", stiffness: 200 }}>
                       <span style={{ fontSize: "14px" }}>{item.emoji}</span>
                       <span className="text-[#1B2D45]/60 w-[120px] shrink-0" style={{ fontSize: "12px", fontWeight: 500 }}>{item.label}</span>
-                      <AnimatedBar score={item.score} color={getScoreColor(item.score)} />
-                      <span className="w-8 text-right shrink-0" style={{ fontSize: "13px", fontWeight: 800, color: getScoreColor(item.score) }}>{item.score}</span>
+                      {item.pending ? (
+                        <span className="flex-1 text-[#1B2D45]/35" style={{ fontSize: "11px", fontWeight: 600 }}>No reviews yet</span>
+                      ) : (
+                        <>
+                          <AnimatedBar score={item.score} color={getScoreColor(item.score)} />
+                          <span className="w-8 text-right shrink-0" style={{ fontSize: "13px", fontWeight: 800, color: getScoreColor(item.score) }}>{item.score}</span>
+                        </>
+                      )}
                     </motion.div>
                   ))}
                 </div>
-                {sublet.landlord_reputation_score === 50 && (
-                  <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>New listing — review score will update as tenants leave ratings.</p>
+                {reviewCount === 0 ? (
+                  <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>No tenant reviews yet — the score above is based on price, location &amp; amenities.</p>
+                ) : reviewCount < 3 ? (
+                  <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>{reviewCount} tenant review{reviewCount > 1 ? "s" : ""} so far — reviews start counting toward the score at 3+.</p>
+                ) : (
+                  <p className="text-[#1B2D45]/30 mt-2" style={{ fontSize: "10px", fontStyle: "italic" }}>{reviewCount} tenant reviews factored into this score.</p>
                 )}
               </motion.div>
 
@@ -728,33 +774,12 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               {/* Map */}
               <div className="mt-4 rounded-xl border border-black/[0.04] overflow-hidden">
                 <CribbMap
+                  lat={sublet.latitude}
+                  lng={sublet.longitude}
                   address={sublet.address}
                   height="180px"
                   zoom={15}
                 />
-              </div>
-
-              {/* Contact Card
-                  Sublet responses do not currently expose a real landlord public-profile id,
-                  so we show the poster summary card here instead of misusing listing_id. */}
-              <div className="mt-4 bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-4"
-                style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#2EC4B6]/20 to-[#4ADE80]/20 flex items-center justify-center">
-                    <span className="text-[#2EC4B6]" style={{ fontSize: "16px", fontWeight: 800 }}>
-                      {sublet.posterName.charAt(0)}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.posterName}</p>
-                    <p className="text-[#1B2D45]/40" style={{ fontSize: "11px" }}>{sublet.posterType}</p>
-                  </div>
-                </div>
-                {sublet.posterIsStudent && sublet.posterYear && sublet.posterProgram && (
-                  <p className="text-[#1B2D45]/30 mt-3 pt-3 border-t border-[#1B2D45]/[0.04]" style={{ fontSize: "11px" }}>
-                    🎓 {sublet.posterYear} year · {sublet.posterProgram}
-                  </p>
-                )}
               </div>
             </div>
           </motion.div>

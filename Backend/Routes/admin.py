@@ -9,7 +9,7 @@ from Schemas.subletSchema import SubletStatus
 from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse
-from helpers import require_admin, cascade_delete_landlord, get_account_or_404, log_security_event
+from helpers import require_admin, cascade_delete_landlord, get_account_or_404, log_security_event, compute_and_save
 from Utils.security import hash_password, create_access_token, verify_password, validate_password, create_refresh_token_for_user
 from Schemas.authSchema import SecurityEventType
 from Utils.cloudinary import delete_image_from_cloudinary
@@ -381,6 +381,39 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db), admin: User =
     db.commit()
 
     return None
+
+@admin_router.post("/healthscore/recompute-all", status_code=status.HTTP_200_OK)
+def recompute_all_health_scores(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+    only_active: bool = Query(True, description="Only recompute ACTIVE listings (default). Set false for every listing."),
+):
+    """Recompute the Cribb Score for every listing using the current formula.
+
+    Existing scores are stored, not recalculated per request — run this once
+    after changing the scoring weights so live listings reflect the new formula.
+    """
+    query = db.query(Listing)
+    if only_active:
+        query = query.filter(Listing.status == ListingStatus.ACTIVE.value)
+
+    listings = query.all()
+    recomputed = 0
+    failed = []
+    for listing in listings:
+        try:
+            compute_and_save(listing.id, db)
+            recomputed += 1
+        except Exception as exc:  # one bad listing shouldn't abort the batch
+            db.rollback()
+            failed.append({"listing_id": listing.id, "error": str(exc)})
+
+    return {
+        "total": len(listings),
+        "recomputed": recomputed,
+        "failed_count": len(failed),
+        "failed": failed,
+    }
 
 # CRIBB AI — MANUAL TRIGGER (for testing the bi-weekly cron without waiting for Sunday)
 @admin_router.post("/cribb-ai/trigger", status_code=status.HTTP_200_OK)

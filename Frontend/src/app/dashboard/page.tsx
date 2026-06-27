@@ -7,20 +7,31 @@ import {
   ArrowRight,
   Bookmark,
   CalendarDays,
+  Check,
+  Circle,
+  Clock,
   Home,
   LayoutDashboard,
+  MapPin,
   MessageCircle,
   PenSquare,
   Settings,
   ShoppingBag,
   Star,
   Users,
+  X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { RequestWriterAccessModal } from "@/components/ui/RequestWriterAccessModal";
 import { DashboardSkeleton } from "@/components/ui/Skeletons";
-import type { PostListResponse, UserDashboardResponse } from "@/types";
+import type {
+  PostListResponse,
+  ReviewResponse,
+  UserDashboardResponse,
+  UserResponse,
+  ViewingBookingResponse,
+} from "@/types";
 
 const emptyDashboard: UserDashboardResponse = {
   sublets_active: 0,
@@ -143,13 +154,131 @@ function ActionCard({
   );
 }
 
+function formatViewingWhen(dateStr: string, startTime: string, endTime: string) {
+  const date = new Date(`${dateStr}T00:00:00`);
+  const day = Number.isNaN(date.getTime())
+    ? dateStr
+    : date.toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
+  const trim = (t: string) => (t ? t.slice(0, 5) : "");
+  return `${day} · ${trim(startTime)}–${trim(endTime)}`;
+}
+
+function profileChecklist(user: UserResponse | null) {
+  return [
+    { label: "Add your first and last name", done: Boolean(user?.first_name && user?.last_name) },
+    { label: "Verify your university email", done: Boolean(user?.email_verified) },
+    { label: "Add your program", done: Boolean(user?.program) },
+    { label: "Add your year of study", done: Boolean(user?.year) },
+    { label: "Write a short bio", done: Boolean(user?.bio) },
+    { label: "Upload a profile photo", done: Boolean(user?.profile_photo_url) },
+  ];
+}
+
+function ProfileChecklistModal({
+  user,
+  completeness,
+  onClose,
+}: {
+  user: UserResponse | null;
+  completeness: number;
+  onClose: () => void;
+}) {
+  const items = profileChecklist(user);
+  const remaining = items.filter((i) => !i.done).length;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-[460px] rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Profile completeness checklist"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>
+              Complete your profile
+            </h2>
+            <p className="mt-1 text-[#98A3B0]" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+              {remaining === 0
+                ? "You're all set — your profile is 100% complete."
+                : `${completeness}% done · ${remaining} thing${remaining > 1 ? "s" : ""} left to stand out to landlords and roommates.`}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="shrink-0 rounded-lg p-1.5 text-[#1B2D45]/40 transition-colors hover:bg-[#1B2D45]/5"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <ul className="mt-5 space-y-2">
+          {items.map((item) => (
+            <li
+              key={item.label}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ${
+                item.done ? "bg-[#4ADE80]/[0.08]" : "bg-[#FAF8F4]"
+              }`}
+            >
+              {item.done ? (
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#4ADE80] text-white">
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                </span>
+              ) : (
+                <Circle className="h-5 w-5 shrink-0 text-[#1B2D45]/20" />
+              )}
+              <span
+                className={item.done ? "text-[#1B2D45]/45 line-through" : "text-[#1B2D45]"}
+                style={{ fontSize: "13px", fontWeight: 600 }}
+              >
+                {item.label}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <Link
+          href="/settings"
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF6B35] py-3 text-white transition-all hover:bg-[#e55e2e]"
+          style={{ fontSize: "13px", fontWeight: 700 }}
+        >
+          {remaining === 0 ? "Review your profile" : "Update profile in Settings"}
+          <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function StudentDashboardPage() {
   const router = useRouter();
   const { user, token, isLoading: authLoading } = useAuthStore();
   const [dashboard, setDashboard] = useState<UserDashboardResponse>(emptyDashboard);
   const [recentBubblePosts, setRecentBubblePosts] = useState<PostListResponse[]>([]);
+  const [upcomingViewings, setUpcomingViewings] = useState<ViewingBookingResponse[]>([]);
+  const [myReviews, setMyReviews] = useState<ReviewResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showWriterRequestModal, setShowWriterRequestModal] = useState(false);
+  const [showCompleteness, setShowCompleteness] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -171,6 +300,20 @@ export default function StudentDashboardPage() {
         if (!cancelled) setDashboard(emptyDashboard);
       } finally {
         if (!cancelled) setLoading(false);
+      }
+
+      // Upcoming viewings + written reviews — surfaced directly on the dashboard.
+      const [viewingsRes, reviewsRes] = await Promise.allSettled([
+        api.viewings.getMyUpcoming(),
+        api.reviews.getMyReviews(),
+      ]);
+      if (!cancelled && viewingsRes.status === "fulfilled") {
+        setUpcomingViewings(
+          viewingsRes.value.filter((v) => v.status === "confirmed").slice(0, 4)
+        );
+      }
+      if (!cancelled && reviewsRes.status === "fulfilled") {
+        setMyReviews(reviewsRes.value.slice(0, 4));
       }
     }
 
@@ -251,7 +394,13 @@ export default function StudentDashboardPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-black/[0.04] bg-white px-4 py-3" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+          <button
+            type="button"
+            onClick={() => setShowCompleteness(true)}
+            aria-haspopup="dialog"
+            className="rounded-2xl border border-black/[0.04] bg-white px-4 py-3 text-left transition-all hover:border-[#FF6B35]/20 hover:shadow-md"
+            style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}
+          >
             <div className="text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
               Profile Completeness
             </div>
@@ -259,19 +408,25 @@ export default function StudentDashboardPage() {
               <div className="text-[#1B2D45]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.03em" }}>
                 {dashboard.profile_completeness}%
               </div>
-              <Link href="/settings" className="pb-1 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 700 }}>
-                Finish profile
-              </Link>
+              <span className="pb-1 text-[#FF6B35]" style={{ fontSize: "12px", fontWeight: 700 }}>
+                {dashboard.profile_completeness < 100 ? "See what's left →" : "View profile →"}
+              </span>
             </div>
-          </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[#1B2D45]/[0.06]">
+              <div
+                className="h-full rounded-full bg-[#FF6B35] transition-all"
+                style={{ width: `${dashboard.profile_completeness}%` }}
+              />
+            </div>
+          </button>
         </div>
 
         {/* At-a-glance numbers — Saved & Messages click through to their pages */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard label="Saved" value={dashboard.saved_listings} sub="Listings saved to compare" href="/saved" icon={<Bookmark className="h-4 w-4 text-[#FF6B35]" />} />
           <StatCard label="Messages" value={dashboard.unread_messages} sub="Unread landlord replies" href="/messages" icon={<MessageCircle className="h-4 w-4 text-[#1B2D45]" />} />
-          <StatCard label="Viewings" value={dashboard.upcoming_viewings} sub="Upcoming confirmed showings" icon={<CalendarDays className="h-4 w-4 text-[#2EC4B6]" />} />
-          <StatCard label="Reviews" value={dashboard.reviews_written} sub="Reviews you’ve written" icon={<Star className="h-4 w-4 text-[#FFB627]" />} />
+          <StatCard label="Viewings" value={dashboard.upcoming_viewings} sub="Upcoming confirmed showings" href="#upcoming-viewings" icon={<CalendarDays className="h-4 w-4 text-[#2EC4B6]" />} />
+          <StatCard label="Reviews" value={dashboard.reviews_written} sub="Reviews you’ve written" href="#my-reviews" icon={<Star className="h-4 w-4 text-[#FFB627]" />} />
         </div>
 
         {/* One tile per destination — counts folded in, no repeats */}
@@ -330,6 +485,85 @@ export default function StudentDashboardPage() {
               icon={<Settings className="h-5 w-5" />}
             />
           </div>
+        </section>
+
+        {/* Upcoming viewings — surfaced and clickable */}
+        <section id="upcoming-viewings" className="mt-8 scroll-mt-24">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Upcoming viewings</h2>
+            <Link href="/browse" className="inline-flex items-center gap-1.5 text-[#FF6B35] hover:underline" style={{ fontSize: "12px", fontWeight: 700 }}>
+              Browse listings <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          {upcomingViewings.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {upcomingViewings.map((v) => (
+                <Link
+                  key={v.id}
+                  href={`/browse/${v.listing_id}`}
+                  className="group rounded-2xl border border-black/[0.04] bg-white p-4 transition-all hover:border-[#2EC4B6]/30 hover:shadow-md"
+                  style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}
+                >
+                  <div className="flex items-center gap-2 text-[#2EC4B6]">
+                    <CalendarDays className="h-4 w-4" />
+                    <span style={{ fontSize: "12px", fontWeight: 800 }}>{formatViewingWhen(v.date, v.start_time, v.end_time)}</span>
+                  </div>
+                  <h3 className="mt-2 truncate text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{v.listing_title}</h3>
+                  <div className="mt-1 flex items-center gap-1.5 text-[#98A3B0]">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate" style={{ fontSize: "12px" }}>{v.listing_address}</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5 text-[#1B2D45]/45" style={{ fontSize: "11px", fontWeight: 600 }}>
+                    <Clock className="h-3 w-3" /> with {v.landlord_name}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[#1B2D45]/12 bg-white/60 px-5 py-8 text-center">
+              <CalendarDays className="mx-auto h-7 w-7 text-[#1B2D45]/15" />
+              <p className="mt-2 text-[#1B2D45]/60" style={{ fontSize: "13px", fontWeight: 600 }}>No upcoming viewings</p>
+              <p className="mt-1 text-[#98A3B0]" style={{ fontSize: "12px" }}>Book a showing from any listing and it&apos;ll appear here.</p>
+            </div>
+          )}
+        </section>
+
+        {/* Reviews you've written */}
+        <section id="my-reviews" className="mt-8 scroll-mt-24">
+          <h2 className="mb-3 text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 800 }}>Reviews you&apos;ve written</h2>
+          {myReviews.length > 0 ? (
+            <div className="space-y-3">
+              {myReviews.map((review) => {
+                const avg = (review.responsiveness + review.maintenance_speed + review.respect_privacy + review.fairness_of_charges) / 4;
+                return (
+                  <div key={review.id} className="rounded-2xl border border-black/[0.04] bg-white p-4" style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.04)" }}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Star key={n} className={`h-4 w-4 ${n <= Math.round(avg) ? "fill-[#FFB627] text-[#FFB627]" : "text-[#1B2D45]/15"}`} />
+                        ))}
+                      </div>
+                      <span
+                        className={`rounded-full px-2 py-0.5 ${review.would_rent_again ? "bg-[#4ADE80]/10 text-[#4ADE80]" : "bg-[#E71D36]/10 text-[#E71D36]"}`}
+                        style={{ fontSize: "10px", fontWeight: 700 }}
+                      >
+                        {review.would_rent_again ? "Would rent again" : "Would not rent again"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[#98A3B0]" style={{ fontSize: "11px" }}>
+                      {new Date(review.created_at).toLocaleDateString("en-CA", { month: "long", year: "numeric" })}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-[#1B2D45]/12 bg-white/60 px-5 py-8 text-center">
+              <Star className="mx-auto h-7 w-7 text-[#1B2D45]/15" />
+              <p className="mt-2 text-[#1B2D45]/60" style={{ fontSize: "13px", fontWeight: 600 }}>No reviews yet</p>
+              <p className="mt-1 text-[#98A3B0]" style={{ fontSize: "12px" }}>Rate a place you&apos;ve lived in to help other students.</p>
+            </div>
+          )}
         </section>
 
         {/* Writer access request — only when they don't have it yet */}
@@ -417,6 +651,14 @@ export default function StudentDashboardPage() {
           }));
         }}
       />
+
+      {showCompleteness && (
+        <ProfileChecklistModal
+          user={user}
+          completeness={dashboard.profile_completeness}
+          onClose={() => setShowCompleteness(false)}
+        />
+      )}
     </div>
   );
 }

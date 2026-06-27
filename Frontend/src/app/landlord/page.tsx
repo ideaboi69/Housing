@@ -190,36 +190,12 @@ function OverviewTab({
 }) {
   type SortKey = "listing" | "status" | "views" | "saves" | "inquiries" | "daysListed" | "lastActivity";
 
-  const [period, setPeriod] = useState<LandlordAnalyticsPeriod>("30d");
   const [sortKey, setSortKey] = useState<SortKey>("inquiries");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  const periodConfig: Record<LandlordAnalyticsPeriod, { label: string; days: number; compare: string }> = {
-    "7d": { label: "Last 7 days", days: 7, compare: "vs last week" },
-    "30d": { label: "Last 30 days", days: 30, compare: "vs previous 30 days" },
-    "90d": { label: "Last 90 days", days: 90, compare: "vs previous 90 days" },
-    all: { label: "All time", days: mockLandlordDailyMetrics.length, compare: "vs earlier period" },
-  };
-
-  const now = new Date("2026-06-07T12:00:00-04:00");
-  const selectedDays = periodConfig[period].days;
-  const chartSeries = mockLandlordDailyMetrics.slice(-selectedDays);
-  const previousSeries = mockLandlordDailyMetrics.slice(
-    Math.max(0, mockLandlordDailyMetrics.length - selectedDays * 2),
-    Math.max(0, mockLandlordDailyMetrics.length - selectedDays)
-  );
-  const responseSeries = mockLandlordDailyMetrics.slice(-30);
+  const now = new Date();
   const recentConvos = conversations.slice(0, 3);
 
-  const total = (series: typeof mockLandlordDailyMetrics, key: "views" | "saves" | "inquiries") =>
-    series.reduce((sum, item) => sum + item[key], 0);
-  const avg = (series: typeof mockLandlordDailyMetrics, key: "responseRate" | "responseMinutes") =>
-    series.length ? series.reduce((sum, item) => sum + item[key], 0) / series.length : 0;
-  const percentDelta = (current: number, previous: number) => {
-    if (!previous) return current ? 100 : 0;
-    return Math.round(((current - previous) / previous) * 100);
-  };
-  const daysBetween = (date: string) => Math.max(0, Math.ceil((now.getTime() - new Date(date).getTime()) / 86400000));
   const relativeTime = (date: string) => {
     const minutes = Math.max(1, Math.round((now.getTime() - new Date(date).getTime()) / 60000));
     if (minutes < 60) return `${minutes} min ago`;
@@ -232,41 +208,38 @@ function OverviewTab({
   const activeListings = overviewListings.filter((l) => getListingStatusBucket(l.status) === "active").length;
   const draftListings = overviewListings.filter((l) => getListingStatusBucket(l.status) === "draft").length;
   const totalListings = overviewListings.length;
-  const currentViews = total(chartSeries, "views");
-  const previousViews = total(previousSeries, "views");
-  const currentInquiries = total(chartSeries, "inquiries");
-  const previousInquiries = total(previousSeries, "inquiries");
-  const currentResponseRate = Math.round(avg(responseSeries, "responseRate"));
-  const currentResponseMinutes = Math.round(avg(responseSeries, "responseMinutes"));
 
-  const attentionItems = [
-    unreadCount > 0
-      ? { key: "messages", label: `${unreadCount} unread message${unreadCount === 1 ? "" : "s"}`, sub: "Reply while students are still warm", tab: "messages" as Tab }
-      : null,
-    draftListings > 0
-      ? { key: "drafts", label: `${draftListings} draft listing${draftListings === 1 ? "" : "s"}`, sub: "Publish or clean up inactive rooms", tab: "listings" as Tab }
-      : null,
-  ].filter(Boolean) as Array<{ key: string; label: string; sub: string; tab: Tab }>;
+  // Real per-listing performance, derived from the landlord's own listings.
+  // (Views come from each listing's view_count; inquiries from conversations.
+  //  Per-listing "saves" aren't tracked yet, so that column is omitted.)
+  const listingRows = useMemo(() => {
+    return properties.flatMap((property) =>
+      property.listings.map((listing) => ({
+        listingId: listing.id,
+        propertyId: property.id,
+        title: property.title,
+        room: getListingRoomLabel(listing, property),
+        status: listing.status,
+        views: listing.view_count ?? 0,
+        inquiries: conversations.filter((c) => c.listing_id === listing.id).length,
+        listedAt: listing.created_at,
+        lastActivityAt: listing.updated_at,
+      }))
+    );
+  }, [properties, conversations]);
 
-  const listingMetricTotals = useMemo(() => {
-    return mockLandlordListingDailyMetrics.reduce<Record<number, { views: number; saves: number; inquiries: number }>>((totals, item) => {
-      totals[item.listingId] ??= { views: 0, saves: 0, inquiries: 0 };
-      totals[item.listingId].views += item.views;
-      totals[item.listingId].saves += item.saves;
-      totals[item.listingId].inquiries += item.inquiries;
-      return totals;
-    }, {});
-  }, []);
+  const totalViews = listingRows.reduce((sum, r) => sum + r.views, 0);
+  const totalInquiries = listingRows.reduce((sum, r) => sum + r.inquiries, 0);
 
   const sortedListings = useMemo(() => {
-    return [...mockLandlordListingPerformance].sort((a, b) => {
-      const value = (item: typeof mockLandlordListingPerformance[number]) => {
-        const totals = listingMetricTotals[item.listingId] ?? { views: 0, saves: 0, inquiries: 0 };
+    return [...listingRows].sort((a, b) => {
+      const value = (item: typeof listingRows[number]): string | number => {
         if (sortKey === "listing") return `${item.title} ${item.room}`;
-        if (sortKey === "daysListed") return daysBetween(item.listedAt);
-        if (sortKey === "lastActivity") return new Date(item.lastActivityAt).getTime();
-        if (sortKey === "views" || sortKey === "saves" || sortKey === "inquiries") return totals[sortKey];
-        return item[sortKey];
+        if (sortKey === "status") return item.status;
+        if (sortKey === "daysListed" || sortKey === "lastActivity") return new Date(item.lastActivityAt).getTime();
+        if (sortKey === "views") return item.views;
+        if (sortKey === "inquiries") return item.inquiries;
+        return 0;
       };
       const aValue = value(a);
       const bValue = value(b);
@@ -275,7 +248,7 @@ function OverviewTab({
         : String(aValue).localeCompare(String(bValue));
       return sortDir === "asc" ? result : -result;
     });
-  }, [listingMetricTotals, sortDir, sortKey]);
+  }, [listingRows, sortDir, sortKey]);
 
   const sortableHeader = (key: SortKey, label: string) => (
     <button
@@ -310,10 +283,6 @@ function OverviewTab({
             <span><span className="text-[#1B2D45]/80" style={{ fontWeight: 500 }}>{totalListings}</span> listing{totalListings === 1 ? "" : "s"}</span>
             <span className="text-[#1B2D45]/25">·</span>
             <span><span className="text-[#239B55]" style={{ fontWeight: 500 }}>{activeListings}</span> active</span>
-            <span className="text-[#1B2D45]/25">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#4ADE80]" /> updated {relativeTime(mockLandlordAnalyticsUpdatedAt)}
-            </span>
           </p>
         </div>
         <Link href="/landlord/properties/new" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#1B2D45] px-4 py-2.5 text-white transition-colors hover:bg-[#152438]" style={{ fontSize: "13px", fontWeight: 600 }}>
@@ -337,28 +306,15 @@ function OverviewTab({
         </button>
       )}
 
-      {/* Metric strip */}
+      {/* Metric strip — real numbers from this landlord's own listings */}
       <div>
-        <div className="mb-3 flex items-center justify-end gap-1">
-          {(Object.keys(periodConfig) as LandlordAnalyticsPeriod[]).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setPeriod(key)}
-              className={`rounded-md px-2.5 py-1 transition-colors ${period === key ? "bg-[#1B2D45]/[0.06] text-[#1B2D45]" : "text-[#1B2D45]/45 hover:text-[#1B2D45]/70"}`}
-              style={{ fontSize: "12px", fontWeight: period === key ? 500 : 400 }}
-            >
-              {periodConfig[key].label.replace("Last ", "")}
-            </button>
-          ))}
-        </div>
         <div className="overflow-hidden rounded-2xl border border-[#1B2D45]/[0.08] bg-white shadow-[0_1px_2px_rgba(27,45,69,0.03)]">
           <div className="grid grid-cols-2 sm:grid-cols-4">
             {[
-              { label: "Views", value: currentViews.toLocaleString(), delta: percentDelta(currentViews, previousViews), onClick: () => onSwitchTab("listings") },
-              { label: "Inquiries", value: currentInquiries.toLocaleString(), delta: percentDelta(currentInquiries, previousInquiries), onClick: () => onSwitchTab("messages") },
-              { label: "Active listings", value: `${activeListings} of ${totalListings}`, sub: draftListings > 0 ? `${draftListings} draft` : "all live", onClick: () => onSwitchTab("listings") },
-              { label: "Avg reply", value: `${currentResponseMinutes}m`, sub: `${currentResponseRate}% response`, onClick: () => onSwitchTab("messages") },
+              { label: "Total views", value: totalViews.toLocaleString(), sub: "Across all listings", onClick: () => onSwitchTab("listings") },
+              { label: "Inquiries", value: totalInquiries.toLocaleString(), sub: "Student conversations", onClick: () => onSwitchTab("messages") },
+              { label: "Active listings", value: `${activeListings} of ${totalListings}`, sub: draftListings > 0 ? `${draftListings} draft` : totalListings > 0 ? "all live" : "none yet", onClick: () => onSwitchTab("listings") },
+              { label: "Unread", value: unreadCount.toLocaleString(), sub: "New messages", onClick: () => onSwitchTab("messages") },
             ].map((m, i) => (
               <button
                 key={m.label}
@@ -369,9 +325,7 @@ function OverviewTab({
                 <div className="text-[#1B2D45]/50" style={{ fontSize: "12px", fontWeight: 400 }}>{m.label}</div>
                 <div className="mt-1.5 text-[#1B2D45]" style={{ fontSize: "26px", fontWeight: 600, lineHeight: 1 }}>{m.value}</div>
                 <div className="mt-1.5" style={{ fontSize: "12px", fontWeight: 400 }}>
-                  {typeof m.delta === "number"
-                    ? <span className={m.delta >= 0 ? "text-[#239B55]" : "text-[#B42318]"}>{m.delta >= 0 ? "↑" : "↓"} {Math.abs(m.delta)}%</span>
-                    : <span className="text-[#1B2D45]/40">{m.sub}</span>}
+                  <span className="text-[#1B2D45]/40">{m.sub}</span>
                 </div>
               </button>
             ))}
@@ -382,24 +336,31 @@ function OverviewTab({
       <div>
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Per-listing performance</h2>
-          <span className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>{sortedListings.length} listings</span>
+          <span className="text-[#1B2D45]/40" style={{ fontSize: "12px" }}>{sortedListings.length} listing{sortedListings.length === 1 ? "" : "s"}</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px]">
-            <thead>
-              <tr className="border-b border-[#1B2D45]/[0.08] text-left">
-                <th className="pb-2.5 pr-4">{sortableHeader("listing", "Listing")}</th>
-                <th className="px-4 pb-2.5">{sortableHeader("status", "Status")}</th>
-                <th className="px-4 pb-2.5">{sortableHeader("views", "Views")}</th>
-                <th className="px-4 pb-2.5">{sortableHeader("saves", "Saves")}</th>
-                <th className="px-4 pb-2.5">{sortableHeader("inquiries", "Inquiries")}</th>
-                <th className="pl-4 pb-2.5">{sortableHeader("lastActivity", "Activity")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedListings.map((listing) => {
-                const totals = listingMetricTotals[listing.listingId] ?? { views: 0, saves: 0, inquiries: 0 };
-                return (
+        {totalListings === 0 ? (
+          <div className="rounded-2xl border border-dashed border-[#1B2D45]/12 bg-white/60 px-5 py-10 text-center">
+            <Building2 className="mx-auto h-7 w-7 text-[#1B2D45]/15" />
+            <p className="mt-2 text-[#1B2D45]/65" style={{ fontSize: "14px", fontWeight: 600 }}>No listings yet</p>
+            <p className="mt-1 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>Publish a listing and its views and inquiries will show up here.</p>
+            <Link href="/landlord/properties/new" className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#1B2D45] px-4 py-2.5 text-white transition-colors hover:bg-[#152438]" style={{ fontSize: "13px", fontWeight: 600 }}>
+              <Plus className="h-4 w-4" /> Add property
+            </Link>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px]">
+              <thead>
+                <tr className="border-b border-[#1B2D45]/[0.08] text-left">
+                  <th className="pb-2.5 pr-4">{sortableHeader("listing", "Listing")}</th>
+                  <th className="px-4 pb-2.5">{sortableHeader("status", "Status")}</th>
+                  <th className="px-4 pb-2.5">{sortableHeader("views", "Views")}</th>
+                  <th className="px-4 pb-2.5">{sortableHeader("inquiries", "Inquiries")}</th>
+                  <th className="pl-4 pb-2.5">{sortableHeader("lastActivity", "Activity")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedListings.map((listing) => (
                   <tr key={listing.listingId} className="border-b border-[#1B2D45]/[0.05] transition-colors hover:bg-[#1B2D45]/[0.02]">
                     <td className="py-3 pr-4">
                       <Link href={`/landlord/properties/${listing.propertyId}`} className="block text-[#1B2D45] hover:underline" style={{ fontSize: "13px", fontWeight: 500 }}>
@@ -412,16 +373,15 @@ function OverviewTab({
                         {getListingStatusLabel(listing.status)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-[#1B2D45]/70" style={{ fontSize: "13px" }}>{totals.views}</td>
-                    <td className="px-4 py-3 text-[#1B2D45]/70" style={{ fontSize: "13px" }}>{totals.saves}</td>
-                    <td className="px-4 py-3 text-[#1B2D45]/70" style={{ fontSize: "13px" }}>{totals.inquiries}</td>
+                    <td className="px-4 py-3 text-[#1B2D45]/70" style={{ fontSize: "13px" }}>{listing.views}</td>
+                    <td className="px-4 py-3 text-[#1B2D45]/70" style={{ fontSize: "13px" }}>{listing.inquiries}</td>
                     <td className="pl-4 py-3 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>{relativeTime(listing.lastActivityAt)}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div>

@@ -511,6 +511,9 @@ export interface CribbScoreResponse {
   landlord_reputation_score: number | null;
   maintenance_score: number | null;
   lease_clarity_score: number | null;
+  amenity_score: number | null;
+  proximity_score: number | null;
+  review_count?: number;
   overall_score: number | null;
   created_at: string;
 }

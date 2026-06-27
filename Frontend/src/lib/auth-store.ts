@@ -118,7 +118,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: (options) => {
-    const role = get().user?.role;
     // Revoke refresh token server-side (fire-and-forget)
     const rt = typeof window !== "undefined" ? localStorage.getItem("cribb_refresh_token") : null;
     if (rt) {
@@ -140,13 +139,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useMarketplaceSavedStore.getState().clear();
     set({ user: null, token: null });
     if (options?.redirect !== false && typeof window !== "undefined") {
-      // Edge case: if user logs out from the landing page, leave them there
-      if (window.location.pathname === "/") {
+      const path = window.location.pathname;
+      // Pages that require a logged-in account for the role that just logged out.
+      // If you're on one of these, you can't stay → go to the landing page.
+      // Otherwise (a public page like /browse, /sublets, /), just reload it so
+      // you see the site as a logged-out visitor on the page you were already on.
+      const protectedPrefixes = [
+        "/landlord",
+        "/writer",
+        "/dashboard",
+        "/settings",
+        "/saved",
+        "/messages",
+        "/marketplace/my",
+        "/marketplace/create",
+        "/marketplace/saved",
+        "/sublets/my",
+        "/sublets/new",
+      ];
+      const onProtected = protectedPrefixes.some(
+        (p) => path === p || path.startsWith(`${p}/`)
+      );
+      if (onProtected) {
+        window.location.href = "/";
+      } else {
         window.location.reload();
-        return;
       }
-      const dest = role === "landlord" ? "/landlord/login" : role === "writer" ? "/writers/login" : "/browse";
-      window.location.href = dest;
     }
   },
 

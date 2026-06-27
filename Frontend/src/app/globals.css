@@ -1,6 +1,52 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════
+   Accessibility — global keyboard & motion support (WCAG 2.1 AA)
+   ═══════════════════════════════════════════════════════ */
+
+/* Always show a visible keyboard focus indicator, even on elements that use
+   Tailwind's `focus:outline-none`. Scoped to :focus-visible so it appears for
+   keyboard/AT users without showing a ring on mouse clicks. (WCAG 2.4.7) */
+:where(a, button, input, select, textarea, summary, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [tabindex]):focus-visible {
+  outline: 2px solid var(--cribb-orange, #FF6B35) !important;
+  outline-offset: 2px !important;
+  border-radius: 3px;
+}
+
+/* Skip-to-content link: visually hidden until focused. */
+.skip-to-content {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  transform: translateY(-120%);
+  margin: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--cribb-navy, #1B2D45);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform 0.15s ease;
+}
+.skip-to-content:focus {
+  transform: translateY(0);
+}
+
+/* Respect the OS "reduce motion" preference: neutralize animations,
+   transitions, and smooth scrolling for users who request it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
    cribb Design System Tokens
    ═══════════════════════════════════════════════════════ */
 

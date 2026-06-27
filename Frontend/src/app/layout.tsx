@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { AuthHydrator } from "@/components/AuthHydrator";
 import { OnboardingProvider } from "@/components/OnboardingProvider";
+import { MotionProvider } from "@/components/MotionProvider";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -26,13 +27,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-white text-[#1B2D45] antialiased">
-        <AuthHydrator />
-        <OnboardingProvider />
-        <Suspense fallback={null}>
-          <Navbar />
-        </Suspense>
-        <main>{children}</main>
-        <Footer />
+        <a href="#main-content" className="skip-to-content">
+          Skip to main content
+        </a>
+        <MotionProvider>
+          <AuthHydrator />
+          <OnboardingProvider />
+          <Suspense fallback={null}>
+            <Navbar />
+          </Suspense>
+          <main id="main-content">{children}</main>
+          <Footer />
+        </MotionProvider>
         <Toaster position="bottom-right" richColors />
       </body>
     </html>

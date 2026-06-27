@@ -1,16 +1,39 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
+
+/** Read the role claim straight from the stored JWT (client-only). */
+function landlordFromToken(): boolean {
+  try {
+    const token = localStorage.getItem("cribb_token");
+    if (!token) return false;
+    const payload = JSON.parse(
+      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))
+    );
+    return payload?.role === "landlord";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Secondary landing-hero CTA.
  * Logged-out visitors get "I'm a Landlord" → landlord login.
  * A signed-in landlord gets "Landlord Dashboard" → their dashboard.
+ *
+ * We check both the auth store AND the JWT directly so the dashboard label
+ * shows for every logged-in landlord — even before `loadUser()` resolves
+ * (landlord login persists the token but doesn't populate the store synchronously).
  */
 export function LandlordHeroCTA() {
   const user = useAuthStore((s) => s.user);
-  const isLandlord = user?.role === "landlord";
+  const [isLandlord, setIsLandlord] = useState(false);
+
+  useEffect(() => {
+    setIsLandlord(user?.role === "landlord" || landlordFromToken());
+  }, [user]);
 
   const href = isLandlord ? "/landlord" : "/landlord/login";
   const label = isLandlord ? "Landlord Dashboard →" : "I’m a Landlord →";

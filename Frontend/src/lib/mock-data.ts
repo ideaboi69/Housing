@@ -60,14 +60,15 @@ export const mockHealthScores: Record<number, number> = {
 };
 
 export const mockHealthScoreDetails: Record<number, HealthScoreResponse> = {
-  1: { id: 1, listing_id: 1, overall_score: 88, price_vs_market_score: 82, landlord_reputation_score: 94, maintenance_score: 85, lease_clarity_score: 90, created_at: "2026-01-16T00:00:00" },
-  2: { id: 2, listing_id: 2, overall_score: 92, price_vs_market_score: 95, landlord_reputation_score: 91, maintenance_score: 88, lease_clarity_score: 93, created_at: "2026-01-21T00:00:00" },
-  3: { id: 3, listing_id: 3, overall_score: 79, price_vs_market_score: 72, landlord_reputation_score: 94, maintenance_score: 68, lease_clarity_score: 82, created_at: "2026-02-02T00:00:00" },
-  4: { id: 4, listing_id: 4, overall_score: 86, price_vs_market_score: 90, landlord_reputation_score: 78, maintenance_score: 84, lease_clarity_score: 92, created_at: "2026-02-11T00:00:00" },
-  5: { id: 5, listing_id: 5, overall_score: 95, price_vs_market_score: 88, landlord_reputation_score: 98, maintenance_score: 96, lease_clarity_score: 97, created_at: "2026-01-26T00:00:00" },
-  6: { id: 6, listing_id: 6, overall_score: 81, price_vs_market_score: 78, landlord_reputation_score: 76, maintenance_score: 88, lease_clarity_score: 82, created_at: "2026-02-06T00:00:00" },
-  7: { id: 7, listing_id: 7, overall_score: 73, price_vs_market_score: 85, landlord_reputation_score: 70, maintenance_score: 62, lease_clarity_score: 75, created_at: "2026-02-13T00:00:00" },
-  8: { id: 8, listing_id: 8, overall_score: 91, price_vs_market_score: 84, landlord_reputation_score: 96, maintenance_score: 92, lease_clarity_score: 91, created_at: "2026-02-09T00:00:00" },
+  // overall_score = Price·0.30 + Location(proximity)·0.40 + Amenities·0.20 + Completeness(clarity)·0.10
+  1: { id: 1, listing_id: 1, overall_score: 84, price_vs_market_score: 82, proximity_score: 86, amenity_score: 78, landlord_reputation_score: 94, maintenance_score: 85, lease_clarity_score: 90, review_count: 0, created_at: "2026-01-16T00:00:00" },
+  2: { id: 2, listing_id: 2, overall_score: 91, price_vs_market_score: 95, proximity_score: 90, amenity_score: 85, landlord_reputation_score: 91, maintenance_score: 88, lease_clarity_score: 93, review_count: 0, created_at: "2026-01-21T00:00:00" },
+  3: { id: 3, listing_id: 3, overall_score: 76, price_vs_market_score: 72, proximity_score: 80, amenity_score: 70, landlord_reputation_score: 94, maintenance_score: 68, lease_clarity_score: 82, review_count: 0, created_at: "2026-02-02T00:00:00" },
+  4: { id: 4, listing_id: 4, overall_score: 80, price_vs_market_score: 90, proximity_score: 70, amenity_score: 80, landlord_reputation_score: 78, maintenance_score: 84, lease_clarity_score: 92, review_count: 0, created_at: "2026-02-11T00:00:00" },
+  5: { id: 5, listing_id: 5, overall_score: 92, price_vs_market_score: 88, proximity_score: 95, amenity_score: 88, landlord_reputation_score: 98, maintenance_score: 96, lease_clarity_score: 97, review_count: 0, created_at: "2026-01-26T00:00:00" },
+  6: { id: 6, listing_id: 6, overall_score: 76, price_vs_market_score: 78, proximity_score: 75, amenity_score: 72, landlord_reputation_score: 76, maintenance_score: 88, lease_clarity_score: 82, review_count: 0, created_at: "2026-02-06T00:00:00" },
+  7: { id: 7, listing_id: 7, overall_score: 71, price_vs_market_score: 85, proximity_score: 65, amenity_score: 60, landlord_reputation_score: 70, maintenance_score: 62, lease_clarity_score: 75, review_count: 0, created_at: "2026-02-13T00:00:00" },
+  8: { id: 8, listing_id: 8, overall_score: 88, price_vs_market_score: 84, proximity_score: 92, amenity_score: 86, landlord_reputation_score: 96, maintenance_score: 92, lease_clarity_score: 91, review_count: 0, created_at: "2026-02-09T00:00:00" },
 };
 
 export const mockReviews: Record<number, ReviewResponse[]> = {
