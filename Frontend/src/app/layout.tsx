@@ -12,6 +12,15 @@ export const metadata: Metadata = {
   title: "cribb — Student Housing, Finally Done Right",
   description:
     "Find trusted, verified student housing in Guelph. Real reviews, transparent pricing, and a Cribb Score on every listing.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   openGraph: {
     title: "cribb — Student Housing in Guelph",
     description: "Trusted listings, real reviews, Cribb Scores. Find your Guelph cribb.",
