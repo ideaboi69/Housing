@@ -753,6 +753,100 @@ function WritersTab({
    Posts Tab
    ════════════════════════════════════════════════════════ */
 
+function PostFeatureControls({ post, onRefresh }: { post: PostListResponse; onRefresh: () => void }) {
+  const [order, setOrder] = useState(post.featured_order?.toString() ?? "");
+  const [until, setUntil] = useState(post.featured_until ?? "");
+  const [saving, setSaving] = useState(false);
+  const isPublished = post.status === "published";
+  const isFeatured = Boolean(post.is_featured);
+
+  useEffect(() => {
+    setOrder(post.featured_order?.toString() ?? "");
+    setUntil(post.featured_until ?? "");
+  }, [post.featured_order, post.featured_until]);
+
+  const saveFeature = async (featured: boolean) => {
+    setSaving(true);
+    try {
+      await api.admin.updatePostFeature(post.id, {
+        is_featured: featured,
+        featured_order: featured && order.trim() ? Number(order) : null,
+        featured_until: featured && until ? until : null,
+      });
+      toast.success(featured ? "Featured post updated" : "Post removed from featured");
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : "Could not update featured post");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <div className="text-white" style={{ fontSize: "12px", fontWeight: 800 }}>This Week in Guelph</div>
+          <div className="text-white/35 mt-0.5" style={{ fontSize: "10px", lineHeight: 1.4 }}>
+            Feature published posts on The Bubble.
+          </div>
+        </div>
+        {isFeatured && <Badge label="Featured" color="#FFB627" />}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="block text-white/30 mb-1" style={{ fontSize: "10px", fontWeight: 700 }}>Order</span>
+          <input
+            type="number"
+            min="0"
+            value={order}
+            onChange={(e) => setOrder(e.target.value)}
+            className="w-full rounded-lg bg-[#0F1923] border border-white/[0.08] px-2.5 py-2 text-white focus:outline-none focus:border-[#FFB627]/50"
+            style={{ fontSize: "12px" }}
+            placeholder="1"
+          />
+        </label>
+        <label className="block">
+          <span className="block text-white/30 mb-1" style={{ fontSize: "10px", fontWeight: 700 }}>Until</span>
+          <input
+            type="date"
+            value={until}
+            onChange={(e) => setUntil(e.target.value)}
+            className="w-full rounded-lg bg-[#0F1923] border border-white/[0.08] px-2.5 py-2 text-white focus:outline-none focus:border-[#FFB627]/50"
+            style={{ fontSize: "12px" }}
+          />
+        </label>
+      </div>
+
+      {!isPublished && (
+        <div className="mt-2 text-[#FFB627]" style={{ fontSize: "10px", lineHeight: 1.4 }}>
+          Publish this post before featuring it.
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 mt-3">
+        <ActionButton
+          onClick={() => saveFeature(true)}
+          icon={Star}
+          label={isFeatured ? "Save feature" : "Feature"}
+          color="#FFB627"
+          loading={saving}
+        />
+        {isFeatured && (
+          <ActionButton
+            onClick={() => saveFeature(false)}
+            icon={X}
+            label="Remove"
+            danger
+            loading={saving}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: () => void }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   
@@ -778,6 +872,7 @@ function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: 
                   <span>{p.title}</span>
                   <Badge label={p.category} color={catColor(p.category)} />
                   <Badge label={p.status} color={p.status === "published" ? "#4ADE80" : "#FFB627"} />
+                  {p.is_featured && <Badge label="Featured" color="#FFB627" />}
                 </div>
                 <div className="text-white/30" style={{ fontSize: "11px" }}>
                   By {p.author_name} · {p.view_count} views · {timeAgo(p.created_at)}
@@ -823,6 +918,7 @@ function PostsTab({ posts, onRefresh }: { posts: PostListResponse[]; onRefresh: 
                       <div><span className="text-white/25">Created:</span> {new Date(p.created_at).toLocaleString("en-CA")}</div>
                       {"updated_at" in p && typeof p.updated_at === "string" ? <div><span className="text-white/25">Updated:</span> {new Date(p.updated_at).toLocaleString("en-CA")}</div> : null}
                     </div>
+                    <PostFeatureControls post={p} onRefresh={onRefresh} />
                   </div>
                 </div>
               </div>

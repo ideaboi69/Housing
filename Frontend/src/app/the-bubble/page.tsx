@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ChevronUp, Bookmark, Share2, MoreHorizontal, X, ImagePlus,
   Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag, Star, ArrowLeft, Loader2,
@@ -46,6 +47,9 @@ interface Post {
   slug?: string;
   viewCount?: number;
   userHasUpvoted?: boolean;
+  isFeatured?: boolean;
+  featuredOrder?: number | null;
+  featuredUntil?: string | null;
 }
 
 function formatRelativeTimestamp(dateStr: string): string {
@@ -98,6 +102,9 @@ function buildLivePost(post: PostListResponse): Post {
     slug: post.slug,
     viewCount: post.view_count,
     userHasUpvoted: post.user_has_upvoted,
+    isFeatured: Boolean(post.is_featured),
+    featuredOrder: post.featured_order ?? null,
+    featuredUntil: post.featured_until ?? null,
   };
 }
 
@@ -119,58 +126,7 @@ function getCategoryMeta(cat: Category) {
   return CATEGORIES.find((c) => c.key === cat) || CATEGORIES[0];
 }
 
-/* ═══════════════════════════════════════════════════════
-   MOCK POSTS
-   ═══════════════════════════════════════════════════════ */
-
-const now = Date.now();
 const HOUR = 3600000;
-const DAY = 86400000;
-
-const POSTS: Post[] = [
-  {
-    id: "p1", author: "Jordan", initial: "J",
-    avatarGradient: "linear-gradient(135deg, #FF6B35, #FFB627)",
-    verified: true, timestamp: "2h ago", category: "event",
-    title: "Homecoming 2026 lineup just dropped!",
-    body: "They got Tory Lanez and bbno$ headlining at Alumni Stadium. Tickets go live March 1st for students. Last year sold out in 20 minutes so set your alarms. Also there's a free BBQ at Johnston Green beforehand.",
-    image: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800&h=450&fit=crop",
-    eventDate: "Sep 27, 2026", eventLocation: "Alumni Stadium",
-    upvotes: 248, postedAt: now - 2 * HOUR,
-  },
-  {
-    id: "p2", author: "Ava", initial: "A",
-    avatarGradient: "linear-gradient(135deg, #6C5CE7, #a29bfe)",
-    verified: true, timestamp: "3h ago", category: "food",
-    title: "New ramen spot on Gordon St is actually amazing",
-    body: "Yuki Ramen just opened where the old Subway used to be. Tried the tonkotsu — absolutely insane for the price ($14). They also do a student discount with your OneCard. Highly recommend going before it gets too busy.",
-    image: "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&h=450&fit=crop",
-    upvotes: 192, postedAt: now - 3 * HOUR,
-  },
-  {
-    id: "p3", author: "Marcus", initial: "M",
-    avatarGradient: "linear-gradient(135deg, #2EC4B6, #0984e3)",
-    verified: true, timestamp: "5h ago", category: "other",
-    title: "PSA: You can get free printing at the library",
-    body: "Most people don't know this but McLaughlin Library gives every student $20 of free printing credits per semester. Just go to the help desk with your student card and they'll load it. Saved me so much money during exam season.",
-    upvotes: 156, postedAt: now - 5 * HOUR,
-  },
-  {
-    id: "p6", author: "Sam", initial: "S",
-    avatarGradient: "linear-gradient(135deg, #FFB627, #e17055)",
-    verified: true, timestamp: "1d ago", category: "lifestyle",
-    title: "Best patios to hit up this spring in Guelph",
-    body: "Now that it's warming up here's my ranked list: 1) Baker St. Station (huge patio, great vibes) 2) The Wooly (rooftop!!) 3) Royal City Brewing (dogs allowed) 4) Miijidaa (fancy but worth it). You're welcome.",
-    upvotes: 201, postedAt: now - DAY - 2 * HOUR,
-  },
-];
-
-const WEEKLY_HIGHLIGHTS = [
-  "🎤 Homecoming 2026 lineup announced — tickets March 1st",
-  "🍜 Yuki Ramen opens on Gordon St with student discounts",
-  "🏗️ UC south entrance closed for March renovations",
-  "☀️ Patios are open — see the community's top picks",
-];
 
 /* ═══════════════════════════════════════════════════════
    AVATAR
@@ -258,15 +214,7 @@ function PostCard({
       return;
     }
 
-    if (!post.sourcePostId) {
-      const nextUpvoted = !upvoted;
-      const nextCount = Math.max(0, voteCount + (nextUpvoted ? 1 : -1));
-      setUpvoted(nextUpvoted);
-      setVoteCount(nextCount);
-      return;
-    }
-
-    if (upvoteLoading) return;
+    if (!post.sourcePostId || upvoteLoading) return;
     setUpvoteLoading(true);
 
     try {
@@ -449,27 +397,41 @@ function PostCard({
 }
 
 /* ═══════════════════════════════════════════════════════
-   WEEKLY HIGHLIGHTS
+   FEATURED HIGHLIGHTS
    ═══════════════════════════════════════════════════════ */
 
-function WeeklyHighlightsCard() {
+function FeaturedHighlightsCard({ posts }: { posts: Post[] }) {
   return (
     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}
       className="rounded-2xl overflow-hidden border border-[#FFB627]/20"
       style={{ background: "linear-gradient(135deg, #FAF8F4 0%, #FFF8E8 100%)", borderLeft: "4px solid #FFB627", boxShadow: "0 2px 8px rgba(255,182,39,0.08)" }}>
       <div className="p-4 md:p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 800 }}>📌 This Week in Guelph</h3>
-          <span className="px-2.5 py-1 rounded-full bg-[#FFB627]/12 text-[#B8860B]" style={{ fontSize: "9px", fontWeight: 700 }}>Curated by cribb</span>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 800 }}>This Week in Guelph</h3>
+          <span className="px-2.5 py-1 rounded-full bg-[#FFB627]/12 text-[#B8860B] whitespace-nowrap" style={{ fontSize: "9px", fontWeight: 700 }}>Featured by cribb</span>
         </div>
         <ul className="space-y-2.5">
-          {WEEKLY_HIGHLIGHTS.map((item, i) => (
-            <motion.li key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + i * 0.08 }}
-              className="text-[#5C6B7A] flex items-start gap-2" style={{ fontSize: "13px", lineHeight: 1.5 }}>
-              <span className="shrink-0 w-5 h-5 rounded-full bg-[#FFB627]/15 text-[#B8860B] flex items-center justify-center mt-0.5" style={{ fontSize: "9px", fontWeight: 800 }}>{i + 1}</span>
-              {item}
-            </motion.li>
-          ))}
+          {posts.map((post, i) => {
+            const meta = getCategoryMeta(post.category);
+            return (
+              <motion.li key={post.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + i * 0.08 }}>
+                <Link
+                  href={`/the-bubble/${post.slug}`}
+                  className="group flex items-start gap-2 rounded-xl -mx-2 px-2 py-1.5 hover:bg-white/60 transition-colors"
+                >
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-[#FFB627]/15 text-[#B8860B] flex items-center justify-center mt-0.5" style={{ fontSize: "9px", fontWeight: 800 }}>{i + 1}</span>
+                  <span className="min-w-0">
+                    <span className="block text-[#1B2D45] group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "13px", fontWeight: 700, lineHeight: 1.4 }}>
+                      {post.title}
+                    </span>
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-[#5C6B7A]" style={{ fontSize: "10px", fontWeight: 600 }}>
+                      <span>{meta.emoji}</span>{meta.label}
+                    </span>
+                  </span>
+                </Link>
+              </motion.li>
+            );
+          })}
         </ul>
       </div>
     </motion.div>
@@ -871,9 +833,9 @@ function HeroSection({ isWriter, writerPending, canContribute, onApply, isMobile
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
             className="flex flex-wrap gap-2 mt-3">
             {[
-              { label: "🎉 Homecoming", color: "#6C5CE7" },
-              { label: "🍕 New Eats", color: "#2EC4B6" },
-              { label: "☀️ Patio Season", color: "#FF6B35" },
+              { label: "🎉 Events", color: "#6C5CE7" },
+              { label: "🍕 Food Deals", color: "#2EC4B6" },
+              { label: "💡 Student Tips", color: "#FF6B35" },
               { label: "🎓 Campus News", color: "#1B2D45" },
             ].map((tag, i) => (
               <motion.span key={tag.label}
@@ -964,7 +926,18 @@ function FilterBar({ activeCategory, onSelectCategory, sortMode, onSelectSort, i
    ═══════════════════════════════════════════════════════ */
 
 function Sidebar({ canContribute, onTip, posts }: { canContribute: boolean; onTip: () => void; posts: Post[] }) {
-  const trendingPosts = useMemo(() => [...posts].sort((a, b) => b.upvotes - a.upvotes).slice(0, 5), [posts]);
+  const trendingPosts = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 24 * HOUR;
+    return posts
+      .filter((post) => post.slug && post.postedAt >= weekAgo)
+      .sort((a, b) => {
+        const scoreA = a.upvotes * 4 + (a.viewCount ?? 0);
+        const scoreB = b.upvotes * 4 + (b.viewCount ?? 0);
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return b.postedAt - a.postedAt;
+      })
+      .slice(0, 5);
+  }, [posts]);
 
   return (
     <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
@@ -976,15 +949,21 @@ function Sidebar({ canContribute, onTip, posts }: { canContribute: boolean; onTi
           <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Trending This Week</h4>
         </div>
         <div className="space-y-2.5">
-          {trendingPosts.map((post, i) => (
-            <div key={post.id} className="flex items-start gap-2.5 cursor-pointer hover:translate-x-0.5 transition-transform">
-              <span className="shrink-0 w-5 h-5 rounded-full bg-[#FF6B35]/10 text-[#FF6B35] flex items-center justify-center" style={{ fontSize: "10px", fontWeight: 800 }}>{i + 1}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[#1B2D45] truncate" style={{ fontSize: "12px", fontWeight: 600, lineHeight: 1.4 }}>{post.title}</p>
-                <span className="text-[#98A3B0]" style={{ fontSize: "10px", fontWeight: 500 }}>▲ {post.upvotes}</span>
-              </div>
-            </div>
-          ))}
+          {trendingPosts.length > 0 ? (
+            trendingPosts.map((post, i) => (
+              <Link key={post.id} href={`/the-bubble/${post.slug}`} className="group flex items-start gap-2.5 rounded-xl -mx-2 px-2 py-1.5 hover:bg-[#1B2D45]/[0.03] hover:translate-x-0.5 transition-all">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-[#FF6B35]/10 text-[#FF6B35] flex items-center justify-center" style={{ fontSize: "10px", fontWeight: 800 }}>{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[#1B2D45] truncate group-hover:text-[#FF6B35] transition-colors" style={{ fontSize: "12px", fontWeight: 600, lineHeight: 1.4 }}>{post.title}</p>
+                  <span className="text-[#98A3B0]" style={{ fontSize: "10px", fontWeight: 500 }}>▲ {post.upvotes} · {post.viewCount ?? 0} views</span>
+                </div>
+              </Link>
+            ))
+          ) : (
+            <p className="text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+              No trending posts yet.
+            </p>
+          )}
         </div>
       </div>
 
@@ -1349,11 +1328,27 @@ export default function TheBubblePage() {
   }, []);
 
   const feedPosts = useMemo(() => {
-    if (livePosts.length === 0) return POSTS;
-    const liveSlugs = new Set(livePosts.map((post) => post.slug).filter(Boolean));
-    const mockPosts = POSTS.filter((post) => !post.slug || !liveSlugs.has(post.slug));
-    return [...livePosts, ...mockPosts];
+    return livePosts;
   }, [livePosts]);
+
+  const featuredPosts = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return feedPosts
+      .filter((post) => {
+        if (!post.isFeatured || !post.slug) return false;
+        if (!post.featuredUntil) return true;
+        return new Date(`${post.featuredUntil}T00:00:00`) >= today;
+      })
+      .sort((a, b) => {
+        const orderA = a.featuredOrder ?? Number.MAX_SAFE_INTEGER;
+        const orderB = b.featuredOrder ?? Number.MAX_SAFE_INTEGER;
+        if (orderA !== orderB) return orderA - orderB;
+        return b.postedAt - a.postedAt;
+      })
+      .slice(0, 6);
+  }, [feedPosts]);
 
   const filteredAndSorted = useMemo(() => {
     let posts = activeCategory === "all" ? [...feedPosts] : feedPosts.filter((p) => p.category === activeCategory);
@@ -1374,10 +1369,7 @@ export default function TheBubblePage() {
       return b.postedAt - a.postedAt; // "latest"
     };
 
-    // Split into real posts (have sourcePostId) and mock posts, sort each, concat
-    const real = posts.filter((p) => p.sourcePostId !== undefined).sort(compare);
-    const mocks = posts.filter((p) => p.sourcePostId === undefined).sort(compare);
-    return [...real, ...mocks];
+    return posts.sort(compare);
   }, [activeCategory, sortMode, feedPosts]);
 
   const handlePostClick = () => {
@@ -1533,7 +1525,7 @@ export default function TheBubblePage() {
                 transition={{ duration: 0.15 }}
                 className="flex-1 min-w-0 space-y-4"
               >
-                {activeCategory === "all" && <WeeklyHighlightsCard />}
+                {activeCategory === "all" && featuredPosts.length > 0 && <FeaturedHighlightsCard posts={featuredPosts} />}
                 {isMobile && renderWriterCard(true)}
 
                 {/* Mobile sort toggle */}

@@ -906,6 +906,9 @@ export const posts = {
       `/api/posts${category ? `?category=${category}` : ""}`
     ),
 
+  getFeatured: () =>
+    request<PostListResponse[]>("/api/posts/featured"),
+
   getBySlug: (slug: string) =>
     request<PostResponse>(`/api/posts/${slug}`),
 
@@ -1441,6 +1444,11 @@ export const admin = {
 
   // Posts
   getPosts: () => request<PostListResponse[]>("/api/admin/posts"),
+  updatePostFeature: (id: number, data: { is_featured: boolean; featured_order?: number | null; featured_until?: string | null }) =>
+    request<PostResponse>(`/api/admin/posts/${id}/feature`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
   deletePost: (id: number) => request<null>(`/api/admin/posts/${id}`, { method: "DELETE" }),
 };
 

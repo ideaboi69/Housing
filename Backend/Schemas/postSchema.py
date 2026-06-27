@@ -40,6 +40,11 @@ class PostUpdate(BaseModel):
     event_link: Optional[str] = None
     deal_expires: Optional[date] = None
 
+class PostFeatureUpdate(BaseModel):
+    is_featured: bool
+    featured_order: Optional[int] = None
+    featured_until: Optional[date] = None
+
 class PostResponse(BaseModel):
     id: int
     title: str
@@ -61,6 +66,9 @@ class PostResponse(BaseModel):
     event_location: Optional[str] = None
     event_link: Optional[str] = None
     deal_expires: Optional[date] = None
+    is_featured: bool = False
+    featured_order: Optional[int] = None
+    featured_until: Optional[date] = None
     created_at: datetime
     updated_at: datetime
 
@@ -86,6 +94,9 @@ class PostListResponse(BaseModel):
     user_has_upvoted: bool = False
     event_date: Optional[date] = None
     deal_expires: Optional[date] = None
+    is_featured: bool = False
+    featured_order: Optional[int] = None
+    featured_until: Optional[date] = None
     created_at: datetime
 
     class Config:

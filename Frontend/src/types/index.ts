@@ -906,6 +906,9 @@ export interface PostResponse {
   event_location?: string;
   event_link?: string;
   deal_expires?: string;
+  is_featured?: boolean;
+  featured_order?: number | null;
+  featured_until?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -929,6 +932,9 @@ export interface PostListResponse {
   user_has_upvoted: boolean;
   event_date?: string;
   deal_expires?: string;
+  is_featured?: boolean;
+  featured_order?: number | null;
+  featured_until?: string | null;
   created_at: string;
 }
 

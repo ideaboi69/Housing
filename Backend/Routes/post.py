@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from typing import Optional
-from sqlalchemy import func
+from datetime import date
+from sqlalchemy import func, or_
 import logging
 from tables import get_db, Post, User, Writer, PostVote, StarredAuthor, NotificationPreferences
 
@@ -107,6 +108,23 @@ def get_all_posts(request: Request, category: Optional[PostCategory] = Query(Non
         query = query.filter(Post.category == category)
 
     posts = query.order_by(Post.created_at.desc()).all()
+    user_id = _get_optional_user_id(request)
+    return _attach_upvote_state(posts, user_id, db)
+
+@post_router.get("/featured", response_model=list[PostListResponse])
+def get_featured_posts(request: Request, db: Session = Depends(get_db)):
+    today = date.today()
+    posts = (
+        db.query(Post)
+        .filter(
+            Post.status == PostStatus.PUBLISHED,
+            Post.is_featured == True,
+            or_(Post.featured_until.is_(None), Post.featured_until >= today),
+        )
+        .order_by(Post.featured_order.asc().nullslast(), Post.created_at.desc())
+        .limit(6)
+        .all()
+    )
     user_id = _get_optional_user_id(request)
     return _attach_upvote_state(posts, user_id, db)
 
@@ -489,6 +507,9 @@ def unpublish_post(post_id: int, db: Session = Depends(get_db), author = Depends
         raise HTTPException(status_code=400, detail="Only published posts can be unpublished")
 
     post.status = PostStatus.DRAFT
+    post.is_featured = False
+    post.featured_order = None
+    post.featured_until = None
     db.commit()
     db.refresh(post)
 
@@ -504,6 +525,9 @@ def archive_post( post_id: int, db: Session = Depends(get_db), author = Depends(
         raise HTTPException(status_code=400, detail="Post is already archived")
 
     post.status = PostStatus.ARCHIVED
+    post.is_featured = False
+    post.featured_order = None
+    post.featured_until = None
     db.commit()
     db.refresh(post)
 

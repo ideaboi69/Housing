@@ -8,7 +8,7 @@ from Schemas.adminSchema import AdminCreate, AdminResponse, AdminUserResponse, A
 from Schemas.subletSchema import SubletStatus
 from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
-from Schemas.postSchema import PostResponse, PostListResponse
+from Schemas.postSchema import PostResponse, PostListResponse, PostFeatureUpdate, PostStatus
 from helpers import require_admin, cascade_delete_landlord, get_account_or_404, log_security_event, compute_and_save
 from Utils.security import hash_password, create_access_token, verify_password, validate_password, create_refresh_token_for_user
 from Schemas.authSchema import SecurityEventType
@@ -16,6 +16,7 @@ from Utils.cloudinary import delete_image_from_cloudinary
 from Utils.email import send_approval_email, send_rejection_email, send_revoked_email, send_sublet_onboarding_email, send_sublet_expired_email, send_listing_expired_email
 from Schemas.listingSchema import ListingStatus
 from Utils.rate_limit import limiter
+from Utils.cache import invalidate
 from config import settings
 
 admin_router = APIRouter()
@@ -788,6 +789,24 @@ def admin_delete_post(post_id: int, db: Session = Depends(get_db), admin: Admin 
 
     db.delete(post)
     db.commit()
+    invalidate("posts:list")
+
+@admin_router.patch("/posts/{post_id}/feature", response_model=PostResponse)
+def admin_update_post_feature(post_id: int, payload: PostFeatureUpdate, db: Session = Depends(get_db), admin: Admin = Depends(require_admin)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if payload.is_featured and post.status != PostStatus.PUBLISHED:
+        raise HTTPException(status_code=400, detail="Only published posts can be featured")
+
+    post.is_featured = payload.is_featured
+    post.featured_order = payload.featured_order if payload.is_featured else None
+    post.featured_until = payload.featured_until if payload.is_featured else None
+    db.commit()
+    db.refresh(post)
+    invalidate("posts:list")
+    return PostResponse.model_validate(post)
 
 # ROOMMATE GROUP ENDPOINTS
 @admin_router.get("/roommate-groups")

@@ -502,6 +502,9 @@ class Post(Base):
     event_link = Column(String(500), nullable=True)
     deal_expires = Column(Date, nullable=True)
     is_ai_draft = Column(Boolean, default=False, nullable=False, server_default="false")
+    is_featured = Column(Boolean, default=False, nullable=False, server_default="false")
+    featured_order = Column(Integer, nullable=True)
+    featured_until = Column(Date, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -517,6 +520,7 @@ class Post(Base):
         Index("ix_posts_status", "status"),
         Index("ix_posts_category", "category"),
         Index("ix_posts_slug", "slug"),
+        Index("ix_posts_featured", "is_featured", "featured_order"),
     )
 
     @property
@@ -1122,6 +1126,10 @@ def ensure_listing_schema_compatibility():
         conn.execute(text("ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS notify_roommate_updates BOOLEAN NOT NULL DEFAULT TRUE"))
         conn.execute(text("ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS notify_viewing_updates BOOLEAN NOT NULL DEFAULT TRUE"))
         conn.execute(text("ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS notify_bubble_posts BOOLEAN NOT NULL DEFAULT TRUE"))
+        conn.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS featured_order INTEGER"))
+        conn.execute(text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS featured_until DATE"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_posts_featured ON posts (is_featured, featured_order)"))
 
 ensure_listing_schema_compatibility()
 
