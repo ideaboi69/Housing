@@ -14,7 +14,7 @@ import type {
 } from "@/types";
 import { formatPrice, formatDate, formatLeaseType } from "@/lib/utils";
 import { getListingStatusLabel, getListingStatusTone } from "@/lib/listing-status";
-import { getListingImages, getMockHealthScore, mockListings, mockLandlordListingDailyMetrics } from "@/lib/mock-data";
+import { getListingImages, getMockHealthScore, mockListings } from "@/lib/mock-data";
 import { EditListingModal } from "@/components/landlord/EditListingModal";
 import { ListingImageUpload } from "@/components/landlord/ListingImageUpload";
 import { ShowingsManager } from "@/components/landlord/ShowingsManager";
@@ -34,22 +34,6 @@ const SECTIONS = [
   { id: "messages", label: "Messages", icon: MessageCircle },
   { id: "danger", label: "Danger Zone", icon: ShieldAlert },
 ] as const;
-
-function Sparkline({ data, color = "#2F6FED" }: { data: number[]; color?: string }) {
-  if (data.length === 0) return null;
-  const max = Math.max(...data, 1);
-  const min = Math.min(...data, 0);
-  const points = data.map((value, index) => {
-    const x = data.length === 1 ? 0 : (index / (data.length - 1)) * 100;
-    const y = 30 - ((value - min) / Math.max(max - min, 1)) * 26;
-    return `${x},${y}`;
-  }).join(" ");
-  return (
-    <svg viewBox="0 0 100 32" className="h-8 w-full" preserveAspectRatio="none" aria-hidden="true">
-      <polyline points={points} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 function SectionCard({ id, icon: Icon, title, description, action, children }: { id: string; icon?: React.ComponentType<{ className?: string }>; title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -185,10 +169,6 @@ export default function ManageListingPage({ params }: { params: Promise<{ id: st
   const upcomingViewings = bookings.filter((b) => b.status === "confirmed").length;
   const roomLabel = listing.rooms?.[0]?.label ?? (listing.rooms && listing.rooms.length > 1 ? `${listing.rooms.length} rooms` : "Whole unit");
   const overall = score?.overall_score ?? null;
-
-  const metrics = mockLandlordListingDailyMetrics.filter((m) => m.listingId === listingId);
-  const viewsSeries = metrics.map((m) => m.views);
-  const savesTotal = metrics.reduce((s, m) => s + m.saves, 0);
 
   const headerStats = [
     { label: "per room", value: formatPrice(Number(listing.rent_per_room)), icon: null },
@@ -356,11 +336,6 @@ export default function ManageListingPage({ params }: { params: Promise<{ id: st
                 <div>
                   <div className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 600, lineHeight: 1 }}>{listing.view_count}</div>
                   <div className="mt-1 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>Views</div>
-                  {viewsSeries.length > 0 && <div className="mt-1 w-24"><Sparkline data={viewsSeries} /></div>}
-                </div>
-                <div>
-                  <div className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 600, lineHeight: 1 }}>{savesTotal}</div>
-                  <div className="mt-1 text-[#1B2D45]/45" style={{ fontSize: "12px" }}>Saves</div>
                 </div>
                 <div>
                   <div className="text-[#1B2D45]" style={{ fontSize: "20px", fontWeight: 600, lineHeight: 1 }}>{listingConversations.length}</div>

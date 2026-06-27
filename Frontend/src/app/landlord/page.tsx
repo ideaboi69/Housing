@@ -20,12 +20,6 @@ import { getListingStatusBucket, getListingStatusLabel, getListingStatusTone, is
 import { useMessagesSocket } from "@/lib/use-messages-socket";
 import {
   getListingImages,
-  type LandlordAnalyticsPeriod,
-  mockListings,
-  mockLandlordAnalyticsUpdatedAt,
-  mockLandlordDailyMetrics,
-  mockLandlordListingDailyMetrics,
-  mockLandlordListingPerformance,
 } from "@/lib/mock-data";
 import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
@@ -290,8 +284,6 @@ function OverviewTab({
         </Link>
       </div>
 
-      <UpcomingShowings />
-
       {(unreadCount > 0 || draftListings > 0) && (
         <button
           type="button"
@@ -383,6 +375,8 @@ function OverviewTab({
           </div>
         )}
       </div>
+
+      <UpcomingShowings />
 
       <div>
         <div className="mb-1 flex items-center justify-between">
@@ -1000,17 +994,15 @@ function MessagesTab({
   }), [conversations, listingFilter, threadFilter]);
   const getConversationListing = useCallback((conversation?: ConversationResponse | null) => {
     if (!conversation) return null;
-    const listing = mockListings.find((item) => item.id === conversation.listing_id);
-    const performance = mockLandlordListingPerformance.find((item) => item.listingId === conversation.listing_id);
     const image = getListingImages(conversation.listing_id)[0] ?? "/demo/listings/apartment.jpg";
     return {
       id: conversation.listing_id,
-      title: listing?.title ?? performance?.title ?? conversation.listing_title ?? `Listing ${conversation.listing_id}`,
-      room: performance?.room ?? (listing ? getListingRoomLabel(listing) : "Listing inquiry"),
-      propertyId: listing?.property_id ?? performance?.propertyId,
-      address: listing?.address,
-      status: getListingStatusLabel(listing?.status ?? performance?.status ?? "active"),
-      statusBucket: getListingStatusBucket(listing?.status ?? performance?.status ?? "active"),
+      title: conversation.listing_title ?? `Listing ${conversation.listing_id}`,
+      room: "Listing inquiry",
+      propertyId: undefined as number | undefined,
+      address: undefined as string | undefined,
+      status: getListingStatusLabel("active"),
+      statusBucket: getListingStatusBucket("active"),
       image,
     };
   }, []);

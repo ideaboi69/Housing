@@ -49,15 +49,25 @@ export function UpcomingShowings() {
     }
   };
 
-  if (loading || bookings.length === 0) return null;
+  if (loading) return null;
 
   return (
     <div className="rounded-2xl border border-[#1B2D45]/[0.08] bg-white p-5">
       <div className="mb-4 flex items-center gap-2">
         <Calendar className="h-4 w-4 text-[#FF6B35]" />
         <h2 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 600 }}>Upcoming showings</h2>
-        <span className="rounded-full bg-[#FF6B35]/10 px-2 py-0.5 text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 600 }}>{bookings.length}</span>
+        {bookings.length > 0 && (
+          <span className="rounded-full bg-[#FF6B35]/10 px-2 py-0.5 text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 600 }}>{bookings.length}</span>
+        )}
       </div>
+      {bookings.length === 0 && (
+        <div className="rounded-xl border border-dashed border-[#1B2D45]/12 px-4 py-6 text-center">
+          <p className="text-[#1B2D45]/60" style={{ fontSize: "13px", fontWeight: 600 }}>No upcoming showings</p>
+          <p className="mt-1 text-[#1B2D45]/40" style={{ fontSize: "12px" }}>
+            When a student books a confirmed viewing on one of your listings, it&apos;ll appear here.
+          </p>
+        </div>
+      )}
       <div className="space-y-2">
         {bookings.map((b) => (
           <div key={b.id} className="flex flex-col gap-2 rounded-xl border border-[#1B2D45]/[0.06] bg-[#FAF8F4] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
