@@ -29,6 +29,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { useSavedStore } from "@/lib/saved-store";
 import { BrowseGridSkeleton } from "@/components/ui/Skeletons";
+import { FloorPlanUploader } from "@/components/listing/FloorPlanUploader";
 import type { GenderPreference } from "@/types";
 import {
   type SubletListing, type SubletViewMode, type SubletCellValue,
@@ -189,6 +190,7 @@ function ListSubletForm({
 }) {
   const isMobile = useIsMobile();
   const [photos, setPhotos] = useState<File[]>([]);
+  const [floorPlans, setFloorPlans] = useState<File[]>([]);
   const [form, setForm] = useState(INITIAL_SUBLET_FORM);
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
@@ -307,6 +309,13 @@ function ListSubletForm({
           coverImage = URL.createObjectURL(photos[0]);
         }
       }
+      if (floorPlans.length > 0) {
+        try {
+          await api.sublets.uploadFloorPlans(response.id, floorPlans);
+        } catch {
+          /* non-fatal — sublet is saved, floor plans can be added later */
+        }
+      }
 
       const availableMonths = MONTHS.map((_, i) => i >= selectedRange[0] && i <= selectedRange[1]);
       const flexibleDates = (selectedRange[1] - selectedRange[0]) >= 2;
@@ -341,6 +350,7 @@ function ListSubletForm({
         bedsTotal: rooms,
         distance: `${distance.toFixed(1)} km`,
         walkTime: `${walk} min`,
+        driveTime: `${drive || Math.max(1, Math.round(walk / 4))} min`,
         amenities: [
           form.is_furnished ? "Furnished" : null,
           form.utilities_included ? "Utilities Incl." : null,
@@ -354,6 +364,7 @@ function ListSubletForm({
 
       setForm(INITIAL_SUBLET_FORM);
       setPhotos([]);
+      setFloorPlans([]);
       onClose();
       toast.success("Your sublet is live.");
     } catch (error) {
@@ -403,6 +414,10 @@ function ListSubletForm({
                     <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => addPhotos(e.target.files)} />
                   </label>
                 )}
+              </div>
+
+              <div className="mt-4">
+                <FloorPlanUploader files={floorPlans} onChange={setFloorPlans} />
               </div>
             </div>
 
@@ -995,7 +1010,7 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
           {/* Meta */}
           <div className="flex flex-wrap gap-2 mt-3">
             <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>📍 {listing.distance}</span>
-            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>🚶 {listing.walkTime}</span>
+            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>🚗 {listing.driveTime}</span>
             <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>{listing.bedsAvailable}/{listing.bedsTotal} beds</span>
           </div>
 
@@ -1167,7 +1182,7 @@ function SubletCompareModal({
       { label: "Original Rent", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => l.originalPrice), type: "price", bestFn: "lowest" },
       { label: "Cribb Score", icon: <ShieldCheck className="w-3.5 h-3.5" />, values: vals((l) => l.healthScore), type: "score", bestFn: "highest" },
       { label: "Distance", icon: <MapPin className="w-3.5 h-3.5" />, values: vals((l) => parseSubletDistance(l.distance)), type: "distance", bestFn: "lowest" },
-      { label: "Walk Time", icon: <Clock className="w-3.5 h-3.5" />, values: vals((l) => parseSubletWalkTime(l.walkTime)), type: "time", bestFn: "lowest" },
+      { label: "Drive Time", icon: <Clock className="w-3.5 h-3.5" />, values: vals((l) => parseSubletWalkTime(l.driveTime)), type: "time", bestFn: "lowest" },
       { label: "Neighborhood", values: vals((l) => l.neighborhood), type: "text" },
       { label: "Type", values: vals((l) => (l.roommatesStaying === null ? "Entire place" : "Private room")), type: "text" },
       { label: "Beds", values: vals((l) => `${l.bedsAvailable} of ${l.bedsTotal}`), type: "text" },
@@ -1528,7 +1543,7 @@ function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { lis
             📍 {listing.distance}
           </div>
           <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
-            🚶 {listing.walkTime}
+            🚗 {listing.driveTime}
           </div>
           <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
             🛏 {listing.bedsAvailable}/{listing.bedsTotal} beds
@@ -1818,7 +1833,7 @@ function SubletMapView({ listings, pinnedIds, onTogglePin, selectedRange }: { li
                           <span>{proximity.emoji}</span>
                           <span>{proximity.label}</span>
                         </span>
-                        <span className="text-[#1B2D45]/42" style={{ fontSize: "11px", fontWeight: 600 }}>{listing.walkTime} walk</span>
+                        <span className="text-[#1B2D45]/42" style={{ fontSize: "11px", fontWeight: 600 }}>{listing.driveTime} drive</span>
                       </div>
 
                       <div className="flex items-center gap-3 mt-3 text-[#1B2D45]/52 flex-wrap" style={{ fontSize: "11px", fontWeight: 600 }}>

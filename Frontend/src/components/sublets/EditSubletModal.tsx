@@ -6,6 +6,7 @@ import { X, Loader2, Upload, Save, GripVertical } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
 import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
+import { FloorPlanManager } from "@/components/listing/FloorPlanManager";
 import { toast } from "sonner";
 import type {
   SubletResponse,
@@ -85,7 +86,7 @@ export function EditSubletModal({ subletId, onClose, onSaved }: EditSubletModalP
         setUtilitiesIncluded(Boolean(s.utilities_included));
         setIsFurnished(Boolean(s.is_furnished));
         setNearestBusRoute(s.nearest_bus_route ?? "");
-        setImages(s.images ?? []);
+        setImages((s.images ?? []).filter((img) => !img.is_floor_plan));
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiError ? err.detail : "Could not load sublet");
@@ -338,6 +339,9 @@ export function EditSubletModal({ subletId, onClose, onSaved }: EditSubletModalP
                   </label>
                 )}
               </div>
+
+              {/* Floor Plan */}
+              <FloorPlanManager kind="sublet" id={subletId} />
 
               <div className="h-px bg-[#1B2D45]/[0.04]" />
 

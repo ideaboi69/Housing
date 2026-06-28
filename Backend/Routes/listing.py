@@ -93,7 +93,10 @@ async def upload_listing_images(listing_id: int, files: list[UploadFile] = File(
     landlord = get_landlord_for_user(current_user, db)
     listing = get_listing_owned_by(listing_id, landlord.id, db)
 
-    existing_count = db.query(ListingImage).filter(ListingImage.listing_id == listing.id).count()
+    existing_count = db.query(ListingImage).filter(
+        ListingImage.listing_id == listing.id,
+        ListingImage.is_floor_plan == False,
+    ).count()
 
     if existing_count + len(files) > 10:
         raise HTTPException(
@@ -127,16 +130,59 @@ async def upload_listing_images(listing_id: int, files: list[UploadFile] = File(
     invalidate("listings:popular")
     return [ListingImageResponse.model_validate(img) for img in images]
 
+# Upload floor-plan diagrams (separate from photos, max 5, rendered in their own section)
+@listing_router.post("/{listing_id}/floor-plans", status_code=status.HTTP_201_CREATED, response_model=list[ListingImageResponse])
+async def upload_listing_floor_plans(listing_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_for_user(current_user, db)
+    listing = get_listing_owned_by(listing_id, landlord.id, db)
+
+    existing_count = db.query(ListingImage).filter(
+        ListingImage.listing_id == listing.id,
+        ListingImage.is_floor_plan == True,
+    ).count()
+
+    if existing_count + len(files) > 5:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum 5 floor plans allowed. You have {existing_count}, trying to add {len(files)}.",
+        )
+
+    images = []
+    for i, file in enumerate(files):
+        if file.content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail=f"'{file.filename}' is not a valid image. Allowed: JPEG, PNG, WebP, GIF")
+
+        image_url = upload_image_to_cloudinary(file, folder=f"listings/{listing_id}/floor-plans")
+        image = ListingImage(
+            listing_id=listing.id,
+            image_url=image_url,
+            display_order=existing_count + i,
+            is_floor_plan=True,
+        )
+        db.add(image)
+        images.append(image)
+
+    db.commit()
+    for img in images:
+        db.refresh(img)
+
+    invalidate("listings:list")
+    invalidate("listings:popular")
+    return [ListingImageResponse.model_validate(img) for img in images]
+
 # Reorder listing images
 @listing_router.patch("/{listing_id}/images/reorder", response_model=list[ListingImageResponse])
 def reorder_listing_images(listing_id: int, payload: ListingImageReorder, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
     landlord = get_landlord_for_user(current_user, db)
     listing = get_listing_owned_by(listing_id, landlord.id, db)
  
-    images = db.query(ListingImage).filter(ListingImage.listing_id == listing.id).all()
+    images = db.query(ListingImage).filter(
+        ListingImage.listing_id == listing.id,
+        ListingImage.is_floor_plan == False,
+    ).all()
     existing_ids = {img.id for img in images}
     incoming_ids = set(payload.image_ids)
- 
+
     if existing_ids != incoming_ids:
         raise HTTPException(
             status_code=400,
@@ -254,7 +300,7 @@ def list_my_listings(db: Session = Depends(get_db), current_user: User = Depends
     landlord = get_landlord_for_user(current_user, db)
 
     listings = db.query(Listing).join(Property).filter(Property.landlord_id == landlord.id).all()
-    return [ListingResponse.model_validate(l) for l in listings]
+    return [build_listing_response(l) for l in listings]
 
 @listing_router.get("/drafts/my", response_model=list[ListingResponse])
 def get_my_draft_listings(db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):

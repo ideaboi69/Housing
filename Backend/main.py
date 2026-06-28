@@ -119,12 +119,22 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
         await websocket.close(code=1008)
         return
  
-    await connection_manager.connect(websocket, role, user_id)
+    try:
+        await connection_manager.connect(websocket, role, user_id)
+    except Exception:
+        # The client vanished mid-handshake (hot-reload / tab close / StrictMode
+        # double-mount racing accept()). Nothing is registered yet, so just bail
+        # instead of letting it surface as an unhandled ASGI error.
+        return
+
     try:
         while True:
             # We don't process incoming WS messages from clients; this just keeps the socket open
             await websocket.receive_text()
     except WebSocketDisconnect:
+        connection_manager.disconnect(websocket, role, user_id)
+    except Exception:
+        # Any other transport error — drop the connection cleanly.
         connection_manager.disconnect(websocket, role, user_id)
 
 # Email scheduler

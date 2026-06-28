@@ -290,10 +290,21 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
   const listingIds = new Set(listings.map((listing) => listing.id));
   const propertyConversations = conversations.filter((c) => listingIds.has(c.listing_id));
 
-  // Photos: real property images, else demo placeholders so the gallery is previewable.
-  const realImages = property.images && property.images.length > 0;
+  // Photos live on the listings, not the property. Aggregate the real uploaded
+  // photos from every listing under this property (skip floor plans, dedupe by
+  // URL). Only fall back to demo placeholders when nothing has been uploaded yet.
+  const listingPhotos = listings.flatMap((l) => (l.images ?? []).filter((img) => !img.is_floor_plan));
+  const seenUrls = new Set<string>();
+  const uploadedCovers = listingPhotos.reduce<{ key: string; url: string }[]>((acc, img) => {
+    if (img.image_url && !seenUrls.has(img.image_url)) {
+      seenUrls.add(img.image_url);
+      acc.push({ key: String(img.id), url: img.image_url });
+    }
+    return acc;
+  }, []);
+  const realImages = uploadedCovers.length > 0;
   const coverImages = realImages
-    ? property.images!.map((img) => ({ key: String(img.id), url: img.image_url }))
+    ? uploadedCovers
     : ["/demo/listings/house.jpg", "/demo/listings/townhouse.jpg", "/demo/listings/apartment.jpg", "/demo/listings/studio.jpg"].map((url, i) => ({ key: `demo-${i}`, url }));
 
   return (

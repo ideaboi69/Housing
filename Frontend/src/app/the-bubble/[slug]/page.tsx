@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Eye, Calendar, MapPin, ExternalLink } from "lucide-react";
+import { ArrowLeft, Eye, Calendar, MapPin, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { VerifiedWriterBadge } from "@/components/ui/Badges";
 import { BubbleShareMenu } from "@/components/ui/BubbleShareMenu";
@@ -21,6 +21,7 @@ export default function BubblePostPage({ params }: { params: Promise<{ slug: str
   const [post, setPost] = useState<PostResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const [slide, setSlide] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +37,21 @@ export default function BubblePostPage({ params }: { params: Promise<{ slug: str
     })();
     return () => { cancelled = true; };
   }, [slug]);
+
+  // Ordered gallery: real gallery images if present, else the legacy single cover.
+  const gallery: string[] =
+    post?.images && post.images.length > 0
+      ? post.images.slice().sort((a, b) => a.display_order - b.display_order).map((i) => i.image_url)
+      : post?.cover_image_url
+      ? [post.cover_image_url]
+      : [];
+
+  const stepSlide = useCallback(
+    (dir: number) => {
+      setSlide((cur) => (gallery.length === 0 ? 0 : (cur + dir + gallery.length) % gallery.length));
+    },
+    [gallery.length]
+  );
 
   if (loading) {
     return (
@@ -112,9 +128,51 @@ export default function BubblePostPage({ params }: { params: Promise<{ slug: str
           </span>
         </div>
 
-        {post.cover_image_url && (
-          <div className="mt-6 overflow-hidden rounded-2xl border border-black/[0.05] bg-white">
-            <img src={post.cover_image_url} alt={post.title} className="w-full object-cover" style={{ aspectRatio: "16/9" }} />
+        {gallery.length > 0 && (
+          <div
+            className="group relative mt-6 overflow-hidden rounded-2xl border border-black/[0.05] bg-white"
+            style={{ aspectRatio: "16/9" }}
+          >
+            <img
+              src={gallery[Math.min(slide, gallery.length - 1)]}
+              alt={post.title}
+              className="h-full w-full object-cover"
+            />
+
+            {gallery.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => stepSlide(-1)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity hover:bg-black/65 group-hover:opacity-100 focus-visible:opacity-100"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepSlide(1)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity hover:bg-black/65 group-hover:opacity-100 focus-visible:opacity-100"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+
+                <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/40 px-2.5 py-1">
+                  {gallery.map((_, i) => (
+                    <span
+                      key={i}
+                      className="rounded-full transition-all"
+                      style={{
+                        width: i === slide ? 16 : 6,
+                        height: 6,
+                        backgroundColor: i === slide ? "#fff" : "rgba(255,255,255,0.5)",
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 

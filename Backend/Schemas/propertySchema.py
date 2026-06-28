@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 from decimal import Decimal
 import enum
-from Schemas.featureSchema import ListingPolicies, PetPolicy, SmokingPolicy, SpaceAmenities
+from Schemas.featureSchema import ListingPolicies, PetPolicy, PetPolicyField, SmokingPolicy, SmokingPolicyField, SpaceAmenities
 
 # Enum
 class PropertyType(str, enum.Enum):
@@ -103,8 +103,8 @@ class PropertyResponse(BaseModel):
     has_backyard: bool
     has_balcony: bool
     wheelchair_accessible: bool
-    pet_policy: PetPolicy
-    smoking_policy: SmokingPolicy
+    pet_policy: PetPolicyField
+    smoking_policy: SmokingPolicyField
     estimated_utility_cost: Optional[Decimal] = None
     distance_to_campus_km: Optional[Decimal] = None
     walk_time_minutes:int

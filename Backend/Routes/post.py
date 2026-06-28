@@ -4,10 +4,10 @@ from typing import Optional
 from datetime import date
 from sqlalchemy import func, or_
 import logging
-from tables import get_db, Post, User, Writer, PostVote, StarredAuthor, NotificationPreferences
+from tables import get_db, Post, PostImage, User, Writer, PostVote, StarredAuthor, NotificationPreferences
 
 logger = logging.getLogger(__name__)
-from Schemas.postSchema import PostCreate, PostUpdate, PostResponse, PostListResponse, PostCategory, PostStatus
+from Schemas.postSchema import PostCreate, PostUpdate, PostResponse, PostListResponse, PostCategory, PostStatus, PostImageResponse, PostImageReorder
 from Utils.security import get_current_user, get_current_author, get_current_student, decode_access_token
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.email import send_new_post_email
@@ -98,6 +98,122 @@ async def upload_cover_image(post_id: int, file: UploadFile = File(...), db: Ses
     db.refresh(post)
 
     return PostResponse.model_validate(post)
+
+
+def _assert_post_author(post: Post, author):
+    """Raise 403 if the author doesn't own the post."""
+    if isinstance(author, User) and post.user_id != author.id:
+        raise HTTPException(status_code=403, detail="Not your post")
+    if isinstance(author, Writer) and post.writer_id != author.id:
+        raise HTTPException(status_code=403, detail="Not your post")
+
+
+def _sync_cover_from_images(post: Post):
+    """Mirror the primary gallery image (display_order 0) into cover_image_url so
+    every existing cover render path keeps working. Clears it when no images remain."""
+    primary = next((img for img in post.images if img.is_primary), None)
+    if primary is None and post.images:
+        primary = min(post.images, key=lambda i: i.display_order)
+        primary.is_primary = True
+    post.cover_image_url = primary.image_url if primary else None
+
+
+# Upload one or more gallery images (the first uploaded becomes the cover)
+@post_router.post("/{post_id}/images", status_code=status.HTTP_201_CREATED, response_model=list[PostImageResponse])
+async def upload_post_images(post_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), author=Depends(get_current_author)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    _assert_post_author(post, author)
+
+    existing_count = len(post.images)
+    if existing_count + len(files) > 10:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum 10 images allowed. You have {existing_count}, trying to add {len(files)}.",
+        )
+
+    created = []
+    for i, file in enumerate(files):
+        image_url = upload_image_to_cloudinary(file, folder=f"posts/{post_id}")
+        image = PostImage(
+            post_id=post.id,
+            image_url=image_url,
+            is_primary=(existing_count == 0 and i == 0),
+            display_order=existing_count + i,
+        )
+        db.add(image)
+        created.append(image)
+
+    db.flush()
+    db.refresh(post)
+    _sync_cover_from_images(post)
+    db.commit()
+    for img in created:
+        db.refresh(img)
+
+    invalidate("posts:list")
+    return [PostImageResponse.model_validate(img) for img in created]
+
+
+# Reorder gallery images — pass every image id in the desired order; index 0 = cover
+@post_router.patch("/{post_id}/images/reorder", response_model=list[PostImageResponse])
+def reorder_post_images(post_id: int, payload: PostImageReorder, db: Session = Depends(get_db), author=Depends(get_current_author)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    _assert_post_author(post, author)
+
+    images = db.query(PostImage).filter(PostImage.post_id == post.id).all()
+    if {img.id for img in images} != set(payload.image_ids):
+        raise HTTPException(
+            status_code=400,
+            detail="image_ids must contain every image on this post exactly once",
+        )
+
+    image_by_id = {img.id: img for img in images}
+    for new_order, image_id in enumerate(payload.image_ids):
+        img = image_by_id[image_id]
+        img.display_order = new_order
+        img.is_primary = (new_order == 0)
+
+    db.refresh(post)
+    _sync_cover_from_images(post)
+    db.commit()
+
+    ordered = sorted(images, key=lambda img: img.display_order)
+    invalidate("posts:list")
+    return [PostImageResponse.model_validate(img) for img in ordered]
+
+
+# Delete a single gallery image
+@post_router.delete("/{post_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post_image(post_id: int, image_id: int, db: Session = Depends(get_db), author=Depends(get_current_author)):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    _assert_post_author(post, author)
+
+    image = db.query(PostImage).filter(PostImage.id == image_id, PostImage.post_id == post.id).first()
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    delete_image_from_cloudinary(image.image_url)
+    db.delete(image)
+    db.flush()
+
+    # Resequence remaining images and re-point the cover.
+    remaining = sorted(
+        (img for img in post.images if img.id != image_id),
+        key=lambda i: i.display_order,
+    )
+    for order, img in enumerate(remaining):
+        img.display_order = order
+        img.is_primary = (order == 0)
+    db.refresh(post)
+    _sync_cover_from_images(post)
+    db.commit()
+    invalidate("posts:list")
 
 # Get all published posts (public)
 @post_router.get("/")
@@ -408,6 +524,8 @@ def delete_post(post_id: int, db: Session = Depends(get_db), author=Depends(get_
 
     if post.cover_image_url:
         delete_image_from_cloudinary(post.cover_image_url)
+    for image in post.images:
+        delete_image_from_cloudinary(image.image_url)
 
     db.delete(post)
     db.commit()

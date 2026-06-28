@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Eye, FileText, PenLine, Trash2, Plus,
   Clock, CheckCircle2, Archive, AlertCircle, X,
-  Send, Loader2, ImagePlus, Camera, Save,
+  Send, Loader2, ImagePlus, Camera, Save, Star,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -12,6 +12,13 @@ import { useWriterStore } from "@/lib/store";
 import { api, ApiError } from "@/lib/api";
 import { VerifiedWriterBadge } from "@/components/ui/Badges";
 import type { PostListResponse, PostResponse, PostCategory, WriterResponse } from "@/types";
+
+/** An image in the editor: either already saved on the server, or a staged local file. */
+type ImageSlot =
+  | { kind: "existing"; id: number; url: string }
+  | { kind: "new"; file: File; preview: string };
+
+const MAX_POST_IMAGES = 10;
 
 /* ═══════════════════════════════════════════════════════
    HELPERS
@@ -121,31 +128,65 @@ function PostEditor({ post, onClose, onSaved }: {
   const [category, setCategory] = useState<string>(post?.category || "");
   const [eventDate, setEventDate] = useState(post?.event_date || "");
   const [eventLocation, setEventLocation] = useState(post?.event_location || "");
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState(post?.cover_image_url || "");
+  const [slots, setSlots] = useState<ImageSlot[]>(
+    (post?.images ?? [])
+      .slice()
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((img) => ({ kind: "existing" as const, id: img.id, url: img.image_url }))
+  );
+  const [removedIds, setRemovedIds] = useState<number[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const isEdit = !!post;
   const canSave = title.trim() && content.trim() && category;
 
+  // A legacy post may have a cover but no gallery rows yet — show it as a hint.
+  const legacyCover = slots.length === 0 ? post?.cover_image_url || "" : "";
+
   const inputClass = "w-full px-3.5 py-2.5 rounded-xl border border-[#E8E4DC] bg-[#FAF8F4] text-[#1B2D45] placeholder:text-[#98A3B0] focus:outline-none focus:border-[#FF6B35]/40 focus:ring-2 focus:ring-[#FF6B35]/10 transition-all";
 
+  // Revoke object URLs for staged files on unmount to avoid leaks.
   useEffect(() => {
     return () => {
-      if (coverPreview.startsWith("blob:")) {
-        URL.revokeObjectURL(coverPreview);
-      }
+      slots.forEach((s) => {
+        if (s.kind === "new") URL.revokeObjectURL(s.preview);
+      });
     };
-  }, [coverPreview]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleCoverSelect = (file: File | null) => {
-    if (!file) return;
-    if (coverPreview.startsWith("blob:")) {
-      URL.revokeObjectURL(coverPreview);
+  const handleAddFiles = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const room = MAX_POST_IMAGES - slots.length;
+    if (room <= 0) {
+      setError(`You can attach up to ${MAX_POST_IMAGES} images.`);
+      return;
     }
-    setCoverFile(file);
-    setCoverPreview(URL.createObjectURL(file));
+    const incoming = Array.from(fileList).slice(0, room);
+    setSlots((prev) => [
+      ...prev,
+      ...incoming.map((file) => ({ kind: "new" as const, file, preview: URL.createObjectURL(file) })),
+    ]);
+  };
+
+  const handleRemoveSlot = (index: number) => {
+    setSlots((prev) => {
+      const slot = prev[index];
+      if (slot.kind === "new") URL.revokeObjectURL(slot.preview);
+      if (slot.kind === "existing") setRemovedIds((ids) => [...ids, slot.id]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  // Promote a slot to the cover position (index 0).
+  const handleMakeCover = (index: number) => {
+    setSlots((prev) => {
+      if (index === 0) return prev;
+      const next = prev.slice();
+      const [picked] = next.splice(index, 1);
+      return [picked, ...next];
+    });
   };
 
   const handleSave = async (publish = false) => {
@@ -177,9 +218,24 @@ function PostEditor({ post, onClose, onSaved }: {
           savedPost = await api.posts.update(savedPost.id, { status: "published" as any });
         }
       }
-      if (coverFile) {
-        savedPost = await api.posts.uploadCoverImage(savedPost.id, coverFile);
+      // Sync the image gallery.
+      const postId = savedPost.id;
+      for (const id of removedIds) {
+        await api.posts.writerDeleteImage(postId, id);
       }
+      const newFiles = slots.filter((s) => s.kind === "new").map((s) => s.file);
+      let uploaded: { id: number }[] = [];
+      if (newFiles.length > 0) {
+        uploaded = await api.posts.writerUploadImages(postId, newFiles);
+      }
+      // Resolve every slot to its server id (existing ids + freshly uploaded ones,
+      // in upload order) and push the final order so index 0 becomes the cover.
+      let u = 0;
+      const orderedIds = slots.map((s) => (s.kind === "existing" ? s.id : uploaded[u++].id));
+      if (orderedIds.length > 1) {
+        await api.posts.writerReorderImages(postId, orderedIds);
+      }
+
       onSaved();
       onClose();
     } catch (err) {
@@ -249,47 +305,81 @@ function PostEditor({ post, onClose, onSaved }: {
           )}
 
           <div>
-            <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cover Image</label>
-            <div className="space-y-3">
-              <label className="block cursor-pointer rounded-xl border-2 border-dashed border-[#E8E4DC] p-5 text-center transition-colors hover:border-[#FF6B35]/30">
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(e) => handleCoverSelect(e.target.files?.[0] ?? null)}
-                />
-                <ImagePlus className="w-6 h-6 text-[#98A3B0] mx-auto mb-2" />
-                <p className="text-[#98A3B0]" style={{ fontSize: "12px", fontWeight: 500 }}>
-                  Upload a cover image to make the post stand out in The Bubble
-                </p>
-                <p className="text-[#98A3B0]/80 mt-1" style={{ fontSize: "10px" }}>
-                  PNG, JPG, or WebP
-                </p>
-              </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[#5C6B7A]" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Images</label>
+              <span className="text-[#98A3B0]" style={{ fontSize: "11px", fontWeight: 600 }}>{slots.length}/{MAX_POST_IMAGES}</span>
+            </div>
 
-              {coverPreview && (
-                <div className="overflow-hidden rounded-xl border border-black/[0.05] bg-[#FAF8F4]">
-                  <img src={coverPreview} alt="Cover preview" className="h-[180px] w-full object-cover" />
-                  <div className="flex items-center justify-between px-3 py-2">
-                    <span className="text-[#1B2D45]/50" style={{ fontSize: "11px", fontWeight: 600 }}>
-                      {coverFile ? "New image ready to upload" : "Current cover image"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (coverPreview.startsWith("blob:")) {
-                          URL.revokeObjectURL(coverPreview);
-                        }
-                        setCoverFile(null);
-                        setCoverPreview("");
-                      }}
-                      className="text-[#E71D36]/70 hover:text-[#E71D36]"
-                      style={{ fontSize: "11px", fontWeight: 700 }}
-                    >
-                      Remove
-                    </button>
-                  </div>
+            {legacyCover && (
+              <div className="mb-3 overflow-hidden rounded-xl border border-black/[0.05] bg-[#FAF8F4]">
+                <img src={legacyCover} alt="Current cover" className="h-[140px] w-full object-cover" />
+                <p className="px-3 py-2 text-[#98A3B0]" style={{ fontSize: "11px", fontWeight: 600 }}>
+                  Current cover — add images below to build a gallery (the first becomes the new cover).
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {slots.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {slots.map((slot, index) => {
+                    const url = slot.kind === "existing" ? slot.url : slot.preview;
+                    const isCover = index === 0;
+                    return (
+                      <div
+                        key={slot.kind === "existing" ? `e${slot.id}` : `n${index}-${slot.preview}`}
+                        className={`group relative aspect-square overflow-hidden rounded-xl border bg-[#FAF8F4] ${isCover ? "border-[#FF6B35] ring-2 ring-[#FF6B35]/20" : "border-black/[0.06]"}`}
+                      >
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+
+                        {isCover && (
+                          <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-[#FF6B35] px-2 py-0.5 text-white" style={{ fontSize: "9px", fontWeight: 800 }}>
+                            <Star className="h-2.5 w-2.5 fill-current" /> COVER
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSlot(index)}
+                          className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                          aria-label="Remove image"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+
+                        {!isCover && (
+                          <button
+                            type="button"
+                            onClick={() => handleMakeCover(index)}
+                            className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 py-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                            style={{ fontSize: "10px", fontWeight: 700 }}
+                          >
+                            <Star className="h-3 w-3" /> Make cover
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+              )}
+
+              {slots.length < MAX_POST_IMAGES && (
+                <label className="block cursor-pointer rounded-xl border-2 border-dashed border-[#E8E4DC] p-5 text-center transition-colors hover:border-[#FF6B35]/30">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => { handleAddFiles(e.target.files); e.target.value = ""; }}
+                  />
+                  <ImagePlus className="w-6 h-6 text-[#98A3B0] mx-auto mb-2" />
+                  <p className="text-[#98A3B0]" style={{ fontSize: "12px", fontWeight: 500 }}>
+                    {slots.length === 0 ? "Add photos to make the post stand out in The Bubble" : "Add more photos"}
+                  </p>
+                  <p className="text-[#98A3B0]/80 mt-1" style={{ fontSize: "10px" }}>
+                    PNG, JPG, or WebP · the first image is the cover
+                  </p>
+                </label>
               )}
             </div>
           </div>

@@ -347,6 +347,7 @@ export interface ListingImageResponse {
   id: number;
   image_url: string;
   display_order: number;
+  is_floor_plan?: boolean;
 }
 
 export interface ListingRoomResponse {
@@ -570,6 +571,7 @@ export interface SubletImageResponse {
   image_url: string;
   is_primary: boolean;
   display_order: number;
+  is_floor_plan?: boolean;
 }
 
 export interface SubletCreate {
@@ -885,6 +887,13 @@ export interface PostUpdate {
   deal_expires?: string;
 }
 
+export interface PostImageResponse {
+  id: number;
+  image_url: string;
+  is_primary: boolean;
+  display_order: number;
+}
+
 export interface PostResponse {
   id: number;
   title: string;
@@ -909,6 +918,7 @@ export interface PostResponse {
   is_featured?: boolean;
   featured_order?: number | null;
   featured_until?: string | null;
+  images?: PostImageResponse[];
   created_at: string;
   updated_at: string;
 }
@@ -935,6 +945,7 @@ export interface PostListResponse {
   is_featured?: boolean;
   featured_order?: number | null;
   featured_until?: string | null;
+  images?: PostImageResponse[];
   created_at: string;
 }
 

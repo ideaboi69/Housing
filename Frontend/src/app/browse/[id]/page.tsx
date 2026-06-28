@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { getAmenityChecklist } from "@/lib/amenities";
+import { FloorPlanSection } from "@/components/listing/FloorPlanSection";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { CribbMap } from "@/components/ui/CribbMap";
 import { getProximityFromKm, getProximityLabel } from "@/lib/proximity";
@@ -312,6 +313,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [healthScore, setHealthScore] = useState<HealthScoreResponse | null>(null);
   const [reviews, setReviews] = useState<ReviewResponse[]>([]);
   const [images, setImages] = useState<string[]>([]);
+  const [floorPlans, setFloorPlans] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [contactSending, setContactSending] = useState(false);
@@ -325,6 +327,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [hasTenantProfile, setHasTenantProfile] = useState<boolean | null>(null);
   const [pendingAction, setPendingAction] = useState<"contact" | "showing" | "quick-message" | null>(null);
   const [pendingMessage, setPendingMessage] = useState<{ content: string; quickKey?: string } | null>(null);
+  // If the student already has a thread for this listing, we skip the compose
+  // popup and jump straight into it. null = none yet (or not checked).
+  const [existingConversationId, setExistingConversationId] = useState<number | null>(null);
   const tenantChecked = useRef(false);
 
   const user = useAuthStore((s) => s.user);
@@ -373,8 +378,10 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           } catch {
             setReviews([]);
           }
-          const realImages = data.images?.map(img => img.image_url) || [];
+          const realImages = data.images?.filter(img => !img.is_floor_plan).map(img => img.image_url) || [];
           setImages(realImages);
+          const plans = data.images?.filter(img => img.is_floor_plan).map(img => img.image_url) || [];
+          setFloorPlans(plans);
         } else {
           setError("Listing not found");
         }
@@ -395,6 +402,25 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       .then((res) => setHasTenantProfile(hasMessagingProfile(res)))
       .catch(() => setHasTenantProfile(true));
   }, [user]);
+
+  // Does the student already have a conversation about this listing? If so, the
+  // "Message landlord" button jumps straight into that thread instead of opening
+  // the compose popup.
+  useEffect(() => {
+    if (!user || user.role !== "student" || isInvalidId) {
+      setExistingConversationId(null);
+      return;
+    }
+    let cancelled = false;
+    api.messages.getConversations()
+      .then((convos) => {
+        if (cancelled) return;
+        const existing = convos.find((c) => c.listing_id === listingId);
+        setExistingConversationId(existing ? existing.id : null);
+      })
+      .catch(() => { if (!cancelled) setExistingConversationId(null); });
+    return () => { cancelled = true; };
+  }, [user, listingId, isInvalidId]);
 
   const handleTenantComplete = () => {
     setShowTenantPrompt(false);
@@ -443,15 +469,17 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       });
       setContactSent(true);
       setShowMessageModal(false);
-      if (quickKey) {
-        toast.success("Opening your chat with the landlord...");
-      }
-      setTimeout(() => router.push(`/messages?type=housing&conversation=${conversation.id}`), 1500);
+      // First message: confirm and keep them on the listing rather than yanking
+      // them into the thread. The landlord's reply lands in their inbox, and the
+      // button now deep-links to this conversation on the next click.
+      setExistingConversationId(conversation.id);
+      toast.success("Message sent \u2014 the landlord will reply in your inbox.");
     } catch (err) {
       if (err instanceof Error && "status" in err && (err as { status?: number }).status === 409) {
+        // A thread already exists \u2014 open it.
         router.push("/messages?type=housing");
       } else {
-        toast.error("We couldn\u2019t open a conversation right now. Please try again.");
+        toast.error("We couldn\u2019t send your message right now. Please try again.");
       }
     } finally {
       setContactSending(false);
@@ -463,6 +491,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
     if (contactSending || contactSent) return;
     if (!user) {
       router.push(`/login?next=${encodeURIComponent(`/browse/${listingId}`)}`);
+      return;
+    }
+    // Already chatting about this listing → skip the compose popup and open the
+    // existing thread directly.
+    if (existingConversationId != null) {
+      router.push(`/messages?type=housing&conversation=${existingConversationId}`);
       return;
     }
     if (await needsTenantProfilePrompt()) {
@@ -633,12 +667,12 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 Campus access uses the same proximity labels shown across Cribb.
               </p>
               <div className="flex items-center gap-4 mt-3 flex-wrap">
-                {listing.walk_time_minutes && (
+                {listing.drive_time_minutes && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]">
-                    <span style={{ fontSize: "16px" }}>🚶</span>
+                    <span style={{ fontSize: "16px" }}>🚗</span>
                     <div>
-                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.walk_time_minutes} min</p>
-                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p>
+                      <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{listing.drive_time_minutes} min</p>
+                      <p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by car</p>
                     </div>
                   </div>
                 )}
@@ -700,6 +734,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   </span>
                 </div>
               )}
+
+              {/* Floor Plan */}
+              <FloorPlanSection images={floorPlans} />
 
               {/* Cribb Score Breakdown */}
               {healthScore && (
@@ -875,9 +912,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                     className="relative w-full mt-5 py-3 rounded-xl bg-[#FF6B35] text-white overflow-hidden hover:bg-[#e55e2e] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
                     style={{ fontSize: "15px", fontWeight: 700, boxShadow: "0 4px 20px rgba(255,107,53,0.3)" }}>
                     {contactSent ? (
-                      <><Check className="w-4 h-4" /> Message Sent — Opening Chat...</>
+                      <><Check className="w-4 h-4" /> Message Sent</>
                     ) : contactSending ? (
                       "Sending..."
+                    ) : existingConversationId != null ? (
+                      <><MessageCircle className="w-4 h-4" /> Open Chat</>
                     ) : (
                       <><MessageCircle className="w-4 h-4" /> Contact Landlord</>
                     )}

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  ChevronUp, Bookmark, MoreHorizontal, X, ImagePlus,
+  ChevronUp, Bookmark, MoreHorizontal, X, ImagePlus, ChevronLeft, ChevronRight,
   Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag, Star, ArrowLeft, Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -40,6 +40,7 @@ interface Post {
   title: string;
   body: string;
   image?: string;
+  images?: string[];
   eventDate?: string;
   eventLocation?: string;
   isHappeningToday?: boolean;
@@ -97,6 +98,12 @@ function buildLivePost(post: PostListResponse): Post {
     title: post.title,
     body: post.preview || "Tap through to read the full post.",
     image: post.cover_image_url || undefined,
+    images:
+      post.images && post.images.length > 0
+        ? post.images.slice().sort((a, b) => a.display_order - b.display_order).map((i) => i.image_url)
+        : post.cover_image_url
+        ? [post.cover_image_url]
+        : [],
     eventDate: post.event_date,
     upvotes: post.upvote_count || 0,
     postedAt: new Date(post.created_at).getTime(),
@@ -202,6 +209,16 @@ function PostCard({
   const [expanded, setExpanded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [upvoteLoading, setUpvoteLoading] = useState(false);
+  const [slide, setSlide] = useState(0);
+
+  const gallery = post.images && post.images.length > 0 ? post.images : post.image ? [post.image] : [];
+
+  const stepSlide = useCallback(
+    (dir: number) => {
+      setSlide((cur) => (gallery.length === 0 ? 0 : (cur + dir + gallery.length) % gallery.length));
+    },
+    [gallery.length]
+  );
 
   useEffect(() => {
     setUpvoted(Boolean(post.userHasUpvoted));
@@ -335,17 +352,52 @@ function PostCard({
           </div>
         )}
 
-        {/* Image — always shows the full image (no spotlight needed) */}
-        {post.image && (
+        {/* Image carousel — one image in frame, arrows scroll through the rest */}
+        {gallery.length > 0 && (
           <div
-            className="rounded-2xl overflow-hidden mb-3 -mx-1 bg-[#0F1923]/[0.04]"
+            className="group relative mb-3 -mx-1 overflow-hidden rounded-2xl bg-[#0F1923]/[0.04]"
             style={{ aspectRatio: "16/9" }}
           >
             <img
-              src={post.image}
+              src={gallery[Math.min(slide, gallery.length - 1)]}
               alt={post.title}
-              className="w-full h-full object-contain"
+              className="h-full w-full object-contain"
             />
+
+            {gallery.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => stepSlide(-1)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity hover:bg-black/65 group-hover:opacity-100 focus-visible:opacity-100"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepSlide(1)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity hover:bg-black/65 group-hover:opacity-100 focus-visible:opacity-100"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+
+                <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/40 px-2 py-1">
+                  {gallery.map((_, i) => (
+                    <span
+                      key={i}
+                      className="rounded-full transition-all"
+                      style={{
+                        width: i === slide ? 14 : 5,
+                        height: 5,
+                        backgroundColor: i === slide ? "#fff" : "rgba(255,255,255,0.5)",
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 

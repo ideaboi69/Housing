@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
-import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse, ListingDetailResponse, SecurityEvent } from "@/types";
+import type { PropertyResponse, ListingResponse, ConversationResponse, MessageResponse, ReviewResponse, LandlordFlagResponse, SecurityEvent } from "@/types";
 import {
   Plus, Building2, Eye, EyeOff, Trash2, Shield, ShieldCheck,
   ChevronDown, ChevronRight, Home, Phone, Mail, Pencil, Check, X,
@@ -59,6 +59,12 @@ function getLandlordScoreTone(score: number) {
   if (score >= 85) return { color: "#16784F", bg: "#E8F7EF" };
   if (score >= 70) return { color: "#1B2D45", bg: "#E9EEF7" };
   return { color: "#B42318", bg: "#FEECEC" };
+}
+
+// Students are addressed by first name in the inbox.
+function firstName(name: string | null | undefined, fallback: string): string {
+  if (!name) return fallback;
+  return name.trim().split(" ")[0] || fallback;
 }
 
 function getListingTypeLabel(listing: Pick<ListingResponse, "is_sublet" | "per_room_pricing" | "rooms">): string {
@@ -392,7 +398,7 @@ function OverviewTab({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{conversation.user_name ?? "Student"}</span>
+                    <span className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 500 }}>{firstName(conversation.user_name, "Student")}</span>
                     {conversation.unread_count > 0 && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#E71D36]" />}
                   </div>
                   <p className="mt-0.5 truncate text-[#1B2D45]/50" style={{ fontSize: "12px" }}>{conversation.last_message?.content ?? conversation.listing_title}</p>
@@ -975,23 +981,41 @@ function MessagesTab({
   const [threadFilter, setThreadFilter] = useState<"all" | "unread">("all");
   const [listingFilter, setListingFilter] = useState<number | "all">("all");
   const [markingUnavailable, setMarkingUnavailable] = useState(false);
-  const unreadTotal = conversations.reduce((sum, convo) => sum + convo.unread_count, 0);
-  const uniqueStudents = new Set(conversations.map((convo) => convo.user_id)).size;
-  const recentInquiry = conversations[0]?.last_message?.created_at;
+  const [viewMode, setViewMode] = useState<"inbox" | "archived">("inbox");
+  const [archivedConvos, setArchivedConvos] = useState<ConversationResponse[]>([]);
+  const [unarchiving, setUnarchiving] = useState(false);
+
+  const loadArchived = useCallback(async () => {
+    try {
+      const data = await api.messages.getLandlordConversations({ archived: true });
+      setArchivedConvos(data);
+    } catch {
+      setArchivedConvos([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === "archived") void loadArchived();
+  }, [viewMode, loadArchived]);
+
+  const sourceConvos = viewMode === "archived" ? archivedConvos : conversations;
+  const unreadTotal = sourceConvos.reduce((sum, convo) => sum + convo.unread_count, 0);
+  const uniqueStudents = new Set(sourceConvos.map((convo) => convo.user_id)).size;
+  const recentInquiry = sourceConvos[0]?.last_message?.created_at;
   const listingOptions = useMemo(() => {
     const seen = new Set<number>();
-    return conversations.reduce<Array<{ id: number; title: string }>>((items, conversation) => {
+    return sourceConvos.reduce<Array<{ id: number; title: string }>>((items, conversation) => {
       if (seen.has(conversation.listing_id)) return items;
       seen.add(conversation.listing_id);
       items.push({ id: conversation.listing_id, title: conversation.listing_title || `Listing ${conversation.listing_id}` });
       return items;
     }, []);
-  }, [conversations]);
-  const filteredConversations = useMemo(() => conversations.filter((conversation) => {
+  }, [sourceConvos]);
+  const filteredConversations = useMemo(() => sourceConvos.filter((conversation) => {
     if (threadFilter === "unread" && conversation.unread_count === 0) return false;
     if (listingFilter !== "all" && conversation.listing_id !== listingFilter) return false;
     return true;
-  }), [conversations, listingFilter, threadFilter]);
+  }), [sourceConvos, listingFilter, threadFilter]);
   const getConversationListing = useCallback((conversation?: ConversationResponse | null) => {
     if (!conversation) return null;
     const image = getListingImages(conversation.listing_id)[0] ?? "/demo/listings/apartment.jpg";
@@ -1033,17 +1057,17 @@ function MessagesTab({
   }, [onRefreshConversations]);
 
   useEffect(() => {
-    if (filteredConversations.length === 0) {
+    // Close the open thread if it's no longer in the current list (archived,
+    // filtered out, or empty inbox). We intentionally do NOT auto-open another
+    // thread — the landlord picks one, matching the student inbox, so toggling a
+    // thread closed actually stays closed.
+    if (activeConvo == null) return;
+    const stillExists = filteredConversations.some((conversation) => conversation.id === activeConvo);
+    if (!stillExists) {
       setActiveConvo(null);
       setMessages([]);
-      return;
     }
-
-    const activeStillExists = activeConvo != null && filteredConversations.some((conversation) => conversation.id === activeConvo);
-    if (!activeStillExists) {
-      void loadMessages(filteredConversations[0].id);
-    }
-  }, [activeConvo, filteredConversations, loadMessages]);
+  }, [activeConvo, filteredConversations]);
 
   // Real-time: the backend pushes { type: "new_message", conversation_id } over the
   // WebSocket. Refresh the inbox on any new message, and reload the open thread if it's
@@ -1098,6 +1122,22 @@ function MessagesTab({
     }
   }
 
+  async function handleUnarchiveActiveConversation() {
+    if (!activeConvo || !activeConvoData) return;
+    setUnarchiving(true);
+    try {
+      await api.messages.landlordUnarchiveConversation(activeConvo);
+      setActiveConvo(null);
+      setMessages([]);
+      await loadArchived();
+      await onRefreshConversations();
+    } catch {
+      window.alert("Could not restore this conversation. Please try again.");
+    } finally {
+      setUnarchiving(false);
+    }
+  }
+
   async function handleMarkUnavailable() {
     if (!activeConvoData) return;
     if (!window.confirm("Take this listing down so students can no longer inquire? You can republish it anytime from the listing.")) return;
@@ -1112,8 +1152,9 @@ function MessagesTab({
     }
   }
 
-  const activeConvoData = conversations.find(c => c.id === activeConvo);
+  const activeConvoData = sourceConvos.find(c => c.id === activeConvo);
   const activeListingContext = getConversationListing(activeConvoData);
+  const isArchivedView = viewMode === "archived";
 
   return (
     <div className="space-y-4">
@@ -1121,13 +1162,30 @@ function MessagesTab({
         <div>
           <h2 className="text-[#1B2D45]" style={{ fontSize: "18px", fontWeight: 600 }}>Messages</h2>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[#1B2D45]/50" style={{ fontSize: "13px" }}>
-            <span><span className="text-[#1B2D45]/80" style={{ fontWeight: 500 }}>{conversations.length}</span> thread{conversations.length === 1 ? "" : "s"}</span>
+            <span><span className="text-[#1B2D45]/80" style={{ fontWeight: 500 }}>{sourceConvos.length}</span> {isArchivedView ? "archived" : "active"} thread{sourceConvos.length === 1 ? "" : "s"}</span>
             <span className="text-[#1B2D45]/25">·</span>
             <span>{uniqueStudents} student{uniqueStudents === 1 ? "" : "s"}</span>
             {unreadTotal > 0 && <><span className="text-[#1B2D45]/25">·</span><span className="text-[#E71D36]" style={{ fontWeight: 500 }}>{unreadTotal} unread</span></>}
           </p>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
+          {([["inbox", "Inbox"], ["archived", "Archived"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => {
+                if (viewMode === key) return;
+                setViewMode(key);
+                setActiveConvo(null);
+                setMessages([]);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors ${viewMode === key ? "bg-[#1B2D45] text-white" : "text-[#1B2D45]/55 hover:bg-[#1B2D45]/[0.05] hover:text-[#1B2D45]"}`}
+              style={{ fontSize: "12px", fontWeight: 500 }}
+            >
+              {label}
+            </button>
+          ))}
+          <span className="mx-1 self-center text-[#1B2D45]/15">·</span>
           {([["all", "All"], ["unread", "Unread"]] as const).map(([key, label]) => (
             <button
               key={key}
@@ -1145,14 +1203,16 @@ function MessagesTab({
         </div>
       </div>
 
-      {conversations.length === 0 ? (
+      {sourceConvos.length === 0 ? (
         <div className="bg-white rounded-2xl border border-black/[0.04] p-10 text-center shadow-[0_10px_30px_rgba(27,45,69,0.04)]">
           <div className="w-14 h-14 rounded-2xl bg-[#1B2D45]/[0.06] flex items-center justify-center mx-auto mb-3 shadow-[0_8px_18px_rgba(27,45,69,0.08)]">
             <Inbox className="w-7 h-7 text-[#1B2D45]/58" />
           </div>
-          <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>No messages yet</h3>
+          <h3 className="text-[#1B2D45]" style={{ fontSize: "16px", fontWeight: 700 }}>{isArchivedView ? "No archived threads" : "No messages yet"}</h3>
           <p className="text-[#1B2D45]/65 mt-1 max-w-[360px] mx-auto" style={{ fontSize: "13px", lineHeight: 1.55 }}>
-            Student inquiries will appear here once someone reaches out from one of your listings.
+            {isArchivedView
+              ? "Threads you archive will show up here. You can restore them any time."
+              : "Student inquiries will appear here once someone reaches out from one of your listings."}
           </p>
         </div>
       ) : (
@@ -1193,7 +1253,16 @@ function MessagesTab({
               return (
                 <button
                   key={c.id}
-                  onClick={() => loadMessages(c.id)}
+                  onClick={() => {
+                    // Clicking the open thread again closes it (toggle), matching
+                    // the student inbox behaviour.
+                    if (activeConvo === c.id) {
+                      setActiveConvo(null);
+                      setMessages([]);
+                    } else {
+                      void loadMessages(c.id);
+                    }
+                  }}
                   className={`w-full cursor-pointer border-b border-black/[0.03] px-4 py-3 text-left transition-all hover:bg-white ${activeConvo === c.id ? "bg-white shadow-[inset_3px_0_0_#1B2D45]" : ""}`}
                 >
                   <div className="flex items-start gap-3">
@@ -1202,7 +1271,7 @@ function MessagesTab({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 850 }}>{c.user_name ?? "Student"}</span>
+                        <span className="truncate text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 850 }}>{firstName(c.user_name, "Student")}</span>
                         {c.unread_count > 0 && (
                           <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-[#1B2D45] px-1 text-white" style={{ fontSize: "8px", fontWeight: 800 }}>{c.unread_count}</span>
                         )}
@@ -1252,7 +1321,7 @@ function MessagesTab({
                     <span className="absolute inset-0 rounded-full animate-ping bg-[#1B2D45]/15" style={{ animationDuration: "2s", animationIterationCount: 3 }} />
                   </button>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 850 }}>{activeConvoData?.user_name ?? "Student"}</div>
+                      <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 850 }}>{firstName(activeConvoData?.user_name, "Student")}</div>
                       {activeListingContext && (
                         <div className="mt-2 flex flex-col gap-3 rounded-xl border border-[#1B2D45]/[0.07] bg-[#F7F9FC] p-3 sm:flex-row sm:items-center">
                           <div className="h-14 w-16 shrink-0 overflow-hidden rounded-lg bg-[#E9EEF7]">
@@ -1300,16 +1369,30 @@ function MessagesTab({
                       <span className="hidden sm:inline">Notes</span>
                       {activeConvo != null && !notesOpen && hasNote(activeConvo) && <span className="h-1.5 w-1.5 rounded-full bg-[#FFB627]" />}
                     </button>
-                    <button
-                      onClick={handleArchiveActiveConversation}
-                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-black/[0.04] bg-white px-2.5 text-[#1B2D45]/70 transition-all hover:border-[#1B2D45]/10 hover:text-[#1B2D45]"
-                      style={{ fontSize: "11px", fontWeight: 700 }}
-                      title="Archive conversation"
-                      aria-label="Archive conversation"
-                    >
-                      <Archive className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Archive</span>
-                    </button>
+                    {isArchivedView ? (
+                      <button
+                        onClick={handleUnarchiveActiveConversation}
+                        disabled={unarchiving}
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-[#1B2D45]/15 bg-[#1B2D45] px-2.5 text-white transition-all hover:bg-[#152438] disabled:opacity-60"
+                        style={{ fontSize: "11px", fontWeight: 700 }}
+                        title="Restore conversation to inbox"
+                        aria-label="Unarchive conversation"
+                      >
+                        {unarchiving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
+                        <span className="hidden sm:inline">Unarchive</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleArchiveActiveConversation}
+                        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-black/[0.04] bg-white px-2.5 text-[#1B2D45]/70 transition-all hover:border-[#1B2D45]/10 hover:text-[#1B2D45]"
+                        style={{ fontSize: "11px", fontWeight: 700 }}
+                        title="Archive conversation"
+                        aria-label="Archive conversation"
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Archive</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2062,30 +2145,23 @@ function LandlordDashboardContent() {
           if (res.ok) props = await res.json();
         } catch { /* backend down */ }
 
-        // Enrich with listings
+        // Fetch all the landlord's listings in one shot (every status, no
+        // pagination cap, no public-cache lag) and bucket them by property.
+        let myListings: ListingResponse[] = [];
+        try {
+          myListings = await api.listings.getMyListings();
+        } catch { /* */ }
+
         const enriched: PropertyWithListings[] = await Promise.all(
           props.map(async (prop) => {
-            let listings: ListingDetailResponse[] = [];
+            const listings = myListings.filter((l) => l.property_id === prop.id);
+            const totalViews = listings.reduce((sum, l) => sum + l.view_count, 0);
             let healthScore: number | null = null;
-            let totalViews = 0;
 
-            try {
-              const listingResults = await Promise.allSettled(
-                ["active", "draft", "rented", "expired"].map((status) =>
-                  api.listings.browse({ skip: 0, limit: 100, status })
-                )
-              );
-              const allListings = listingResults.flatMap((result) => (
-                result.status === "fulfilled" ? result.value : []
-              ));
-              listings = allListings.filter((l) => l.property_id === prop.id);
-              totalViews = listings.reduce((sum, l) => sum + l.view_count, 0);
-
-              const active = listings.find(l => l.status === "active");
-              if (active) {
-                try { const hs = await api.healthScores.get(active.id); healthScore = hs?.overall_score ?? null; } catch { /* */ }
-              }
-            } catch { /* */ }
+            const active = listings.find(l => l.status === "active");
+            if (active) {
+              try { const hs = await api.healthScores.get(active.id); healthScore = hs?.overall_score ?? null; } catch { /* */ }
+            }
 
             return { ...prop, listings, healthScore, totalViews };
           })

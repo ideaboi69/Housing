@@ -43,6 +43,7 @@ import type {
   PostCreate,
   PostUpdate,
   PostResponse,
+  PostImageResponse,
   PostListResponse,
   PostCategory,
   StartConversation,
@@ -544,6 +545,25 @@ export const listings = {
     method: "PATCH",
     body: JSON.stringify({ image_ids: imageIds }),
   }),
+
+  uploadFloorPlans: async (listingId: number, files: File[]) => {
+    const token = getToken();
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    const res = await fetch(`${API_URL}/api/listings/${listingId}/floor-plans`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Floor plan upload failed" }));
+      throw new ApiError(res.status, body.detail || "Floor plan upload failed");
+    }
+    return res.json() as Promise<ListingImageResponse[]>;
+  },
+
+  deleteImage: (listingId: number, imageId: number) =>
+    request<null>(`/api/listings/${listingId}/images/${imageId}`, { method: "DELETE" }),
 };
 
 
@@ -635,6 +655,22 @@ export const sublets = {
       method: "PATCH",
       body: JSON.stringify({ image_ids: imageIds }),
     }),
+
+  uploadFloorPlans: async (subletId: number, files: File[]) => {
+    const token = getToken();
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    const res = await fetch(`${API_URL}/api/sublets/${subletId}/floor-plans`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Floor plan upload failed" }));
+      throw new ApiError(res.status, body.detail || "Floor plan upload failed");
+    }
+    return res.json() as Promise<SubletImageResponse[]>;
+  },
 
   startConversation: (data: StartSubletConversation) =>
     request<SubletMessageResponse>("/api/sublets/conversations", {
@@ -975,6 +1011,31 @@ export const posts = {
     return res.json() as Promise<PostResponse>;
   },
 
+  // Gallery images (student token). First image uploaded becomes the cover.
+  uploadImages: async (postId: number, files: File[]) => {
+    const token = getToken();
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/posts/${postId}/images`,
+      { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body: formData }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new ApiError(res.status, body.detail || "Upload failed");
+    }
+    return res.json() as Promise<PostImageResponse[]>;
+  },
+
+  reorderImages: (postId: number, imageIds: number[]) =>
+    request<PostImageResponse[]>(`/api/posts/${postId}/images/reorder`, {
+      method: "PATCH",
+      body: JSON.stringify({ image_ids: imageIds }),
+    }),
+
+  deleteImage: (postId: number, imageId: number) =>
+    request<null>(`/api/posts/${postId}/images/${imageId}`, { method: "DELETE" }),
+
   upvote: (postId: number) =>
     request<{ post_id: number; upvote_count: number; user_has_upvoted: boolean }>(
       `/api/posts/${postId}/upvote`, { method: "POST" }
@@ -1052,6 +1113,31 @@ export const posts = {
     }
     return res.json() as Promise<PostResponse>;
   },
+
+  // Gallery images (writer token). First image uploaded becomes the cover.
+  writerUploadImages: async (postId: number, files: File[]) => {
+    const token = getWriterToken();
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/posts/${postId}/images`,
+      { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body: formData }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new ApiError(res.status, body.detail || "Upload failed");
+    }
+    return res.json() as Promise<PostImageResponse[]>;
+  },
+
+  writerReorderImages: (postId: number, imageIds: number[]) =>
+    writerRequest<PostImageResponse[]>(`/api/posts/${postId}/images/reorder`, {
+      method: "PATCH",
+      body: JSON.stringify({ image_ids: imageIds }),
+    }),
+
+  writerDeleteImage: (postId: number, imageId: number) =>
+    writerRequest<null>(`/api/posts/${postId}/images/${imageId}`, { method: "DELETE" }),
 };
 
 // ── Messages / Conversations ────────────────────────────
@@ -1078,13 +1164,17 @@ export const messages = {
       body: JSON.stringify(data),
     }),
 
-  // Get all conversations (student)
-  getConversations: () =>
-    request<ConversationResponse[]>("/api/messages/conversations"),
+  // Get all conversations (student). Pass { archived: true } to fetch the archive tab.
+  getConversations: (opts?: { archived?: boolean }) =>
+    request<ConversationResponse[]>(
+      `/api/messages/conversations${opts?.archived ? "?archived=true" : ""}`
+    ),
 
-  // Get all conversations (landlord)
-  getLandlordConversations: () =>
-    request<ConversationResponse[]>("/api/messages/landlord/conversations"),
+  // Get all conversations (landlord). Pass { archived: true } for the archive tab.
+  getLandlordConversations: (opts?: { archived?: boolean }) =>
+    request<ConversationResponse[]>(
+      `/api/messages/landlord/conversations${opts?.archived ? "?archived=true" : ""}`
+    ),
 
   // Get single conversation with messages
   getConversation: (id: number) =>
@@ -1111,6 +1201,14 @@ export const messages = {
   // Remove conversation from inbox (landlord)
   landlordDeleteConversation: (id: number) =>
     request<null>(`/api/messages/landlord/conversations/${id}`, { method: "DELETE" }),
+
+  // Restore an archived conversation (student)
+  unarchiveConversation: (id: number) =>
+    request<null>(`/api/messages/conversations/${id}/unarchive`, { method: "PATCH" }),
+
+  // Restore an archived conversation (landlord)
+  landlordUnarchiveConversation: (id: number) =>
+    request<null>(`/api/messages/landlord/conversations/${id}/unarchive`, { method: "PATCH" }),
 
   // Private landlord notes for a conversation (landlord-only, never shown to the student)
   getConversationNotes: (conversationId: number) =>

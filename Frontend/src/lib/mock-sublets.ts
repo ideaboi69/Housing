@@ -42,11 +42,13 @@ export interface SubletDetail {
   propertyType: string;
   distanceKm: number;
   walkTime: number;
+  driveTime?: number | null;
   busTime: number | null;
   genderPreference: string;
   views: number;
   saves: number;
   images: string[];
+  floorPlans?: string[];
   createdAt: string;
   // ── Standard Amenities (same as listings) ──
   is_furnished: boolean;
@@ -172,6 +174,7 @@ export function getMockSublet(id: string): SubletDetail | undefined {
   const location_score = computeLocationScore({
     lat: base.latitude,
     lng: base.longitude,
+    busMinutes: base.busTime,
     walkMinutes: base.walkTime,
     distanceKm: base.distanceKm,
   });

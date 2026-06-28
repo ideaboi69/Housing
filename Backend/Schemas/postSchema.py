@@ -45,6 +45,18 @@ class PostFeatureUpdate(BaseModel):
     featured_order: Optional[int] = None
     featured_until: Optional[date] = None
 
+class PostImageResponse(BaseModel):
+    id: int
+    image_url: str
+    is_primary: bool
+    display_order: int
+
+    class Config:
+        from_attributes = True
+
+class PostImageReorder(BaseModel):
+    image_ids: list[int]
+
 class PostResponse(BaseModel):
     id: int
     title: str
@@ -69,6 +81,7 @@ class PostResponse(BaseModel):
     is_featured: bool = False
     featured_order: Optional[int] = None
     featured_until: Optional[date] = None
+    images: list[PostImageResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -97,6 +110,7 @@ class PostListResponse(BaseModel):
     is_featured: bool = False
     featured_order: Optional[int] = None
     featured_until: Optional[date] = None
+    images: list[PostImageResponse] = []
     created_at: datetime
 
     class Config:

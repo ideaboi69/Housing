@@ -49,6 +49,7 @@ interface UnifiedConversation {
   lastMessage?: {
     content: string;
     sender_id: number;
+    sender_type?: string;
     is_read: boolean;
     created_at: string;
   } | null;
@@ -60,9 +61,23 @@ interface UnifiedMessage {
   id: number;
   conversation_id: number;
   sender_id: number;
+  // Housing messages carry an explicit role (student↔landlord live in separate
+  // tables whose ids can collide), so we trust this over a sender_id match.
+  // Sublet/marketplace chats are student↔student, so they omit it.
+  sender_type?: string;
   content: string;
   is_read: boolean;
   created_at: string;
+}
+
+// Whether a message was sent by the logged-in student. Housing chats can have a
+// landlord whose id equals the student's, so prefer the role when present.
+function isMessageFromMe(
+  msg: { sender_type?: string; sender_id: number },
+  currentUserId: number,
+): boolean {
+  if (msg.sender_type) return msg.sender_type === "student";
+  return msg.sender_id === currentUserId;
 }
 
 interface ThreadDetail {
@@ -130,6 +145,11 @@ function getInitials(name: string): string {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "CR";
 }
 
+// People are addressed by first name in the inbox; full name is kept for initials.
+function firstName(name: string): string {
+  return name.trim().split(" ")[0] || name;
+}
+
 function normalizeHousing(convo: ConversationResponse): UnifiedConversation {
   return {
     key: `housing:${convo.id}`,
@@ -182,6 +202,7 @@ function mapMessage(message: MessageResponse | SubletMessageResponse | Marketpla
     id: message.id,
     conversation_id: message.conversation_id,
     sender_id: message.sender_id,
+    sender_type: "sender_type" in message ? message.sender_type : undefined,
     content: message.content,
     is_read: message.is_read,
     created_at: message.created_at,
@@ -237,7 +258,7 @@ function ConversationItem({
 }) {
   const meta = TYPE_META[convo.type];
   const Icon = meta.icon;
-  const isFromMe = convo.lastMessage?.sender_id === currentUserId;
+  const isFromMe = convo.lastMessage ? isMessageFromMe(convo.lastMessage, currentUserId) : false;
 
   return (
     <div
@@ -256,7 +277,7 @@ function ConversationItem({
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <p className="truncate text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: convo.unreadCount > 0 ? 800 : 650 }}>
-                {convo.otherName}
+                {firstName(convo.otherName)}
               </p>
               {convo.lastMessage && (
                 <span className="shrink-0 text-[#98A3B0]" style={{ fontSize: "10px" }}>
@@ -463,7 +484,7 @@ function ChatThread({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>{detail.otherName}</p>
+            <p className="truncate text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>{firstName(detail.otherName)}</p>
             <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 ${meta.bg} ${meta.tone}`} style={{ fontSize: "10px", fontWeight: 800 }}>
               <Icon className="h-3 w-3" />
               {meta.label}
@@ -489,7 +510,7 @@ function ChatThread({
                 <div className="h-px flex-1 bg-black/[0.06]" />
               </div>
               {group.msgs.map((msg) => (
-                <MessageBubble key={`${msg.conversation_id}-${msg.id}`} message={msg} isMe={msg.sender_id === currentUserId} />
+                <MessageBubble key={`${msg.conversation_id}-${msg.id}`} message={msg} isMe={isMessageFromMe(msg, currentUserId)} />
               ))}
             </div>
           ))}
@@ -805,7 +826,18 @@ export default function MessagesPage() {
                           key={convo.key}
                           convo={convo}
                           isActive={activeKey === convo.key}
-                          onClick={() => setActiveKey((current) => (current === convo.key ? null : convo.key))}
+                          onClick={() => setActiveKey((current) => {
+                            if (current === convo.key) return null;
+                            // Opening the thread marks it read server-side (ChatThread
+                            // calls getConversation on mount), so clear the badge now
+                            // instead of waiting for the next inbox poll.
+                            if (convo.unreadCount > 0) {
+                              setConversations((prev) => prev.map((c) => (
+                                c.key === convo.key ? { ...c, unreadCount: 0 } : c
+                              )));
+                            }
+                            return convo.key;
+                          })}
                           onArchive={() => void handleArchiveConversation(convo)}
                           currentUserId={user.id}
                         />

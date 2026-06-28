@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { AlertCircle, ArrowRight, CheckCircle2, PenLine, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, CheckCircle2, PenLine, ShieldCheck, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WriterRegister } from "@/types";
 import { TurnstileWidget } from "@/components/ui/TurnstileWidget";
@@ -22,6 +22,55 @@ const BUSINESS_TYPES = [
   { key: "organization", label: "Organization" },
   { key: "business", label: "Business" },
 ] as const;
+
+const PASSWORD_RULES = [
+  { key: "length", label: "At least 8 characters", test: (pw: string) => pw.length >= 8 },
+  { key: "uppercase", label: "One uppercase letter", test: (pw: string) => /[A-Z]/.test(pw) },
+  { key: "lowercase", label: "One lowercase letter", test: (pw: string) => /[a-z]/.test(pw) },
+  { key: "number", label: "One number", test: (pw: string) => /\d/.test(pw) },
+  { key: "special", label: "One special character", test: (pw: string) => /[^A-Za-z0-9]/.test(pw) },
+];
+
+function PasswordChecklist({ password }: { password: string }) {
+  if (password.length === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.2 }}
+      className="mt-3 grid gap-2"
+    >
+      {PASSWORD_RULES.map((rule) => {
+        const passed = rule.test(password);
+        return (
+          <div key={rule.key} className="flex items-center gap-2">
+            <div
+              className="flex h-4 w-4 items-center justify-center rounded-full"
+              style={{
+                background: passed ? "rgba(74,222,128,0.14)" : "rgba(27,45,69,0.05)",
+                border: passed ? "1.5px solid rgba(74,222,128,0.38)" : "1.5px solid rgba(27,45,69,0.08)",
+              }}
+            >
+              {passed ? <Check className="h-2.5 w-2.5 text-[#4ADE80]" /> : <X className="h-2.5 w-2.5 text-[#1B2D45]/20" />}
+            </div>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: passed ? "#2A9F63" : "#1B2D45",
+                opacity: passed ? 1 : 0.42,
+              }}
+            >
+              {rule.label}
+            </span>
+          </div>
+        );
+      })}
+    </motion.div>
+  );
+}
 
 export default function WriterSignupPage() {
   const router = useRouter();
@@ -53,11 +102,13 @@ export default function WriterSignupPage() {
   }, []);
 
   const passwordsMatch = form.password.length > 0 && form.password === confirmPassword;
+  const passwordValid = PASSWORD_RULES.every((rule) => rule.test(form.password));
   const canContinue =
     form.first_name.trim() &&
     form.last_name.trim() &&
     form.email.trim() &&
     form.password.trim() &&
+    passwordValid &&
     passwordsMatch;
 
   const canSubmit = canContinue && form.business_name.trim() && form.reason.trim();
@@ -67,8 +118,16 @@ export default function WriterSignupPage() {
   }
 
   function goToStepTwo() {
-    if (!canContinue) {
-      setError("Please add your name, email, and password first.");
+    if (!form.first_name.trim() || !form.last_name.trim() || !form.email.trim()) {
+      setError("Please add your name and email first.");
+      return;
+    }
+    if (!passwordValid) {
+      setError("Your password doesn't meet all the requirements listed below.");
+      return;
+    }
+    if (!passwordsMatch) {
+      setError("Passwords don't match.");
       return;
     }
     setError("");
@@ -362,6 +421,9 @@ export default function WriterSignupPage() {
                                 className="mt-2 w-full rounded-2xl border border-[#FF6B35]/10 bg-[#FAFBFA] px-4 py-3.5 text-[#1B2D45] transition-all placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/25 focus:bg-white focus:outline-none"
                                 style={{ fontSize: "14px", fontWeight: 500 }}
                               />
+                              <AnimatePresence>
+                                <PasswordChecklist password={form.password} />
+                              </AnimatePresence>
                             </div>
 
                             <div className="mt-4">

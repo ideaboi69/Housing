@@ -77,7 +77,7 @@ async def upload_sublet_images(sublet_id: int, files: list[UploadFile] = File(..
     if not sublet:
         raise HTTPException(status_code=404, detail="Sublet not found")
 
-    existing_count = len(sublet.images)
+    existing_count = sum(1 for img in sublet.images if not img.is_floor_plan)
 
     if existing_count + len(files) > 10:
         raise HTTPException(
@@ -107,6 +107,40 @@ async def upload_sublet_images(sublet_id: int, files: list[UploadFile] = File(..
     invalidate("sublets:list")
     return [SubletImageResponse.model_validate(img) for img in images]
 
+# Upload floor-plan diagrams (separate from photos, max 5, rendered in their own section)
+@sublet_router.post("/{sublet_id}/floor-plans", status_code=status.HTTP_201_CREATED, response_model=list[SubletImageResponse])
+async def upload_sublet_floor_plans(sublet_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    sublet = db.query(Sublet).filter(Sublet.id == sublet_id, Sublet.user_id == current_user.id).first()
+    if not sublet:
+        raise HTTPException(status_code=404, detail="Sublet not found")
+
+    existing_count = sum(1 for img in sublet.images if img.is_floor_plan)
+    if existing_count + len(files) > 5:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum 5 floor plans allowed. You have {existing_count}, trying to add {len(files)}.",
+        )
+
+    images = []
+    for i, file in enumerate(files):
+        image_url = upload_image_to_cloudinary(file, folder=f"sublets/{sublet_id}/floor-plans")
+        image = SubletImage(
+            sublet_id=sublet.id,
+            image_url=image_url,
+            is_primary=False,
+            display_order=existing_count + i,
+            is_floor_plan=True,
+        )
+        db.add(image)
+        images.append(image)
+
+    db.commit()
+    for img in images:
+        db.refresh(img)
+
+    invalidate("sublets:list")
+    return [SubletImageResponse.model_validate(img) for img in images]
+
 # Reorder sublet images — provide image IDs in the new desired order
 @sublet_router.patch("/{sublet_id}/images/reorder", response_model=list[SubletImageResponse])
 def reorder_sublet_images(sublet_id: int, payload: SubletImageReorder, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
@@ -114,10 +148,13 @@ def reorder_sublet_images(sublet_id: int, payload: SubletImageReorder, db: Sessi
     if not sublet:
         raise HTTPException(status_code=404, detail="Sublet not found")
  
-    images = db.query(SubletImage).filter(SubletImage.sublet_id == sublet.id).all()
+    images = db.query(SubletImage).filter(
+        SubletImage.sublet_id == sublet.id,
+        SubletImage.is_floor_plan == False,
+    ).all()
     existing_ids = {img.id for img in images}
     incoming_ids = set(payload.image_ids)
- 
+
     if existing_ids != incoming_ids:
         raise HTTPException(
             status_code=400,

@@ -282,7 +282,7 @@ function ListingPreviewCard({ listing }: { listing: typeof popularListings[0] })
         <div className="flex items-center gap-2 mt-2.5">
           <span className="bg-[#1B2D45]/5 text-[#1B2D45]/60 px-2 py-0.5 rounded-md" style={{ fontSize: "10px", fontWeight: 500 }}>{listing.propertyType}</span>
           <span className="bg-[#1B2D45]/5 text-[#1B2D45]/60 px-2 py-0.5 rounded-md" style={{ fontSize: "10px", fontWeight: 500 }}>{listing.beds} bed</span>
-          <span className="bg-[#1B2D45]/5 text-[#1B2D45]/60 px-2 py-0.5 rounded-md" style={{ fontSize: "10px", fontWeight: 500 }}>🚶 {listing.walkTime} min</span>
+          <span className="bg-[#1B2D45]/5 text-[#1B2D45]/60 px-2 py-0.5 rounded-md" style={{ fontSize: "10px", fontWeight: 500 }}>🚗 {listing.walkTime} min</span>
         </div>
       </div>
     </Link>
@@ -392,7 +392,7 @@ function ShowcaseVisual({ featureId }: { featureId: (typeof showcaseFeatures)[nu
               { label: "Total Rent", a: "$2,175", b: "$680", best: "b" },
               { label: "Cribb Score", a: "88", b: "79", best: "a" },
               { label: "Distance", a: "0.4 km", b: "0.5 km", best: "a" },
-              { label: "Walk Time", a: "5 min", b: "6 min", best: "a" },
+              { label: "Drive Time", a: "5 min", b: "6 min", best: "a" },
               { label: "Type", a: "townhouse", b: "apartment", best: "" },
             ].map((row) => (
               <div key={row.label} className="grid grid-cols-[100px_1fr_1fr] sm:grid-cols-[190px_1fr_1fr] border-t border-black/[0.04] first:border-t-0">
@@ -921,7 +921,7 @@ function listingToCard(l: ListingDetailResponse, score: number | null) {
     price: Math.round(Number(l.rent_per_room)),
     propertyType: formatPropertyType(l.property_type),
     beds: l.total_rooms,
-    walkTime: l.walk_time_minutes ?? 0,
+    walkTime: l.drive_time_minutes ?? l.walk_time_minutes ?? 0,
     healthScore: score ?? 0,
     views: l.view_count,
     popular: (score ?? 0) >= 85,

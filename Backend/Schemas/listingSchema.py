@@ -72,6 +72,7 @@ class ListingImageResponse(BaseModel):
     id: int
     image_url: str
     display_order: int
+    is_floor_plan: bool = False
 
     class Config:
         from_attributes = True

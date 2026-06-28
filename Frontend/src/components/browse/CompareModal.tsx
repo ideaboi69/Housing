@@ -159,7 +159,7 @@ export function CompareModal({ isOpen, onClose, listings, healthScores }: Compar
       { label: "Total Rent", icon: <DollarSign className="w-3.5 h-3.5" />, values: vals((l) => Number(l.rent_total)), type: "price", bestFn: "lowest" },
       { label: "Cribb Score", icon: <TrendingUp className="w-3.5 h-3.5" />, values: vals((l) => healthScores[l.id] ?? null), type: "score", bestFn: "highest" },
       { label: "Distance", icon: <MapPin className="w-3.5 h-3.5" />, values: vals((l) => l.distance_to_campus_km), type: "distance", bestFn: "lowest" },
-      { label: "Walk Time", icon: <Clock className="w-3.5 h-3.5" />, values: vals((l) => l.walk_time_minutes), type: "time", bestFn: "lowest" },
+      { label: "Drive Time", icon: <Clock className="w-3.5 h-3.5" />, values: vals((l) => l.drive_time_minutes), type: "time", bestFn: "lowest" },
       { label: "Type", values: vals((l) => l.property_type), type: "text" },
       { label: "Rooms", values: vals((l) => `${l.total_rooms} bed · ${l.bathrooms} bath`), type: "text" },
       { label: "Lease", values: vals((l) => l.lease_type === "8_month" ? "8-month" : l.lease_type === "12_month" ? "12-month" : "Flexible"), type: "text" },
@@ -276,8 +276,8 @@ export function CompareModal({ isOpen, onClose, listings, healthScores }: Compar
                             <Link href={`/browse/${l.id}`} className="group block">
                               {/* Thumbnail */}
                               <div className="w-full h-[100px] rounded-lg bg-gradient-to-br from-[#f0ece6] to-[#e6e0d6] mb-2.5 overflow-hidden relative">
-                              {l.images?.[0]?.image_url ? (
-                                <img src={l.images[0].image_url} alt="" className="w-full h-full object-cover" />
+                              {l.images?.filter((img) => !img.is_floor_plan)[0]?.image_url ? (
+                                <img src={l.images.filter((img) => !img.is_floor_plan)[0].image_url} alt="" className="w-full h-full object-cover" />
                                 ) : (
                                   <div className="absolute inset-0 flex items-center justify-center">
                                     <span style={{ fontSize: "24px" }}>🏠</span>

@@ -57,6 +57,7 @@ export function PolaroidCard({
   const score = healthScore ?? 0;
   const isBoard = variant === "board";
   const walkMinutes = listing.walk_time_minutes == null ? null : Number(listing.walk_time_minutes);
+  const driveMinutes = listing.drive_time_minutes == null ? null : Number(listing.drive_time_minutes);
   const busMinutes = listing.bus_time_minutes == null ? null : Number(listing.bus_time_minutes);
   const distanceKm = listing.distance_to_campus_km == null ? null : Number(listing.distance_to_campus_km);
 
@@ -99,8 +100,8 @@ export function PolaroidCard({
   const proximity = getProximityLabel(walkMinutes);
   const campusFacts = [
     `${proximity.emoji} ${proximity.label}`,
-    walkMinutes != null
-      ? `🚶 ${walkMinutes} min walk`
+    driveMinutes != null
+      ? `🚗 ${driveMinutes} min drive`
       : busMinutes != null
         ? `🚌 ${busMinutes} min bus`
         : null,
@@ -236,13 +237,13 @@ export function PolaroidCard({
               )}
             </div>
 
-            {/* Walk time pill */}
-            {walkMinutes != null && (
+            {/* Drive time pill */}
+            {driveMinutes != null && (
               <div
                 className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full"
                 style={{ fontSize: "10px", fontWeight: 600, color: "#1B2D45" }}
               >
-                🚶 {walkMinutes} min
+                🚗 {driveMinutes} min
               </div>
             )}
           </div>

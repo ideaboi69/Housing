@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from tables import Listing, Conversation, User, get_db, Landlord, Message, Property, ConversationNote
@@ -211,11 +211,19 @@ def landlord_reply(request: Request, conversation_id: int, payload: MessageCreat
 
 # Get all conversations for a user
 @message_router.get("/conversations", response_model=list[ConversationResponse])
-def get_conversations( db: Session = Depends(get_db), current_user=Depends(get_current_student)):
-    
+def get_conversations(
+    archived: bool = Query(False, description="If true, return only archived threads"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_student),
+):
+    archive_filter = (
+        Conversation.student_archived_at.isnot(None)
+        if archived
+        else Conversation.student_archived_at.is_(None)
+    )
     conversations = db.query(Conversation).filter(
         Conversation.user_id == current_user.id,
-        Conversation.student_archived_at.is_(None),
+        archive_filter,
     ).order_by(Conversation.updated_at.desc()).all()
 
     result = []
@@ -252,11 +260,19 @@ def get_conversations( db: Session = Depends(get_db), current_user=Depends(get_c
 
 # Get all conversations for a LANDLORD
 @message_router.get("/landlord/conversations", response_model=list[ConversationResponse])
-def get_landlord_conversations( db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-
+def get_landlord_conversations(
+    archived: bool = Query(False, description="If true, return only archived threads"),
+    db: Session = Depends(get_db),
+    landlord: Landlord = Depends(require_landlord),
+):
+    archive_filter = (
+        Conversation.landlord_archived_at.isnot(None)
+        if archived
+        else Conversation.landlord_archived_at.is_(None)
+    )
     conversations = db.query(Conversation).filter(
         Conversation.landlord_id == landlord.id,
-        Conversation.landlord_archived_at.is_(None),
+        archive_filter,
     ).order_by(Conversation.updated_at.desc()).all()
 
     result = []
@@ -300,20 +316,28 @@ def get_specific_conversation( conversation_id: int, db: Session = Depends(get_d
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    is_user = conversation.user_id == current_user.id
-    is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id == current_user.id
-    if not is_user and not is_landlord:
-        raise HTTPException(status_code=403, detail="Access denied")
+    # Determine the viewer's role by TYPE first. Students and landlords live in
+    # separate tables with overlapping id ranges (both start at 1), so a plain
+    # `conversation.user_id == current_user.id` check misidentifies a landlord as
+    # the student whenever their numeric ids collide — which then marks the wrong
+    # party's messages read and leaves the inbox stuck "unread".
+    is_landlord = isinstance(current_user, Landlord)
+    if is_landlord:
+        if conversation.landlord_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        if conversation.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
-    # Mark unread messages as read for current viewer
-    sender_type_to_mark = SenderType.LANDLORD if is_user else SenderType.STUDENT
+    # Mark the OTHER party's messages as read for the current viewer.
+    sender_type_to_mark = SenderType.STUDENT if is_landlord else SenderType.LANDLORD
     db.query(Message).filter(
         and_(
             Message.conversation_id == conversation_id,
             Message.sender_type == sender_type_to_mark,
             Message.is_read == False,
         )
-    ).update({"is_read": True})
+    ).update({"is_read": True}, synchronize_session=False)
     db.commit()
 
     listing = db.query(Listing).filter(Listing.id == conversation.listing_id).first()
@@ -347,7 +371,7 @@ def get_user_unread_count(db: Session = Depends(get_db),current_user: User = Dep
     total_unread = db.query(func.count(Message.id)).filter(
         and_(
             Message.conversation_id.in_(conversation_ids),
-            Message.sender_type == SenderType.LANDLORD.value,
+            Message.sender_type == SenderType.LANDLORD,
             Message.is_read == False,
         )).scalar()
 
@@ -369,7 +393,7 @@ def get_landlord_unread_count(db: Session = Depends(get_db), landlord: Landlord 
     total_unread = db.query(func.count(Message.id)).filter(
         and_(
             Message.conversation_id.in_(conversation_ids),
-            Message.sender_type == SenderType.STUDENT.value,
+            Message.sender_type == SenderType.STUDENT,
             Message.is_read == False,
         )).scalar()
 
@@ -420,6 +444,34 @@ def landlord_delete_conversation(conversation_id: int, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     conversation.landlord_archived_at = func.now()
+    db.commit()
+
+# Student unarchives a conversation
+@message_router.patch("/conversations/{conversation_id}/unarchive", status_code=status.HTTP_204_NO_CONTENT)
+def unarchive_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    conversation = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        Conversation.user_id == current_user.id,
+    ).first()
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conversation.student_archived_at = None
+    db.commit()
+
+# Landlord unarchives a conversation
+@message_router.patch("/landlord/conversations/{conversation_id}/unarchive", status_code=status.HTTP_204_NO_CONTENT)
+def landlord_unarchive_conversation(conversation_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
+    conversation = db.query(Conversation).filter(
+        Conversation.id == conversation_id,
+        Conversation.landlord_id == landlord.id,
+    ).first()
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conversation.landlord_archived_at = None
     db.commit()
 
 

@@ -28,6 +28,7 @@ export interface SubletListing {
   bedsTotal: number;
   distance: string;
   walkTime: string;
+  driveTime: string;
   amenities: string[];
   views: number;
   saves: number;
@@ -107,6 +108,7 @@ function mapMockDetailToListing(
     bedsTotal: detail.bedsTotal,
     distance: `${detail.distanceKm.toFixed(1)} km`,
     walkTime: `${detail.walkTime} min`,
+    driveTime: `${Math.max(1, Math.round(detail.walkTime / 4))} min`,
     amenities: [
       detail.utilities_included ? "Utilities Incl." : null,
       detail.has_laundry ? "Laundry" : null,
@@ -185,6 +187,7 @@ export function mapApiSubletToListing(sublet: SubletListResponse): SubletListing
   const distance = Number(sublet.distance_to_campus_km ?? 0);
   const originalPrice = Math.round(Number(sublet.rent_per_month) * 1.18);
   const walkTime = Number(sublet.walk_time_minutes ?? 0);
+  const driveTime = Number(sublet.drive_time_minutes ?? 0);
   const bedsTotal = Number(sublet.total_rooms ?? 1);
   const terms = sublet.terms;
   const occupancy = inferSubletOccupancy({
@@ -243,6 +246,7 @@ export function mapApiSubletToListing(sublet: SubletListResponse): SubletListing
     bedsTotal,
     distance: `${distance.toFixed(1)} km`,
     walkTime: `${walkTime} min`,
+    driveTime: `${driveTime || Math.max(1, Math.round(walkTime / 4))} min`,
     amenities,
     views: 0,
     saves: 0,

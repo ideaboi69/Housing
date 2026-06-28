@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr
 from decimal import Decimal
 from Schemas.listingSchema import GenderPreference
-from Schemas.featureSchema import ListingPolicies, PetPolicy, SmokingPolicy, SpaceAmenities, SubletTerms
+from Schemas.featureSchema import ListingPolicies, PetPolicy, PetPolicyField, SmokingPolicy, SmokingPolicyField, SpaceAmenities, SubletTerms
 import enum 
 
 # Enums
@@ -97,7 +97,8 @@ class SubletImageResponse(BaseModel):
     image_url: str
     is_primary: bool
     display_order: int
-    
+    is_floor_plan: bool = False
+
     class Config:
         from_attributes = True
 
@@ -132,8 +133,8 @@ class SubletResponse(BaseModel):
     has_backyard: bool
     has_balcony: bool
     wheelchair_accessible: bool
-    pet_policy: PetPolicy
-    smoking_policy: SmokingPolicy
+    pet_policy: PetPolicyField
+    smoking_policy: SmokingPolicyField
     estimated_utility_cost: Decimal
     rent_per_month: Decimal
     sublet_start_date: date
@@ -168,8 +169,8 @@ class SubletListResponse(BaseModel):
     has_laundry: bool
     utilities_included: bool
     has_wifi: bool
-    pet_policy: PetPolicy
-    smoking_policy: SmokingPolicy
+    pet_policy: PetPolicyField
+    smoking_policy: SmokingPolicyField
     distance_to_campus_km: Decimal
     walk_time_minutes: int
     drive_time_minutes: int

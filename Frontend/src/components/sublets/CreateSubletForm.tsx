@@ -387,6 +387,7 @@ export function CreateSubletForm({
         bedsTotal: rooms,
         distance: `${distance.toFixed(1)} km`,
         walkTime: `${walk} min`,
+        driveTime: `${drive || Math.max(1, Math.round(walk / 4))} min`,
         amenities: [
           form.is_furnished ? "Furnished" : null,
           form.utilities_included ? "Utilities Incl." : null,

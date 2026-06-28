@@ -222,6 +222,9 @@ class ListingImage(Base):
     listing_id = Column(Integer, ForeignKey("listings.id", ondelete="CASCADE"), nullable=False)
     image_url = Column(String(500), nullable=False)
     display_order = Column(Integer, default=0, nullable=False)
+    # Floor-plan diagrams are stored alongside photos but rendered in their own
+    # section; they're capped and counted separately from listing photos.
+    is_floor_plan = Column(Boolean, default=False, nullable=False, server_default="false")
 
     listing = relationship("Listing", back_populates="images")
 
@@ -456,6 +459,9 @@ class SubletImage(Base):
     image_url = Column(String(500), nullable=False)
     is_primary = Column(Boolean, default=False, nullable=False)
     display_order = Column(Integer, default=0, nullable=False)
+    # Floor-plan diagrams: stored here but rendered in their own section,
+    # capped and counted separately from sublet photos.
+    is_floor_plan = Column(Boolean, default=False, nullable=False, server_default="false")
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     sublet = relationship("Sublet", back_populates="images")
@@ -523,6 +529,14 @@ class Post(Base):
         Index("ix_posts_featured", "is_featured", "featured_order"),
     )
 
+    images = relationship(
+        "PostImage",
+        back_populates="post",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="PostImage.display_order",
+    )
+
     @property
     def author_name(self):
         if self.user:
@@ -556,6 +570,21 @@ class Post(Base):
     @property
     def author_is_official(self):
         return bool(self.writer and self.writer.is_official)
+
+class PostImage(Base):
+    # Gallery images for a Bubble post. The image with display_order 0 is the
+    # primary/cover and its URL is mirrored into Post.cover_image_url so all the
+    # existing cover-image render paths keep working unchanged.
+    __tablename__ = "post_images"
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    image_url = Column(String(500), nullable=False)
+    is_primary = Column(Boolean, default=False, nullable=False)
+    display_order = Column(Integer, default=0, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    post = relationship("Post", back_populates="images")
 
 class MarketplaceItem(Base):
     __tablename__ = "marketplace_items"

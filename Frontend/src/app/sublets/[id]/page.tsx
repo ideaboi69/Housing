@@ -10,6 +10,7 @@ import { SmartBackLink } from "@/components/ui/SmartBackLink";
 import { DetailPageSkeleton } from "@/components/ui/Skeletons";
 import { getScoreColor } from "@/lib/utils";
 import { getAmenityChecklist } from "@/lib/amenities";
+import { FloorPlanSection } from "@/components/listing/FloorPlanSection";
 import { getMockSublet } from "@/lib/mock-sublets";
 import { isSampleSublet } from "@/lib/sample-data";
 import { SampleNote } from "@/components/ui/SampleBadge";
@@ -80,6 +81,7 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
   const availableMonths = visibleMonths.map((month) => month >= startMonth && month <= endMonth);
   const distance = safeNumber(sublet.distance_to_campus_km, 1.5);
   const walk = safeNumber(sublet.walk_time_minutes, 15);
+  const bus = sublet.bus_time_minutes != null ? safeNumber(sublet.bus_time_minutes, 0) : null;
   const price = safeNumber(sublet.rent_per_month, 0);
   const totalRooms = Math.max(1, safeNumber(sublet.total_rooms, 1));
 
@@ -89,6 +91,7 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
   const locationScore = computeLocationScore({
     lat: sublet.latitude,
     lng: sublet.longitude,
+    busMinutes: bus,
     walkMinutes: walk,
     distanceKm: distance,
   });
@@ -150,11 +153,13 @@ function mapApiSubletToDetail(sublet: SubletResponse): SubletDetail {
     propertyType: roomType,
     distanceKm: distance,
     walkTime: walk,
+    driveTime: sublet.drive_time_minutes != null ? safeNumber(sublet.drive_time_minutes, 0) : null,
     busTime: safeNumber(sublet.bus_time_minutes, 0) || null,
     genderPreference: sublet.gender_preference || "any",
     views: sublet.view_count,
     saves: 0,
-    images: (sublet.images || []).map((img) => img.image_url),
+    images: (sublet.images || []).filter((img) => !img.is_floor_plan).map((img) => img.image_url),
+    floorPlans: (sublet.images || []).filter((img) => img.is_floor_plan).map((img) => img.image_url),
     createdAt: sublet.created_at,
     is_furnished: sublet.is_furnished,
     has_parking: sublet.has_parking,
@@ -595,7 +600,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 Campus access uses the same proximity labels shown across Cribb.
               </p>
               <div className="flex items-center gap-4 mt-3 flex-wrap">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚶</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.walkTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>walk</p></div></div>
+                {sublet.driveTime ? <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚗</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.driveTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by car</p></div></div> : null}
                 {sublet.busTime ? <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>🚌</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.busTime} min</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>by bus</p></div></div> : null}
                 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FAF8F4]"><span style={{ fontSize: "16px" }}>📍</span><div><p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>{sublet.distanceKm} km</p><p className="text-[#1B2D45]/30" style={{ fontSize: "9px" }}>to campus</p></div></div>
               </div>
@@ -624,6 +629,9 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                   <span className="text-[#1B2D45]/60" style={{ fontSize: "11px" }}>Estimated utilities: <strong className="text-[#1B2D45]">${sublet.estimated_utility_cost}/mo</strong> per person</span>
                 </div>
               )}
+
+              {/* Floor Plan */}
+              <FloorPlanSection images={sublet.floorPlans ?? []} />
 
               {/* Cribb Score Breakdown */}
               <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.4 }}>

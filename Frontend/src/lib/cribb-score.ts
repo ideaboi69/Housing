@@ -51,31 +51,63 @@ function distanceScore(km: number): number {
   return 20;
 }
 
-function walkScore(minutes: number): number {
-  if (minutes <= 10) return 100;
+/**
+ * Bus-time scoring (primary signal for campus distance in Guelph).
+ *
+ * Walking isn't realistic here — closest off-campus housing is ~30 min walk in
+ * the best case — and driving varies wildly by who has a car. Bus time is the
+ * universal student commute measure, so it anchors the location score.
+ *
+ *   ≤ 12 min → 95 (golden zone, near-campus residences)
+ *   ≤ 15 min → 90 (still golden)
+ *   ≤ 22 min → 82 (comfy 80s)
+ *   ≤ 30 min → 75 (high 70s)
+ *   ≤ 40 min → 68 (low 70s / high 60s)
+ *   41 min+  → 50 (capped — doesn't keep falling)
+ */
+function busScore(minutes: number): number {
+  if (minutes <= 12) return 95;
   if (minutes <= 15) return 90;
-  if (minutes <= 20) return 75;
-  if (minutes <= 30) return 60;
-  if (minutes <= 45) return 40;
-  return 20;
+  if (minutes <= 22) return 82;
+  if (minutes <= 30) return 75;
+  if (minutes <= 40) return 68;
+  return 50;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-/** Composite Location score: campus 50% + groceries 25% + downtown 25%. */
+/**
+ * Composite Location score.
+ *
+ * Campus distance is scored via bus time (see {@link busScore}). When bus time
+ * isn't available we fall back to a haversine distance estimate so the score
+ * still works on older mock rows.
+ *
+ * Weights: campus 60% + groceries 25% + downtown 15%.
+ */
 export function computeLocationScore(opts: {
   lat?: number | null;
   lng?: number | null;
+  busMinutes?: number | null;
   walkMinutes?: number | null;
   distanceKm?: number | null;
 }): number {
-  const { lat, lng, walkMinutes, distanceKm } = opts;
+  const { lat, lng, busMinutes, walkMinutes, distanceKm } = opts;
 
   let campus: number;
-  if (walkMinutes != null && walkMinutes > 0) campus = walkScore(walkMinutes);
-  else if (distanceKm != null && distanceKm > 0) campus = distanceScore(distanceKm);
-  else if (lat != null && lng != null) campus = distanceScore(haversineKm({ lat, lng }, CAMPUS));
-  else campus = 50;
+  if (busMinutes != null && busMinutes > 0) {
+    campus = busScore(busMinutes);
+  } else if (walkMinutes != null && walkMinutes > 0 && walkMinutes <= 20) {
+    // Treat a very short walk as roughly equivalent to a short bus ride —
+    // anyone walking under 20 min is effectively in the golden zone.
+    campus = busScore(Math.max(8, walkMinutes - 4));
+  } else if (distanceKm != null && distanceKm > 0) {
+    campus = distanceScore(distanceKm);
+  } else if (lat != null && lng != null) {
+    campus = distanceScore(haversineKm({ lat, lng }, CAMPUS));
+  } else {
+    campus = 50;
+  }
 
   let grocery = 50;
   let downtown = 50;
@@ -87,30 +119,77 @@ export function computeLocationScore(opts: {
   return round1(campus * 0.6 + grocery * 0.25 + downtown * 0.15);
 }
 
-// Amenity fields that count toward the score (gym excluded).
-const AMENITY_KEYS = [
-  "is_furnished",
-  "has_parking",
-  "has_laundry",
-  "utilities_included",
-  "has_wifi",
-  "has_air_conditioning",
-  "has_dishwasher",
-  "has_elevator",
-  "has_backyard",
-  "has_balcony",
-  "wheelchair_accessible",
-] as const;
+/**
+ * Per-amenity weights for the amenity sub-score.
+ *
+ * The weights reflect what actually matters for Guelph student rentals:
+ *   - Laundry is the top priority
+ *   - has_air_conditioning covers AC *and* heating — they're the same HVAC
+ *     system here, so the field doubles as a climate-control signal
+ *   - Furnished is a bonus when present and *doesn't penalize* when absent
+ *     (see {@link computeAmenityScore}) — most Guelph rentals aren't furnished
+ *   - Utilities-included is a billing convenience (rent vs. pay separately),
+ *     weighted moderately — becoming the norm so its absence shouldn't crush
+ *   - Wifi same story — increasingly bundled
+ *   - Parking sits middle (some students need it, many don't)
+ *   - Gym and smoking-allowed are intentionally excluded
+ */
+const AMENITY_WEIGHTS = {
+  has_laundry: 20,
+  has_air_conditioning: 22, // AC + heating share this signal
+  is_furnished: 12, // bonus only — see scoring rules below
+  utilities_included: 10,
+  has_wifi: 8,
+  has_dishwasher: 8,
+  has_parking: 5,
+  pet_friendly: 4,
+  has_elevator: 3,
+  has_backyard: 3,
+  has_balcony: 2,
+  wheelchair_accessible: 3,
+} as const;
 
-/** Amenity score: base 20 + share of amenities present (incl. pet-friendliness). */
+type AmenityWeightKey = keyof typeof AMENITY_WEIGHTS;
+
+// Kept exported for any callers that imported the old constant.
+const AMENITY_KEYS = Object.keys(AMENITY_WEIGHTS) as AmenityWeightKey[];
+
+/**
+ * Amenity score.
+ *
+ * Each amenity earns its weight in points when present. The final score is
+ * `earned / earnable * 100`. The trick: a missing `is_furnished` is excluded
+ * from *both* sides, so unfurnished places can still reach 100 by nailing the
+ * rest of the list — they aren't artificially capped just for matching the
+ * Guelph norm of being unfurnished.
+ */
 export function computeAmenityScore(
-  amenities: Partial<Record<(typeof AMENITY_KEYS)[number], boolean>>,
+  amenities: Partial<Record<AmenityWeightKey, boolean>>,
   petFriendly?: boolean
 ): number {
-  const total = AMENITY_KEYS.length + 1; // +1 for the pet slot
-  let count = AMENITY_KEYS.reduce((n, key) => n + (amenities[key] ? 1 : 0), 0);
-  if (petFriendly) count += 1;
-  return round1(20 + (count / total) * 80);
+  let earned = 0;
+  let earnable = 0;
+
+  for (const key of AMENITY_KEYS) {
+    const weight = AMENITY_WEIGHTS[key];
+    const present = key === "pet_friendly" ? Boolean(petFriendly) : Boolean(amenities[key]);
+
+    if (key === "is_furnished") {
+      // Furnished: pure bonus. Counts toward both numerator and denominator
+      // only when present, so its absence never pulls the score down.
+      if (present) {
+        earned += weight;
+        earnable += weight;
+      }
+      continue;
+    }
+
+    earnable += weight;
+    if (present) earned += weight;
+  }
+
+  if (earnable === 0) return 0;
+  return round1((earned / earnable) * 100);
 }
 
 /** Price-vs-market score. Cheaper than baseline → higher. */

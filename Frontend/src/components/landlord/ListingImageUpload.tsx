@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { X, Upload, Loader2, GripVertical } from "lucide-react";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
+import { FloorPlanManager } from "@/components/listing/FloorPlanManager";
 
 interface ListingImageUploadProps {
   listingId: number;
@@ -34,10 +35,12 @@ export function ListingImageUpload({ listingId, existingImages, onClose, onUploa
         const listing = await api.listings.getById(listingId);
         if (cancelled) return;
         setImages(
-          (listing.images ?? []).map((img) => ({
-            id: img.id,
-            image_url: img.image_url,
-          }))
+          (listing.images ?? [])
+            .filter((img) => !img.is_floor_plan)
+            .map((img) => ({
+              id: img.id,
+              image_url: img.image_url,
+            }))
         );
       } catch {
         if (!cancelled) setError("Couldn't load existing photos. You can still add new ones.");
@@ -290,6 +293,10 @@ export function ListingImageUpload({ listingId, existingImages, onClose, onUploa
           <p className="text-[#1B2D45]/20 mt-3 text-center" style={{ fontSize: "10px" }}>
             Drag photos to reorder · First image is the cover · Max 10 per listing
           </p>
+
+          <div className="mt-5 border-t border-black/[0.06] pt-4">
+            <FloorPlanManager kind="listing" id={listingId} />
+          </div>
         </div>
 
         {/* Footer */}

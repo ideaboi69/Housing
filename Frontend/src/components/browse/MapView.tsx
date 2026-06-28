@@ -146,7 +146,7 @@ function ListingRailCard({
               <span>{proximity.label}</span>
             </span>
             <span className="text-[#1B2D45]/42" style={{ fontSize: "11px", fontWeight: 600 }}>
-              {listing.walk_time_minutes ? `${listing.walk_time_minutes} min walk` : listing.bus_time_minutes ? `${listing.bus_time_minutes} min bus` : "Distance available"}
+              {listing.drive_time_minutes ? `${listing.drive_time_minutes} min drive` : listing.bus_time_minutes ? `${listing.bus_time_minutes} min bus` : "Distance available"}
             </span>
           </div>
 
@@ -207,7 +207,7 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
     } else if (sortKey === "price_high") {
       result.sort((a, b) => Number(b.rent_per_room) - Number(a.rent_per_room));
     } else if (sortKey === "closest") {
-      result.sort((a, b) => (a.walk_time_minutes ?? 999) - (b.walk_time_minutes ?? 999));
+      result.sort((a, b) => (a.drive_time_minutes ?? a.walk_time_minutes ?? 999) - (b.drive_time_minutes ?? b.walk_time_minutes ?? 999));
     } else {
       result.sort((a, b) => (healthScores[b.id] ?? 0) - (healthScores[a.id] ?? 0));
     }

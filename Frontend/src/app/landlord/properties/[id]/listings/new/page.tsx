@@ -6,6 +6,7 @@ import { useAuthStore } from "@/lib/auth-store";
 import { useBack } from "@/lib/use-back";
 import { api } from "@/lib/api";
 import { LeaseType, GenderPreference, ListingCreate } from "@/types";
+import { FloorPlanUploader } from "@/components/listing/FloorPlanUploader";
 import type { PropertyResponse } from "@/types";
 import { ArrowLeft, DollarSign, Calendar, Users, Check, Home, Loader2, Image as ImageIcon, X, Upload, GripVertical } from "lucide-react";
 
@@ -30,6 +31,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
   const [loadingProperty, setLoadingProperty] = useState(true);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [floorPlanFiles, setFloorPlanFiles] = useState<File[]>([]);
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
@@ -255,6 +257,9 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
       // can retry from the property page — no data loss.
       try {
         await uploadImagesToListing(createdListing.id);
+        if (floorPlanFiles.length > 0) {
+          await api.listings.uploadFloorPlans(createdListing.id, floorPlanFiles);
+        }
       } catch (imgErr) {
         setError(
           (imgErr instanceof Error ? imgErr.message : "Image upload failed") +
@@ -603,6 +608,10 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
                 ✓ Great — you&apos;re in the sweet spot for visibility.
               </p>
             )}
+
+            <div className="pt-2 border-t border-black/[0.05]">
+              <FloorPlanUploader files={floorPlanFiles} onChange={setFloorPlanFiles} />
+            </div>
           </div>
 
           <div className="flex items-center gap-3 pt-2">
