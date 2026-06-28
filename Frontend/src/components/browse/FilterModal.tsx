@@ -250,6 +250,51 @@ const AMENITY_FILTERS = [
   { key: "utilities_included", label: "Utilities Incl.", icon: Zap },
 ] as const;
 
+const BED_OPTIONS = [1, 2, 3, 4, 5];
+const BATH_OPTIONS = [1, 2, 3];
+
+/* ── Count Selector ("Any / 1+ / 2+ …") ───────── */
+
+function CountSelector({
+  options,
+  value,
+  onChange,
+}: {
+  options: number[];
+  value: number | undefined;
+  onChange: (v: number | undefined) => void;
+}) {
+  const pill = (active: boolean) =>
+    `flex-1 min-w-[44px] py-2 rounded-xl border text-center transition-all ${
+      active
+        ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.06] text-[#FF6B35]"
+        : "border-[#1B2D45]/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15 hover:bg-[#1B2D45]/[0.02]"
+    }`;
+  return (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={() => onChange(undefined)}
+        className={pill(value === undefined)}
+        style={{ fontSize: "12px", fontWeight: value === undefined ? 600 : 500 }}
+      >
+        Any
+      </button>
+      {options.map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(value === n ? undefined : n)}
+          className={pill(value === n)}
+          style={{ fontSize: "12px", fontWeight: value === n ? 600 : 500 }}
+        >
+          {n}+
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /* ════════════════════════════════════════════════
    FILTER MODAL
    ════════════════════════════════════════════════ */
@@ -261,6 +306,8 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
     currentFilters.price_max ?? PRICE_MAX,
   ]);
   const [propertyType, setPropertyType] = useState<string | undefined>(currentFilters.property_type);
+  const [roomsMin, setRoomsMin] = useState<number | undefined>(currentFilters.rooms_min);
+  const [bathroomsMin, setBathroomsMin] = useState<number | undefined>(currentFilters.bathrooms_min);
   const [leaseType, setLeaseType] = useState<string | undefined>(currentFilters.lease_type);
   const [amenities, setAmenities] = useState({
     is_furnished: currentFilters.is_furnished ?? false,
@@ -283,6 +330,8 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
     if (isOpen) {
       setPriceRange([currentFilters.price_min ?? PRICE_MIN, currentFilters.price_max ?? PRICE_MAX]);
       setPropertyType(currentFilters.property_type);
+      setRoomsMin(currentFilters.rooms_min);
+      setBathroomsMin(currentFilters.bathrooms_min);
       setLeaseType(currentFilters.lease_type);
       setAmenities({
         is_furnished: currentFilters.is_furnished ?? false,
@@ -305,6 +354,8 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
   const activeFilterCount = [
     priceRange[0] > PRICE_MIN || priceRange[1] < PRICE_MAX,
     !!propertyType,
+    roomsMin !== undefined,
+    bathroomsMin !== undefined,
     !!leaseType,
     amenities.is_furnished,
     amenities.has_parking,
@@ -317,6 +368,8 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
   const handleReset = () => {
     setPriceRange([PRICE_MIN, PRICE_MAX]);
     setPropertyType(undefined);
+    setRoomsMin(undefined);
+    setBathroomsMin(undefined);
     setLeaseType(undefined);
     setAmenities({ is_furnished: false, has_parking: false, has_laundry: false, utilities_included: false });
     setProximityFilter(null);
@@ -333,6 +386,8 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
     if (priceRange[0] > PRICE_MIN) filters.price_min = priceRange[0];
     if (priceRange[1] < PRICE_MAX) filters.price_max = priceRange[1];
     if (propertyType) filters.property_type = propertyType;
+    if (roomsMin !== undefined) filters.rooms_min = roomsMin;
+    if (bathroomsMin !== undefined) filters.bathrooms_min = bathroomsMin;
     if (leaseType) filters.lease_type = leaseType;
     if (amenities.is_furnished) filters.is_furnished = true;
     if (amenities.has_parking) filters.has_parking = true;
@@ -433,6 +488,18 @@ export function FilterModal({ isOpen, onClose, onApply, currentFilters, resultCo
                     />
                   ))}
                 </div>
+              </div>
+
+              {/* Bedrooms */}
+              <div>
+                <SectionLabel>Bedrooms</SectionLabel>
+                <CountSelector options={BED_OPTIONS} value={roomsMin} onChange={setRoomsMin} />
+              </div>
+
+              {/* Bathrooms */}
+              <div>
+                <SectionLabel>Bathrooms</SectionLabel>
+                <CountSelector options={BATH_OPTIONS} value={bathroomsMin} onChange={setBathroomsMin} />
               </div>
 
               {/* Lease Type */}

@@ -8,7 +8,7 @@ import {
   useSpring,
   useInView,
 } from "framer-motion";
-import { Footprints, Grid2X2, HelpCircle, Home, LayoutList, Map as MapIcon, Pin, TrendingUp } from "lucide-react";
+import { Footprints, Grid2X2, Home, LayoutList, Map as MapIcon, Pin, TrendingUp } from "lucide-react";
 import { useIsMobile } from "@/hooks";
 import { useRouter } from "next/navigation";
 import { PolaroidCard } from "@/components/browse/PolaroidCard";
@@ -171,6 +171,8 @@ export default function BrowsePage() {
       filters.price_min !== undefined,
       filters.price_max !== undefined,
       !!filters.property_type,
+      filters.rooms_min !== undefined,
+      filters.bathrooms_min !== undefined,
       !!filters.lease_type,
       filters.is_furnished === true,
       filters.has_parking === true,
@@ -268,13 +270,6 @@ export default function BrowsePage() {
               <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{filteredListings.length} listings</span>{" "}
               available in Guelph
             </p>
-            <button
-              onClick={() => window.dispatchEvent(new Event("cribb:start-tour"))}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[#FF6B35]/20 bg-[#FF6B35]/[0.06] px-3 py-1 text-[#FF6B35] transition-colors hover:bg-[#FF6B35]/10"
-              style={{ fontSize: "12px", fontWeight: 600 }}
-            >
-              <HelpCircle className="h-3.5 w-3.5" /> Take a quick tour
-            </button>
           </div>
 
           {/* View toggle with indicator */}

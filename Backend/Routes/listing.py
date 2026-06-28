@@ -214,6 +214,9 @@ def list_listings(
     has_parking: Optional[bool] = Query(None),
     has_laundry: Optional[bool] = Query(None),
     utilities_included: Optional[bool] = Query(None),
+    # bed / bath filters (minimum, "N+" semantics)
+    rooms_min: Optional[int] = Query(None, ge=1, description="Minimum number of bedrooms"),
+    bathrooms_min: Optional[int] = Query(None, ge=1, description="Minimum number of bathrooms"),
     # distance filter
     distance_max: Optional[Decimal] = Query(None, description="Max km from campus"),
     # lease filters
@@ -274,6 +277,10 @@ def list_listings(
         query = query.filter(Property.has_laundry == has_laundry)
     if utilities_included is not None:
         query = query.filter(Property.utilities_included == utilities_included)
+    if rooms_min is not None:
+        query = query.filter(Property.total_rooms >= rooms_min)
+    if bathrooms_min is not None:
+        query = query.filter(Property.bathrooms >= bathrooms_min)
     if distance_max is not None:
         query = query.filter(Property.distance_to_campus_km <= distance_max)
 

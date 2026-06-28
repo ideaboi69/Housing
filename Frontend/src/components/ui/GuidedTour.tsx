@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, X, ShieldCheck, Pin, LayoutGrid, MessageCircle, Users, ShoppingBag } from "lucide-react";
+import { ArrowRight, X, ShieldCheck, Pin, LayoutGrid, MessageCircle, Users, ShoppingBag, LayoutDashboard, Building2, Home, Star } from "lucide-react";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { useAuthStore } from "@/lib/auth-store";
+import { useIsMobile } from "@/hooks";
 import { usePathname } from "next/navigation";
 
 /* ═══════════════════════════════════════════════════════
@@ -19,7 +20,7 @@ interface TourStep {
   color: string;
 }
 
-const TOUR_STEPS: TourStep[] = [
+const STUDENT_TOUR_STEPS: TourStep[] = [
   {
     selector: "[data-tour='health-score']",
     title: "Cribb Score",
@@ -64,6 +65,44 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
+const LANDLORD_TOUR_STEPS: TourStep[] = [
+  {
+    selector: "[data-tour='landlord-overview']",
+    title: "Your dashboard",
+    description: "Views, messages, upcoming showings, and listing performance — all at a glance the moment you log in.",
+    icon: <LayoutDashboard className="w-5 h-5" />,
+    color: "#1B2D45",
+  },
+  {
+    selector: "[data-tour='landlord-properties']",
+    title: "Add your properties",
+    description: "Start here. Each property holds the address, amenities, and details — then you create listings underneath it.",
+    icon: <Building2 className="w-5 h-5" />,
+    color: "#2EC4B6",
+  },
+  {
+    selector: "[data-tour='landlord-listings']",
+    title: "Create listings",
+    description: "Set rent, lease terms, and photos, then publish. Once your identity is verified, listings can go live instantly.",
+    icon: <Home className="w-5 h-5" />,
+    color: "#FF6B35",
+  },
+  {
+    selector: "[data-tour='landlord-reviews']",
+    title: "Reviews & Cribb Score",
+    description: "See what tenants say, track your Cribb Score, and respond to anything that gets flagged.",
+    icon: <Star className="w-5 h-5" />,
+    color: "#FFB627",
+  },
+  {
+    selector: "[data-tour='landlord-messages']",
+    title: "Message students",
+    description: "Chat with interested students in real time. New unread messages show up here with a badge.",
+    icon: <MessageCircle className="w-5 h-5" />,
+    color: "#6C5CE7",
+  },
+];
+
 const PAD = 10;
 const CARD_W = 320;
 const CARD_GAP = 16;
@@ -76,13 +115,21 @@ export function GuidedTour() {
   const pathname = usePathname();
   const { user } = useAuthStore();
   const { hydrated, isTipSeen, markTipSeen } = useOnboarding();
+  const isMobile = useIsMobile();
   const [active, setActive] = useState(false);
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState({ x: 0, y: 0, w: 0, h: 0 });
   const rafRef = useRef<number>(0);
 
-  const tourSeen = isTipSeen("guided-tour");
-  const shouldStart = hydrated && !!user && !tourSeen && pathname === "/browse";
+  // Role decides which tour runs, on which page, and under which seen-key.
+  const isLandlord = user?.role === "landlord";
+  const TOUR_STEPS = isLandlord ? LANDLORD_TOUR_STEPS : STUDENT_TOUR_STEPS;
+  const tourPage = isLandlord ? "/landlord" : "/browse";
+  const tourKey = isLandlord ? "guided-tour-landlord" : "guided-tour";
+
+  const tourSeen = isTipSeen(tourKey);
+  // No tour on mobile — the anchored elements live in the desktop nav/sidebar.
+  const shouldStart = hydrated && !!user && !isMobile && !tourSeen && pathname === tourPage;
 
   // Start tour
   useEffect(() => {
@@ -93,17 +140,6 @@ export function GuidedTour() {
     }, 1500);
     return () => clearTimeout(timer);
   }, [shouldStart]);
-
-  // Manual replay from a "Take the tour" button — restarts regardless of seen-state.
-  useEffect(() => {
-    const start = () => {
-      setStep(0);
-      setActive(true);
-      document.body.style.overflow = "hidden";
-    };
-    window.addEventListener("cribb:start-tour", start);
-    return () => window.removeEventListener("cribb:start-tour", start);
-  }, []);
 
   // Measure target element
   const measure = useCallback(() => {
@@ -176,7 +212,7 @@ export function GuidedTour() {
   function handleClose() {
     setActive(false);
     document.body.style.overflow = "";
-    markTipSeen("guided-tour");
+    markTipSeen(tourKey);
   }
 
   if (!active) return null;

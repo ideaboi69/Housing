@@ -465,6 +465,8 @@ export interface ListingFilters {
   has_parking?: boolean;
   has_laundry?: boolean;
   utilities_included?: boolean;
+  rooms_min?: number;
+  bathrooms_min?: number;
   distance_max?: number;
   lease_type?: string;
   is_sublet?: boolean;

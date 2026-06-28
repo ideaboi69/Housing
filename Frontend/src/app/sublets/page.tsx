@@ -678,6 +678,10 @@ function SubletFiltersModal({
   activeFilters,
   selectedRange,
   filteredCount,
+  bedsMin,
+  bathsMin,
+  onBedsChange,
+  onBathsChange,
   onToggleFilter,
   onClear,
   onClose,
@@ -686,6 +690,10 @@ function SubletFiltersModal({
   activeFilters: string[];
   selectedRange: [number, number];
   filteredCount: number;
+  bedsMin: number | undefined;
+  bathsMin: number | undefined;
+  onBedsChange: (v: number | undefined) => void;
+  onBathsChange: (v: number | undefined) => void;
   onToggleFilter: (key: string) => void;
   onClear: () => void;
   onClose: () => void;
@@ -778,12 +786,63 @@ function SubletFiltersModal({
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-[#1B2D45] mb-2" style={{ fontSize: "13px", fontWeight: 700 }}>
+                    Beds available
+                  </div>
+                  <div className="flex gap-1.5">
+                    {[undefined, 1, 2, 3].map((n) => {
+                      const active = bedsMin === n;
+                      return (
+                        <button
+                          key={n ?? "any"}
+                          onClick={() => onBedsChange(active ? undefined : n)}
+                          className={`flex-1 py-2 rounded-lg border text-center transition-all ${
+                            active
+                              ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
+                              : "border-black/[0.06] text-[#1B2D45]/55 hover:border-[#FF6B35]/20"
+                          }`}
+                          style={{ fontSize: "12px", fontWeight: active ? 700 : 500 }}
+                        >
+                          {n === undefined ? "Any" : `${n}+`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[#1B2D45] mb-2" style={{ fontSize: "13px", fontWeight: 700 }}>
+                    Bathrooms
+                  </div>
+                  <div className="flex gap-1.5">
+                    {[undefined, 1, 2, 3].map((n) => {
+                      const active = bathsMin === n;
+                      return (
+                        <button
+                          key={n ?? "any"}
+                          onClick={() => onBathsChange(active ? undefined : n)}
+                          className={`flex-1 py-2 rounded-lg border text-center transition-all ${
+                            active
+                              ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
+                              : "border-black/[0.06] text-[#1B2D45]/55 hover:border-[#FF6B35]/20"
+                          }`}
+                          style={{ fontSize: "12px", fontWeight: active ? 700 : 500 }}
+                        >
+                          {n === undefined ? "Any" : `${n}+`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
                     Amenities & Match Filters
                   </div>
-                  {activeFilters.filter((filter) => !proximityFilterKeys.includes(filter as ProximityFilterKey)).length > 0 && (
+                  {(activeFilters.filter((filter) => !proximityFilterKeys.includes(filter as ProximityFilterKey)).length > 0 || bedsMin !== undefined || bathsMin !== undefined) && (
                     <button
                       onClick={onClear}
                       className="text-[#FF6B35] hover:text-[#e55e2e]"
@@ -1878,6 +1937,8 @@ function SubletsContent() {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [selectedRange, setSelectedRange] = useState<[number, number]>([4, 6]); // May-Jul default (summer feel)
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [bedsMin, setBedsMin] = useState<number | undefined>(undefined);
+  const [bathsMin, setBathsMin] = useState<number | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState("");
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<SubletViewMode>("board");
@@ -1991,7 +2052,9 @@ function SubletsContent() {
       return prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key];
     });
   };
-  const clearFilters = () => setActiveFilters([]);
+  const clearFilters = () => { setActiveFilters([]); setBedsMin(undefined); setBathsMin(undefined); };
+  const extraFilterCount = (bedsMin !== undefined ? 1 : 0) + (bathsMin !== undefined ? 1 : 0);
+  const totalActiveFilters = activeFilters.length + extraFilterCount;
 
   const togglePin = (id: string) => {
     setPinnedIds((prev) => prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]);
@@ -2017,6 +2080,8 @@ function SubletsContent() {
       if (activeFilters.includes("private") && listing.roommatesStaying === null) return false;
       if (activeFilters.includes("entire") && listing.roommatesStaying !== null) return false;
       if (activeFilters.includes("parking") && !listing.amenities.includes("Parking")) return false;
+      if (bedsMin !== undefined && Number(listing.bedsAvailable) < bedsMin) return false;
+      if (bathsMin !== undefined && Number(listing.bathrooms) < bathsMin) return false;
       if (maxWalk !== undefined) {
         const walkMinutes = parseSubletWalkTime(listing.walkTime);
         if (walkMinutes == null || walkMinutes > maxWalk) return false;
@@ -2031,7 +2096,7 @@ function SubletsContent() {
       }
       return true;
     });
-  }, [listings, selectedRange, activeFilters, searchQuery, proximityFilterKeys]);
+  }, [listings, selectedRange, activeFilters, bedsMin, bathsMin, searchQuery, proximityFilterKeys]);
 
   useEffect(() => { setHydrated(true); }, []);
 
@@ -2045,7 +2110,7 @@ function SubletsContent() {
       <SearchAndFilters
         onSearchChange={setSearchQuery}
         onOpenFilters={() => setShowFiltersModal(true)}
-        activeFilterCount={activeFilters.length}
+        activeFilterCount={totalActiveFilters}
         placeholder="Search by street, neighborhood..."
       />
 
@@ -2055,9 +2120,9 @@ function SubletsContent() {
           <span className="text-[#1B2D45]/35" style={{ fontSize: "12px", fontWeight: 600 }}>
             {filteredListings.length} available
           </span>
-          {activeFilters.length > 0 && (
+          {totalActiveFilters > 0 && (
             <span className="rounded-full bg-white px-3 py-1.5 text-[#1B2D45]/45 border border-black/[0.06]" style={{ fontSize: "11px", fontWeight: 600 }}>
-              {activeFilters.length} filter{activeFilters.length !== 1 ? "s" : ""} active
+              {totalActiveFilters} filter{totalActiveFilters !== 1 ? "s" : ""} active
             </span>
           )}
         </div>
@@ -2083,6 +2148,10 @@ function SubletsContent() {
         activeFilters={activeFilters}
         selectedRange={selectedRange}
         filteredCount={filteredListings.length}
+        bedsMin={bedsMin}
+        bathsMin={bathsMin}
+        onBedsChange={setBedsMin}
+        onBathsChange={setBathsMin}
         onToggleFilter={toggleFilter}
         onClear={clearFilters}
         onClose={() => setShowFiltersModal(false)}

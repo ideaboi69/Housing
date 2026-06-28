@@ -14,7 +14,6 @@ import { FloorPlanSection } from "@/components/listing/FloorPlanSection";
 import { getMockSublet } from "@/lib/mock-sublets";
 import { isSampleSublet } from "@/lib/sample-data";
 import { SampleNote } from "@/components/ui/SampleBadge";
-import { BedBath } from "@/components/ui/BedBath";
 import { getMockReviews } from "@/lib/mock-data";
 import { useSavedStore } from "@/lib/saved-store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -530,7 +529,6 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 <div className="min-w-0">
                   <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.3px" }}>{sublet.title}</h1>
                   <div className="flex items-center gap-2 mt-1.5 text-[#1B2D45]/50"><MapPin className="w-3.5 h-3.5 shrink-0" /><span style={{ fontSize: "13px" }}>{sublet.address}</span></div>
-                  <div className="mt-2.5"><BedBath beds={`${sublet.bedsAvailable}/${sublet.bedsTotal}`} baths={sublet.bathrooms} size="md" /></div>
                 </div>
                 {score > 0 && <div className="shrink-0 text-center"><ScoreRing score={score} size={56} /><p className="mt-1" style={{ fontSize: "9px", fontWeight: 700, color: scoreColor }}>{getScoreLabel(score)}</p></div>}
               </div>

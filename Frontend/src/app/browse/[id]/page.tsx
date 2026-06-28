@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft, MapPin, Clock, Bus, Heart, Check, X, ChevronLeft, ChevronRight,
-  Bed, Bath, Calendar, MessageCircle, Share2, Flag, Zap, Ruler, AlertCircle, Star,
+  Bed, Calendar, MessageCircle, Share2, Flag, Zap, Ruler, AlertCircle, Star,
 } from "lucide-react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { getAmenityChecklist } from "@/lib/amenities";
@@ -32,7 +32,6 @@ import { getProximityFromKm, getProximityLabel } from "@/lib/proximity";
 import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
 import { isSampleListing } from "@/lib/sample-data";
 import { SampleNote } from "@/components/ui/SampleBadge";
-import { BedBath } from "@/components/ui/BedBath";
 import { FirstVisitTip } from "@/components/ui/FirstVisitTip";
 
 /* ── Animation helpers ─────────────────────────── */
@@ -627,9 +626,6 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   <div className="flex items-center gap-2 mt-1.5 text-[#1B2D45]/50">
                     <MapPin className="w-3.5 h-3.5 shrink-0" />
                     <span style={{ fontSize: "13px" }}>{listing.address}</span>
-                  </div>
-                  <div className="mt-2.5">
-                    <BedBath beds={listing.total_rooms} baths={listing.bathrooms} size="md" />
                   </div>
                 </div>
                 {overallScore > 0 && (

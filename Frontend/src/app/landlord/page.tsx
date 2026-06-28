@@ -112,6 +112,7 @@ function Sidebar({ active, onChange, unreadCount }: { active: Tab; onChange: (t:
         {tabs.map((t) => (
           <button
             key={t.key}
+            data-tour={`landlord-${t.key}`}
             onClick={() => onChange(t.key)}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg transition-colors text-left ${
               active === t.key

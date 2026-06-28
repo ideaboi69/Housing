@@ -124,15 +124,16 @@ function RotatingHeadline() {
     return () => clearInterval(interval);
   }, []);
   return (
-    <span className="inline-block relative" style={{ height: "1.1em", verticalAlign: "top" }}>
-      <AnimatePresence mode="wait">
+    <span className="inline-block relative overflow-hidden" style={{ height: "1.1em", verticalAlign: "top" }}>
+      <AnimatePresence mode="wait" initial={false}>
         <motion.span
-          key={heroRotatingLines[index]}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="inline-block"
+          key={index}
+          initial={{ opacity: 0, y: "100%" }}
+          animate={{ opacity: 1, y: "0%" }}
+          exit={{ opacity: 0, y: "-100%" }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="block whitespace-nowrap"
+          style={{ lineHeight: 1.1, willChange: "transform" }}
         >
           {heroRotatingLines[index]}
         </motion.span>
