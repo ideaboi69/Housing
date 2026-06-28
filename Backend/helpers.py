@@ -500,6 +500,7 @@ def build_sublet_list_response(sublet: Sublet) -> SubletListResponse:
         sublet_end_date=sublet.sublet_end_date,
         room_type=sublet.room_type,
         total_rooms=sublet.total_rooms,
+        bathrooms=sublet.bathrooms,
         is_furnished=sublet.is_furnished,
         has_parking=sublet.has_parking,
         has_laundry=sublet.has_laundry,

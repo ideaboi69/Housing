@@ -21,6 +21,7 @@ import { GOOGLE_MAPS_KEY, GUELPH_CENTER, loadGoogleMaps, projectLngLatToContaine
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import { isSampleSublet } from "@/lib/sample-data";
 import { SampleBadge } from "@/components/ui/SampleBadge";
+import { BedBath } from "@/components/ui/BedBath";
 import { OnboardingBanner } from "@/components/ui/OnboardingBanner";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -974,11 +975,14 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
           <AvailabilityTimeline months={listing.availableMonths} selectedRange={selectedRange} />
 
           {/* Price */}
-          <div className="flex items-baseline gap-2 mt-3">
-            <span className="text-[#FF6B35]" style={{ fontSize: "22px", fontWeight: 800 }}>
-              ${listing.subletPrice}<span style={{ fontSize: "12px", fontWeight: 500 }}>/mo</span>
-            </span>
-            <span className="text-[#1B2D45]/30 line-through" style={{ fontSize: "13px", fontWeight: 500 }}>${listing.originalPrice}</span>
+          <div className="flex items-end justify-between gap-2 mt-3">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[#FF6B35]" style={{ fontSize: "22px", fontWeight: 800 }}>
+                ${listing.subletPrice}<span style={{ fontSize: "12px", fontWeight: 500 }}>/mo</span>
+              </span>
+              <span className="text-[#1B2D45]/30 line-through" style={{ fontSize: "13px", fontWeight: 500 }}>${listing.originalPrice}</span>
+            </div>
+            <BedBath beds={`${listing.bedsAvailable}/${listing.bedsTotal}`} baths={listing.bathrooms} />
           </div>
 
           {/* Flexibility badges */}
@@ -1011,7 +1015,6 @@ function SubletCard({ listing, selectedRange, isMobile, isPinned, onTogglePin }:
           <div className="flex flex-wrap gap-2 mt-3">
             <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>📍 {listing.distance}</span>
             <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>🚗 {listing.driveTime}</span>
-            <span className="bg-[#1B2D45]/5 text-[#1B2D45]/50 px-2.5 py-1 rounded" style={{ fontSize: "10px", fontWeight: 500 }}>{listing.bedsAvailable}/{listing.bedsTotal} beds</span>
           </div>
 
           {/* Amenities */}
@@ -1546,7 +1549,7 @@ function SubletGridCard({ listing, selectedRange, isPinned, onTogglePin }: { lis
             🚗 {listing.driveTime}
           </div>
           <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
-            🛏 {listing.bedsAvailable}/{listing.bedsTotal} beds
+            🛏 {listing.bedsAvailable}/{listing.bedsTotal}{listing.bathrooms != null ? ` · 🛁 ${listing.bathrooms}` : ""}
           </div>
           <div className="rounded-xl bg-[#FAF8F4] px-2.5 py-2 text-[#1B2D45]" style={{ fontSize: "10px", fontWeight: 700 }}>
             {listing.posterIsStudent ? "🎓 Student post" : "🏢 Managed post"}

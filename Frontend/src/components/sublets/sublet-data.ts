@@ -26,6 +26,7 @@ export interface SubletListing {
   roommateDesc: string | null;
   bedsAvailable: number;
   bedsTotal: number;
+  bathrooms?: number | null;
   distance: string;
   walkTime: string;
   driveTime: string;
@@ -106,6 +107,7 @@ function mapMockDetailToListing(
     roommateDesc: detail.roommateDesc,
     bedsAvailable: detail.bedsAvailable,
     bedsTotal: detail.bedsTotal,
+    bathrooms: detail.bathrooms,
     distance: `${detail.distanceKm.toFixed(1)} km`,
     walkTime: `${detail.walkTime} min`,
     driveTime: `${Math.max(1, Math.round(detail.walkTime / 4))} min`,
@@ -244,6 +246,7 @@ export function mapApiSubletToListing(sublet: SubletListResponse): SubletListing
     roommateDesc: occupancy.roommateDesc,
     bedsAvailable: occupancy.bedsAvailable,
     bedsTotal,
+    bathrooms: sublet.bathrooms != null ? Number(sublet.bathrooms) : null,
     distance: `${distance.toFixed(1)} km`,
     walkTime: `${walkTime} min`,
     driveTime: `${driveTime || Math.max(1, Math.round(walkTime / 4))} min`,

@@ -14,6 +14,7 @@ import { FloorPlanSection } from "@/components/listing/FloorPlanSection";
 import { getMockSublet } from "@/lib/mock-sublets";
 import { isSampleSublet } from "@/lib/sample-data";
 import { SampleNote } from "@/components/ui/SampleBadge";
+import { BedBath } from "@/components/ui/BedBath";
 import { getMockReviews } from "@/lib/mock-data";
 import { useSavedStore } from "@/lib/saved-store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -529,6 +530,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
                 <div className="min-w-0">
                   <h1 className="text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.3px" }}>{sublet.title}</h1>
                   <div className="flex items-center gap-2 mt-1.5 text-[#1B2D45]/50"><MapPin className="w-3.5 h-3.5 shrink-0" /><span style={{ fontSize: "13px" }}>{sublet.address}</span></div>
+                  <div className="mt-2.5"><BedBath beds={`${sublet.bedsAvailable}/${sublet.bedsTotal}`} baths={sublet.bathrooms} size="md" /></div>
                 </div>
                 {score > 0 && <div className="shrink-0 text-center"><ScoreRing score={score} size={56} /><p className="mt-1" style={{ fontSize: "9px", fontWeight: 700, color: scoreColor }}>{getScoreLabel(score)}</p></div>}
               </div>
@@ -564,7 +566,7 @@ export default function SubletDetailPage({ params }: { params: Promise<{ id: str
               </div>
 
               {/* Quick facts */}
-              <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+              <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" animate="visible">
                 {[{ label: "Beds", value: `${sublet.bedsAvailable} of ${sublet.bedsTotal}`, icon: Bed }, { label: "Bath", value: `${sublet.bathrooms}`, icon: Bath }, { label: "Type", value: `${sublet.propertyType || "Private"}`.charAt(0).toUpperCase() + `${sublet.propertyType || "Private"}`.slice(1), icon: MapPin }, { label: "Area", value: sublet.neighborhood, icon: MapPin }].map((fact) => {
                   const Icon = fact.icon;
                   return <motion.div key={fact.label} variants={fadeUp} className="bg-[#FAF8F4] rounded-xl p-3"><div className="flex items-center gap-1.5"><Icon className="w-3 h-3 text-[#FF6B35]/50" /><span className="text-[#1B2D45]/35" style={{ fontSize: "10px", fontWeight: 600 }}>{fact.label}</span></div><div className="text-[#1B2D45] mt-1" style={{ fontSize: "13px", fontWeight: 700 }}>{fact.value}</div></motion.div>;

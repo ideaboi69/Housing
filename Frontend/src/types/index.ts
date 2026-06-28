@@ -672,6 +672,7 @@ export interface SubletListResponse {
   sublet_end_date: string;
   room_type: SubletRoomType;
   total_rooms: number;
+  bathrooms: number;
   is_furnished: boolean;
   has_parking: boolean;
   has_laundry: boolean;

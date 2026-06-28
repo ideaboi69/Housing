@@ -32,6 +32,8 @@ import { getProximityFromKm, getProximityLabel } from "@/lib/proximity";
 import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
 import { isSampleListing } from "@/lib/sample-data";
 import { SampleNote } from "@/components/ui/SampleBadge";
+import { BedBath } from "@/components/ui/BedBath";
+import { FirstVisitTip } from "@/components/ui/FirstVisitTip";
 
 /* ── Animation helpers ─────────────────────────── */
 
@@ -606,6 +608,14 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               <ImageGallery images={images} />
             </motion.div>
 
+            {user && !isLandlord && (
+              <div className="mt-6">
+                <FirstVisitTip tipKey="listing-intro" title="What you can do here">
+                  Tap the heart to save a place and compare your picks, message the landlord with questions, and book a showing — all from the sidebar.
+                </FirstVisitTip>
+              </div>
+            )}
+
             {/* Title + address + score */}
             <motion.div variants={fadeUp} className="mt-6 bg-white rounded-xl border border-black/[0.04] p-5 md:p-6"
               style={{ boxShadow: "0 1px 4px rgba(27,45,69,0.03)" }}>
@@ -617,6 +627,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                   <div className="flex items-center gap-2 mt-1.5 text-[#1B2D45]/50">
                     <MapPin className="w-3.5 h-3.5 shrink-0" />
                     <span style={{ fontSize: "13px" }}>{listing.address}</span>
+                  </div>
+                  <div className="mt-2.5">
+                    <BedBath beds={listing.total_rooms} baths={listing.bathrooms} size="md" />
                   </div>
                 </div>
                 {overallScore > 0 && (
@@ -632,7 +645,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               {isSampleListing(listingId) && <SampleNote className="mt-4" />}
 
               {/* Quick facts */}
-              <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+              <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" animate="visible">
                 {[
                   { label: "Type", value: formatPropertyType(listing.property_type), icon: Ruler },
                   { label: "Rooms", value: `${listing.total_rooms} bed · ${listing.bathrooms} bath`, icon: Bed },

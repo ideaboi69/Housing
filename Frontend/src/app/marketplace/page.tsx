@@ -12,6 +12,7 @@ import { MARKETPLACE_CATEGORIES, CONDITION_LABELS, getPriceLabel, timeAgo } from
 import { isSampleMarketplaceItem } from "@/lib/sample-data";
 import { SampleBadge } from "@/components/ui/SampleBadge";
 import { OnboardingBanner } from "@/components/ui/OnboardingBanner";
+import { FirstVisitTip } from "@/components/ui/FirstVisitTip";
 import { cloudinaryUrl } from "@/lib/cloudinary";
 import type { MarketplaceItemListResponse, MarketplaceCategory, ItemCondition } from "@/types";
 import { toast } from "sonner";
@@ -259,6 +260,9 @@ export default function MarketplacePage() {
           </div>
         )}
         <AnimatePresence>{showBanner && <SeasonalBanner onDismiss={dismissBanner} canSell={!isLandlord} />}</AnimatePresence>
+        <FirstVisitTip tipKey="marketplace-intro" title="How the marketplace works">
+          Filter by category in the sidebar, search up top, and tap an item to message the seller and arrange pickup{!isLandlord ? " — or hit “Sell Something” to post your own" : ""}.
+        </FirstVisitTip>
         <div className="flex md:hidden items-center gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 mb-4">
           <button onClick={() => setActiveCategory("all")} className={`px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === "all" ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === "all" ? 700 : 500 }}>All</button>
           {MARKETPLACE_CATEGORIES.map((cat) => (<button key={cat.key} onClick={() => setActiveCategory(cat.key)} className={`px-3.5 py-2 rounded-full border transition-all shrink-0 ${activeCategory === cat.key ? "border-[#FF6B35] bg-[#FF6B35]/[0.08] text-[#FF6B35]" : "border-black/[0.06] text-[#1B2D45]/50 hover:border-[#1B2D45]/15"}`} style={{ fontSize: "12px", fontWeight: activeCategory === cat.key ? 700 : 500 }}>{cat.label}</button>))}

@@ -164,6 +164,7 @@ class SubletListResponse(BaseModel):
     sublet_end_date: date
     room_type: RoomType
     total_rooms: int
+    bathrooms: int
     is_furnished: bool
     has_parking: bool
     has_laundry: bool

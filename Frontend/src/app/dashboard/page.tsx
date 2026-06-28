@@ -25,6 +25,7 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { RequestWriterAccessModal } from "@/components/ui/RequestWriterAccessModal";
 import { DashboardSkeleton } from "@/components/ui/Skeletons";
+import { FirstVisitTip } from "@/components/ui/FirstVisitTip";
 import type {
   PostListResponse,
   ReviewResponse,
@@ -420,6 +421,10 @@ export default function StudentDashboardPage() {
             </div>
           </button>
         </div>
+
+        <FirstVisitTip tipKey="dashboard-intro" title="This is your home base">
+          Jump to your saved places, messages, viewings, marketplace, and roommates from the tiles below. Finish your profile (top-right) to stand out to landlords and roommates.
+        </FirstVisitTip>
 
         {/* At-a-glance numbers — Saved & Messages click through to their pages */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

@@ -16,6 +16,7 @@ import type { ListingDetailResponse } from "@/types";
 import { getProximityLabel } from "@/lib/proximity";
 import { isSampleListing } from "@/lib/sample-data";
 import { SampleBadge } from "@/components/ui/SampleBadge";
+import { BedBath } from "@/components/ui/BedBath";
 
 interface PolaroidCardProps {
   listing: ListingDetailResponse;
@@ -265,21 +266,24 @@ export function PolaroidCard({
                   {listing.address}
                 </p>
 
-                <div className="flex items-baseline gap-1 mt-2.5">
-                  <span
-                    className="text-[#FF6B35]"
-                    style={{ fontSize: "21px", fontWeight: 800 }}
-                  >
-                    {listing.per_room_pricing
-                      ? `From ${formatPrice(Number(listing.rent_min || listing.rent_per_room))}`
-                      : formatPrice(Number(listing.rent_per_room))}
-                  </span>
-                  <span
-                    className="text-[#1B2D45]/30"
-                    style={{ fontSize: "11px", fontWeight: 500 }}
-                  >
-                    /room/mo
-                  </span>
+                <div className="flex items-end justify-between gap-2 mt-2.5">
+                  <div className="flex items-baseline gap-1">
+                    <span
+                      className="text-[#FF6B35]"
+                      style={{ fontSize: "21px", fontWeight: 800 }}
+                    >
+                      {listing.per_room_pricing
+                        ? `From ${formatPrice(Number(listing.rent_min || listing.rent_per_room))}`
+                        : formatPrice(Number(listing.rent_per_room))}
+                    </span>
+                    <span
+                      className="text-[#1B2D45]/30"
+                      style={{ fontSize: "11px", fontWeight: 500 }}
+                    >
+                      /room/mo
+                    </span>
+                  </div>
+                  <BedBath beds={listing.total_rooms} baths={listing.bathrooms} />
                 </div>
 
                 <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -302,12 +306,6 @@ export function PolaroidCard({
                     style={{ fontSize: "10px", fontWeight: 500 }}
                   >
                     {formatPropertyType(listing.property_type)}
-                  </span>
-                  <span
-                    className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2.5 py-1 rounded"
-                    style={{ fontSize: "10px", fontWeight: 500 }}
-                  >
-                    {listing.total_rooms} bed
                   </span>
                   {leaseLabel && (
                     <span
@@ -392,21 +390,24 @@ export function PolaroidCard({
                   {listing.address}
                 </p>
 
-                <div className="flex items-baseline gap-1 mt-1.5">
-                  <span
-                    className="text-[#FF6B35]"
-                    style={{ fontSize: "22px", fontWeight: 800 }}
-                  >
-                    {listing.per_room_pricing
-                      ? `From ${formatPrice(Number(listing.rent_min || listing.rent_per_room))}`
-                      : formatPrice(Number(listing.rent_per_room))}
-                  </span>
-                  <span
-                    className="text-[#1B2D45]/30"
-                    style={{ fontSize: "11px", fontWeight: 500 }}
-                  >
-                    /room/mo
-                  </span>
+                <div className="flex items-end justify-between gap-2 mt-1.5">
+                  <div className="flex items-baseline gap-1">
+                    <span
+                      className="text-[#FF6B35]"
+                      style={{ fontSize: "22px", fontWeight: 800 }}
+                    >
+                      {listing.per_room_pricing
+                        ? `From ${formatPrice(Number(listing.rent_min || listing.rent_per_room))}`
+                        : formatPrice(Number(listing.rent_per_room))}
+                    </span>
+                    <span
+                      className="text-[#1B2D45]/30"
+                      style={{ fontSize: "11px", fontWeight: 500 }}
+                    >
+                      /room/mo
+                    </span>
+                  </div>
+                  <BedBath beds={listing.total_rooms} baths={listing.bathrooms} />
                 </div>
 
                 <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -429,18 +430,6 @@ export function PolaroidCard({
                     style={{ fontSize: "10px", fontWeight: 500 }}
                   >
                     {formatPropertyType(listing.property_type)}
-                  </span>
-                  <span
-                    className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded"
-                    style={{ fontSize: "10px", fontWeight: 500 }}
-                  >
-                    {listing.total_rooms} bed
-                  </span>
-                  <span
-                    className="bg-[#1B2D45]/5 text-[#1B2D45]/55 px-2 py-0.5 rounded"
-                    style={{ fontSize: "10px", fontWeight: 500 }}
-                  >
-                    {listing.bathrooms} bath
                   </span>
                   {leaseLabel && (
                     <span
