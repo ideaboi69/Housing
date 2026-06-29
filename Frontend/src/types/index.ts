@@ -294,6 +294,11 @@ export interface PropertyCreate {
   property_type: PropertyType;
   total_rooms: number;
   bathrooms: number;
+  // Apartment-only bed/bath ranges (e.g. bed_min=1, bed_max=3 → "1-3 bed")
+  bed_min?: number | null;
+  bed_max?: number | null;
+  bath_min?: number | null;
+  bath_max?: number | null;
   is_furnished?: boolean;
   has_parking?: boolean;
   has_laundry?: boolean;
@@ -337,6 +342,13 @@ export interface ListingResponse {
   gender_preference: string | null;
   status: string;
   rejection_reason?: string | null;
+  // apartment unit-type fields (apartments only — null otherwise)
+  unit_label?: string | null;
+  beds?: number | null;
+  baths?: number | null;
+  sqft?: number | null;
+  units_total?: number | null;
+  units_available?: number | null;
   view_count: number;
   images?: ListingImageResponse[];
   created_at: string;
@@ -385,6 +397,13 @@ export interface ListingDetailResponse {
   view_count: number;
   created_at: string;
   updated_at: string;
+  // apartment unit-type fields (apartments only — null otherwise)
+  unit_label?: string | null;
+  beds?: number | null;
+  baths?: number | null;
+  sqft?: number | null;
+  units_total?: number | null;
+  units_available?: number | null;
   // property info
   property_id: number;
   title: string;
@@ -437,6 +456,13 @@ export interface ListingCreate {
   rent_total?: number;
   per_room_pricing: boolean;
   rooms?: ListingRoomCreate[];
+  // apartment unit-type fields
+  unit_label?: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  units_total?: number;
+  units_available?: number;
   lease_type: LeaseType;
   custom_lease_type?: string;
   move_in_date?: string | null;
@@ -450,6 +476,12 @@ export interface ListingCreate {
 export interface ListingUpdate {
   rent_per_room?: number;
   rent_total?: number;
+  unit_label?: string;
+  beds?: number;
+  baths?: number;
+  sqft?: number;
+  units_total?: number;
+  units_available?: number;
   lease_type?: LeaseType;
   move_in_date?: string | null;
   has_flexible_move_in?: boolean;
@@ -478,6 +510,65 @@ export interface ListingFilters {
   sort_order?: "asc" | "desc";
   skip?: number;
   limit?: number;
+}
+
+// ── Apartment building (2-level: building → unit types) ──
+
+export interface BuildingUnitResponse {
+  id: number; // underlying listing id (links to /browse/[id])
+  unit_label?: string | null;
+  beds?: number | null;
+  baths?: number | null;
+  sqft?: number | null;
+  rent: number; // monthly rent for this unit type
+  lease_type: string;
+  units_total?: number | null;
+  units_available?: number | null;
+  status: string;
+  floor_plan_image?: string | null;
+  images?: ListingImageResponse[];
+  overall_score?: number | null;
+}
+
+export interface BuildingResponse {
+  id: number; // property id
+  title: string;
+  address: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  property_type: string;
+  price_min?: number | null;
+  price_max?: number | null;
+  bed_min?: number | null;
+  bed_max?: number | null;
+  bath_min?: number | null;
+  bath_max?: number | null;
+  unit_count: number;
+  amenities?: SpaceAmenities;
+  policies?: ListingPolicies;
+  is_furnished?: boolean;
+  has_parking?: boolean;
+  has_laundry?: boolean;
+  utilities_included?: boolean;
+  has_wifi?: boolean;
+  has_air_conditioning?: boolean;
+  has_dishwasher?: boolean;
+  has_gym?: boolean;
+  has_elevator?: boolean;
+  has_balcony?: boolean;
+  wheelchair_accessible?: boolean;
+  estimated_utility_cost?: number | null;
+  distance_to_campus_km?: number | null;
+  walk_time_minutes?: number | null;
+  bus_time_minutes?: number | null;
+  drive_time_minutes?: number | null;
+  nearest_bus_route?: string | null;
+  images?: ListingImageResponse[];
+  landlord_id: number;
+  landlord_name: string;
+  landlord_verified: boolean;
+  landlord_is_early_adopter?: boolean;
+  units: BuildingUnitResponse[];
 }
 
 // ── Review ─────────────────────────────────────────────

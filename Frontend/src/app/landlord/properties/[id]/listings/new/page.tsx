@@ -46,7 +46,13 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
     sublet_start_date: "",
     sublet_end_date: "",
     gender_preference: GenderPreference.ANY,
-    
+    // apartment unit-type fields
+    unit_label: "",
+    beds: "",
+    baths: "",
+    sqft: "",
+    units_total: "",
+    units_available: "",
   });
   const [perRoomPricing, setPerRoomPricing] = useState(false);
   const [rooms, setRooms] = useState<{ label: string; rent: string }[]>([]);
@@ -78,6 +84,8 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
       return next;
     });
   }, [property]);
+
+  const isApartment = property?.property_type === "apartment";
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -203,7 +211,11 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
   }
 
   function validate(): boolean {
-    if (perRoomPricing) {
+    if (isApartment) {
+      if (!form.unit_label.trim()) { setError("Give this unit type a name (e.g. \"1 Bedroom\")"); return false; }
+      if (!form.beds) { setError("Number of bedrooms is required"); return false; }
+      if (!form.rent_total || Number(form.rent_total) <= 0) { setError("Monthly rent for this unit is required"); return false; }
+    } else if (perRoomPricing) {
       if (!rooms.every((r) => r.rent && Number(r.rent) > 0)) { setError("Set a rent for every room"); return false; }
     } else if (!form.rent_per_room) {
       setError("Rent per room is required"); return false;
@@ -240,7 +252,19 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
         gender_preference: form.gender_preference !== GenderPreference.ANY ? form.gender_preference : undefined,
       };
 
-      if (perRoomPricing) {
+      if (isApartment) {
+        // Apartment unit type: single monthly rent + unit details
+        const unitRent = Number(form.rent_total);
+        payload.per_room_pricing = false;
+        payload.rent_total = unitRent;
+        payload.rent_per_room = unitRent;
+        payload.unit_label = form.unit_label.trim();
+        payload.beds = Number(form.beds);
+        if (form.baths) payload.baths = Number(form.baths);
+        if (form.sqft) payload.sqft = Number(form.sqft);
+        if (form.units_total) payload.units_total = Number(form.units_total);
+        if (form.units_available) payload.units_available = Number(form.units_available);
+      } else if (perRoomPricing) {
         payload.rooms = rooms.map((r, i) => ({
           label: r.label || `Room ${i + 1}`,
           rent: Number(r.rent),
@@ -326,6 +350,52 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
 
         <form onSubmit={handleReview} className="space-y-6">
           {/* Pricing */}
+          {isApartment ? (
+            <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
+              <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
+                <DollarSign className="w-4 h-4 text-[#1B2D45]" /> Unit type &amp; pricing
+              </h2>
+              <p className="text-[#1B2D45]/40" style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                Each unit type (floor plan) in this building is its own listing — e.g. &quot;1 Bedroom&quot;, &quot;2 Bedroom&quot;. Add one now; you can add more unit types from the property page. Students see them all grouped on the building page.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Unit type name</label>
+                  <input type="text" value={form.unit_label} onChange={(e) => update("unit_label", e.target.value)} placeholder="1 Bedroom" className="mt-1.5 w-full px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all" style={{ fontSize: "14px" }} />
+                </div>
+                <div>
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bedrooms</label>
+                  <input type="number" min="0" value={form.beds} onChange={(e) => update("beds", e.target.value)} placeholder="1" className="mt-1.5 w-full px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all" style={{ fontSize: "14px" }} />
+                </div>
+                <div>
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bathrooms</label>
+                  <input type="number" min="0" value={form.baths} onChange={(e) => update("baths", e.target.value)} placeholder="1" className="mt-1.5 w-full px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all" style={{ fontSize: "14px" }} />
+                </div>
+                <div>
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Square feet <span className="text-[#1B2D45]/30">(optional)</span></label>
+                  <input type="number" min="0" value={form.sqft} onChange={(e) => update("sqft", e.target.value)} placeholder="560" className="mt-1.5 w-full px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all" style={{ fontSize: "14px" }} />
+                </div>
+                <div>
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Monthly rent</label>
+                  <div className="relative mt-1.5">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1B2D45]/30" style={{ fontSize: "14px" }}>$</span>
+                    <input type="number" min="0" value={form.rent_total} onChange={(e) => update("rent_total", e.target.value)} placeholder="1750" className="w-full pl-8 pr-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all" style={{ fontSize: "14px" }} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Total units of this type <span className="text-[#1B2D45]/30">(optional)</span></label>
+                  <input type="number" min="0" value={form.units_total} onChange={(e) => update("units_total", e.target.value)} placeholder="12" className="mt-1.5 w-full px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all" style={{ fontSize: "14px" }} />
+                </div>
+                <div>
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Units available <span className="text-[#1B2D45]/30">(optional)</span></label>
+                  <input type="number" min="0" value={form.units_available} onChange={(e) => update("units_available", e.target.value)} placeholder="4" className="mt-1.5 w-full px-4 py-2.5 rounded-lg bg-white border border-[#1B2D45]/15 focus:border-[#1B2D45]/45 focus:ring-2 focus:ring-[#1B2D45]/10 focus:outline-none transition-all" style={{ fontSize: "14px" }} />
+                </div>
+              </div>
+              <p className="text-[#1B2D45]/35 pt-1" style={{ fontSize: "11px" }}>
+                Tip: upload this unit&apos;s floor-plan diagram in the floor-plan section below — it shows on the building page.
+              </p>
+            </div>
+          ) : (
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
             <div className="flex items-start justify-between gap-4">
               <h2 className="text-[#1B2D45] flex items-center gap-2" style={{ fontSize: "15px", fontWeight: 700 }}>
@@ -424,6 +494,7 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
               </>
             )}
           </div>
+          )}
 
           {/* Lease Details */}
           <div className="bg-white rounded-xl border border-black/[0.06] p-5 space-y-4">
@@ -659,7 +730,15 @@ function NewListingPageContent({ params }: { params: Promise<{ id: string }> }) 
               <dl className="divide-y divide-black/[0.05]">
                 {[
                   { label: "Property", value: property?.title ?? "—" },
-                  { label: "Pricing", value: perRoomPricing ? `Per room · ${rooms.length} room${rooms.length === 1 ? "" : "s"}` : `$${form.rent_per_room || 0}/room` },
+                  ...(isApartment
+                    ? [
+                        { label: "Unit type", value: `${form.unit_label || "—"} · ${form.beds || 0} bed${form.baths ? ` · ${form.baths} bath` : ""}${form.sqft ? ` · ${form.sqft} sq ft` : ""}` },
+                        { label: "Pricing", value: `$${form.rent_total || 0}/mo` },
+                        ...(form.units_total ? [{ label: "Availability", value: `${form.units_available || 0} of ${form.units_total} available` }] : []),
+                      ]
+                    : [
+                        { label: "Pricing", value: perRoomPricing ? `Per room · ${rooms.length} room${rooms.length === 1 ? "" : "s"}` : `$${form.rent_per_room || 0}/room` },
+                      ]),
                   { label: "Lease type", value: form.lease_type === LeaseType.CUSTOM ? (form.custom_lease_type || "Custom") : (leaseTypes.find((t) => t.value === form.lease_type)?.label ?? form.lease_type) },
                   { label: "Move-in", value: form.has_flexible_move_in ? "Flexible" : (form.move_in_date || "—") },
                   { label: "Gender preference", value: form.gender_preference === GenderPreference.ANY ? "Any" : form.gender_preference },

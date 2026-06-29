@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { X, Loader2, AlertCircle, Home, Sparkles, MapPin, Check, Image as ImageIcon } from "lucide-react";
+import { useRef, useState } from "react";
+import { X, Loader2, AlertCircle, AlertTriangle, Home, Sparkles, MapPin, Check, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, ApiError } from "@/lib/api";
 import { findBlockedField, BLOCKED_CONTENT_MESSAGE } from "@/lib/content-filter";
 import { PropertyType } from "@/types";
 import type { PetPolicy, SmokingPolicy } from "@/types";
 import type { PropertyResponse, PropertyImageResponse } from "@/types";
-import { PropertyImageManager } from "@/components/landlord/PropertyImageManager";
+import { PropertyImageManager, type PropertyImageManagerHandle } from "@/components/landlord/PropertyImageManager";
 import { AddressAutocomplete, type AddressSelection } from "@/components/ui/AddressAutocomplete";
 import { fetchProximityToUC } from "@/lib/proximity-google";
 
@@ -22,12 +22,21 @@ interface EditPropertyModalProps {
   onClose: () => void;
   onSaved: (updated: PropertyResponse) => void;
   initialTab?: Tab;
+  /** IDs of listings under this property currently in ACTIVE status. If
+   *  non-empty the modal shows a warning and, on Save, briefly unpublishes
+   *  them so the property edit applies cleanly, then re-publishes. */
+  activeListingIds?: number[];
+  /** Called after re-publish so the parent can refresh listing state. */
+  onListingsRefreshed?: () => void;
 }
 
-export function EditPropertyModal({ property, onClose, onSaved, initialTab = "basics" }: EditPropertyModalProps) {
+export function EditPropertyModal({ property, onClose, onSaved, initialTab = "basics", activeListingIds = [], onListingsRefreshed }: EditPropertyModalProps) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmRedraft, setConfirmRedraft] = useState(false);
+  const hasActiveListings = activeListingIds.length > 0;
+  const imageManagerRef = useRef<PropertyImageManagerHandle>(null);
   const [images, setImages] = useState<PropertyImageResponse[]>(property.images ?? []);
 
   // Basics
@@ -93,9 +102,31 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
 
   const handleSave = async () => {
     if (findBlockedField({ Title: title, Address: address })) { setError(BLOCKED_CONTENT_MESSAGE); return; }
+    // Active listings present? Confirm once, then orchestrate redraft.
+    if (hasActiveListings && !confirmRedraft) { setConfirmRedraft(true); return; }
     setSaving(true);
     setError("");
+
+    // Track which listings we successfully unpublished so we know what to
+    // re-publish (or report) regardless of save outcome.
+    const unpublished: number[] = [];
     try {
+      // Commit any photo deletions the landlord staged in the Photos tab.
+      try {
+        await imageManagerRef.current?.commitPendingDeletes();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Couldn't delete one or more photos");
+        setSaving(false);
+        return;
+      }
+
+      if (hasActiveListings) {
+        for (const id of activeListingIds) {
+          await api.listings.unpublish(id);
+          unpublished.push(id);
+        }
+      }
+
       const updated = await api.properties.update(property.id, {
         title: title.trim(),
         property_type: propertyType,
@@ -125,9 +156,30 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
         nearest_bus_route: nearestBusRoute.trim() || undefined,
         ...(latLng ? { latitude: latLng.lat, longitude: latLng.lng } : {}),
       });
+      // Re-publish whatever we took offline so the listings go live again.
+      const republishFailures: number[] = [];
+      for (const id of unpublished) {
+        try {
+          await api.listings.publish(id);
+        } catch {
+          republishFailures.push(id);
+        }
+      }
+
       onSaved(updated);
+      onListingsRefreshed?.();
+      if (republishFailures.length > 0) {
+        setError(`Saved, but couldn't re-publish ${republishFailures.length} listing(s). Re-publish them from the listings tab.`);
+        setSaving(false);
+        return;
+      }
       onClose();
     } catch (err) {
+      // Attempt to re-publish anything we took offline before the failure so
+      // we don't leave the landlord with silently-drafted listings.
+      for (const id of unpublished) {
+        try { await api.listings.publish(id); } catch { /* surfaced below */ }
+      }
       if (err instanceof ApiError) setError(err.detail || "Failed to save changes");
       else setError("Failed to save changes");
       setSaving(false);
@@ -154,7 +206,7 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
         initial={{ scale: 0.95, opacity: 0, y: 10 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.95, opacity: 0, y: 10 }}
-        className="bg-white rounded-2xl w-full overflow-hidden flex flex-col"
+        className="relative bg-white rounded-2xl w-full overflow-hidden flex flex-col"
         style={{ maxWidth: "560px", maxHeight: "90vh", boxShadow: "0 24px 80px rgba(0,0,0,0.15)" }}
       >
         {/* Header */}
@@ -183,6 +235,16 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
             </button>
           ))}
         </div>
+
+        {/* Active-listing warning */}
+        {hasActiveListings && (
+          <div className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-[#FFB627]/40 bg-[#FFB627]/10 px-3 py-2.5">
+            <AlertTriangle className="w-3.5 h-3.5 mt-[2px] shrink-0 text-[#B45309]" />
+            <p className="text-[#1B2D45]/75" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+              This property has <span style={{ fontWeight: 700 }}>{activeListingIds.length} active listing{activeListingIds.length === 1 ? "" : "s"}</span>. Saving will briefly take {activeListingIds.length === 1 ? "it" : "them"} offline and re-publish automatically.
+            </p>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -421,6 +483,7 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
           {tab === "photos" && (
             <Field label="Property photos">
               <PropertyImageManager
+                ref={imageManagerRef}
                 propertyId={property.id}
                 initialImages={images}
                 onChanged={(next) => {
@@ -462,6 +525,45 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
             {saving ? (<><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...</>) : (<><Check className="w-3.5 h-3.5" /> Save changes</>)}
           </button>
         </div>
+
+        {/* Confirm redraft */}
+        {confirmRedraft && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-black/35 px-4">
+            <div className="w-full max-w-[380px] rounded-xl bg-white p-5" style={{ boxShadow: "0 16px 50px rgba(0,0,0,0.18)" }}>
+              <div className="flex items-start gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-[#FFB627]/15 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-[#B45309]" />
+                </div>
+                <div>
+                  <h4 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 800 }}>
+                    Take {activeListingIds.length} listing{activeListingIds.length === 1 ? "" : "s"} offline?
+                  </h4>
+                  <p className="text-[#1B2D45]/55 mt-1" style={{ fontSize: "12px", lineHeight: 1.45 }}>
+                    We&apos;ll switch {activeListingIds.length === 1 ? "it" : "them"} to draft, save your changes, then re-publish. Students won&apos;t see {activeListingIds.length === 1 ? "the listing" : "the listings"} for a few seconds.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => setConfirmRedraft(false)}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded-lg text-[#1B2D45]/55 hover:bg-black/[0.04] transition-colors disabled:opacity-50"
+                  style={{ fontSize: "12px", fontWeight: 600 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-60 transition-all"
+                  style={{ fontSize: "12px", fontWeight: 700 }}
+                >
+                  {saving ? (<><Loader2 className="w-3 h-3 animate-spin" /> Working...</>) : "Yes, save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </motion.div>
     </motion.div>
   );

@@ -52,6 +52,11 @@ function NewPropertyPageContent() {
     property_type: PropertyType.HOUSE,
     total_rooms: 1,
     bathrooms: 1,
+    // Apartment-only ranges (ignored unless property_type === apartment)
+    bed_min: 1,
+    bed_max: 1,
+    bath_min: 1,
+    bath_max: 1,
     is_furnished: false,
     has_parking: false,
     has_laundry: false,
@@ -128,13 +133,22 @@ function NewPropertyPageContent() {
     setError("");
 
     try {
+      const isApartment = form.property_type === PropertyType.APARTMENT;
       const payload = {
         title: form.title,
         address: form.address,
         postal_code: form.postal_code,
         property_type: form.property_type,
-        total_rooms: form.total_rooms,
-        bathrooms: form.bathrooms,
+        // For apartments, total_rooms/bathrooms aren't shown to students but
+        // are still required NOT NULL columns. Seed them from the range mins.
+        total_rooms: isApartment ? form.bed_min : form.total_rooms,
+        bathrooms: isApartment ? form.bath_min : form.bathrooms,
+        ...(isApartment ? {
+          bed_min: form.bed_min,
+          bed_max: form.bed_max,
+          bath_min: form.bath_min,
+          bath_max: form.bath_max,
+        } : {}),
         is_furnished: form.is_furnished,
         has_parking: form.has_parking,
         has_laundry: form.has_laundry,
@@ -285,35 +299,103 @@ function NewPropertyPageContent() {
               </div>
             </div>
 
-            {/* Rooms */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bedrooms</label>
-                <select
-                  value={form.total_rooms}
-                  onChange={(e) => update("total_rooms", Number(e.target.value))}
-                  className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all appearance-none"
-                  style={{ fontSize: "14px" }}
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
+            {/* Rooms — apartments use min/max ranges, everything else uses a single count */}
+            {form.property_type === PropertyType.APARTMENT ? (
+              <div className="space-y-4">
+                <p className="text-[#1B2D45]/45" style={{ fontSize: "12px" }}>
+                  Apartment buildings cover a range of unit types. Tell us what beds &amp; baths are available across all of them — leave “max” the same as “min” if you only offer one size.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bedrooms — min</label>
+                    <select
+                      value={form.bed_min}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        setForm((p) => ({ ...p, bed_min: n, bed_max: Math.max(n, p.bed_max) }));
+                      }}
+                      className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all appearance-none"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+                        <option key={n} value={n}>{n === 0 ? "Studio" : n}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bedrooms — max</label>
+                    <select
+                      value={form.bed_max}
+                      onChange={(e) => update("bed_max", Number(e.target.value))}
+                      className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all appearance-none"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {[0, 1, 2, 3, 4, 5, 6].filter((n) => n >= form.bed_min).map((n) => (
+                        <option key={n} value={n}>{n === 0 ? "Studio" : n}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bathrooms — min</label>
+                    <select
+                      value={form.bath_min}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        setForm((p) => ({ ...p, bath_min: n, bath_max: Math.max(n, p.bath_max) }));
+                      }}
+                      className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all appearance-none"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {[1, 2, 3, 4].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bathrooms — max</label>
+                    <select
+                      value={form.bath_max}
+                      onChange={(e) => update("bath_max", Number(e.target.value))}
+                      className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all appearance-none"
+                      style={{ fontSize: "14px" }}
+                    >
+                      {[1, 2, 3, 4].filter((n) => n >= form.bath_min).map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bathrooms</label>
-                <select
-                  value={form.bathrooms}
-                  onChange={(e) => update("bathrooms", Number(e.target.value))}
-                  className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all appearance-none"
-                  style={{ fontSize: "14px" }}
-                >
-                  {[1, 2, 3, 4].map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bedrooms</label>
+                  <select
+                    value={form.total_rooms}
+                    onChange={(e) => update("total_rooms", Number(e.target.value))}
+                    className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all appearance-none"
+                    style={{ fontSize: "14px" }}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Bathrooms</label>
+                  <select
+                    value={form.bathrooms}
+                    onChange={(e) => update("bathrooms", Number(e.target.value))}
+                    className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all appearance-none"
+                    style={{ fontSize: "14px" }}
+                  >
+                    {[1, 2, 3, 4].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Amenities */}
@@ -535,7 +617,12 @@ function NewPropertyPageContent() {
                   { label: "Name", value: form.title || "—" },
                   { label: "Address", value: [form.address, form.postal_code].filter(Boolean).join(", ") || "—" },
                   { label: "Type", value: formatPropertyType(form.property_type) },
-                  { label: "Layout", value: `${form.total_rooms} bed · ${form.bathrooms} bath` },
+                  {
+                    label: "Layout",
+                    value: form.property_type === PropertyType.APARTMENT
+                      ? `${form.bed_min === form.bed_max ? (form.bed_min === 0 ? "Studio" : `${form.bed_min} bed`) : `${form.bed_min}–${form.bed_max} bed`} · ${form.bath_min === form.bath_max ? `${form.bath_min} bath` : `${form.bath_min}–${form.bath_max} bath`}`
+                      : `${form.total_rooms} bed · ${form.bathrooms} bath`,
+                  },
                   { label: "To campus", value: form.distance_to_campus_km ? `${form.distance_to_campus_km} km · ${form.drive_time_minutes} min drive` : `${form.drive_time_minutes} min drive` },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between gap-4 py-2.5">

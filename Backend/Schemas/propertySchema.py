@@ -5,6 +5,17 @@ from decimal import Decimal
 import enum
 from Schemas.featureSchema import ListingPolicies, PetPolicy, PetPolicyField, SmokingPolicy, SmokingPolicyField, SpaceAmenities
 
+class PropertyImageResponse(BaseModel):
+    id: int
+    image_url: str
+    display_order: int
+
+    class Config:
+        from_attributes = True
+
+class PropertyImageReorder(BaseModel):
+    image_ids: list[int]
+
 # Enum
 class PropertyType(str, enum.Enum):
     HOUSE = "house"
@@ -28,6 +39,11 @@ class PropertyCreate(BaseModel):
     property_type: PropertyType
     total_rooms: int
     bathrooms: int
+    # Apartment-only ranges (NULL for other types)
+    bed_min: Optional[int] = None
+    bed_max: Optional[int] = None
+    bath_min: Optional[int] = None
+    bath_max: Optional[int] = None
     is_furnished: bool = False
     has_parking: bool = False
     has_laundry: bool = False
@@ -58,6 +74,10 @@ class PropertyUpdate(BaseModel):
     property_type: Optional[PropertyType] = None
     total_rooms: Optional[int] = None
     bathrooms: Optional[int] = None
+    bed_min: Optional[int] = None
+    bed_max: Optional[int] = None
+    bath_min: Optional[int] = None
+    bath_max: Optional[int] = None
     is_furnished: Optional[bool] = None
     has_parking: Optional[bool] = None
     has_laundry: Optional[bool] = None
@@ -91,6 +111,10 @@ class PropertyResponse(BaseModel):
     property_type: PropertyType
     total_rooms: int
     bathrooms: int
+    bed_min: Optional[int] = None
+    bed_max: Optional[int] = None
+    bath_min: Optional[int] = None
+    bath_max: Optional[int] = None
     is_furnished: bool
     has_parking: bool
     has_laundry: bool
@@ -113,6 +137,7 @@ class PropertyResponse(BaseModel):
     nearest_bus_route: Optional[str] = None
     amenities: SpaceAmenities
     policies: ListingPolicies
+    images: list[PropertyImageResponse] = []
     created_at: datetime
     updated_at: datetime
 

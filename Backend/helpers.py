@@ -10,8 +10,8 @@ from Schemas.userSchema import UserRole
 from Utils.security import get_current_user, decode_access_token
 from fastapi import Depends, HTTPException, status
 from Schemas.featureSchema import AmenityValue, ListingPolicies, ListingTerms, PetPolicy, SmokingPolicy, SpaceAmenities, SubletTerms
-from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse, ListingRoomResponse, ListingResponse
-from Schemas.propertySchema import PropertyResponse
+from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse, ListingRoomResponse, ListingResponse, BuildingResponse, BuildingUnitResponse
+from Schemas.propertySchema import PropertyResponse, PropertyImageResponse
 from Schemas.adminSchema import AccountType
 from Schemas.subletSchema import SubletListResponse, SubletResponse, SubletImageResponse
 from Utils.cloudinary import delete_image_from_cloudinary
@@ -296,6 +296,11 @@ def get_property_owned_by(property_id: int, landlord_id: int, db: Session) -> Pr
     return prop
 
 
+def get_primary_listing_for_property(property_id: int, db: Session) -> Listing | None:
+    """Lowest-id listing under a property — owns the property-level photos."""
+    return db.query(Listing).filter(Listing.property_id == property_id).order_by(Listing.id.asc()).first()
+
+
 def _amenity_value(enabled: bool | None) -> AmenityValue:
     if enabled is None:
         return AmenityValue.UNKNOWN
@@ -360,6 +365,10 @@ def build_property_response(prop: Property) -> PropertyResponse:
         property_type=prop.property_type,
         total_rooms=prop.total_rooms,
         bathrooms=prop.bathrooms,
+        bed_min=prop.bed_min,
+        bed_max=prop.bed_max,
+        bath_min=prop.bath_min,
+        bath_max=prop.bath_max,
         is_furnished=prop.is_furnished,
         has_parking=prop.has_parking,
         has_laundry=prop.has_laundry,
@@ -398,8 +407,129 @@ def build_property_response(prop: Property) -> PropertyResponse:
             pet_policy=prop.pet_policy,
             smoking_policy=prop.smoking_policy,
         ),
+        images=[
+            PropertyImageResponse(id=img.id, image_url=img.image_url, display_order=img.display_order)
+            for listing in sorted(prop.listings or [], key=lambda l: l.id)[:1]
+            for img in sorted(
+                [i for i in (listing.images or []) if not i.is_floor_plan],
+                key=lambda i: i.display_order,
+            )
+        ],
         created_at=prop.created_at,
         updated_at=prop.updated_at,
+    )
+
+
+def build_building_response(
+    prop: Property,
+    listings: list[Listing],
+    landlord: Landlord,
+    scores: dict[int, float] | None = None,
+) -> BuildingResponse:
+    """Aggregate an apartment building (Property) and its unit-type listings.
+
+    `listings` should already be filtered to the unit types you want shown
+    (e.g. active only). `scores` optionally maps listing_id -> Cribb Score.
+    """
+    scores = scores or {}
+
+    units: list[BuildingUnitResponse] = []
+    building_images: list[ListingImageResponse] = []
+    seen_image_urls: set[str] = set()
+    prices: list = []
+    beds_list: list[int] = []
+    baths_list: list[int] = []
+
+    for listing in listings:
+        floor_plan = next((img for img in listing.images if img.is_floor_plan), None)
+        photos = [img for img in listing.images if not img.is_floor_plan]
+
+        # Building gallery = de-duped photos across all units
+        for img in photos:
+            if img.image_url not in seen_image_urls:
+                seen_image_urls.add(img.image_url)
+                building_images.append(ListingImageResponse.model_validate(img))
+
+        if listing.rent_total is not None:
+            prices.append(listing.rent_total)
+        if listing.beds is not None:
+            beds_list.append(listing.beds)
+        if listing.baths is not None:
+            baths_list.append(listing.baths)
+
+        units.append(BuildingUnitResponse(
+            id=listing.id,
+            unit_label=listing.unit_label,
+            beds=listing.beds,
+            baths=listing.baths,
+            sqft=listing.sqft,
+            rent=listing.rent_total,
+            lease_type=listing.lease_type if isinstance(listing.lease_type, str) else listing.lease_type.value,
+            units_total=listing.units_total,
+            units_available=listing.units_available,
+            status=listing.status if isinstance(listing.status, str) else listing.status.value,
+            floor_plan_image=floor_plan.image_url if floor_plan else None,
+            images=[ListingImageResponse.model_validate(img) for img in photos],
+            overall_score=scores.get(listing.id),
+        ))
+
+    return BuildingResponse(
+        id=prop.id,
+        title=prop.title,
+        address=prop.address,
+        latitude=prop.latitude,
+        longitude=prop.longitude,
+        property_type=prop.property_type if isinstance(prop.property_type, str) else prop.property_type.value,
+        price_min=min(prices) if prices else None,
+        price_max=max(prices) if prices else None,
+        # Prefer manually-entered ranges on the property; fall back to values
+        # computed from active unit listings.
+        bed_min=prop.bed_min if prop.bed_min is not None else (min(beds_list) if beds_list else None),
+        bed_max=prop.bed_max if prop.bed_max is not None else (max(beds_list) if beds_list else None),
+        bath_min=prop.bath_min if prop.bath_min is not None else (min(baths_list) if baths_list else None),
+        bath_max=prop.bath_max if prop.bath_max is not None else (max(baths_list) if baths_list else None),
+        unit_count=len(units),
+        amenities=build_space_amenities(
+            furnished=prop.is_furnished,
+            utilities_included=prop.utilities_included,
+            parking=prop.has_parking,
+            laundry=prop.has_laundry,
+            wifi=prop.has_wifi,
+            air_conditioning=prop.has_air_conditioning,
+            dishwasher=prop.has_dishwasher,
+            balcony=prop.has_balcony,
+            backyard=prop.has_backyard,
+            elevator=prop.has_elevator,
+            gym=prop.has_gym,
+            wheelchair_accessible=prop.wheelchair_accessible,
+        ),
+        policies=build_listing_policies(
+            pet_policy=prop.pet_policy,
+            smoking_policy=prop.smoking_policy,
+        ),
+        is_furnished=prop.is_furnished,
+        has_parking=prop.has_parking,
+        has_laundry=prop.has_laundry,
+        utilities_included=prop.utilities_included,
+        has_wifi=prop.has_wifi,
+        has_air_conditioning=prop.has_air_conditioning,
+        has_dishwasher=prop.has_dishwasher,
+        has_gym=prop.has_gym,
+        has_elevator=prop.has_elevator,
+        has_balcony=prop.has_balcony,
+        wheelchair_accessible=prop.wheelchair_accessible,
+        estimated_utility_cost=prop.estimated_utility_cost,
+        distance_to_campus_km=prop.distance_to_campus_km,
+        walk_time_minutes=prop.walk_time_minutes,
+        bus_time_minutes=prop.bus_time_minutes,
+        drive_time_minutes=prop.drive_time_minutes,
+        nearest_bus_route=prop.nearest_bus_route,
+        images=building_images,
+        landlord_id=landlord.id,
+        landlord_name=f"{landlord.first_name} {landlord.last_name}",
+        landlord_verified=landlord.identity_verified,
+        landlord_is_early_adopter=landlord.is_early_adopter,
+        units=units,
     )
 
 
@@ -577,6 +707,12 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         rent_max=rent_max,
         per_room_pricing=listing.per_room_pricing,
         rooms=[ListingRoomResponse.model_validate(r) for r in listing.rooms],
+        unit_label=listing.unit_label,
+        beds=listing.beds,
+        baths=listing.baths,
+        sqft=listing.sqft,
+        units_total=listing.units_total,
+        units_available=listing.units_available,
         lease_type=lease_type,
         move_in_date=listing.move_in_date,
         has_flexible_move_in=listing.has_flexible_move_in,
@@ -660,6 +796,12 @@ def build_listing_response(listing: Listing) -> ListingResponse:
         rent_max=rent_max,
         per_room_pricing=listing.per_room_pricing,
         rooms=[ListingRoomResponse.model_validate(r) for r in listing.rooms],
+        unit_label=listing.unit_label,
+        beds=listing.beds,
+        baths=listing.baths,
+        sqft=listing.sqft,
+        units_total=listing.units_total,
+        units_available=listing.units_available,
         lease_type=listing.lease_type if isinstance(listing.lease_type, str) else listing.lease_type.value,
         move_in_date=listing.move_in_date,
         has_flexible_move_in=listing.has_flexible_move_in,

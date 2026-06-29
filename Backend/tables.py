@@ -144,6 +144,13 @@ class Property(Base):
     property_type = Column(Enum(PropertyType), nullable=False)
     total_rooms = Column(Integer, nullable=False)
     bathrooms = Column(Integer, nullable=False)
+    # Apartment-only: manually-entered bed/bath ranges across all unit types in
+    # the building (e.g. bed_min=1, bed_max=3 → "1-3 bed"). NULL for houses /
+    # rooms / townhouses, which use total_rooms / bathrooms directly.
+    bed_min = Column(Integer, nullable=True)
+    bed_max = Column(Integer, nullable=True)
+    bath_min = Column(Integer, nullable=True)
+    bath_max = Column(Integer, nullable=True)
     is_furnished = Column(Boolean, default=False, nullable=False)
     has_parking = Column(Boolean, default=False, nullable=False)
     has_laundry = Column(Boolean, default=False, nullable=False)
@@ -184,6 +191,12 @@ class Listing(Base):
     rent_per_room = Column(Numeric(8, 2), nullable=False)
     rent_total = Column(Numeric(8, 2), nullable=False)
     per_room_pricing = Column(Boolean, default=False, nullable=False)
+    unit_label = Column(String(80), nullable=True)
+    beds = Column(Integer, nullable=True)
+    baths = Column(Integer, nullable=True)
+    sqft = Column(Integer, nullable=True)
+    units_total = Column(Integer, nullable=True)
+    units_available = Column(Integer, nullable=True)
     lease_type = Column(Enum(LeaseType), nullable=False)
     move_in_date = Column(Date, nullable=True)
     has_flexible_move_in = Column(Boolean, default=False, nullable=False)

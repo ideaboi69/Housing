@@ -44,6 +44,16 @@ export function formatPropertyType(type: string): string {
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 
+export function propertyTypeEmoji(type: string): string {
+  switch (type) {
+    case "apartment": return "🏢";
+    case "townhouse": return "🏘️";
+    case "room": return "🚪";
+    case "house":
+    default: return "🏠";
+  }
+}
+
 export function formatDate(dateStr?: string | null, fallback = "Any move-in date"): string {
   if (!dateStr) return fallback;
 

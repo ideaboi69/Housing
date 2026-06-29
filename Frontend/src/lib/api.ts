@@ -705,6 +705,10 @@ export const properties = {
   getById: (id: number) =>
     request<PropertyResponse>(`/api/properties/${id}`),
 
+  // Apartment building + its unit-type listings (2-level browse)
+  getBuilding: (id: number) =>
+    request<import("@/types").BuildingResponse>(`/api/properties/${id}/building`),
+
   create: (data: PropertyCreate) =>
     request<PropertyResponse>("/api/properties", {
       method: "POST",

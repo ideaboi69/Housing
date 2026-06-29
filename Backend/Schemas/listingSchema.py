@@ -32,10 +32,17 @@ class ListingRoomCreate(BaseModel):
 
 class ListingCreate(BaseModel):
     property_id: int
-    rent_per_room: Optional[Decimal] = None 
-    rent_total: Optional[Decimal] = None 
+    rent_per_room: Optional[Decimal] = None
+    rent_total: Optional[Decimal] = None
     per_room_pricing: bool = False
     rooms: Optional[list[ListingRoomCreate]] = None
+    # Apartment unit-type fields (only used when the parent property is an apartment)
+    unit_label: Optional[str] = None
+    beds: Optional[int] = None
+    baths: Optional[int] = None
+    sqft: Optional[int] = None
+    units_total: Optional[int] = None
+    units_available: Optional[int] = None
     lease_type: LeaseType
     move_in_date: Optional[date] = None
     has_flexible_move_in: bool = False
@@ -53,6 +60,12 @@ class ListingRoomUpdate(BaseModel):
 class ListingUpdate(BaseModel):
     rent_per_room: Optional[Decimal] = None
     rent_total: Optional[Decimal] = None
+    unit_label: Optional[str] = None
+    beds: Optional[int] = None
+    baths: Optional[int] = None
+    sqft: Optional[int] = None
+    units_total: Optional[int] = None
+    units_available: Optional[int] = None
     lease_type: Optional[str] = None
     move_in_date: Optional[date] = None
     has_flexible_move_in: Optional[bool] = None
@@ -99,6 +112,12 @@ class ListingResponse(BaseModel):
     rent_max: Decimal
     per_room_pricing: bool
     rooms: list[ListingRoomResponse] = []
+    unit_label: Optional[str] = None
+    beds: Optional[int] = None
+    baths: Optional[int] = None
+    sqft: Optional[int] = None
+    units_total: Optional[int] = None
+    units_available: Optional[int] = None
     lease_type: str
     move_in_date: Optional[date] = None
     has_flexible_move_in: bool = False
@@ -124,6 +143,12 @@ class ListingDetailResponse(BaseModel):
     rent_max: Decimal
     per_room_pricing: bool
     rooms: list[ListingRoomResponse] = []
+    unit_label: Optional[str] = None
+    beds: Optional[int] = None
+    baths: Optional[int] = None
+    sqft: Optional[int] = None
+    units_total: Optional[int] = None
+    units_available: Optional[int] = None
     lease_type: str
     move_in_date: Optional[date] = None
     has_flexible_move_in: bool = False
@@ -182,3 +207,71 @@ class PopularListingResponse(ListingDetailResponse):
     `overall_score` is null when no HousingHealthScore row exists yet for the listing.
     """
     overall_score: Optional[float] = None
+
+
+# ── Apartment building (2-level: building → unit types) ──────────────
+
+class BuildingUnitResponse(BaseModel):
+    """One unit type / floor plan inside an apartment building."""
+    id: int  # the underlying Listing id (links to /browse/[id])
+    unit_label: Optional[str] = None
+    beds: Optional[int] = None
+    baths: Optional[int] = None
+    sqft: Optional[int] = None
+    rent: Decimal  # monthly rent for this unit type
+    lease_type: str
+    units_total: Optional[int] = None
+    units_available: Optional[int] = None
+    status: str
+    floor_plan_image: Optional[str] = None  # the is_floor_plan diagram, if uploaded
+    images: list[ListingImageResponse] = []
+    overall_score: Optional[float] = None
+
+
+class BuildingResponse(BaseModel):
+    """An apartment building (Property) plus its unit-type listings.
+
+    Powers the Residen-style building detail page: building-level hero +
+    a list of unit types, each with its own price/beds/baths/floor plan.
+    """
+    id: int  # property id
+    title: str
+    address: str
+    latitude: Optional[Decimal] = None
+    longitude: Optional[Decimal] = None
+    property_type: str
+    # building-level summary across active units
+    price_min: Optional[Decimal] = None
+    price_max: Optional[Decimal] = None
+    bed_min: Optional[int] = None
+    bed_max: Optional[int] = None
+    bath_min: Optional[int] = None
+    bath_max: Optional[int] = None
+    unit_count: int = 0
+    # building info
+    amenities: SpaceAmenities
+    policies: ListingPolicies
+    is_furnished: bool = False
+    has_parking: bool = False
+    has_laundry: bool = False
+    utilities_included: bool = False
+    has_wifi: bool = False
+    has_air_conditioning: bool = False
+    has_dishwasher: bool = False
+    has_gym: bool = False
+    has_elevator: bool = False
+    has_balcony: bool = False
+    wheelchair_accessible: bool = False
+    estimated_utility_cost: Optional[Decimal] = None
+    distance_to_campus_km: Optional[Decimal] = None
+    walk_time_minutes: Optional[int] = None
+    bus_time_minutes: Optional[int] = None
+    drive_time_minutes: Optional[int] = None
+    nearest_bus_route: Optional[str] = None
+    images: list[ListingImageResponse] = []
+    # landlord info
+    landlord_id: int
+    landlord_name: str
+    landlord_verified: bool
+    landlord_is_early_adopter: bool = False
+    units: list[BuildingUnitResponse] = []

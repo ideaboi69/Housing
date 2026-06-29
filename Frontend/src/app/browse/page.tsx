@@ -12,6 +12,8 @@ import { Footprints, Grid2X2, Home, LayoutList, Map as MapIcon, Pin, TrendingUp 
 import { useIsMobile } from "@/hooks";
 import { useRouter } from "next/navigation";
 import { PolaroidCard } from "@/components/browse/PolaroidCard";
+import { BuildingCard } from "@/components/browse/BuildingCard";
+import { groupBrowseItems } from "@/lib/buildings";
 import { MapView } from "@/components/browse/MapView";
 import { SearchAndFilters } from "@/components/browse/SearchAndFilters";
 import { FilterModal } from "@/components/browse/FilterModal";
@@ -198,6 +200,10 @@ export default function BrowsePage() {
     );
   }, [listings, searchQuery]);
 
+  // Apartments collapse into one building card per property; everything else
+  // stays an individual listing card.
+  const browseItems = useMemo(() => groupBrowseItems(filteredListings), [filteredListings]);
+
   const togglePin = useCallback((id: number) => {
     if (!user) {
       router.push("/login");
@@ -267,7 +273,7 @@ export default function BrowsePage() {
               </span>
             </h1>
             <p className="mt-1 md:mt-1.5 text-[#1B2D45]/45" style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 400 }}>
-              <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{filteredListings.length} listings</span>{" "}
+              <span className="text-[#1B2D45]/70" style={{ fontWeight: 600 }}>{browseItems.length} listings</span>{" "}
               available in Guelph
             </p>
           </div>
@@ -382,24 +388,37 @@ export default function BrowsePage() {
               transition={{ duration: 0.25 }}
             >
               <div className={isMobile ? "relative z-[1] flex flex-col gap-5" : "relative z-[1] grid grid-cols-3 gap-5"}>
-                  {Array.from(new Map(filteredListings.map(l => [l.id, l])).values()).map((listing, i) => {
+                  {browseItems.map((item, i) => {
                     const row = Math.floor(i / 3);
                     const col = i % 3;
+                    const rotation = isMobile
+                      ? (rotations[row % 3] ?? rotations[0])[col] * 0.55
+                      : (rotations[row % 3] ?? rotations[0])[col] ?? 0;
+                    const key = item.kind === "building" ? `b-${item.building.propertyId}` : `l-${item.listing.id}`;
                     return (
                       <div
-                        key={listing.id}
+                        key={key}
                         className="min-w-0"
                         style={isMobile ? undefined : { marginTop: `${(staggers[row % 3] ?? staggers[0])[col] ?? 0}px` }}
                       >
-                      <PolaroidCard
-                        listing={listing}
-                        healthScore={healthScores[listing.id] ?? null}
-                        rotation={isMobile ? (rotations[row % 3] ?? rotations[0])[col] * 0.55 : (rotations[row % 3] ?? rotations[0])[col] ?? 0}
-                        isPinned={pinnedIds.includes(listing.id)}
-                        onTogglePin={togglePin}
-                        isMobile={isMobile}
-                        variant="board"
-                      />
+                        {item.kind === "building" ? (
+                          <BuildingCard
+                            building={item.building}
+                            rotation={rotation}
+                            isMobile={isMobile}
+                            variant="board"
+                          />
+                        ) : (
+                          <PolaroidCard
+                            listing={item.listing}
+                            healthScore={healthScores[item.listing.id] ?? null}
+                            rotation={rotation}
+                            isPinned={pinnedIds.includes(item.listing.id)}
+                            onTogglePin={togglePin}
+                            isMobile={isMobile}
+                            variant="board"
+                          />
+                        )}
                     </div>
                   );
                 })}
@@ -418,18 +437,28 @@ export default function BrowsePage() {
             className="max-w-[1200px] mx-auto px-4 md:px-6 py-4 md:py-6"
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5">
-              {filteredListings.map((listing) => (
-                <PolaroidCard
-                  key={listing.id}
-                  listing={listing}
-                  healthScore={healthScores[listing.id] ?? null}
-                  rotation={0}
-                  isPinned={pinnedIds.includes(listing.id)}
-                  onTogglePin={togglePin}
-                  isMobile={isMobile}
-                  variant="grid"
-                />
-              ))}
+              {browseItems.map((item) =>
+                item.kind === "building" ? (
+                  <BuildingCard
+                    key={`b-${item.building.propertyId}`}
+                    building={item.building}
+                    rotation={0}
+                    isMobile={isMobile}
+                    variant="grid"
+                  />
+                ) : (
+                  <PolaroidCard
+                    key={`l-${item.listing.id}`}
+                    listing={item.listing}
+                    healthScore={healthScores[item.listing.id] ?? null}
+                    rotation={0}
+                    isPinned={pinnedIds.includes(item.listing.id)}
+                    onTogglePin={togglePin}
+                    isMobile={isMobile}
+                    variant="grid"
+                  />
+                )
+              )}
             </div>
           </motion.div>
         ) : (

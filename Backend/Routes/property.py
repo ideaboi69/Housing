@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, Message, Conversation
-from Schemas.propertySchema import PropertyCreate, PropertyUpdate, PropertyResponse
-from Schemas.listingSchema import ListingStatus
-from Utils.cloudinary import delete_image_from_cloudinary
-from helpers import build_property_response, require_landlord, get_landlord_for_user, get_property_owned_by
+from Schemas.propertySchema import PropertyCreate, PropertyUpdate, PropertyResponse, PropertyImageResponse, PropertyImageReorder
+from Schemas.listingSchema import ListingStatus, BuildingResponse
+from Utils.cloudinary import delete_image_from_cloudinary, upload_image_to_cloudinary
+from helpers import build_property_response, build_building_response, require_landlord, get_landlord_for_user, get_property_owned_by, get_primary_listing_for_property
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+MAX_PROPERTY_IMAGES = 10
 
 property_router = APIRouter()
 
@@ -23,6 +26,10 @@ def create_property(payload: PropertyCreate, db: Session = Depends(get_db), curr
         property_type=payload.property_type,
         total_rooms=payload.total_rooms,
         bathrooms=payload.bathrooms,
+        bed_min=payload.bed_min,
+        bed_max=payload.bed_max,
+        bath_min=payload.bath_min,
+        bath_max=payload.bath_max,
         is_furnished=payload.is_furnished,
         has_parking=payload.has_parking,
         has_laundry=payload.has_laundry,
@@ -71,6 +78,31 @@ def get_property(property_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     return build_property_response(prop)
+
+# Building view (public) — an apartment building plus its unit-type listings.
+# Powers the Residen-style building detail page.
+@property_router.get("/{property_id}/building", response_model=BuildingResponse)
+def get_building(property_id: int, db: Session = Depends(get_db)):
+    prop = db.query(Property).filter(Property.id == property_id).first()
+    if not prop:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
+
+    landlord = db.query(Landlord).filter(Landlord.id == prop.landlord_id).first()
+    if not landlord:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Landlord not found")
+
+    listings = db.query(Listing).filter(
+        Listing.property_id == prop.id,
+        Listing.status == ListingStatus.ACTIVE,
+    ).all()
+
+    scores: dict[int, float] = {}
+    for listing in listings:
+        hs = db.query(HousingHealthScore).filter(HousingHealthScore.listing_id == listing.id).first()
+        if hs and hs.overall_score is not None:
+            scores[listing.id] = hs.overall_score
+
+    return build_building_response(prop, listings, landlord, scores)
 
 # Update Properties (landlord only, must own it)
 @property_router.patch("/{property_id}", response_model=PropertyResponse)
@@ -132,3 +164,89 @@ def delete_property(property_id: int, db: Session = Depends(get_db), current_use
     db.query(Review).filter(Review.property_id == prop.id).delete(synchronize_session=False)
     db.delete(prop)
     db.commit()
+
+
+# ── Property photos ──
+# Property-level photos reuse the existing per-listing image storage by
+# operating on the property's *primary* listing (lowest id, photos only —
+# excludes floor-plan diagrams). This matches the data that already powers
+# the browse card cover image. Cover = display_order 0.
+
+def _primary_listing_images(prop: Property, db: Session) -> tuple[Listing, list[ListingImage]]:
+    listing = get_primary_listing_for_property(prop.id, db)
+    if not listing:
+        raise HTTPException(status_code=400, detail="Create a listing for this property before adding photos.")
+    images = db.query(ListingImage).filter(
+        ListingImage.listing_id == listing.id,
+        ListingImage.is_floor_plan == False,
+    ).order_by(ListingImage.display_order).all()
+    return listing, images
+
+
+@property_router.post("/{property_id}/images", response_model=list[PropertyImageResponse], status_code=status.HTTP_201_CREATED)
+async def upload_property_images(property_id: int, files: list[UploadFile] = File(...), db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_for_user(current_user, db)
+    prop = get_property_owned_by(property_id, landlord.id, db)
+    listing, existing = _primary_listing_images(prop, db)
+
+    if len(existing) + len(files) > MAX_PROPERTY_IMAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximum {MAX_PROPERTY_IMAGES} photos. You have {len(existing)}, trying to add {len(files)}.",
+        )
+
+    created: list[ListingImage] = []
+    for i, file in enumerate(files):
+        if file.content_type not in ALLOWED_IMAGE_TYPES:
+            raise HTTPException(status_code=400, detail=f"'{file.filename}' is not a valid image. Allowed: JPEG, PNG, WebP, GIF")
+
+        image_url = upload_image_to_cloudinary(file, folder=f"listings/{listing.id}")
+        img = ListingImage(
+            listing_id=listing.id,
+            image_url=image_url,
+            display_order=len(existing) + i,
+            is_floor_plan=False,
+        )
+        db.add(img)
+        created.append(img)
+
+    db.commit()
+    for img in created:
+        db.refresh(img)
+    return [PropertyImageResponse.model_validate(img) for img in created]
+
+
+@property_router.delete("/{property_id}/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_property_image(property_id: int, image_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_for_user(current_user, db)
+    prop = get_property_owned_by(property_id, landlord.id, db)
+    listing, _ = _primary_listing_images(prop, db)
+
+    img = db.query(ListingImage).filter(
+        ListingImage.id == image_id,
+        ListingImage.listing_id == listing.id,
+        ListingImage.is_floor_plan == False,
+    ).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    delete_image_from_cloudinary(img.image_url)
+    db.delete(img)
+    db.commit()
+
+
+@property_router.patch("/{property_id}/images/reorder", response_model=list[PropertyImageResponse])
+def reorder_property_images(property_id: int, payload: PropertyImageReorder, db: Session = Depends(get_db), current_user: User = Depends(require_landlord)):
+    landlord = get_landlord_for_user(current_user, db)
+    prop = get_property_owned_by(property_id, landlord.id, db)
+    _, images = _primary_listing_images(prop, db)
+
+    by_id = {img.id: img for img in images}
+    if set(payload.image_ids) != set(by_id.keys()):
+        raise HTTPException(status_code=400, detail="image_ids must contain every image for this property")
+
+    for order, img_id in enumerate(payload.image_ids):
+        by_id[img_id].display_order = order
+
+    db.commit()
+    return [PropertyImageResponse.model_validate(img) for img in sorted(by_id.values(), key=lambda i: i.display_order)]

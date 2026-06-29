@@ -9,6 +9,7 @@ import { ReviewModal } from "@/components/ui/ReviewModal";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { LandlordContactCard } from "@/components/ui/LandlordContactCard";
 import { SmartBackLink } from "@/components/ui/SmartBackLink";
+import { BedBath } from "@/components/ui/BedBath";
 import { DetailPageSkeleton } from "@/components/ui/Skeletons";
 import { BookShowingModal } from "@/components/landlord/BookShowingModal";
 import { TenantProfilePrompt } from "@/components/ui/TenantProfilePrompt";
@@ -627,6 +628,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                     <MapPin className="w-3.5 h-3.5 shrink-0" />
                     <span style={{ fontSize: "13px" }}>{listing.address}</span>
                   </div>
+                  <div className="mt-2.5">
+                    <BedBath beds={listing.beds ?? listing.total_rooms} baths={listing.baths ?? listing.bathrooms} size="md" />
+                  </div>
                 </div>
                 {overallScore > 0 && (
                   <div className="shrink-0 text-center">
@@ -643,8 +647,8 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               {/* Quick facts */}
               <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 mt-5" variants={stagger} initial="hidden" animate="visible">
                 {[
-                  { label: "Type", value: formatPropertyType(listing.property_type), icon: Ruler },
-                  { label: "Rooms", value: `${listing.total_rooms} bed · ${listing.bathrooms} bath`, icon: Bed },
+                  { label: "Type", value: listing.unit_label ? `${formatPropertyType(listing.property_type)} · ${listing.unit_label}` : formatPropertyType(listing.property_type), icon: Ruler },
+                  { label: "Rooms", value: `${listing.beds ?? listing.total_rooms} bed · ${listing.baths ?? listing.bathrooms} bath${listing.sqft ? ` · ${listing.sqft} sq ft` : ""}`, icon: Bed },
                   { label: "Lease", value: formatLeaseType(listing.lease_type, listing.custom_lease_type), icon: Calendar },
                   { label: "Move-in", value: listing.has_flexible_move_in ? "Any move-in date" : formatDate(listing.move_in_date), icon: Clock },
                 ].map((fact) => {

@@ -1,4 +1,4 @@
-import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse } from "@/types";
+import type { ListingDetailResponse, HealthScoreResponse, ReviewResponse, BuildingResponse, BuildingUnitResponse } from "@/types";
 
 const LISTING_IMAGES: Record<number, string[]> = {
   1: [
@@ -42,6 +42,10 @@ const LISTING_IMAGES: Record<number, string[]> = {
     "/demo/listings/house.jpg",
     "/demo/listings/townhouse.jpg",
   ],
+  // Maple House Residences (apartment building, property_id 100) — unit types
+  101: ["/demo/listings/apartment.jpg", "/demo/listings/studio.jpg"],
+  102: ["/demo/listings/apartment.jpg", "/demo/listings/house.jpg"],
+  103: ["/demo/listings/apartment.jpg", "/demo/listings/townhouse.jpg"],
 };
 
 export const mockListings : ListingDetailResponse[] = [
@@ -53,10 +57,16 @@ export const mockListings : ListingDetailResponse[] = [
   { id: 6, rent_per_room: 750, rent_total: 2250, rent_min: 2250, rent_max: 2250, per_room_pricing: false, rooms: [], lease_type: "12_month", move_in_date: "2026-09-01", is_sublet: false, sublet_start_date: null, sublet_end_date: null, gender_preference: null, status: "active", view_count: 156, created_at: "2026-02-05T13:30:00", updated_at: "2026-02-15T10:30:00", property_id: 6, title: "Modern Apartment with Balcony", address: "415 Gordon St, Unit B, Guelph", property_type: "apartment", total_rooms: 3, bathrooms: 1, is_furnished: false, has_parking: false, has_laundry: true, utilities_included: false, pet_friendly: false, has_air_conditioning: true, has_wifi: true, has_dishwasher: false, has_gym: false, has_elevator: true, has_backyard: false, has_balcony: true, smoking_allowed: false, wheelchair_accessible: false, estimated_utility_cost: 40, distance_to_campus_km: 0.9, walk_time_minutes: 10, bus_time_minutes: 4, landlord_id: 3, landlord_name: "Mike Patterson", landlord_verified: false },
   { id: 7, rent_per_room: 620, rent_total: 1860, rent_min: 1860, rent_max: 1860, per_room_pricing: false, rooms: [], lease_type: "8_month", move_in_date: "2026-05-01", is_sublet: false, sublet_start_date: null, sublet_end_date: null, gender_preference: null, status: "active", view_count: 67, created_at: "2026-02-12T08:00:00", updated_at: "2026-02-15T10:30:00", property_id: 7, title: "Charming Duplex with Yard", address: "90 Suffolk St W, Guelph", property_type: "townhouse", total_rooms: 3, bathrooms: 1, is_furnished: false, has_parking: false, has_laundry: false, utilities_included: false, pet_friendly: false, has_air_conditioning: false, has_wifi: false, has_dishwasher: false, has_gym: false, has_elevator: false, has_backyard: true, has_balcony: false, smoking_allowed: true, wheelchair_accessible: false, estimated_utility_cost: 50, distance_to_campus_km: 1.8, walk_time_minutes: 15, bus_time_minutes: 6, landlord_id: 1, landlord_name: "Sarah Mitchell", landlord_verified: true },
   { id: 8, rent_per_room: 780, rent_total: 1560, rent_min: 1560, rent_max: 1560, per_room_pricing: false, rooms: [], lease_type: "12_month", move_in_date: "2026-09-01", is_sublet: false, sublet_start_date: null, sublet_end_date: null, gender_preference: null, status: "active", view_count: 203, created_at: "2026-02-08T15:00:00", updated_at: "2026-02-15T10:30:00", property_id: 8, title: "New Build near Kortright", address: "150 Kortright Rd W, Unit 210, Guelph", property_type: "apartment", total_rooms: 2, bathrooms: 1, is_furnished: true, has_parking: true, has_laundry: true, utilities_included: true, pet_friendly: false, has_air_conditioning: true, has_wifi: true, has_dishwasher: true, has_gym: true, has_elevator: true, has_backyard: false, has_balcony: true, smoking_allowed: false, wheelchair_accessible: true, estimated_utility_cost: null, distance_to_campus_km: 2.8, walk_time_minutes: 22, bus_time_minutes: 10, landlord_id: 2, landlord_name: "David Chen", landlord_verified: true },
+
+  // ── Maple House Residences — apartment building (property_id 100, 3 unit types) ──
+  { id: 101, rent_per_room: 1750, rent_total: 1750, rent_min: 1750, rent_max: 1750, per_room_pricing: false, rooms: [], unit_label: "1 Bedroom", beds: 1, baths: 1, sqft: 560, units_total: 12, units_available: 4, lease_type: "12_month", move_in_date: "2026-09-01", is_sublet: false, sublet_start_date: null, sublet_end_date: null, gender_preference: "any", status: "active", view_count: 320, created_at: "2026-03-01T10:00:00", updated_at: "2026-03-10T10:00:00", property_id: 100, title: "Maple House Residences", address: "200 Maple St, Guelph", property_type: "apartment", total_rooms: 1, bathrooms: 1, is_furnished: true, has_parking: true, has_laundry: true, utilities_included: false, pet_friendly: true, has_air_conditioning: true, has_wifi: true, has_dishwasher: true, has_gym: true, has_elevator: true, has_backyard: false, has_balcony: true, smoking_allowed: false, wheelchair_accessible: true, estimated_utility_cost: 60, distance_to_campus_km: 0.6, walk_time_minutes: 7, bus_time_minutes: 4, drive_time_minutes: 3, landlord_id: 2, landlord_name: "David Chen", landlord_verified: true, images: [{ id: 1011, image_url: "/demo/listings/apartment.jpg", display_order: 0, is_floor_plan: false }, { id: 1012, image_url: "/demo/listings/studio.jpg", display_order: 1, is_floor_plan: false }, { id: 1013, image_url: "/demo/floorplans/1bed.svg", display_order: 2, is_floor_plan: true }] },
+  { id: 102, rent_per_room: 2400, rent_total: 2400, rent_min: 2400, rent_max: 2400, per_room_pricing: false, rooms: [], unit_label: "2 Bedroom", beds: 2, baths: 1, sqft: 780, units_total: 10, units_available: 2, lease_type: "12_month", move_in_date: "2026-09-01", is_sublet: false, sublet_start_date: null, sublet_end_date: null, gender_preference: "any", status: "active", view_count: 280, created_at: "2026-03-01T10:00:00", updated_at: "2026-03-10T10:00:00", property_id: 100, title: "Maple House Residences", address: "200 Maple St, Guelph", property_type: "apartment", total_rooms: 2, bathrooms: 1, is_furnished: true, has_parking: true, has_laundry: true, utilities_included: false, pet_friendly: true, has_air_conditioning: true, has_wifi: true, has_dishwasher: true, has_gym: true, has_elevator: true, has_backyard: false, has_balcony: true, smoking_allowed: false, wheelchair_accessible: true, estimated_utility_cost: 75, distance_to_campus_km: 0.6, walk_time_minutes: 7, bus_time_minutes: 4, drive_time_minutes: 3, landlord_id: 2, landlord_name: "David Chen", landlord_verified: true, images: [{ id: 1021, image_url: "/demo/listings/apartment.jpg", display_order: 0, is_floor_plan: false }, { id: 1022, image_url: "/demo/listings/house.jpg", display_order: 1, is_floor_plan: false }, { id: 1023, image_url: "/demo/floorplans/2bed.svg", display_order: 2, is_floor_plan: true }] },
+  { id: 103, rent_per_room: 3150, rent_total: 3150, rent_min: 3150, rent_max: 3150, per_room_pricing: false, rooms: [], unit_label: "3 Bedroom", beds: 3, baths: 2, sqft: 1050, units_total: 6, units_available: 1, lease_type: "12_month", move_in_date: "2026-09-01", is_sublet: false, sublet_start_date: null, sublet_end_date: null, gender_preference: "any", status: "active", view_count: 190, created_at: "2026-03-01T10:00:00", updated_at: "2026-03-10T10:00:00", property_id: 100, title: "Maple House Residences", address: "200 Maple St, Guelph", property_type: "apartment", total_rooms: 3, bathrooms: 2, is_furnished: true, has_parking: true, has_laundry: true, utilities_included: false, pet_friendly: true, has_air_conditioning: true, has_wifi: true, has_dishwasher: true, has_gym: true, has_elevator: true, has_backyard: false, has_balcony: true, smoking_allowed: false, wheelchair_accessible: true, estimated_utility_cost: 95, distance_to_campus_km: 0.6, walk_time_minutes: 7, bus_time_minutes: 4, drive_time_minutes: 3, landlord_id: 2, landlord_name: "David Chen", landlord_verified: true, images: [{ id: 1031, image_url: "/demo/listings/apartment.jpg", display_order: 0, is_floor_plan: false }, { id: 1032, image_url: "/demo/listings/townhouse.jpg", display_order: 1, is_floor_plan: false }, { id: 1033, image_url: "/demo/floorplans/2bed.svg", display_order: 2, is_floor_plan: true }] },
 ];
 
 export const mockHealthScores: Record<number, number> = {
   1: 88, 2: 92, 3: 79, 4: 86, 5: 95, 6: 81, 7: 73, 8: 91,
+  101: 89, 102: 87, 103: 90,
 };
 
 export const mockHealthScoreDetails: Record<number, HealthScoreResponse> = {
@@ -65,6 +75,9 @@ export const mockHealthScoreDetails: Record<number, HealthScoreResponse> = {
   2: { id: 2, listing_id: 2, overall_score: 91, price_vs_market_score: 95, proximity_score: 90, amenity_score: 85, landlord_reputation_score: 91, maintenance_score: 88, lease_clarity_score: 93, review_count: 0, created_at: "2026-01-21T00:00:00" },
   3: { id: 3, listing_id: 3, overall_score: 76, price_vs_market_score: 72, proximity_score: 80, amenity_score: 70, landlord_reputation_score: 94, maintenance_score: 68, lease_clarity_score: 82, review_count: 0, created_at: "2026-02-02T00:00:00" },
   4: { id: 4, listing_id: 4, overall_score: 80, price_vs_market_score: 90, proximity_score: 70, amenity_score: 80, landlord_reputation_score: 78, maintenance_score: 84, lease_clarity_score: 92, review_count: 0, created_at: "2026-02-11T00:00:00" },
+  101: { id: 101, listing_id: 101, overall_score: 89, price_vs_market_score: 86, proximity_score: 94, amenity_score: 90, landlord_reputation_score: 91, maintenance_score: 88, lease_clarity_score: 92, review_count: 0, created_at: "2026-03-02T00:00:00" },
+  102: { id: 102, listing_id: 102, overall_score: 87, price_vs_market_score: 84, proximity_score: 94, amenity_score: 90, landlord_reputation_score: 91, maintenance_score: 88, lease_clarity_score: 92, review_count: 0, created_at: "2026-03-02T00:00:00" },
+  103: { id: 103, listing_id: 103, overall_score: 90, price_vs_market_score: 88, proximity_score: 94, amenity_score: 92, landlord_reputation_score: 91, maintenance_score: 88, lease_clarity_score: 92, review_count: 0, created_at: "2026-03-02T00:00:00" },
   5: { id: 5, listing_id: 5, overall_score: 92, price_vs_market_score: 88, proximity_score: 95, amenity_score: 88, landlord_reputation_score: 98, maintenance_score: 96, lease_clarity_score: 97, review_count: 0, created_at: "2026-01-26T00:00:00" },
   6: { id: 6, listing_id: 6, overall_score: 76, price_vs_market_score: 78, proximity_score: 75, amenity_score: 72, landlord_reputation_score: 76, maintenance_score: 88, lease_clarity_score: 82, review_count: 0, created_at: "2026-02-06T00:00:00" },
   7: { id: 7, listing_id: 7, overall_score: 71, price_vs_market_score: 85, proximity_score: 65, amenity_score: 60, landlord_reputation_score: 70, maintenance_score: 62, lease_clarity_score: 75, review_count: 0, created_at: "2026-02-13T00:00:00" },
@@ -105,6 +118,82 @@ export function getMockReviews(propertyId: number): ReviewResponse[] {
   return mockReviews[propertyId] || [];
 }
 
+/**
+ * Build a BuildingResponse from the mock apartment units sharing a property_id.
+ * Used as a fallback by the building detail page when the API has no data
+ * (e.g. local dev / sample buildings).
+ */
+export function getMockBuilding(propertyId: number): BuildingResponse | undefined {
+  const units = mockListings.filter(
+    (l) => l.property_id === propertyId && l.property_type === "apartment"
+  );
+  if (units.length === 0) return undefined;
+
+  const sorted = [...units].sort((a, b) => Number(a.rent_total) - Number(b.rent_total));
+  const first = sorted[0];
+  const rents = sorted.map((u) => Number(u.rent_total)).filter((r) => r > 0);
+  const beds = sorted.map((u) => (u.beds ?? u.total_rooms)).filter((b): b is number => b != null);
+
+  const buildingImages = Array.from(
+    new Set(
+      sorted.flatMap((u) =>
+        (u.images ?? []).filter((img) => !img.is_floor_plan).map((img) => img.image_url)
+      )
+    )
+  ).map((url, i) => ({ id: 90000 + i, image_url: url, display_order: i, is_floor_plan: false }));
+
+  const unitResponses: BuildingUnitResponse[] = sorted.map((u) => ({
+    id: u.id,
+    unit_label: u.unit_label ?? null,
+    beds: u.beds ?? u.total_rooms ?? null,
+    baths: u.baths ?? u.bathrooms ?? null,
+    sqft: u.sqft ?? null,
+    rent: Number(u.rent_total),
+    lease_type: u.lease_type,
+    units_total: u.units_total ?? null,
+    units_available: u.units_available ?? null,
+    status: u.status,
+    floor_plan_image: u.images?.find((img) => img.is_floor_plan)?.image_url ?? null,
+    images: (u.images ?? []).filter((img) => !img.is_floor_plan),
+    overall_score: mockHealthScores[u.id] ?? null,
+  }));
+
+  return {
+    id: propertyId,
+    title: first.title,
+    address: first.address,
+    latitude: first.latitude ?? null,
+    longitude: first.longitude ?? null,
+    property_type: "apartment",
+    price_min: rents.length ? Math.min(...rents) : null,
+    price_max: rents.length ? Math.max(...rents) : null,
+    bed_min: beds.length ? Math.min(...beds) : null,
+    bed_max: beds.length ? Math.max(...beds) : null,
+    unit_count: sorted.length,
+    is_furnished: first.is_furnished,
+    has_parking: first.has_parking,
+    has_laundry: first.has_laundry,
+    utilities_included: first.utilities_included,
+    has_wifi: first.has_wifi,
+    has_air_conditioning: first.has_air_conditioning,
+    has_dishwasher: first.has_dishwasher,
+    has_gym: first.has_gym,
+    has_elevator: first.has_elevator,
+    has_balcony: first.has_balcony,
+    wheelchair_accessible: first.wheelchair_accessible,
+    estimated_utility_cost: first.estimated_utility_cost ?? null,
+    distance_to_campus_km: first.distance_to_campus_km ?? null,
+    walk_time_minutes: first.walk_time_minutes ?? null,
+    bus_time_minutes: first.bus_time_minutes ?? null,
+    drive_time_minutes: first.drive_time_minutes ?? null,
+    images: buildingImages,
+    landlord_id: first.landlord_id,
+    landlord_name: first.landlord_name,
+    landlord_verified: first.landlord_verified,
+    units: unitResponses,
+  };
+}
+
 export const mockCoordinates: Record<number, { lat: number; lng: number }> = {
   1: { lat: 43.5310, lng: -80.2262 },
   2: { lat: 43.5380, lng: -80.2480 },
@@ -114,6 +203,10 @@ export const mockCoordinates: Record<number, { lat: number; lng: number }> = {
   6: { lat: 43.5340, lng: -80.2350 },
   7: { lat: 43.5230, lng: -80.2520 },
   8: { lat: 43.5190, lng: -80.2280 },
+  100: { lat: 43.5298, lng: -80.2275 },
+  101: { lat: 43.5298, lng: -80.2275 },
+  102: { lat: 43.5298, lng: -80.2275 },
+  103: { lat: 43.5298, lng: -80.2275 },
 };
 
 export type LandlordAnalyticsPeriod = "7d" | "30d" | "90d" | "all";

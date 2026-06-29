@@ -9,7 +9,7 @@ import { Heart, Pin, Eye } from "lucide-react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import { ScoreRing } from "@/components/ui/ScoreRing";
 import { Pushpin, TapeStrip } from "@/components/ui/BoardDecorations";
-import { formatPrice, formatPropertyType, formatLeaseType } from "@/lib/utils";
+import { formatPrice, formatPropertyType, formatLeaseType, propertyTypeEmoji } from "@/lib/utils";
 import { useSavedStore } from "@/lib/saved-store";
 import { useAuthStore } from "@/lib/auth-store";
 import type { ListingDetailResponse } from "@/types";
@@ -202,8 +202,14 @@ export function PolaroidCard({
               </div>
             )}
 
-            {/* Save button + Popular badge */}
+            {/* Property-type badge + Save button + Popular badge */}
             <div className="absolute top-2 right-2 flex items-center gap-1.5">
+              <div
+                className="bg-white/85 backdrop-blur-sm text-[#1B2D45] px-2 py-1 rounded-full"
+                style={{ fontSize: "10px", fontWeight: 700 }}
+              >
+                {propertyTypeEmoji(listing.property_type)} {formatPropertyType(listing.property_type)}
+              </div>
               {listing.view_count > 100 && (
                 <motion.div
                   className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-full"

@@ -30,8 +30,21 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
     if not payload.has_flexible_move_in and payload.move_in_date is None:
         raise HTTPException(status_code=400, detail="move_in_date is required unless has_flexible_move_in is true")
 
+    is_apartment = (
+        prop.property_type == PropertyType.APARTMENT
+        or getattr(prop.property_type, "value", prop.property_type) == "apartment"
+    )
+
     # Resolve rooms based on pricing mode
-    if payload.per_room_pricing:
+    if is_apartment:
+        # Apartment buildings: each listing is a unit type / floor plan with a
+        # single monthly rent. Room rows don't apply — we store one room so the
+        # rent stats still compute, and the unit detail comes from beds/baths.
+        unit_rent = payload.rent_total or payload.rent_per_room
+        if not unit_rent:
+            raise HTTPException(status_code=400, detail="rent_total is required for an apartment unit type")
+        room_specs = [ListingRoomCreate(label=payload.unit_label or "Unit", rent=unit_rent, display_order=0)]
+    elif payload.per_room_pricing:
         if not payload.rooms or len(payload.rooms) == 0:
             raise HTTPException(status_code=400, detail="rooms required when per_room_pricing is true")
         if len(payload.rooms) != prop.total_rooms:
@@ -59,6 +72,12 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
         rent_per_room=rent_min,
         rent_total=rent_total,
         per_room_pricing=payload.per_room_pricing,
+        unit_label=payload.unit_label,
+        beds=payload.beds,
+        baths=payload.baths,
+        sqft=payload.sqft,
+        units_total=payload.units_total,
+        units_available=payload.units_available,
         lease_type=payload.lease_type,
         move_in_date=None if payload.has_flexible_move_in else payload.move_in_date,
         has_flexible_move_in=payload.has_flexible_move_in,

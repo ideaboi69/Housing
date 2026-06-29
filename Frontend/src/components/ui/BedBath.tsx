@@ -11,7 +11,7 @@ export function BedBath({
   size = "sm",
 }: {
   beds: React.ReactNode;
-  baths?: number | null;
+  baths?: React.ReactNode;
   size?: "sm" | "md";
 }) {
   const iconClass = size === "md" ? "w-4 h-4" : "w-3.5 h-3.5";
@@ -25,7 +25,7 @@ export function BedBath({
         <BedDouble className={`${iconClass} text-[#1B2D45]/40`} strokeWidth={2} />
         {beds}
       </span>
-      {baths != null && (
+      {baths != null && baths !== "" && (
         <>
           <span className="text-[#1B2D45]/15">|</span>
           <span className="flex items-center gap-1">

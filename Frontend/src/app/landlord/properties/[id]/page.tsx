@@ -551,7 +551,28 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
           property={property}
           initialTab={editTab}
           onClose={() => { setEditing(false); setEditTab("basics"); }}
-          onSaved={(updated) => setProperty(updated)}
+          onSaved={(updated) => {
+            setProperty(updated);
+            // Property photos live on the primary listing's image set. Mirror
+            // the updated.images onto that listing so the page's photo gallery
+            // refreshes without a page reload. Floor-plan rows are preserved.
+            setListings((prev) => {
+              if (prev.length === 0) return prev;
+              const primaryId = [...prev].sort((a, b) => a.id - b.id)[0].id;
+              return prev.map((l) => {
+                if (l.id !== primaryId) return l;
+                const floorPlans = (l.images ?? []).filter((i) => i.is_floor_plan);
+                const photos = (updated.images ?? []).map((i) => ({
+                  id: i.id,
+                  image_url: i.image_url,
+                  display_order: i.display_order,
+                  is_floor_plan: false,
+                }));
+                return { ...l, images: [...photos, ...floorPlans] };
+              });
+            });
+          }}
+          activeListingIds={listings.filter((l) => l.status.toLowerCase() === "active").map((l) => l.id)}
         />
       )}
       {lightboxIndex !== null && (
