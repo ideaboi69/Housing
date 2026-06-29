@@ -246,6 +246,7 @@ export interface PropertyResponse {
   landlord_id: number;
   title: string;
   address: string;
+  description?: string | null;
   postal_code: string;
   latitude: number | null;
   longitude: number | null;
@@ -408,6 +409,7 @@ export interface ListingDetailResponse {
   property_id: number;
   title: string;
   address: string;
+  description?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   property_type: string;
@@ -443,6 +445,7 @@ export interface ListingDetailResponse {
   // landlord info
   landlord_id: number;
   landlord_name: string;
+  landlord_company_name?: string | null;
   landlord_verified: boolean;
   landlord_is_early_adopter?: boolean;
   images?: ListingImageResponse[];
@@ -534,6 +537,7 @@ export interface BuildingResponse {
   id: number; // property id
   title: string;
   address: string;
+  description?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   property_type: string;
@@ -566,9 +570,41 @@ export interface BuildingResponse {
   images?: ListingImageResponse[];
   landlord_id: number;
   landlord_name: string;
+  landlord_company_name?: string | null;
   landlord_verified: boolean;
   landlord_is_early_adopter?: boolean;
   units: BuildingUnitResponse[];
+}
+
+// ── Landlord org / team ────────────────────────────────
+
+export interface OrgMember {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  org_role: string | null;
+  identity_verified: boolean;
+}
+
+export interface OrgResponse {
+  id: number;
+  name: string;
+  members: OrgMember[];
+}
+
+export interface OrgInvite {
+  id: number;
+  email: string;
+  status: string;
+  created_at: string;
+}
+
+export interface OrgInvitePreview {
+  org_name: string;
+  inviter_name: string;
+  email: string;
+  status: string;
 }
 
 // ── Review ─────────────────────────────────────────────

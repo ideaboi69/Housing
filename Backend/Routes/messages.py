@@ -5,7 +5,7 @@ from tables import Listing, Conversation, User, get_db, Landlord, Message, Prope
 from Schemas.convoSchema import SenderType
 from Schemas.convoSchema import ConversationDetailResponse, StartConversation, MessageCreate, MessageResponse, ConversationResponse, ConversationNoteUpdate, ConversationNoteResponse
 from Utils.security import get_current_user, get_current_student
-from helpers import require_landlord, should_notify_student, should_notify_landlord
+from helpers import require_landlord, should_notify_student, should_notify_landlord, org_member_ids
 from Utils.email import send_message_notification
 from Utils.websocket import connection_manager
 from Utils.rate_limit import limiter
@@ -165,7 +165,7 @@ def send_message(request: Request, conversation_id: int, payload: MessageCreate,
 @message_router.post("/landlord/conversations/{conversation_id}", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit("30/minute")
 def landlord_reply(request: Request, conversation_id: int, payload: MessageCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.landlord_id == landlord.id).first()
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.landlord_id.in_(org_member_ids(landlord, db))).first()
 
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -271,7 +271,7 @@ def get_landlord_conversations(
         else Conversation.landlord_archived_at.is_(None)
     )
     conversations = db.query(Conversation).filter(
-        Conversation.landlord_id == landlord.id,
+        Conversation.landlord_id.in_(org_member_ids(landlord, db)),
         archive_filter,
     ).order_by(Conversation.updated_at.desc()).all()
 
@@ -289,6 +289,9 @@ def get_landlord_conversations(
         listing = db.query(Listing).filter(Listing.id == conv.listing_id).first()
         property = db.query(Property).filter(Property.id == listing.property_id).first()
         user = db.query(User).filter(User.id == conv.user_id).first()
+        # In a shared org inbox a thread may belong to a teammate, so name the
+        # conversation's actual landlord rather than the viewer.
+        conv_landlord = db.query(Landlord).filter(Landlord.id == conv.landlord_id).first()
 
         result.append(
             ConversationResponse(
@@ -298,7 +301,7 @@ def get_landlord_conversations(
                 user_id=conv.user_id,
                 user_name=f"{user.first_name} {user.last_name}",
                 landlord_id=conv.landlord_id,
-                landlord_name=f"{landlord.first_name} {landlord.last_name}",
+                landlord_name=f"{conv_landlord.first_name} {conv_landlord.last_name}" if conv_landlord else f"{landlord.first_name} {landlord.last_name}",
                 created_at=conv.created_at,
                 updated_at=conv.updated_at,
                 last_message=MessageResponse.model_validate(last_message) if last_message else None,
@@ -323,7 +326,7 @@ def get_specific_conversation( conversation_id: int, db: Session = Depends(get_d
     # party's messages read and leaves the inbox stuck "unread".
     is_landlord = isinstance(current_user, Landlord)
     if is_landlord:
-        if conversation.landlord_id != current_user.id:
+        if conversation.landlord_id not in org_member_ids(current_user, db):
             raise HTTPException(status_code=403, detail="Access denied")
     else:
         if conversation.user_id != current_user.id:
@@ -382,7 +385,7 @@ def get_user_unread_count(db: Session = Depends(get_db),current_user: User = Dep
 def get_landlord_unread_count(db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
     
     conversations = db.query(Conversation.id).filter(
-        Conversation.landlord_id == landlord.id,
+        Conversation.landlord_id.in_(org_member_ids(landlord, db)),
         Conversation.landlord_archived_at.is_(None),
     ).all()
     conversation_ids = [c.id for c in conversations]
@@ -408,7 +411,7 @@ def delete_message(conversation_id: int, message_id: int, db: Session = Depends(
 
     # Verify access
     is_user = conversation.user_id == current_user.id
-    is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id == current_user.id
+    is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id in org_member_ids(current_user, db)
     if not is_user and not is_landlord:
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -438,7 +441,7 @@ def delete_conversation(conversation_id: int, db: Session = Depends(get_db), cur
 # Landlord removes a conversation from their inbox
 @message_router.delete("/landlord/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def landlord_delete_conversation(conversation_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id,Conversation.landlord_id == landlord.id).first()
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.landlord_id.in_(org_member_ids(landlord, db))).first()
 
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -465,7 +468,7 @@ def unarchive_conversation(conversation_id: int, db: Session = Depends(get_db), 
 def landlord_unarchive_conversation(conversation_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
     conversation = db.query(Conversation).filter(
         Conversation.id == conversation_id,
-        Conversation.landlord_id == landlord.id,
+        Conversation.landlord_id.in_(org_member_ids(landlord, db)),
     ).first()
 
     if not conversation:
@@ -479,7 +482,7 @@ def landlord_unarchive_conversation(conversation_id: int, db: Session = Depends(
 # These notes are never returned on any student-facing endpoint.
 @message_router.get("/conversations/{conversation_id}/notes", response_model=ConversationNoteResponse)
 def get_conversation_notes(conversation_id: int, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.landlord_id == landlord.id).first()
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.landlord_id.in_(org_member_ids(landlord, db))).first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -489,7 +492,7 @@ def get_conversation_notes(conversation_id: int, db: Session = Depends(get_db), 
 
 @message_router.put("/conversations/{conversation_id}/notes", response_model=ConversationNoteResponse)
 def save_conversation_notes(conversation_id: int, payload: ConversationNoteUpdate, db: Session = Depends(get_db), landlord: Landlord = Depends(require_landlord)):
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.landlord_id == landlord.id).first()
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id, Conversation.landlord_id.in_(org_member_ids(landlord, db))).first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 

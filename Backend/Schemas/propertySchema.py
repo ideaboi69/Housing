@@ -33,6 +33,7 @@ class PropertyRange(str, enum.Enum):
 class PropertyCreate(BaseModel):
     title: str
     address: str
+    description: Optional[str] = None
     postal_code: str
     latitude: Optional[Decimal] = None
     longitude: Optional[Decimal] = None
@@ -68,6 +69,7 @@ class PropertyCreate(BaseModel):
 class PropertyUpdate(BaseModel):
     title: Optional[str] = None
     address: Optional[str] = None
+    description: Optional[str] = None
     postal_code: Optional[str] = None
     latitude: Optional[Decimal] = None
     longitude: Optional[Decimal] = None
@@ -105,6 +107,7 @@ class PropertyResponse(BaseModel):
     landlord_id: int
     title: str
     address: str
+    description: Optional[str] = None
     postal_code: str
     latitude: Optional[Decimal] = None
     longitude: Optional[Decimal] = None

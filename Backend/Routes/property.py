@@ -20,6 +20,7 @@ def create_property(payload: PropertyCreate, db: Session = Depends(get_db), curr
         landlord_id=landlord.id,
         title=payload.title,
         address=payload.address,
+        description=payload.description,
         postal_code=payload.postal_code,
         latitude=payload.latitude,
         longitude=payload.longitude,

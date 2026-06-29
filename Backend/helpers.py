@@ -359,6 +359,7 @@ def build_property_response(prop: Property) -> PropertyResponse:
         landlord_id=prop.landlord_id,
         title=prop.title,
         address=prop.address,
+        description=prop.description,
         postal_code=prop.postal_code,
         latitude=prop.latitude,
         longitude=prop.longitude,
@@ -477,6 +478,7 @@ def build_building_response(
         id=prop.id,
         title=prop.title,
         address=prop.address,
+        description=prop.description,
         latitude=prop.latitude,
         longitude=prop.longitude,
         property_type=prop.property_type if isinstance(prop.property_type, str) else prop.property_type.value,
@@ -527,6 +529,7 @@ def build_building_response(
         images=building_images,
         landlord_id=landlord.id,
         landlord_name=f"{landlord.first_name} {landlord.last_name}",
+        landlord_company_name=landlord.company_name,
         landlord_verified=landlord.identity_verified,
         landlord_is_early_adopter=landlord.is_early_adopter,
         units=units,
@@ -688,6 +691,20 @@ def get_listing_owned_by(listing_id: int, landlord_id: int, db: Session) -> List
 
     return listing
 
+def org_member_ids(landlord: Landlord, db: Session) -> list[int]:
+    """Landlord ids whose conversations this landlord may access.
+
+    Solo landlords (org_id IS NULL) see only their own threads — unchanged
+    behavior. Members of a property-management org see every teammate's threads,
+    giving the whole company one shared inbox.
+    """
+    org_id = getattr(landlord, "org_id", None)
+    if org_id is None:
+        return [landlord.id]
+    ids = [lid for (lid,) in db.query(Landlord.id).filter(Landlord.org_id == org_id).all()]
+    return ids or [landlord.id]
+
+
 def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -> ListingDetailResponse:
     """Build a full listing detail response with property and landlord info."""
     lease_type = listing.lease_type if isinstance(listing.lease_type, str) else listing.lease_type.value
@@ -727,6 +744,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         property_id=prop.id,
         title=prop.title,
         address=prop.address,
+        description=prop.description,
         latitude=prop.latitude,
         longitude=prop.longitude,
         property_type=prop.property_type if isinstance(prop.property_type, str) else prop.property_type.value,
@@ -780,6 +798,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         ),
         landlord_id=landlord.id,
         landlord_name=f"{landlord.first_name} {landlord.last_name}",
+        landlord_company_name=landlord.company_name,
         landlord_verified=landlord.identity_verified,
         landlord_is_early_adopter=landlord.is_early_adopter,
     )

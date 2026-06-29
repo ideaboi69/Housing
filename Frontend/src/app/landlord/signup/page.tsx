@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
+import { api } from "@/lib/api";
 import { motion } from "framer-motion";
 import {
   Building2, Phone, Shield, Upload, FileText, X, Check,
@@ -151,7 +152,7 @@ function LandlordSignupPageContent() {
   const [error, setError] = useState("");
 
   const [account, setAccount] = useState({ first_name: "", last_name: "", email: "", password: "", confirm_password: "" });
-  const [business, setBusiness] = useState({ company_name: "", phone: "", num_properties: "1" });
+  const [business, setBusiness] = useState({ company_name: "", phone: "", num_properties: "1", is_company_team: false });
   const [idType, setIdType] = useState<string>("drivers_license");
   const [documentType, setDocumentType] = useState<string>("property_tax_bill");
   const [govId, setGovId] = useState<File | null>(null);
@@ -168,6 +169,7 @@ function LandlordSignupPageContent() {
 
   function validateStep1() {
     if (!business.phone) { setError("Phone number is required so students can reach you"); return false; }
+    if (business.is_company_team && !business.company_name.trim()) { setError("Enter your company or agency name to set up a team"); return false; }
     return true;
   }
 
@@ -236,6 +238,24 @@ function LandlordSignupPageContent() {
           token: data.access_token,
           isLoading: false,
         });
+        // Property manager opted into a team — auto-create the org from their
+        // company name so they're an owner from first login. Token is already
+        // stored, so this authed call works. Non-fatal if it fails (Settings → Team).
+        if (business.is_company_team && business.company_name.trim()) {
+          try {
+            await api.landlords.createOrg(business.company_name.trim());
+          } catch {
+            /* they can still create the team later in Settings */
+          }
+        }
+        // Invited agents arrive with ?next=/landlord/join-team/<token>. Since
+        // registration logs them in, send them straight back to accept the
+        // invite. Normal signups (no `next`) keep the existing flow untouched.
+        const next = new URLSearchParams(window.location.search).get("next");
+        if (next && next.startsWith("/")) {
+          router.push(next);
+          return;
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
@@ -407,6 +427,31 @@ function LandlordSignupPageContent() {
               <label htmlFor="landlord-company-name" className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Company or management name</label>
               <input id="landlord-company-name" type="text" value={business.company_name} onChange={(e) => setBusiness({ ...business, company_name: e.target.value })} placeholder="Optional — leave blank if individual landlord" className={inputCls} style={{ fontSize: "14px" }} />
             </div>
+
+            {/* Property-management team opt-in — auto-creates the org after signup */}
+            <button
+              type="button"
+              onClick={() => setBusiness({ ...business, is_company_team: !business.is_company_team })}
+              className={`w-full flex items-start gap-3 rounded-xl border p-3.5 text-left transition-colors ${
+                business.is_company_team
+                  ? "border-[#1B2D45]/25 bg-[#1B2D45]/[0.04]"
+                  : "border-black/[0.08] hover:border-[#1B2D45]/20 hover:bg-[#1B2D45]/[0.02]"
+              }`}
+            >
+              <span className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
+                business.is_company_team ? "bg-[#1B2D45] border-[#1B2D45]" : "border-[#1B2D45]/25"
+              }`}>
+                {business.is_company_team && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>
+                  I manage properties for a company or agency
+                </span>
+                <span className="block text-[#1B2D45]/55 mt-0.5" style={{ fontSize: "11px", lineHeight: 1.5 }}>
+                  Sets up a team under your company name so you can invite agents and share one inbox. You can also do this later in Settings.
+                </span>
+              </span>
+            </button>
 
             <div>
               <label htmlFor="landlord-phone" className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>

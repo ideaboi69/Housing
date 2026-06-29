@@ -665,6 +665,16 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 })}
               </motion.div>
 
+              {/* About this home */}
+              {listing.description && listing.description.trim() && (
+                <div className="mt-6">
+                  <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>About this home</h3>
+                  <p className="mt-2 text-[#1B2D45]/70 whitespace-pre-line" style={{ fontSize: "13px", lineHeight: 1.7 }}>
+                    {listing.description}
+                  </p>
+                </div>
+              )}
+
               {/* Getting to campus */}
               <div className="mt-6 flex items-center justify-between gap-3 flex-wrap">
                 <h3 className="text-[#1B2D45]" style={{ fontSize: "15px", fontWeight: 700 }}>Getting to Campus</h3>
@@ -931,7 +941,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                     ) : existingConversationId != null ? (
                       <><MessageCircle className="w-4 h-4" /> Open Chat</>
                     ) : (
-                      <><MessageCircle className="w-4 h-4" /> Contact Landlord</>
+                      <><MessageCircle className="w-4 h-4" /> Contact {listing.landlord_company_name ? "Leasing Office" : "Landlord"}</>
                     )}
                   </motion.button>
 

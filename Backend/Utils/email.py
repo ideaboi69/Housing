@@ -1409,3 +1409,61 @@ def send_new_post_email(to_email: str, recipient_name: str, author_name: str, po
         "subject": f"{subject_line} — FindYourCribb",
         "html": html_content,
     })
+
+def send_org_invite_email(to_email: str, org_name: str, inviter_name: str, invite_url: str):
+    """Invite an agent to join a property-management team (landlord org)."""
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f5; padding: 40px 20px;">
+            <tr>
+                <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 480px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <tr>
+                            <td style="background-color: #1B2D45; padding: 32px 40px; text-align: center;">
+                                <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">FindYourCribb</h1>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 20px;">
+                                    <span style="display: inline-block; background-color: #e9eef7; color: #1B2D45; font-size: 13px; font-weight: 600; padding: 6px 16px; border-radius: 20px;">Team invitation</span>
+                                </div>
+                                <h2 style="margin: 0 0 8px; color: #18181b; font-size: 20px; font-weight: 600; text-align: center;">
+                                    Join {org_name} on Cribb
+                                </h2>
+                                <p style="margin: 0 0 28px; color: #52525b; font-size: 15px; line-height: 1.6; text-align: center;">
+                                    {inviter_name} invited you to join <strong>{org_name}</strong> as an agent. You'll share one inbox with your team and can reply to any tenant inquiry for your properties.
+                                </p>
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
+                                    <tr>
+                                        <td align="center">
+                                            <a href="{invite_url}" style="display: inline-block; background-color: #1B2D45; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 10px;">Accept invitation</a>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <p style="margin: 0; color: #a1a1aa; font-size: 13px; line-height: 1.6; text-align: center;">
+                                    If you don't have a Cribb landlord account yet, you can create one from that link, then accept. If you weren't expecting this, you can ignore this email.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    resend.Emails.send({
+        "from": "FindYourCribb <no-reply@findyourcribb.com>",
+        "reply_to": "support@findyourcribb.com",
+        "to": [to_email],
+        "subject": f"{inviter_name} invited you to join {org_name} on Cribb",
+        "html": html_content,
+    })

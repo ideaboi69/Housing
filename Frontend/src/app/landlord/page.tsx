@@ -23,6 +23,7 @@ import {
 } from "@/lib/mock-data";
 import { ListingVisibilitySwitch } from "@/components/landlord/ListingVisibilitySwitch";
 import { ProfilePhotoUpload } from "@/components/landlord/ProfilePhotoUpload";
+import { TeamSection } from "@/components/landlord/TeamSection";
 import { FoundingLandlordBadge } from "@/components/ui/Badges";
 import { PrivateNotesPanel } from "@/components/landlord/PrivateNotesPanel";
 import { hasNote } from "@/lib/landlord-notes";
@@ -2007,6 +2008,9 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
           </div>
         )}
       </div>
+
+      {/* ─── Team / org ─── */}
+      <TeamSection />
 
       {/* ─── Public Profile Preview ─── */}
       <div className={sectionCls} style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>

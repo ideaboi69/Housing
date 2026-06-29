@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, Form, UploadFile, Request
+from fastapi import APIRouter, Depends, HTTPException, status, File, Form, UploadFile, Request, BackgroundTasks
+import secrets
+from datetime import datetime
+from config import settings
+from Utils.email import send_org_invite_email
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sql_func
-from tables import get_db, User, Landlord, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, LandlordDocuments, LandlordNotificationPreferences
+from tables import get_db, User, Landlord, LandlordOrg, LandlordOrgInvite, Property, Listing, ListingImage, Review, Flag, SavedListing, HousingHealthScore, LandlordDocuments, LandlordNotificationPreferences
 from Schemas.landlordSchema import LandlordLogin, LandlordUpdate, LandlordResponse, LandlordPublicResponse, LandlordPropertyResponse, LandlordReviewResponse, LandlordFlagResponse, PropertyRange, IDType, DocumentType, LandlordVerification, LandlordTokenResponse, LandlordNotificationPreferencesUpdate, LandlordNotificationPreferencesResponse
 from Schemas.userSchema import UserRole, TokenResponse
 from Utils.security import get_current_landlord, hash_password, verify_password, create_access_token, validate_password, create_refresh_token_for_user, revoke_all_refresh_tokens
@@ -11,7 +15,7 @@ from Utils.verification import compare_landlord_data
 from helpers import require_landlord, get_landlord_profile, compute_landlord_stats, upload_to_s3, BUCKET_NAME, log_security_event
 from Schemas.authSchema import SecurityEventType, SecurityEventResponse
 from typing import Optional
-from pydantic import EmailStr
+from pydantic import EmailStr, BaseModel
 from Utils.rate_limit import limiter
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.turnstile import verify_turnstile
@@ -350,3 +354,205 @@ def update_landlord_notifications(payload: LandlordNotificationPreferencesUpdate
     db.refresh(prefs)
 
     return LandlordNotificationPreferencesResponse.model_validate(prefs)
+
+
+# ════════════════════════════════════════════════════════════
+# Property-management teams (orgs) — multiple agents, one inbox
+# ════════════════════════════════════════════════════════════
+
+class OrgCreate(BaseModel):
+    name: str
+
+class OrgMemberAdd(BaseModel):
+    email: EmailStr
+
+class OrgMemberResponse(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    email: str
+    org_role: Optional[str] = None
+    identity_verified: bool
+
+    class Config:
+        from_attributes = True
+
+class OrgResponse(BaseModel):
+    id: int
+    name: str
+    members: list[OrgMemberResponse]
+
+
+def _org_response(org_id: int, db: Session) -> OrgResponse:
+    org = db.query(LandlordOrg).filter(LandlordOrg.id == org_id).first()
+    members = db.query(Landlord).filter(Landlord.org_id == org_id).order_by(Landlord.org_role.desc(), Landlord.id).all()
+    return OrgResponse(
+        id=org.id,
+        name=org.name,
+        members=[OrgMemberResponse.model_validate(m) for m in members],
+    )
+
+
+@landlord_router.post("/org", response_model=OrgResponse, status_code=status.HTTP_201_CREATED)
+def create_org(payload: OrgCreate, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    if current_landlord.org_id:
+        raise HTTPException(status_code=400, detail="You're already part of a team")
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Team name is required")
+    org = LandlordOrg(name=name)
+    db.add(org)
+    db.flush()  # assign org.id
+    current_landlord.org_id = org.id
+    current_landlord.org_role = "owner"
+    db.commit()
+    return _org_response(org.id, db)
+
+
+@landlord_router.get("/org", response_model=Optional[OrgResponse])
+def get_my_org(db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    if not current_landlord.org_id:
+        return None
+    return _org_response(current_landlord.org_id, db)
+
+
+@landlord_router.post("/org/members", response_model=OrgResponse)
+def add_org_member(payload: OrgMemberAdd, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    if not current_landlord.org_id or current_landlord.org_role != "owner":
+        raise HTTPException(status_code=403, detail="Only the team owner can add agents")
+    target = db.query(Landlord).filter(Landlord.email == payload.email).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="No landlord account with that email. Ask them to sign up first.")
+    if target.id == current_landlord.id:
+        raise HTTPException(status_code=400, detail="You're already in the team")
+    if target.org_id and target.org_id != current_landlord.org_id:
+        raise HTTPException(status_code=400, detail="That landlord already belongs to another team")
+    target.org_id = current_landlord.org_id
+    target.org_role = target.org_role or "agent"
+    db.commit()
+    return _org_response(current_landlord.org_id, db)
+
+
+@landlord_router.delete("/org/members/{landlord_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_org_member(landlord_id: int, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    if not current_landlord.org_id or current_landlord.org_role != "owner":
+        raise HTTPException(status_code=403, detail="Only the team owner can remove agents")
+    if landlord_id == current_landlord.id:
+        raise HTTPException(status_code=400, detail="The owner can't be removed from the team")
+    target = db.query(Landlord).filter(Landlord.id == landlord_id, Landlord.org_id == current_landlord.org_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Member not found")
+    target.org_id = None
+    target.org_role = None
+    db.commit()
+
+
+# ── Email invites to join a team ──
+
+class OrgInviteCreate(BaseModel):
+    email: EmailStr
+
+class OrgInviteResponse(BaseModel):
+    id: int
+    email: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class OrgInvitePreview(BaseModel):
+    org_name: str
+    inviter_name: str
+    email: str
+    status: str
+
+
+@landlord_router.post("/org/invites", response_model=OrgInviteResponse, status_code=status.HTTP_201_CREATED)
+def create_org_invite(payload: OrgInviteCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    if not current_landlord.org_id or current_landlord.org_role != "owner":
+        raise HTTPException(status_code=403, detail="Only the team owner can invite agents")
+    already = db.query(Landlord).filter(Landlord.email == payload.email, Landlord.org_id == current_landlord.org_id).first()
+    if already:
+        raise HTTPException(status_code=400, detail="That person is already on your team")
+
+    token = secrets.token_urlsafe(32)
+    # Refresh an existing pending invite for the same email rather than piling up rows.
+    invite = db.query(LandlordOrgInvite).filter(
+        LandlordOrgInvite.org_id == current_landlord.org_id,
+        LandlordOrgInvite.email == payload.email,
+        LandlordOrgInvite.status == "pending",
+    ).first()
+    if invite:
+        invite.token = token
+    else:
+        invite = LandlordOrgInvite(org_id=current_landlord.org_id, email=payload.email, token=token, invited_by=current_landlord.id, status="pending")
+        db.add(invite)
+    db.commit()
+    db.refresh(invite)
+
+    org = db.query(LandlordOrg).filter(LandlordOrg.id == current_landlord.org_id).first()
+    invite_url = f"{settings.FRONTEND_URL}/landlord/join-team/{token}"
+    background_tasks.add_task(
+        send_org_invite_email,
+        payload.email,
+        org.name,
+        f"{current_landlord.first_name} {current_landlord.last_name}",
+        invite_url,
+    )
+    return invite
+
+
+@landlord_router.get("/org/invites", response_model=list[OrgInviteResponse])
+def list_org_invites(db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    if not current_landlord.org_id or current_landlord.org_role != "owner":
+        raise HTTPException(status_code=403, detail="Only the team owner can view invites")
+    return db.query(LandlordOrgInvite).filter(
+        LandlordOrgInvite.org_id == current_landlord.org_id,
+        LandlordOrgInvite.status == "pending",
+    ).order_by(LandlordOrgInvite.created_at.desc()).all()
+
+
+@landlord_router.delete("/org/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_org_invite(invite_id: int, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    if not current_landlord.org_id or current_landlord.org_role != "owner":
+        raise HTTPException(status_code=403, detail="Only the team owner can cancel invites")
+    invite = db.query(LandlordOrgInvite).filter(LandlordOrgInvite.id == invite_id, LandlordOrgInvite.org_id == current_landlord.org_id).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    invite.status = "cancelled"
+    db.commit()
+
+
+@landlord_router.get("/org/invites/{token}/preview", response_model=OrgInvitePreview)
+def preview_org_invite(token: str, db: Session = Depends(get_db)):
+    """Public — lets the join-team landing page show who invited you."""
+    invite = db.query(LandlordOrgInvite).filter(LandlordOrgInvite.token == token).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    org = db.query(LandlordOrg).filter(LandlordOrg.id == invite.org_id).first()
+    inviter = db.query(Landlord).filter(Landlord.id == invite.invited_by).first()
+    return OrgInvitePreview(
+        org_name=org.name if org else "a team",
+        inviter_name=f"{inviter.first_name} {inviter.last_name}" if inviter else "A landlord",
+        email=invite.email,
+        status=invite.status,
+    )
+
+
+@landlord_router.post("/org/invites/{token}/accept", response_model=OrgResponse)
+def accept_org_invite(token: str, db: Session = Depends(get_db), current_landlord: Landlord = Depends(get_current_landlord)):
+    invite = db.query(LandlordOrgInvite).filter(LandlordOrgInvite.token == token).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    if invite.status != "pending":
+        raise HTTPException(status_code=400, detail="This invite is no longer valid")
+    if current_landlord.org_id and current_landlord.org_id != invite.org_id:
+        raise HTTPException(status_code=400, detail="You already belong to another team")
+    current_landlord.org_id = invite.org_id
+    current_landlord.org_role = current_landlord.org_role or "agent"
+    invite.status = "accepted"
+    invite.accepted_by = current_landlord.id
+    invite.accepted_at = sql_func.now()
+    db.commit()
+    return _org_response(invite.org_id, db)

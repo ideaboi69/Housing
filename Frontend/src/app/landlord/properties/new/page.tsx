@@ -48,6 +48,7 @@ function NewPropertyPageContent() {
   const [form, setForm] = useState({
     title: "",
     address: "",
+    description: "",
     postal_code: "",
     property_type: PropertyType.HOUSE,
     total_rooms: 1,
@@ -137,6 +138,7 @@ function NewPropertyPageContent() {
       const payload = {
         title: form.title,
         address: form.address,
+        description: form.description.trim() || undefined,
         postal_code: form.postal_code,
         property_type: form.property_type,
         // For apartments, total_rooms/bathrooms aren't shown to students but
@@ -220,6 +222,23 @@ function NewPropertyPageContent() {
                 className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
                 style={{ fontSize: "14px" }}
               />
+            </div>
+
+            <div>
+              <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>
+                {form.property_type === PropertyType.APARTMENT ? "Building overview" : "About this home"}
+                <span className="text-[#1B2D45]/35" style={{ fontWeight: 500 }}> (optional)</span>
+              </label>
+              <textarea
+                value={form.description}
+                onChange={(e) => update("description", e.target.value)}
+                rows={5}
+                maxLength={2000}
+                placeholder="Describe the place — what makes it great for students, the neighbourhood, what's included. This shows at the top of your listing."
+                className="w-full mt-1.5 px-4 py-2.5 rounded-lg bg-[#f3f3f5] border border-transparent focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all resize-y"
+                style={{ fontSize: "14px", lineHeight: 1.6 }}
+              />
+              <p className="text-[#1B2D45]/35 mt-1 text-right" style={{ fontSize: "11px" }}>{form.description.length}/2000</p>
             </div>
 
             <div>

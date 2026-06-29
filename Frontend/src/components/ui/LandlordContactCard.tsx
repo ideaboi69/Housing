@@ -151,18 +151,22 @@ export function LandlordContactCard({
       className="bg-white/90 backdrop-blur-xl rounded-xl border border-black/[0.04] p-5"
       style={{ boxShadow: "0 2px 12px rgba(0,0,0,0.03)" }}
     >
-      {/* Section label */}
+      {/* Section label — companies (property managers) read as "managed by" */}
       <p className="text-[#1B2D45]/30 mb-3" style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em" }}>
-        LISTED BY
+        {companyName ? "MANAGED BY" : "LISTED BY"}
       </p>
 
-      {/* Header — Avatar + Name */}
+      {/* Header — Avatar + Name. For a company the org leads, the person is the contact. */}
       <div className="flex items-center gap-3">
         <div className="relative shrink-0">
           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center">
-            <span className="text-[#FF6B35]" style={{ fontSize: "15px", fontWeight: 800 }}>
-              {initials}
-            </span>
+            {companyName ? (
+              <Building2 className="w-5 h-5 text-[#FF6B35]" />
+            ) : (
+              <span className="text-[#FF6B35]" style={{ fontSize: "15px", fontWeight: 800 }}>
+                {initials}
+              </span>
+            )}
           </div>
           {isVerified && (
             <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-[#4ADE80] flex items-center justify-center border-2 border-white">
@@ -173,14 +177,14 @@ export function LandlordContactCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <p className="text-[#1B2D45] truncate" style={{ fontSize: "14px", fontWeight: 700 }}>
-              {displayName}
+              {companyName || displayName}
             </p>
             {landlordIsEarlyAdopter && <FoundingLandlordBadge />}
           </div>
           {companyName ? (
-            <p className="text-[#1B2D45]/40 truncate flex items-center gap-1" style={{ fontSize: "11px" }}>
-              <Building2 className="w-3 h-3 shrink-0" />
-              {companyName}
+            <p className="text-[#1B2D45]/40 truncate" style={{ fontSize: "11px" }}>
+              {isVerified ? "Verified leasing office" : "Leasing office"}
+              {displayName ? ` · ${displayName}` : ""}
             </p>
           ) : isVerified ? (
             <p className="text-[#4ADE80]" style={{ fontSize: "11px", fontWeight: 600 }}>

@@ -164,6 +164,7 @@ class ListingDetailResponse(BaseModel):
     property_id: int
     title: str
     address: str
+    description: Optional[str] = None
     latitude: Optional[Decimal] = None
     longitude: Optional[Decimal] = None
     property_type: str
@@ -197,6 +198,7 @@ class ListingDetailResponse(BaseModel):
     # landlord info
     landlord_id: int
     landlord_name: str
+    landlord_company_name: Optional[str] = None
     landlord_verified: bool
     landlord_is_early_adopter: bool = False
 
@@ -237,6 +239,7 @@ class BuildingResponse(BaseModel):
     id: int  # property id
     title: str
     address: str
+    description: Optional[str] = None
     latitude: Optional[Decimal] = None
     longitude: Optional[Decimal] = None
     property_type: str
@@ -272,6 +275,7 @@ class BuildingResponse(BaseModel):
     # landlord info
     landlord_id: int
     landlord_name: str
+    landlord_company_name: Optional[str] = None
     landlord_verified: bool
     landlord_is_early_adopter: bool = False
     units: list[BuildingUnitResponse] = []

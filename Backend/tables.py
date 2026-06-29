@@ -73,6 +73,35 @@ class User(Base):
         CheckConstraint("email LIKE '%@uoguelph.ca'", name="ck_users_uoguelph_email"),
     )
 
+class LandlordOrg(Base):
+    """A property-management company / leasing org that groups multiple landlord
+    logins (agents). Solo landlords have no org (landlords.org_id IS NULL) and
+    behave exactly as before. Agents in the same org share one inbox."""
+    __tablename__ = "landlord_orgs"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    members = relationship("Landlord", back_populates="org")
+
+
+class LandlordOrgInvite(Base):
+    """Email invite for an agent to join a landlord org. The invitee clicks the
+    tokenised link, signs in / signs up as a landlord, and accepts to join."""
+    __tablename__ = "landlord_org_invites"
+
+    id = Column(Integer, primary_key=True)
+    org_id = Column(Integer, ForeignKey("landlord_orgs.id"), nullable=False)
+    email = Column(String(255), nullable=False)
+    token = Column(String(64), unique=True, nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="pending")  # pending | accepted | cancelled
+    invited_by = Column(Integer, ForeignKey("landlords.id"), nullable=False)
+    accepted_by = Column(Integer, ForeignKey("landlords.id"), nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    accepted_at = Column(TIMESTAMP(timezone=True), nullable=True)
+
+
 class Landlord(Base):
     __tablename__ = "landlords"
 
@@ -89,9 +118,14 @@ class Landlord(Base):
     no_of_property = Column(Enum(PropertyRange), nullable=False)
     profile_photo_url = Column(String(500), nullable=True)
     token_version = Column(Integer, nullable=False, server_default="0", default=0)
+    # Property-management team. NULL org_id = solo landlord (unchanged behavior).
+    # org_role is "owner" (created the org) or "agent".
+    org_id = Column(Integer, ForeignKey("landlord_orgs.id"), nullable=True)
+    org_role = Column(String(20), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    org = relationship("LandlordOrg", back_populates="members")
     properties = relationship("Property", back_populates="landlord")
     reviews = relationship("Review", back_populates="landlord")
     documents = relationship("LandlordDocuments", back_populates="landlord")
@@ -138,6 +172,9 @@ class Property(Base):
     landlord_id = Column(Integer, ForeignKey("landlords.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(255), nullable=False)
     address = Column(String(500), nullable=False)
+    # Landlord-written overview shown as "About this home" (houses/rooms) or
+    # "Building Overview" (apartments). NULL until the landlord adds one.
+    description = Column(Text, nullable=True)
     postal_code = Column(String, nullable=False) #new
     latitude = Column(Numeric(9, 6), nullable=True)
     longitude = Column(Numeric(9, 6), nullable=True)

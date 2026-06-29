@@ -36,6 +36,9 @@ import type {
   FlagCreate,
   FlagResponse,
   LandlordFlagResponse,
+  OrgResponse,
+  OrgInvite,
+  OrgInvitePreview,
   LandlordPublicResponse,
   WriterRegister,
   WriterResponse,
@@ -861,6 +864,49 @@ export const landlords = {
 
   logoutAll: () =>
     request<{ message: string }>("/api/landlords/me/logout-all", { method: "POST" }),
+
+  // ── Team / org (property-management companies) ──
+  getOrg: () =>
+    request<OrgResponse | null>("/api/landlords/org"),
+
+  createOrg: (name: string) =>
+    request<OrgResponse>("/api/landlords/org", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  addOrgMember: (email: string) =>
+    request<OrgResponse>("/api/landlords/org/members", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  removeOrgMember: (landlordId: number) =>
+    request<void>(`/api/landlords/org/members/${landlordId}`, {
+      method: "DELETE",
+    }),
+
+  inviteOrgMember: (email: string) =>
+    request<OrgInvite>("/api/landlords/org/invites", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  listOrgInvites: () =>
+    request<OrgInvite[]>("/api/landlords/org/invites"),
+
+  cancelOrgInvite: (inviteId: number) =>
+    request<void>(`/api/landlords/org/invites/${inviteId}`, {
+      method: "DELETE",
+    }),
+
+  getOrgInvitePreview: (token: string) =>
+    request<OrgInvitePreview>(`/api/landlords/org/invites/${token}/preview`),
+
+  acceptOrgInvite: (token: string) =>
+    request<OrgResponse>(`/api/landlords/org/invites/${token}/accept`, {
+      method: "POST",
+    }),
 
   getSecurityLog: (limit = 50, offset = 0) =>
     request<SecurityEvent[]>(`/api/landlords/me/security-log?limit=${limit}&offset=${offset}`),

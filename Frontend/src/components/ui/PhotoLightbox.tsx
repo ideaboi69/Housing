@@ -8,13 +8,15 @@ interface PhotoLightboxProps {
   images: string[];
   startIndex?: number;
   onClose: () => void;
+  /** Optional label shown in the header (e.g. "Floor Plan", "Unit Photos"). */
+  title?: string;
 }
 
 /**
  * Full-screen photo viewer. Navigate with the arrows, keyboard (←/→/Esc),
  * swipe on touch, or the thumbnail strip. Click the backdrop to close.
  */
-export function PhotoLightbox({ images, startIndex = 0, onClose }: PhotoLightboxProps) {
+export function PhotoLightbox({ images, startIndex = 0, onClose, title }: PhotoLightboxProps) {
   const [index, setIndex] = useState(startIndex);
   const touchStartX = useRef<number | null>(null);
 
@@ -59,7 +61,10 @@ export function PhotoLightbox({ images, startIndex = 0, onClose }: PhotoLightbox
       aria-label="Photo gallery"
     >
       <div className="flex items-center justify-between px-4 py-3 text-white/85" onClick={(e) => e.stopPropagation()}>
-        <span style={{ fontSize: "13px", fontWeight: 500 }}>{index + 1} / {images.length}</span>
+        <span style={{ fontSize: "13px", fontWeight: 500 }}>
+          {title ? <span className="font-bold mr-2 text-white">{title}</span> : null}
+          {index + 1} / {images.length}
+        </span>
         <button onClick={onClose} aria-label="Close" className="flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-white/10">
           <X className="h-5 w-5" />
         </button>
