@@ -327,7 +327,7 @@ export default function BuildingDetailPage({ params }: { params: Promise<{ id: s
               )}
 
               <p className="mt-4 text-[#1B2D45]/55" style={{ fontSize: "12px", lineHeight: 1.55 }}>
-                Pick a unit above and tap <strong className="text-[#1B2D45]">Details</strong> to book a showing or message the {building.landlord_company_name ? "leasing office" : "landlord"} about that layout.
+                Pick a unit below and tap <strong className="text-[#1B2D45]">Details</strong> to book a showing or message the {building.landlord_company_name ? "leasing office" : "landlord"} about that layout.
               </p>
             </div>
 

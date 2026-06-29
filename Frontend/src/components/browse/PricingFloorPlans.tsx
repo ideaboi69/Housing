@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Maximize2, ChevronDown, ChevronLeft, ChevronRight, X, Check, Layers, Table2 } from "lucide-react";
 import { formatPrice, formatLeaseType } from "@/lib/utils";
 import { PhotoLightbox } from "@/components/ui/PhotoLightbox";
@@ -113,13 +112,6 @@ function UnitDetailsModal({
                 <Maximize2 className="w-3.5 h-3.5" /> Tour Floor Plan
               </button>
             )}
-            <Link
-              href={`/browse/${unit.id}`}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#FF6B35]/30 text-[#FF6B35] hover:bg-[#FF6B35]/[0.06] transition-colors"
-              style={{ fontSize: "13px", fontWeight: 700 }}
-            >
-              Send Message
-            </Link>
             <button
               type="button"
               onClick={onClose}
@@ -367,13 +359,6 @@ export function PricingFloorPlans({
                             >
                               View More
                             </button>
-                            <Link
-                              href={`/browse/${unit.id}`}
-                              className="px-3 py-1.5 rounded-lg border border-[#FF6B35]/30 text-[#FF6B35] hover:bg-[#FF6B35]/[0.06] transition-colors"
-                              style={{ fontWeight: 700, fontSize: "12px" }}
-                            >
-                              Send Message
-                            </Link>
                           </div>
                         </td>
                       </tr>

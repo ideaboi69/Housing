@@ -88,6 +88,20 @@ interface ThreadDetail {
   messages: UnifiedMessage[];
 }
 
+/* Polling re-fetches the inbox every few seconds. Without these, each poll
+   replaces state with brand-new objects and forces a full re-render (the
+   "random refresh" flicker). Compare a cheap signature and skip the update
+   when nothing actually changed. */
+function convosSignature(list: UnifiedConversation[]): string {
+  return list.map((c) => `${c.key}|${c.updatedAt}|${c.unreadCount}|${c.lastMessage?.content ?? ""}`).join("§");
+}
+
+function detailSignature(d: ThreadDetail | null): string {
+  if (!d) return "∅";
+  const last = d.messages[d.messages.length - 1];
+  return `${d.title}|${d.otherName}|${d.messages.length}|${last?.id ?? ""}|${last?.content ?? ""}`;
+}
+
 const TYPE_META: Record<InboxType, { label: string; short: string; icon: LucideIcon; tone: string; bg: string }> = {
   housing: {
     label: "Housing",
@@ -361,6 +375,10 @@ function ChatThread({
   onRefreshConversations: () => Promise<void>;
 }) {
   const [detail, setDetail] = useState<ThreadDetail | null>(null);
+  // Skip re-render when a poll returns an identical thread (avoids flicker).
+  const applyDetail = useCallback((next: ThreadDetail | null) => {
+    setDetail((prev) => (detailSignature(prev) === detailSignature(next) ? prev : next));
+  }, []);
   const [loading, setLoading] = useState(true);
   const [newMsg, setNewMsg] = useState("");
   const [sending, setSending] = useState(false);
@@ -371,7 +389,7 @@ function ChatThread({
     try {
       if (conversation.type === "housing") {
         const data = await api.messages.getConversation(conversation.id);
-        setDetail({
+        applyDetail({
           title: data.listing_title || conversation.title,
           subtitle: "Listing inquiry",
           otherName: data.landlord_name || conversation.otherName,
@@ -381,7 +399,7 @@ function ChatThread({
       } else if (conversation.type === "sublet") {
         const data = await api.sublets.getConversation(conversation.id);
         const otherName = data.poster_id === currentUserId ? data.inquirer_name : data.poster_name;
-        setDetail({
+        applyDetail({
           title: data.sublet_title || conversation.title,
           subtitle: "Sublet conversation",
           otherName: otherName || conversation.otherName,
@@ -391,7 +409,7 @@ function ChatThread({
       } else {
         const data = await api.marketplace.getConversation(conversation.id);
         const otherName = data.seller_id === currentUserId ? data.buyer_name : data.seller_name;
-        setDetail({
+        applyDetail({
           title: data.item_title || conversation.title,
           subtitle: "Marketplace item",
           otherName: otherName || conversation.otherName,
@@ -400,11 +418,11 @@ function ChatThread({
         });
       }
     } catch {
-      setDetail(null);
+      applyDetail(null);
     } finally {
       setLoading(false);
     }
-  }, [conversation, currentUserId]);
+  }, [conversation, currentUserId, applyDetail]);
 
   useEffect(() => {
     setLoading(true);
@@ -568,7 +586,7 @@ export default function MessagesPage() {
       const marketplace = marketplaceResult.status === "fulfilled" ? marketplaceResult.value.map((convo) => normalizeMarketplace(convo, user.id)) : [];
       const merged = [...housing, ...sublets, ...marketplace].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
-      setConversations(merged);
+      setConversations((prev) => (convosSignature(prev) === convosSignature(merged) ? prev : merged));
       setActiveKey((current) => {
         if (current && merged.some((convo) => convo.key === current)) return current;
         if (typeof window !== "undefined") {

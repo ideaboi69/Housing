@@ -305,6 +305,22 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
     }).filter(Boolean) as { listing: ListingDetailResponse; point: { x: number; y: number } }[];
   }, [mapCenter, mapSize.height, mapSize.width, mapZoom, sortedListings]);
 
+  // Apartment units share a property_id (and coordinates), so a building would
+  // otherwise show as several stacked pins. Collapse units into one marker per
+  // building, labelled "From $X" with the unit count.
+  const buildingMarkers = useMemo(() => {
+    const groups = new Map<number, { listings: ListingDetailResponse[]; point: { x: number; y: number } }>();
+    for (const { listing, point } of markerPoints) {
+      const existing = groups.get(listing.property_id);
+      if (existing) existing.listings.push(listing);
+      else groups.set(listing.property_id, { listings: [listing], point });
+    }
+    return [...groups.values()].map(({ listings: group, point }) => {
+      const representative = group.reduce((min, l) => (Number(l.rent_per_room) < Number(min.rent_per_room) ? l : min), group[0]);
+      return { point, representative, group, count: group.length };
+    });
+  }, [markerPoints]);
+
   return (
     <div className="max-w-[1440px] mx-auto px-4 md:px-6 py-4 md:py-5">
       <div
@@ -323,14 +339,16 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
             <MapHintCard text="Tap a price pin to preview that listing in the panel beside the map." />
 
             <div className="pointer-events-none absolute inset-0 z-[5]">
-              {markerPoints.map(({ listing, point }) => {
-                const score = healthScores[listing.id] ?? 0;
+              {buildingMarkers.map(({ representative, group, point, count }) => {
+                const score = healthScores[representative.id] ?? 0;
                 const color = score >= 85 ? "#4ADE80" : score >= 65 ? "#FFB627" : "#E71D36";
-                const isSelected = selectedListing?.id === listing.id;
+                const isSelected = selectedListing != null && group.some((l) => l.id === selectedListing.id);
+                const minRent = Math.round(Math.min(...group.map((l) => Number(l.rent_per_room))));
+                const isMulti = count > 1;
                 return (
                   <button
-                    key={listing.id}
-                    onClick={() => focusListing(listing.id)}
+                    key={representative.property_id}
+                    onClick={() => focusListing(representative.id)}
                     className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
                     style={{
                       left: point.x,
@@ -344,8 +362,16 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />
                       <span style={{ fontSize: "11px", fontWeight: 800, color: isSelected ? "white" : "#FF6B35" }}>
-                        ${Math.round(Number(listing.rent_per_room))}
+                        {isMulti ? `From $${minRent}` : `$${minRent}`}
                       </span>
+                      {isMulti && (
+                        <span
+                          className="rounded-full px-1.5"
+                          style={{ fontSize: "9px", fontWeight: 800, background: isSelected ? "rgba(255,255,255,0.2)" : "#1B2D45", color: "white" }}
+                        >
+                          {count}
+                        </span>
+                      )}
                     </span>
                   </button>
                 );
