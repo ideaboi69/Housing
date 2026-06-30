@@ -13,6 +13,7 @@ import {
   projectLngLatToContainer,
 } from "@/lib/google-maps";
 import type { ListingDetailResponse } from "@/types";
+import { groupBrowseItems, type BrowseItem, type BuildingGroup } from "@/lib/buildings";
 
 type SortKey = "recommended" | "price_low" | "price_high" | "closest";
 
@@ -186,6 +187,100 @@ function ListingRailCard({
   );
 }
 
+function BuildingRailCard({
+  building,
+  healthScores,
+  isSelected,
+  onSelect,
+}: {
+  building: BuildingGroup;
+  healthScores: Record<number, number>;
+  isSelected: boolean;
+  onSelect: () => void;
+}) {
+  const score = healthScores[building.listings[0]?.id] ?? 0;
+  const image = building.coverImage;
+  const proximity = getProximityLabel(building.walk_time_minutes);
+  const bedLabel = building.bedMin != null
+    ? (building.bedMax && building.bedMax !== building.bedMin ? `${building.bedMin}–${building.bedMax} bed` : `${building.bedMin} bed`)
+    : null;
+
+  return (
+    <div
+      onClick={onSelect}
+      className={`rounded-2xl border bg-white overflow-hidden cursor-pointer transition-all ${
+        isSelected
+          ? "border-[#FF6B35]/35 shadow-[0_12px_28px_rgba(255,107,53,0.14)]"
+          : "border-black/[0.06] hover:border-[#1B2D45]/12 hover:shadow-[0_10px_24px_rgba(27,45,69,0.08)]"
+      }`}
+    >
+      <div className="grid grid-cols-[136px_minmax(0,1fr)] min-h-[152px]">
+        <div className="relative h-full bg-[#F2EEE8]">
+          {image ? (
+            <img src={image} alt={building.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-4xl">🏢</div>
+          )}
+          <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-white/95 backdrop-blur-sm shadow-sm">
+            <span style={{ fontSize: "12px", fontWeight: 800, color: "#FF6B35" }}>
+              From {formatPrice(building.priceMin)}
+            </span>
+          </div>
+          <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-[#1B2D45] text-white" style={{ fontSize: "10px", fontWeight: 800 }}>
+            {building.unitCount} units
+          </div>
+        </div>
+
+        <div className="p-3.5 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-[#1B2D45] truncate" style={{ fontSize: "15px", fontWeight: 800 }}>
+                {building.title}
+              </h3>
+              <div className="flex items-center gap-1.5 mt-1 text-[#1B2D45]/40 min-w-0">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate" style={{ fontSize: "11px", fontWeight: 500 }}>
+                  {building.address}
+                </span>
+              </div>
+            </div>
+            <ScoreRing score={score} size={40} />
+          </div>
+
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <span
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full border"
+              style={{ fontSize: "10px", fontWeight: 700, color: proximity.color, background: proximity.bg, borderColor: `${proximity.color}22` }}
+            >
+              <span>{proximity.emoji}</span>
+              <span>{proximity.label}</span>
+            </span>
+            {bedLabel && (
+              <span className="text-[#1B2D45]/42" style={{ fontSize: "11px", fontWeight: 600 }}>{bedLabel}</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 mt-3 text-[#1B2D45]/52 flex-wrap" style={{ fontSize: "11px", fontWeight: 600 }}>
+            <span className="flex items-center gap-1"><Bed className="w-3.5 h-3.5" /> {building.unitCount} unit{building.unitCount !== 1 ? "s" : ""}</span>
+            <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Apartment</span>
+          </div>
+
+          <div className="flex items-center gap-2 mt-4">
+            <Link
+              href={`/browse/building/${building.propertyId}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 inline-flex items-center justify-center rounded-xl bg-[#FF6B35] px-3 py-2 text-white hover:bg-[#e55e2e] transition-colors"
+              style={{ fontSize: "12px", fontWeight: 700 }}
+            >
+              View building
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -289,37 +384,27 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
     if (current !== rounded) map.setZoom(rounded);
   }, [mapZoom]);
 
+  // Group apartment units into one building entry (the same logic the board/grid
+  // use), so the map markers AND the side list show a building once instead of
+  // once per unit.
+  const items = useMemo(() => groupBrowseItems(sortedListings), [sortedListings]);
+
   const markerPoints = useMemo(() => {
-    return sortedListings.map((listing) => {
-      if (listing.latitude == null || listing.longitude == null) return null;
-      const coords = { lat: Number(listing.latitude), lng: Number(listing.longitude) };
+    return items.map((item) => {
+      const lat = item.kind === "building" ? item.building.latitude : item.listing.latitude;
+      const lng = item.kind === "building" ? item.building.longitude : item.listing.longitude;
+      if (lat == null || lng == null) return null;
       const point = projectLngLatToContainer({
-        lat: coords.lat,
-        lng: coords.lng,
+        lat: Number(lat),
+        lng: Number(lng),
         center: mapCenter,
         zoom: mapZoom,
         width: mapSize.width,
         height: mapSize.height,
       });
-      return { listing, point };
-    }).filter(Boolean) as { listing: ListingDetailResponse; point: { x: number; y: number } }[];
-  }, [mapCenter, mapSize.height, mapSize.width, mapZoom, sortedListings]);
-
-  // Apartment units share a property_id (and coordinates), so a building would
-  // otherwise show as several stacked pins. Collapse units into one marker per
-  // building, labelled "From $X" with the unit count.
-  const buildingMarkers = useMemo(() => {
-    const groups = new Map<number, { listings: ListingDetailResponse[]; point: { x: number; y: number } }>();
-    for (const { listing, point } of markerPoints) {
-      const existing = groups.get(listing.property_id);
-      if (existing) existing.listings.push(listing);
-      else groups.set(listing.property_id, { listings: [listing], point });
-    }
-    return [...groups.values()].map(({ listings: group, point }) => {
-      const representative = group.reduce((min, l) => (Number(l.rent_per_room) < Number(min.rent_per_room) ? l : min), group[0]);
-      return { point, representative, group, count: group.length };
-    });
-  }, [markerPoints]);
+      return { item, point };
+    }).filter(Boolean) as { item: BrowseItem; point: { x: number; y: number } }[];
+  }, [items, mapCenter, mapSize.height, mapSize.width, mapZoom]);
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 md:px-6 py-4 md:py-5">
@@ -339,16 +424,21 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
             <MapHintCard text="Tap a price pin to preview that listing in the panel beside the map." />
 
             <div className="pointer-events-none absolute inset-0 z-[5]">
-              {buildingMarkers.map(({ representative, group, point, count }) => {
-                const score = healthScores[representative.id] ?? 0;
+              {markerPoints.map(({ item, point }) => {
+                const repId = item.kind === "building" ? item.building.listings[0].id : item.listing.id;
+                const score = healthScores[repId] ?? 0;
                 const color = score >= 85 ? "#4ADE80" : score >= 65 ? "#FFB627" : "#E71D36";
-                const isSelected = selectedListing != null && group.some((l) => l.id === selectedListing.id);
-                const minRent = Math.round(Math.min(...group.map((l) => Number(l.rent_per_room))));
-                const isMulti = count > 1;
+                const isSelected = item.kind === "building"
+                  ? (selectedListing != null && item.building.listings.some((l) => l.id === selectedListing.id))
+                  : selectedListing?.id === item.listing.id;
+                const minRent = Math.round(item.kind === "building" ? item.building.priceMin : Number(item.listing.rent_per_room));
+                const isMulti = item.kind === "building" && item.building.unitCount > 1;
+                const count = item.kind === "building" ? item.building.unitCount : 1;
+                const key = item.kind === "building" ? `b-${item.building.propertyId}` : `l-${item.listing.id}`;
                 return (
                   <button
-                    key={representative.property_id}
-                    onClick={() => focusListing(representative.id)}
+                    key={key}
+                    onClick={() => focusListing(repId)}
                     className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
                     style={{
                       left: point.x,
@@ -411,17 +501,27 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-              {sortedListings.map((listing) => (
-                <ListingRailCard
-                  key={listing.id}
-                  listing={listing}
-                  healthScores={healthScores}
-                  isPinned={pinnedIds.includes(listing.id)}
-                  isSelected={selectedListing?.id === listing.id}
-                  onSelect={focusListing}
-                  onTogglePin={onTogglePin}
-                />
-              ))}
+              {items.map((item) =>
+                item.kind === "building" ? (
+                  <BuildingRailCard
+                    key={`b-${item.building.propertyId}`}
+                    building={item.building}
+                    healthScores={healthScores}
+                    isSelected={selectedListing != null && item.building.listings.some((l) => l.id === selectedListing.id)}
+                    onSelect={() => focusListing(item.building.listings[0].id)}
+                  />
+                ) : (
+                  <ListingRailCard
+                    key={`l-${item.listing.id}`}
+                    listing={item.listing}
+                    healthScores={healthScores}
+                    isPinned={pinnedIds.includes(item.listing.id)}
+                    isSelected={selectedListing?.id === item.listing.id}
+                    onSelect={focusListing}
+                    onTogglePin={onTogglePin}
+                  />
+                )
+              )}
             </div>
           </div>
         </div>
