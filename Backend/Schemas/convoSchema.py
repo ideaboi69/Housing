@@ -38,6 +38,9 @@ class ConversationResponse(BaseModel):
     user_id: int
     landlord_id: int
     listing_id: int
+    listing_title: Optional[str] = None
+    user_name: Optional[str] = None
+    landlord_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     last_message: Optional[MessageResponse] = None
@@ -51,6 +54,9 @@ class ConversationDetailResponse(BaseModel):
     user_id: int
     landlord_id: int
     listing_id: int
+    listing_title: Optional[str] = None
+    user_name: Optional[str] = None
+    landlord_name: Optional[str] = None
     messages: list[MessageResponse]
 
     class Config:

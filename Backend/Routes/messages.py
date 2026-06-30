@@ -409,16 +409,24 @@ def delete_message(conversation_id: int, message_id: int, db: Session = Depends(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Verify access
-    is_user = conversation.user_id == current_user.id
-    is_landlord = isinstance(current_user, Landlord) and conversation.landlord_id in org_member_ids(current_user, db)
-    if not is_user and not is_landlord:
+    # Verify access — determine the viewer's role by TYPE first (student and
+    # landlord ids can collide across tables).
+    is_landlord = isinstance(current_user, Landlord)
+    in_conversation = (
+        (is_landlord and conversation.landlord_id in org_member_ids(current_user, db))
+        or (not is_landlord and conversation.user_id == current_user.id)
+    )
+    if not in_conversation:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    # You may only delete your OWN messages — match sender_type too so a student
+    # and a landlord that share a numeric id can't delete each other's messages.
+    expected_sender_type = SenderType.LANDLORD if is_landlord else SenderType.STUDENT
     message = db.query(Message).filter(
         Message.id == message_id,
         Message.conversation_id == conversation_id,
         Message.sender_id == current_user.id,
+        Message.sender_type == expected_sender_type,
     ).first()
 
     if not message:

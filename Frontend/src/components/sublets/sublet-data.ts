@@ -34,6 +34,7 @@ export interface SubletListing {
   views: number;
   saves: number;
   rotation: number;
+  ownerUserId?: number; // owner's user id (live sublets only) — used to hide your own
 }
 
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -254,5 +255,6 @@ export function mapApiSubletToListing(sublet: SubletListResponse): SubletListing
     views: 0,
     saves: 0,
     rotation: Number(sublet.id) % 2 === 0 ? 1.2 : -1.2,
+    ownerUserId: sublet.user_id,
   };
 }

@@ -1106,6 +1106,18 @@ function MessagesTab({
     finally { setSending(false); }
   }
 
+  // Delete one of your own (landlord) messages. Optimistic; re-sync on failure.
+  async function handleDeleteMessage(messageId: number) {
+    if (!activeConvo) return;
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    try {
+      await api.messages.deleteMessage(activeConvo, messageId);
+      await onRefreshConversations();
+    } catch {
+      void loadMessages(activeConvo, true);
+    }
+  }
+
   async function handleArchiveActiveConversation() {
     if (!activeConvo || !activeConvoData) return;
 
@@ -1417,7 +1429,17 @@ function MessagesTab({
                   {loadingMessages ? (
                     <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#1B2D45]/20" /></div>
                   ) : messages.map((m) => (
-                    <div key={m.id} className={`flex ${m.sender_type === "landlord" ? "justify-end" : "justify-start"}`}>
+                    <div key={m.id} className={`group flex items-center gap-1.5 ${m.sender_type === "landlord" ? "justify-end" : "justify-start"}`}>
+                      {m.sender_type === "landlord" && (
+                        <button
+                          onClick={() => handleDeleteMessage(m.id)}
+                          aria-label="Delete message"
+                          title="Delete message"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[#1B2D45]/25 hover:text-[#E71D36] shrink-0"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <div className={`max-w-[75%] px-3 py-2 rounded-xl ${
                         m.sender_type === "landlord"
                           ? "bg-[#1B2D45] text-white"

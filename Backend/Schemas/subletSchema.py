@@ -157,6 +157,7 @@ class SubletResponse(BaseModel):
 
 class SubletListResponse(BaseModel):
     id: int
+    user_id: int
     title: str
     address: str
     rent_per_month: Decimal

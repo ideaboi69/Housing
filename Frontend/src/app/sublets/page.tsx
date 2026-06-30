@@ -1993,7 +1993,7 @@ function SubletsContent() {
             if (createdSubletHandledRef.current !== createdSubletId) {
               focusCreatedSublet(createdListing);
               createdSubletHandledRef.current = createdSubletId;
-              toast.success("Your sublet is now live in the feed.");
+              toast.success("Your sublet is now live — students can see it on the sublets page.");
             }
           }
         }
@@ -2008,7 +2008,7 @@ function SubletsContent() {
           if (parsedCreatedSublet && createdSubletHandledRef.current !== createdSubletId) {
             focusCreatedSublet(parsedCreatedSublet);
             createdSubletHandledRef.current = createdSubletId;
-            toast.success("Your sublet is now live in the feed.");
+            toast.success("Your sublet is now live — students can see it on the sublets page.");
           }
 
           setListings(fallbackListings);
@@ -2068,6 +2068,8 @@ function SubletsContent() {
     const maxWalk = getMaxWalkForProximityFilter(activeProximityFilter);
 
     return listings.filter((listing) => {
+      // Owners shouldn't see their own sublets in the public feed.
+      if (user?.id != null && listing.ownerUserId === user.id) return false;
       const [start, end] = selectedRange;
       let hasOverlap = false;
       for (let i = start; i <= end; i++) {
@@ -2096,7 +2098,7 @@ function SubletsContent() {
       }
       return true;
     });
-  }, [listings, selectedRange, activeFilters, bedsMin, bathsMin, searchQuery, proximityFilterKeys]);
+  }, [listings, selectedRange, activeFilters, bedsMin, bathsMin, searchQuery, proximityFilterKeys, user?.id]);
 
   useEffect(() => { setHydrated(true); }, []);
 

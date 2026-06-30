@@ -17,6 +17,7 @@ import {
   Send,
   ShoppingBag,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
@@ -160,8 +161,9 @@ function getInitials(name: string): string {
 }
 
 // People are addressed by first name in the inbox; full name is kept for initials.
-function firstName(name: string): string {
-  return name.trim().split(" ")[0] || name;
+function firstName(name?: string | null, fallback = ""): string {
+  const trimmed = (name ?? "").trim();
+  return trimmed ? trimmed.split(/\s+/)[0] : fallback;
 }
 
 function normalizeHousing(convo: ConversationResponse): UnifiedConversation {
@@ -171,7 +173,7 @@ function normalizeHousing(convo: ConversationResponse): UnifiedConversation {
     id: convo.id,
     title: convo.listing_title || `Listing #${convo.listing_id}`,
     subtitle: "Listing inquiry",
-    otherName: convo.landlord_name || "Landlord",
+    otherName: firstName(convo.landlord_name, "Landlord"),
     href: `/browse/${convo.listing_id}`,
     lastMessage: convo.last_message,
     unreadCount: convo.unread_count || 0,
@@ -187,7 +189,7 @@ function normalizeSublet(convo: SubletConversationResponse, currentUserId: numbe
     id: convo.id,
     title: convo.sublet_title || `Sublet #${convo.sublet_id}`,
     subtitle: "Sublet conversation",
-    otherName: otherName || "Student",
+    otherName: firstName(otherName, "Student"),
     href: `/sublets/${convo.sublet_id}`,
     lastMessage: convo.last_message,
     unreadCount: convo.unread_count || 0,
@@ -203,7 +205,7 @@ function normalizeMarketplace(convo: MarketplaceConversationResponse, currentUse
     id: convo.id,
     title: convo.item_title || `Marketplace item #${convo.item_id}`,
     subtitle: "Marketplace item",
-    otherName: otherName || "Student",
+    otherName: firstName(otherName, "Student"),
     href: `/marketplace/${convo.item_id}`,
     lastMessage: convo.last_message,
     unreadCount: convo.unread_count || 0,
@@ -340,9 +342,19 @@ function ConversationItem({
   );
 }
 
-function MessageBubble({ message, isMe }: { message: UnifiedMessage; isMe: boolean }) {
+function MessageBubble({ message, isMe, onDelete }: { message: UnifiedMessage; isMe: boolean; onDelete?: () => void }) {
   return (
-    <div className={`mb-1 flex ${isMe ? "justify-end" : "justify-start"}`}>
+    <div className={`group mb-1 flex items-center gap-1.5 ${isMe ? "justify-end" : "justify-start"}`}>
+      {isMe && onDelete && (
+        <button
+          onClick={onDelete}
+          aria-label="Delete message"
+          title="Delete message"
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-[#1B2D45]/25 hover:text-[#E71D36] shrink-0"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
       <div
         className={`max-w-[75%] px-3.5 py-2.5 ${
           isMe
@@ -391,8 +403,9 @@ function ChatThread({
         const data = await api.messages.getConversation(conversation.id);
         applyDetail({
           title: data.listing_title || conversation.title,
+          // keep first-name display when the detail payload includes the landlord
           subtitle: "Listing inquiry",
-          otherName: data.landlord_name || conversation.otherName,
+          otherName: data.landlord_name ? firstName(data.landlord_name, conversation.otherName) : conversation.otherName,
           href: conversation.href,
           messages: data.messages.map(mapMessage),
         });
@@ -423,6 +436,19 @@ function ChatThread({
       setLoading(false);
     }
   }, [conversation, currentUserId, applyDetail]);
+
+  // Delete one of your own messages (housing threads only — the only type with a
+  // delete endpoint). Optimistically remove, then re-sync on failure.
+  const handleDeleteMessage = useCallback(async (messageId: number) => {
+    if (conversation.type !== "housing") return;
+    setDetail((prev) => (prev ? { ...prev, messages: prev.messages.filter((m) => m.id !== messageId) } : prev));
+    try {
+      await api.messages.deleteMessage(conversation.id, messageId);
+      await onRefreshConversations();
+    } catch {
+      void fetchConversation();
+    }
+  }, [conversation.type, conversation.id, onRefreshConversations, fetchConversation]);
 
   useEffect(() => {
     setLoading(true);
@@ -528,7 +554,12 @@ function ChatThread({
                 <div className="h-px flex-1 bg-black/[0.06]" />
               </div>
               {group.msgs.map((msg) => (
-                <MessageBubble key={`${msg.conversation_id}-${msg.id}`} message={msg} isMe={isMessageFromMe(msg, currentUserId)} />
+                <MessageBubble
+                  key={`${msg.conversation_id}-${msg.id}`}
+                  message={msg}
+                  isMe={isMessageFromMe(msg, currentUserId)}
+                  onDelete={conversation.type === "housing" && isMessageFromMe(msg, currentUserId) ? () => handleDeleteMessage(msg.id) : undefined}
+                />
               ))}
             </div>
           ))}

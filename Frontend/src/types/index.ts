@@ -794,6 +794,7 @@ export interface SubletResponse {
 
 export interface SubletListResponse {
   id: number;
+  user_id: number;
   title: string;
   address: string;
   rent_per_month: number;

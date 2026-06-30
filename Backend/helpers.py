@@ -626,6 +626,7 @@ def build_sublet_response(sublet: Sublet) -> SubletResponse:
 def build_sublet_list_response(sublet: Sublet) -> SubletListResponse:
     return SubletListResponse(
         id=sublet.id,
+        user_id=sublet.user_id,
         title=sublet.title,
         address=sublet.address,
         rent_per_month=sublet.rent_per_month,

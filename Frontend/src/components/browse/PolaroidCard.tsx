@@ -489,6 +489,27 @@ export function PolaroidCard({
                     )}
                   </div>
                 )}
+
+                {onTogglePin && (
+                  <motion.button
+                    data-tour="pin-to-board"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onTogglePin(listing.id);
+                    }}
+                    className={`mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border transition-colors ${
+                      isPinned
+                        ? "border-[#FF6B35]/30 bg-[#FF6B35]/[0.08] text-[#FF6B35]"
+                        : "border-black/[0.06] text-[#1B2D45]/40 hover:border-[#FF6B35]/20 hover:text-[#FF6B35]/60"
+                    }`}
+                    style={{ fontSize: "11px", fontWeight: 600 }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    <Pin className="w-3 h-3" />
+                    {isPinned ? "Pinned" : "Pin to board"}
+                  </motion.button>
+                )}
               </>
             )}
           </div>
