@@ -350,7 +350,7 @@ function MessageBubble({ message, isMe, onDelete }: { message: UnifiedMessage; i
           onClick={onDelete}
           aria-label="Delete message"
           title="Delete message"
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-[#1B2D45]/25 hover:text-[#E71D36] shrink-0"
+          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-[#1B2D45]/25 hover:text-[#E71D36] shrink-0"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>

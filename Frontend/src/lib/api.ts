@@ -39,6 +39,8 @@ import type {
   OrgResponse,
   OrgInvite,
   OrgInvitePreview,
+  PostComment,
+  AppNotification,
   LandlordPublicResponse,
   WriterRegister,
   WriterResponse,
@@ -820,6 +822,15 @@ export const saved = {
     request<{ saved: boolean }>(`/api/saved/${listingId}/check`),
 };
 
+// ── Notifications (in-app) ──────────────────────────────
+
+export const notifications = {
+  list: () => request<AppNotification[]>("/api/notifications"),
+  unreadCount: () => request<{ unread_count: number }>("/api/notifications/unread-count"),
+  markAllRead: () => request<{ message: string }>("/api/notifications/read-all", { method: "POST" }),
+  markRead: (id: number) => request<{ message: string }>(`/api/notifications/${id}/read`, { method: "POST" }),
+};
+
 // ── Flags ───────────────────────────────────────────────
 
 export const flags = {
@@ -1094,6 +1105,24 @@ export const posts = {
   removeUpvote: (postId: number) =>
     request<{ post_id: number; upvote_count: number; user_has_upvoted: boolean }>(
       `/api/posts/${postId}/upvote`, { method: "DELETE" }
+    ),
+
+  // ── Comments (Bubble replies) ──
+  listComments: (postId: number) =>
+    request<PostComment[]>(`/api/posts/${postId}/comments`),
+
+  createComment: (postId: number, content: string, parentCommentId?: number) =>
+    request<PostComment>(`/api/posts/${postId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ content, parent_comment_id: parentCommentId ?? null }),
+    }),
+
+  deleteComment: (commentId: number) =>
+    request<void>(`/api/posts/comments/${commentId}`, { method: "DELETE" }),
+
+  toggleCommentLike: (commentId: number) =>
+    request<{ comment_id: number; like_count: number; liked_by_me: boolean }>(
+      `/api/posts/comments/${commentId}/like`, { method: "POST" }
     ),
 
   getByStudentAuthor: (userId: number) =>
@@ -1598,6 +1627,7 @@ export const admin = {
       body: JSON.stringify(data),
     }),
   deletePost: (id: number) => request<null>(`/api/admin/posts/${id}`, { method: "DELETE" }),
+  deleteComment: (id: number) => request<null>(`/api/admin/comments/${id}`, { method: "DELETE" }),
 };
 
 // ── Marketplace ────────────────────────────────────────
@@ -1710,6 +1740,7 @@ export const api = {
   healthScores,
   saved,
   flags,
+  notifications,
   landlords,
   writers,
   posts,

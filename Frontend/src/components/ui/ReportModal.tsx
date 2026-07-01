@@ -32,9 +32,10 @@ interface ReportModalProps {
   reviewId?: number;
   marketplaceItemId?: number;
   subletId?: number;
+  postCommentId?: number;
   listingTitle?: string;
   targetTitle?: string;
-  targetType?: "listing" | "review" | "marketplace_item" | "sublet";
+  targetType?: "listing" | "review" | "marketplace_item" | "sublet" | "post_comment";
 }
 
 export function ReportModal({
@@ -44,9 +45,10 @@ export function ReportModal({
   reviewId,
   marketplaceItemId,
   subletId,
+  postCommentId,
   listingTitle,
   targetTitle,
-  targetType = reviewId ? "review" : subletId ? "sublet" : marketplaceItemId ? "marketplace_item" : "listing",
+  targetType = reviewId ? "review" : subletId ? "sublet" : marketplaceItemId ? "marketplace_item" : postCommentId ? "post_comment" : "listing",
 }: ReportModalProps) {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -81,6 +83,7 @@ export function ReportModal({
         review_id: reviewId,
         marketplace_item_id: marketplaceItemId,
         sublet_id: subletId,
+        post_comment_id: postCommentId,
         reason,
       });
       setStatus("sent");
@@ -115,7 +118,9 @@ export function ReportModal({
       ? "Sublet"
       : targetType === "marketplace_item"
         ? "Marketplace Item"
-        : "Listing";
+        : targetType === "post_comment"
+          ? "Comment"
+          : "Listing";
   const displayTitle = targetTitle ?? listingTitle;
 
   return (

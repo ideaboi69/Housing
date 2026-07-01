@@ -77,6 +77,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showVerification, setShowVerification] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [rotatingIndex, setRotatingIndex] = useState(0);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   // Only require the captcha when it's actually configured (otherwise the widget
@@ -328,15 +329,24 @@ export default function SignupPage() {
                       <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
                         Confirm password
                       </label>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Re-enter your password"
-                        required
-                        className="mt-2 w-full rounded-2xl border border-[#1B2D45]/8 bg-[#FCFAF6] px-4 py-3.5 text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
-                        style={{ fontSize: "14px", fontWeight: 500 }}
-                      />
+                      <div className="relative">
+                        <input
+                          type={showConfirm ? "text" : "password"}
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Re-enter your password"
+                          required
+                          className="mt-2 w-full rounded-2xl border border-[#1B2D45]/8 bg-[#FCFAF6] px-4 py-3.5 pr-11 text-[#1B2D45] placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/30 focus:bg-white focus:outline-none transition-all"
+                          style={{ fontSize: "14px", fontWeight: 500 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirm(!showConfirm)}
+                          className="absolute right-3 top-1/2 translate-y-[2px] text-[#1B2D45]/25 hover:text-[#1B2D45]/55 transition-colors"
+                        >
+                          {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                       {confirmPassword.length > 0 && !passwordsMatch && (
                         <p className="mt-1.5 text-[#E71D36]" style={{ fontSize: "12px" }}>Passwords don&apos;t match</p>
                       )}

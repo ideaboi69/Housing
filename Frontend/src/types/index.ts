@@ -871,6 +871,7 @@ export interface FlagCreate {
   review_id?: number;
   marketplace_item_id?: number;
   sublet_id?: number;
+  post_comment_id?: number;
   reason: string;
 }
 
@@ -1052,6 +1053,38 @@ export interface PostResponse {
   images?: PostImageResponse[];
   created_at: string;
   updated_at: string;
+}
+
+export interface CommentAuthor {
+  id: number;
+  first_name: string;
+  last_name: string;
+  profile_photo_url?: string | null;
+  is_early_adopter?: boolean;
+}
+
+export interface PostComment {
+  id: number;
+  post_id: number;
+  parent_comment_id: number | null;
+  content: string;
+  created_at: string;
+  author: CommentAuthor | null;
+  like_count: number;
+  liked_by_me: boolean;
+  reply_count: number;
+  replies: PostComment[];
+}
+
+export interface AppNotification {
+  id: number;
+  type: string;
+  title: string;
+  body?: string | null;
+  link?: string | null;
+  actor_name?: string | null;
+  is_read: boolean;
+  created_at: string;
 }
 
 export interface PostListResponse {
@@ -1526,11 +1559,12 @@ export interface AdminFlagResponse {
   id: number;
   reporter_id: number;
   reporter_name: string;
-  flag_type: "listing" | "review" | "marketplace_item" | "sublet" | "unknown";
+  flag_type: "listing" | "review" | "marketplace_item" | "sublet" | "post_comment" | "unknown";
   listing_id?: number;
   review_id?: number;
   marketplace_item_id?: number;
   sublet_id?: number;
+  post_comment_id?: number;
   flagged_title?: string;
   target_path?: string | null;
   reason: string;

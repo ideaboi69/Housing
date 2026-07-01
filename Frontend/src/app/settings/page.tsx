@@ -810,6 +810,8 @@ function SecurityLogSection({ fetchLog }: { fetchLog: (limit: number, offset: nu
 function AccountTab() {
   const { user, logout } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -918,8 +920,14 @@ function AccountTab() {
           </div>
           <div>
             <label className={labelClass} style={labelStyle}>New Password</label>
-            <input type={showPassword ? "text" : "password"} value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="••••••••"
-              className={inputClass} style={{ fontSize: "13px" }} />
+            <div className="relative">
+              <input type={showNew ? "text" : "password"} value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="••••••••"
+                className={`${inputClass} pr-10`} style={{ fontSize: "13px" }} />
+              <button type="button" onClick={() => setShowNew(!showNew)} aria-label={showNew ? "Hide password" : "Show password"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#98A3B0] hover:text-[#5C6B7A] transition-colors">
+                {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {newPw.length > 0 && (
               <div className="mt-2 space-y-1">
                 {PASSWORD_RULES.map((rule) => {
@@ -938,8 +946,14 @@ function AccountTab() {
           </div>
           <div>
             <label className={labelClass} style={labelStyle}>Confirm Password</label>
-            <input type={showPassword ? "text" : "password"} value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="••••••••"
-              className={inputClass} style={{ fontSize: "13px" }} />
+            <div className="relative">
+              <input type={showConfirm ? "text" : "password"} value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="••••••••"
+                className={`${inputClass} pr-10`} style={{ fontSize: "13px" }} />
+              <button type="button" onClick={() => setShowConfirm(!showConfirm)} aria-label={showConfirm ? "Hide password" : "Show password"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#98A3B0] hover:text-[#5C6B7A] transition-colors">
+                {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             {confirmPw.length > 0 && !passwordsMatch && (
               <p className="mt-1 text-[#E71D36]" style={{ fontSize: "10px", fontWeight: 500 }}>Passwords don&apos;t match</p>
             )}

@@ -4,14 +4,16 @@ from typing import Optional
 from datetime import date
 from sqlalchemy import func, or_
 import logging
-from tables import get_db, Post, PostImage, User, Writer, PostVote, StarredAuthor, NotificationPreferences
+from tables import get_db, Post, PostImage, User, Writer, PostVote, PostComment, PostCommentLike, StarredAuthor, NotificationPreferences
 
 logger = logging.getLogger(__name__)
-from Schemas.postSchema import PostCreate, PostUpdate, PostResponse, PostListResponse, PostCategory, PostStatus, PostImageResponse, PostImageReorder
+from Schemas.postSchema import PostCreate, PostUpdate, PostResponse, PostListResponse, PostCategory, PostStatus, PostImageResponse, PostImageReorder, CommentCreate, CommentResponse, CommentAuthor
 from Utils.security import get_current_user, get_current_author, get_current_student, decode_access_token
+from Utils.rate_limit import limiter
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
 from Utils.email import send_new_post_email
-from helpers import generate_slug, get_owned_post
+from helpers import generate_slug, get_owned_post, create_notification
+from Utils.websocket import connection_manager
 from Utils.cache import cached, invalidate
 from config import settings
 
@@ -666,3 +668,158 @@ def unarchive_post(post_id: int, db: Session = Depends(get_db), author = Depends
 
     invalidate("posts:list")
     return PostResponse.model_validate(post)
+
+
+# ════════════════════════════════════════════════════════
+# Comments (Bubble replies) + likes
+# ════════════════════════════════════════════════════════
+
+def _comment_author(u: Optional[User]) -> Optional[CommentAuthor]:
+    if not u:
+        return None
+    return CommentAuthor(id=u.id, first_name=u.first_name, last_name=u.last_name, profile_photo_url=u.profile_photo_url, is_early_adopter=u.is_early_adopter)
+
+
+def _serialize_comments(post_id: int, viewer_id: Optional[int], db: Session) -> list[CommentResponse]:
+    comments = db.query(PostComment).filter(PostComment.post_id == post_id).order_by(PostComment.created_at.asc()).all()
+    if not comments:
+        return []
+    ids = [c.id for c in comments]
+
+    like_counts = {cid: n for cid, n in db.query(PostCommentLike.comment_id, func.count(PostCommentLike.id)).filter(PostCommentLike.comment_id.in_(ids)).group_by(PostCommentLike.comment_id).all()}
+    liked: set[int] = set()
+    if viewer_id:
+        liked = {cid for (cid,) in db.query(PostCommentLike.comment_id).filter(PostCommentLike.user_id == viewer_id, PostCommentLike.comment_id.in_(ids)).all()}
+    authors = {u.id: u for u in db.query(User).filter(User.id.in_({c.author_user_id for c in comments})).all()}
+
+    children: dict[int, list] = {}
+    tops = []
+    for c in comments:
+        if c.parent_comment_id:
+            children.setdefault(c.parent_comment_id, []).append(c)
+        else:
+            tops.append(c)
+
+    def node(c: PostComment) -> CommentResponse:
+        deleted = c.status == "deleted"
+        return CommentResponse(
+            id=c.id,
+            post_id=c.post_id,
+            parent_comment_id=c.parent_comment_id,
+            content="[deleted]" if deleted else c.content,
+            created_at=c.created_at,
+            author=None if deleted else _comment_author(authors.get(c.author_user_id)),
+            like_count=0 if deleted else like_counts.get(c.id, 0),
+            liked_by_me=False if deleted else (c.id in liked),
+            reply_count=0,
+            replies=[],
+        )
+
+    result: list[CommentResponse] = []
+    for c in tops:
+        active_replies = [r for r in children.get(c.id, []) if r.status != "deleted"]
+        if c.status == "deleted" and not active_replies:
+            continue  # drop deleted comments that have no surviving replies
+        n = node(c)
+        n.replies = [node(r) for r in active_replies]
+        n.reply_count = len(n.replies)
+        result.append(n)
+    return result
+
+
+@post_router.get("/{post_id}/comments", response_model=list[CommentResponse])
+def list_post_comments(request: Request, post_id: int, db: Session = Depends(get_db)):
+    viewer_id = _get_optional_user_id(request)
+    return _serialize_comments(post_id, viewer_id, db)
+
+
+@post_router.post("/{post_id}/comments", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
+def create_post_comment(request: Request, post_id: int, payload: CommentCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    content = payload.content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="Comment can't be empty")
+    if len(content) > 2000:
+        raise HTTPException(status_code=400, detail="Comment is too long (2000 characters max)")
+
+    post = db.query(Post).filter(Post.id == post_id, Post.status == PostStatus.PUBLISHED).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    parent_id = payload.parent_comment_id
+    replied_to_author = None  # who to notify for a reply (the comment they actually replied to)
+    if parent_id is not None:
+        parent = db.query(PostComment).filter(PostComment.id == parent_id, PostComment.post_id == post_id, PostComment.status == "active").first()
+        if not parent:
+            raise HTTPException(status_code=404, detail="Parent comment not found")
+        replied_to_author = parent.author_user_id
+        # One level of nesting: a reply to a reply attaches to the top-level parent.
+        if parent.parent_comment_id is not None:
+            parent_id = parent.parent_comment_id
+
+    comment = PostComment(post_id=post_id, author_user_id=current_user.id, parent_comment_id=parent_id, content=content)
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+
+    # In-app notifications (no email). Never notify yourself; notify each person once.
+    actor = f"{current_user.first_name} {current_user.last_name}"
+    link = f"/the-bubble/{post.slug}"
+    preview = content[:120]
+    notified: set[int] = {current_user.id}
+
+    def _notify(uid, ntype, title):
+        if uid is None or uid in notified:
+            return
+        notified.add(uid)
+        create_notification(db, user_id=uid, type=ntype, title=title, body=preview, link=link, actor_name=actor)
+        background_tasks.add_task(connection_manager.send_to_user, "student", uid, {"type": "notification"})
+
+    if replied_to_author is not None:
+        _notify(replied_to_author, "comment_reply", f"{actor} replied to your comment")
+    # Post author (only student-authored posts land in the student feed)
+    _notify(post.user_id, "post_comment", f"{actor} commented on your post")
+    db.commit()
+
+    return CommentResponse(
+        id=comment.id,
+        post_id=post_id,
+        parent_comment_id=comment.parent_comment_id,
+        content=comment.content,
+        created_at=comment.created_at,
+        author=_comment_author(current_user),
+        like_count=0,
+        liked_by_me=False,
+        reply_count=0,
+        replies=[],
+    )
+
+
+@post_router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post_comment(comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    comment = db.query(PostComment).filter(PostComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.author_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can only delete your own comment")
+    comment.status = "deleted"
+    db.commit()
+
+
+@post_router.post("/comments/{comment_id}/like")
+@limiter.limit("60/minute")
+def toggle_comment_like(request: Request, comment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):
+    comment = db.query(PostComment).filter(PostComment.id == comment_id, PostComment.status == "active").first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    existing = db.query(PostCommentLike).filter(PostCommentLike.comment_id == comment_id, PostCommentLike.user_id == current_user.id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+        liked = False
+    else:
+        db.add(PostCommentLike(comment_id=comment_id, user_id=current_user.id))
+        db.commit()
+        liked = True
+    count = db.query(func.count(PostCommentLike.id)).filter(PostCommentLike.comment_id == comment_id).scalar()
+    return {"comment_id": comment_id, "like_count": count, "liked_by_me": liked}

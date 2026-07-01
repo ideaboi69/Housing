@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from tables import get_db, User, Listing, Review, Flag, MarketplaceItem, Sublet
+from tables import get_db, User, Listing, Review, Flag, MarketplaceItem, Sublet, PostComment
 from Schemas.flagSchema import FlagCreate, FlagResponse, FlagStatus
 from Utils.security import get_current_user, get_current_student
 from Utils.rate_limit import limiter
@@ -29,7 +29,11 @@ def create_flag(request: Request, payload: FlagCreate, db: Session = Depends(get
     if payload.sublet_id:
         if not db.query(Sublet).filter(Sublet.id == payload.sublet_id).first():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sublet not found")
- 
+
+    if payload.post_comment_id:
+        if not db.query(PostComment).filter(PostComment.id == payload.post_comment_id).first():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+
     # Check for duplicate flag from same user on same target
     existing_query = db.query(Flag).filter(Flag.reporter_id == current_user.id)
     if payload.listing_id:
@@ -40,16 +44,19 @@ def create_flag(request: Request, payload: FlagCreate, db: Session = Depends(get
         existing_query = existing_query.filter(Flag.marketplace_item_id == payload.marketplace_item_id)
     if payload.sublet_id:
         existing_query = existing_query.filter(Flag.sublet_id == payload.sublet_id)
- 
+    if payload.post_comment_id:
+        existing_query = existing_query.filter(Flag.post_comment_id == payload.post_comment_id)
+
     if existing_query.first():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You have already flagged this")
- 
+
     flag = Flag(
         reporter_id=current_user.id,
         listing_id=payload.listing_id,
         review_id=payload.review_id,
         marketplace_item_id=payload.marketplace_item_id,
         sublet_id=payload.sublet_id,
+        post_comment_id=payload.post_comment_id,
         reason=payload.reason,
         status=FlagStatus.PENDING,
     )

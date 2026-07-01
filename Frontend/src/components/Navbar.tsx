@@ -11,6 +11,7 @@ import {
 import { useAuthStore } from "@/lib/auth-store";
 import { useWriterStore } from "@/lib/store";
 import { api } from "@/lib/api";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const navItems = [
   { label: "Browse", path: "/browse" },
@@ -362,6 +363,8 @@ export function Navbar() {
                   <PenLine className="h-4 w-4" /> New post
                 </Link>
               )}
+              {/* Notification bell (students) */}
+              {!isLandlord && !writerSessionActive && <NotificationBell />}
               {/* Message icon */}
               {!writerSessionActive && (
                 <Link

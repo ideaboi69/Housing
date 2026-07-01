@@ -6,6 +6,7 @@ import { ArrowLeft, Eye, Calendar, MapPin, ExternalLink, ChevronLeft, ChevronRig
 import { api } from "@/lib/api";
 import { VerifiedWriterBadge } from "@/components/ui/Badges";
 import { BubbleShareMenu } from "@/components/ui/BubbleShareMenu";
+import { CommentThread } from "@/components/bubble/CommentThread";
 import type { PostResponse } from "@/types";
 
 function formatDate(iso: string) {
@@ -206,6 +207,9 @@ export default function BubblePostPage({ params }: { params: Promise<{ slug: str
         <div className="mt-6 text-[#1B2D45]/85" style={{ fontSize: "16px", lineHeight: 1.75, whiteSpace: "pre-wrap" }}>
           {post.content}
         </div>
+
+        {/* Comments */}
+        <CommentThread postId={post.id} />
       </article>
     </div>
   );

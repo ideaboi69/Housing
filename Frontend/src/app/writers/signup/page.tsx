@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { AlertCircle, ArrowRight, Check, CheckCircle2, PenLine, ShieldCheck, X } from "lucide-react";
+import { AlertCircle, ArrowRight, Check, CheckCircle2, PenLine, ShieldCheck, X, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { WriterRegister } from "@/types";
 import { TurnstileWidget } from "@/components/ui/TurnstileWidget";
@@ -87,6 +87,8 @@ export default function WriterSignupPage() {
     reason: "",
   });
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [step, setStep] = useState<WriterSignupStep>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -412,15 +414,20 @@ export default function WriterSignupPage() {
                               <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
                                 Password
                               </label>
-                              <input
-                                type="password"
-                                value={form.password}
-                                onChange={(e) => update("password", e.target.value)}
-                                placeholder="Create a strong password"
-                                required
-                                className="mt-2 w-full rounded-2xl border border-[#FF6B35]/10 bg-[#FAFBFA] px-4 py-3.5 text-[#1B2D45] transition-all placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/25 focus:bg-white focus:outline-none"
-                                style={{ fontSize: "14px", fontWeight: 500 }}
-                              />
+                              <div className="relative">
+                                <input
+                                  type={showPassword ? "text" : "password"}
+                                  value={form.password}
+                                  onChange={(e) => update("password", e.target.value)}
+                                  placeholder="Create a strong password"
+                                  required
+                                  className="mt-2 w-full rounded-2xl border border-[#FF6B35]/10 bg-[#FAFBFA] px-4 py-3.5 pr-11 text-[#1B2D45] transition-all placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/25 focus:bg-white focus:outline-none"
+                                  style={{ fontSize: "14px", fontWeight: 500 }}
+                                />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 translate-y-[4px] text-[#1B2D45]/25 hover:text-[#1B2D45]/55 transition-colors">
+                                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                              </div>
                               <AnimatePresence>
                                 <PasswordChecklist password={form.password} />
                               </AnimatePresence>
@@ -430,15 +437,20 @@ export default function WriterSignupPage() {
                               <label className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>
                                 Confirm password
                               </label>
-                              <input
-                                type="password"
-                                value={confirmPassword}
-                                onChange={(e) => setConfirmPassword(e.target.value)}
-                                placeholder="Re-enter your password"
-                                required
-                                className="mt-2 w-full rounded-2xl border border-[#FF6B35]/10 bg-[#FAFBFA] px-4 py-3.5 text-[#1B2D45] transition-all placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/25 focus:bg-white focus:outline-none"
-                                style={{ fontSize: "14px", fontWeight: 500 }}
-                              />
+                              <div className="relative">
+                                <input
+                                  type={showConfirm ? "text" : "password"}
+                                  value={confirmPassword}
+                                  onChange={(e) => setConfirmPassword(e.target.value)}
+                                  placeholder="Re-enter your password"
+                                  required
+                                  className="mt-2 w-full rounded-2xl border border-[#FF6B35]/10 bg-[#FAFBFA] px-4 py-3.5 pr-11 text-[#1B2D45] transition-all placeholder:text-[#1B2D45]/25 focus:border-[#FF6B35]/25 focus:bg-white focus:outline-none"
+                                  style={{ fontSize: "14px", fontWeight: 500 }}
+                                />
+                                <button type="button" onClick={() => setShowConfirm(!showConfirm)} aria-label={showConfirm ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 translate-y-[4px] text-[#1B2D45]/25 hover:text-[#1B2D45]/55 transition-colors">
+                                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                              </div>
                               {confirmPassword.length > 0 && !passwordsMatch && (
                                 <p className="mt-1.5 text-[#E71D36]" style={{ fontSize: "12px" }}>Passwords don&apos;t match</p>
                               )}

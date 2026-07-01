@@ -1435,7 +1435,7 @@ function MessagesTab({
                           onClick={() => handleDeleteMessage(m.id)}
                           aria-label="Delete message"
                           title="Delete message"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-[#1B2D45]/25 hover:text-[#E71D36] shrink-0"
+                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-[#1B2D45]/25 hover:text-[#E71D36] shrink-0"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -1639,7 +1639,10 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
   const [phone, setPhone] = useState(user.phone ?? "");
 
   // Password
-  const [showPassword, setShowPassword] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -1689,7 +1692,7 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
       await api.auth.changePassword({ current_password: currentPw, new_password: newPw });
       setPwSuccess(true);
       setCurrentPw(""); setNewPw(""); setConfirmPw("");
-      setShowPassword(false);
+      setPwOpen(false); setShowCurrent(false); setShowNew(false); setShowConfirm(false);
       setTimeout(() => setPwSuccess(false), 3000);
     } catch (err) {
       setPwError(err instanceof Error ? err.message : "Failed to change password");
@@ -1842,45 +1845,55 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
       <div className={sectionCls} style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 700 }}>Password</h3>
-          {!showPassword && (
-            <button onClick={() => setShowPassword(true)} className="text-[#1B2D45]/65 hover:text-[#1B2D45] transition-colors" style={{ fontSize: "12px", fontWeight: 600 }}>
+          {!pwOpen && (
+            <button onClick={() => setPwOpen(true)} className="text-[#1B2D45]/65 hover:text-[#1B2D45] transition-colors" style={{ fontSize: "12px", fontWeight: 600 }}>
               Change
             </button>
           )}
         </div>
         {pwSuccess && <div className="flex items-center gap-1.5 text-[#4ADE80] mb-2" style={{ fontSize: "12px", fontWeight: 600 }}><Check className="w-3.5 h-3.5" /> Password updated</div>}
-        {!showPassword ? (
+        {!pwOpen ? (
           <p className="text-[#1B2D45]/58" style={{ fontSize: "12px" }}>••••••••••</p>
         ) : (
           <div className="space-y-3 mt-3">
             <div>
               <label className="text-[#1B2D45]/65 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>Current password</label>
               <div className="relative">
-                <input type={showPassword ? "text" : "password"} value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className={`${inputCls} pr-10`} style={{ fontSize: "13px" }} />
+                <input type={showCurrent ? "text" : "password"} value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} className={`${inputCls} pr-10`} style={{ fontSize: "13px" }} />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((value) => !value)}
+                  onClick={() => setShowCurrent((value) => !value)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B2D45]/58 hover:text-[#1B2D45]/55 transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showCurrent ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
             <div>
               <label className="text-[#1B2D45]/65 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>New password</label>
-              <input type={showPassword ? "text" : "password"} value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Min 8 characters" className={inputCls} style={{ fontSize: "13px" }} />
+              <div className="relative">
+                <input type={showNew ? "text" : "password"} value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Min 8 characters" className={`${inputCls} pr-10`} style={{ fontSize: "13px" }} />
+                <button type="button" onClick={() => setShowNew((v) => !v)} aria-label={showNew ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B2D45]/58 hover:text-[#1B2D45]/55 transition-colors">
+                  {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="text-[#1B2D45]/65 block mb-1" style={{ fontSize: "11px", fontWeight: 600 }}>Confirm new password</label>
-              <input type={showPassword ? "text" : "password"} value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className={inputCls} style={{ fontSize: "13px" }} />
+              <div className="relative">
+                <input type={showConfirm ? "text" : "password"} value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className={`${inputCls} pr-10`} style={{ fontSize: "13px" }} />
+                <button type="button" onClick={() => setShowConfirm((v) => !v)} aria-label={showConfirm ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B2D45]/58 hover:text-[#1B2D45]/55 transition-colors">
+                  {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <p className="text-[#1B2D45]/58" style={{ fontSize: "11px", lineHeight: 1.5 }}>
               Strong passwords usually include an uppercase letter, a number, and a symbol.
             </p>
             {pwError && <div className="text-[#E71D36] flex items-center gap-1.5" style={{ fontSize: "12px" }}><AlertCircle className="w-3.5 h-3.5" /> {pwError}</div>}
             <div className="flex items-center gap-2">
-              <button onClick={() => { setShowPassword(false); setPwError(""); setCurrentPw(""); setNewPw(""); setConfirmPw(""); }}
+              <button onClick={() => { setPwOpen(false); setShowCurrent(false); setShowNew(false); setShowConfirm(false); setPwError(""); setCurrentPw(""); setNewPw(""); setConfirmPw(""); }}
                 className="px-3 py-1.5 rounded-lg text-[#1B2D45]/65 hover:bg-[#1B2D45]/[0.04] transition-colors" style={{ fontSize: "12px", fontWeight: 600 }}>
                 Cancel
               </button>

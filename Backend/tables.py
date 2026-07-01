@@ -356,15 +356,17 @@ class Flag(Base):
     review_id = Column(Integer, ForeignKey("reviews.id", ondelete="SET NULL"), nullable=True)
     marketplace_item_id = Column(Integer, ForeignKey("marketplace_items.id", ondelete="SET NULL"), nullable=True)
     sublet_id = Column(Integer, ForeignKey("sublets.id", ondelete="SET NULL"), nullable=True)
+    post_comment_id = Column(Integer, ForeignKey("post_comments.id", ondelete="SET NULL"), nullable=True)
     reason = Column(Text, nullable=False)
     status = Column(Enum(FlagStatus), default=FlagStatus.PENDING, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
- 
+
     reporter = relationship("User", back_populates="flags")
     listing = relationship("Listing", back_populates="flags")
     review = relationship("Review", back_populates="flags")
     marketplace_item = relationship("MarketplaceItem", back_populates="flags")
     sublet = relationship("Sublet", back_populates="flags")
+    post_comment = relationship("PostComment")
  
     __table_args__ = (
         Index("ix_flags_status", "status"),
@@ -778,6 +780,26 @@ class UserHousingPreferences(Base):
 
     user = relationship("User", back_populates="housing_preferences")
 
+class Notification(Base):
+    """In-app notification for a student (feed + unread badge). Keeps things
+    off email. type is e.g. 'comment_reply' | 'post_comment'."""
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    type = Column(String(40), nullable=False)
+    title = Column(String(255), nullable=False)
+    body = Column(String(500), nullable=True)
+    link = Column(String(500), nullable=True)
+    actor_name = Column(String(160), nullable=True)
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_notifications_user", "user_id", "is_read"),
+    )
+
+
 class NotificationPreferences(Base):
     __tablename__ = "notification_preferences"
 
@@ -1149,7 +1171,43 @@ class PostVote(Base):
     __table_args__ = (
         UniqueConstraint("post_id", "user_id", name="uq_post_vote_user"),
     )
- 
+
+
+class PostComment(Base):
+    """A student/writer reply on a Bubble post. One level of threading:
+    top-level comments have parent_comment_id NULL; replies point at a top-level
+    comment. (Replies to replies are stored flat under the top-level parent.)"""
+    __tablename__ = "post_comments"
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    author_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    parent_comment_id = Column(Integer, ForeignKey("post_comments.id", ondelete="CASCADE"), nullable=True)
+    content = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="active")  # active | deleted
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_post_comments_post", "post_id"),
+        Index("ix_post_comments_parent", "parent_comment_id"),
+    )
+
+
+class PostCommentLike(Base):
+    __tablename__ = "post_comment_likes"
+
+    id = Column(Integer, primary_key=True)
+    comment_id = Column(Integer, ForeignKey("post_comments.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("comment_id", "user_id", name="uq_post_comment_like"),
+        Index("ix_post_comment_likes_comment", "comment_id"),
+    )
+
+
 class SecurityEvent(Base):
     __tablename__ = "security_events"
 

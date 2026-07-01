@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion, useInView, useAnimation } from "framer-motion";
 import Link from "next/link";
-import { Heart } from "lucide-react";
+import { Heart, Instagram } from "lucide-react";
 import { LandlordHeroCTA } from "@/components/landing/LandlordHeroCTA";
+import { ContactModal } from "@/components/ui/ContactModal";
 import { api } from "@/lib/api";
 import { formatPropertyType } from "@/lib/utils";
 import type { ListingDetailResponse, SubletListResponse } from "@/types";
@@ -70,6 +71,7 @@ const footerColumns = [
   { title: "Community", links: [{ label: "Roommates", to: "/roommates" }, { label: "The Bubble", to: "/the-bubble" }] },
   { title: "For Landlords", links: [{ label: "List a Property", to: "/landlord/login" }, { label: "Dashboard", to: "/landlord" }, { label: "How It Works", to: "/landlord/login" }] },
   { title: "cribb", links: [{ label: "Sign Up", to: "/signup" }, { label: "Log In", to: "/login" }] },
+  { title: "Company", links: [{ label: "Privacy", to: "/privacy" }, { label: "Terms", to: "/terms" }, { label: "Accessibility", to: "/accessibility" }, { label: "Contact us", to: "#contact" }] },
 ];
 
 const showcaseFeatures = [
@@ -934,6 +936,7 @@ function listingToCard(l: ListingDetailResponse, score: number | null) {
 
 export default function HomePage() {
   const [activeShowcase, setActiveShowcase] = useState<(typeof showcaseFeatures)[number]["id"]>("compare");
+  const [contactOpen, setContactOpen] = useState(false);
   const activeFeature = showcaseFeatures.find((feature) => feature.id === activeShowcase) ?? showcaseFeatures[0];
 
   // Live data from backend — falls back to the mocks so the landing page is
@@ -1344,14 +1347,30 @@ export default function HomePage() {
             <div className="md:w-[200px] shrink-0">
               <Link href="/" className="text-[#FF6B35]" style={{ fontSize: "28px", fontWeight: 900, letterSpacing: "-0.04em" }}>cribb</Link>
               <p className="text-white/30 mt-2" style={{ fontSize: "12px", fontWeight: 400, lineHeight: 1.6 }}>Student housing, finally done right.</p>
+              <a
+                href="https://www.instagram.com/findyourcribb/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="cribb on Instagram"
+                className="inline-flex items-center gap-2 mt-4 text-white/40 hover:text-white/70 transition-colors"
+                style={{ fontSize: "13px", fontWeight: 500 }}
+              >
+                <Instagram className="w-4 h-4" /> @findyourcribb
+              </a>
             </div>
-            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+            <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-8">
               {footerColumns.map((col) => (
                 <div key={col.title}>
                   <h4 className="text-white/50 mb-3 md:mb-4" style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>{col.title}</h4>
                   <ul className="space-y-2 md:space-y-2.5">
                     {col.links.map((link) => (
-                      <li key={link.label}><Link href={link.to} className="text-white/40 hover:text-white/70 transition-colors" style={{ fontSize: "13px", fontWeight: 400 }}>{link.label}</Link></li>
+                      <li key={link.label}>
+                        {link.to === "#contact" ? (
+                          <button type="button" onClick={() => setContactOpen(true)} className="text-white/40 hover:text-white/70 transition-colors text-left" style={{ fontSize: "13px", fontWeight: 400 }}>{link.label}</button>
+                        ) : (
+                          <Link href={link.to} className="text-white/40 hover:text-white/70 transition-colors" style={{ fontSize: "13px", fontWeight: 400 }}>{link.label}</Link>
+                        )}
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -1370,6 +1389,7 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+      <ContactModal isOpen={contactOpen} onClose={() => setContactOpen(false)} />
     </>
   );
 }

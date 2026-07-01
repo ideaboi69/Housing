@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ChevronUp, Bookmark, MoreHorizontal, X, ImagePlus, ChevronLeft, ChevronRight,
-  Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag, Star, ArrowLeft, Loader2,
+  Shield, TrendingUp, MapPin, Calendar, Pencil, BadgeCheck, Sparkles, Flag, Star, ArrowLeft, Loader2, MessageCircle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useIsMobile } from "@/hooks";
@@ -425,6 +425,16 @@ function PostCard({
             </AnimatePresence>
           </div>
           <div className="flex items-center gap-0.5">
+            {post.slug && (
+              <Link
+                href={`/the-bubble/${post.slug}#comments`}
+                className="h-8 inline-flex items-center gap-1 rounded-lg px-2 text-[#98A3B0] hover:bg-[#1B2D45]/5 hover:text-[#1B2D45] transition-colors"
+                style={{ fontSize: "11px", fontWeight: 700 }}
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                Reply
+              </Link>
+            )}
             {post.authorType && post.authorId && user?.role === "student" && !post.isOfficial && (
               <motion.button
                 onClick={() => onToggleStar?.(post.authorType!, post.authorId!)}

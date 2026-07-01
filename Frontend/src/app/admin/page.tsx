@@ -533,6 +533,16 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
       toast.error("Failed");
     }
   };
+  const handleDeleteComment = async (commentId: number) => {
+    if (!confirm("Delete this flagged comment?")) return;
+    try {
+      await api.admin.deleteComment(commentId);
+      toast.success("Comment deleted");
+      onRefresh();
+    } catch {
+      toast.error("Failed");
+    }
+  };
 
  const handleViewFlagged = (f: AdminFlagResponse) => {
     if (f.target_path) router.push(f.target_path);
@@ -543,11 +553,12 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
     if (f.review_id) return `Review: ${f.flagged_title || `#${f.review_id}`}`;
     if (f.marketplace_item_id) return `Marketplace: ${f.flagged_title || `#${f.marketplace_item_id}`}`;
     if (f.sublet_id) return `Sublet: ${f.flagged_title || `#${f.sublet_id}`}`;
+    if (f.post_comment_id) return f.flagged_title || `Comment #${f.post_comment_id}`;
     return "Unknown";
   };
 
   const typeColor = (t: string) => {
-    const map: Record<string, string> = { listing: "#FF6B35", review: "#A78BFA", marketplace_item: "#2EC4B6", sublet: "#FFB627" };
+    const map: Record<string, string> = { listing: "#FF6B35", review: "#A78BFA", marketplace_item: "#2EC4B6", sublet: "#FFB627", post_comment: "#6C5CE7" };
     return map[t] || "#98A3B0";
   };
 
@@ -558,6 +569,7 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
         {flags.map((f) => (
           (() => {
             const reviewId = typeof f.review_id === "number" ? f.review_id : null;
+            const commentId = typeof f.post_comment_id === "number" ? f.post_comment_id : null;
             return (
           <div key={f.id} className="bg-[#1B2D45] rounded-xl border border-white/[0.04] px-4 py-3 flex items-center gap-4">
             <div className="w-9 h-9 rounded-full bg-[#E71D36]/10 flex items-center justify-center shrink-0">
@@ -580,6 +592,7 @@ function FlagsTab({ flags, onRefresh }: { flags: AdminFlagResponse[]; onRefresh:
             <div className="flex items-center gap-1 shrink-0">
               {f.target_path && <ActionButton onClick={() => handleViewFlagged(f)} icon={Eye} label="View" color="#60A5FA" />}
               {reviewId !== null && <ActionButton onClick={() => handleDeleteReview(reviewId)} icon={Trash2} label="Delete Review" danger />}
+              {commentId !== null && <ActionButton onClick={() => handleDeleteComment(commentId)} icon={Trash2} label="Delete Comment" danger />}
               <ActionButton onClick={() => handleResolve(f.id)} icon={Check} label="Resolve" color="#4ADE80" />
               <ActionButton onClick={() => handleDismiss(f.id)} icon={X} label="Dismiss" color="#98A3B0" />
             </div>

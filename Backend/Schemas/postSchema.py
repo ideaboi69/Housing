@@ -115,3 +115,37 @@ class PostListResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── Comments (Bubble replies) ──
+
+class CommentCreate(BaseModel):
+    content: str
+    parent_comment_id: Optional[int] = None
+
+
+class CommentAuthor(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    profile_photo_url: Optional[str] = None
+    is_early_adopter: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class CommentResponse(BaseModel):
+    id: int
+    post_id: int
+    parent_comment_id: Optional[int] = None
+    content: str
+    created_at: datetime
+    author: Optional[CommentAuthor] = None
+    like_count: int = 0
+    liked_by_me: bool = False
+    reply_count: int = 0
+    replies: list["CommentResponse"] = []
+
+
+CommentResponse.model_rebuild()

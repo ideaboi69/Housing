@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import {
-  Eye, FileText, PenLine, Trash2, Plus,
+  Eye, EyeOff, FileText, PenLine, Trash2, Plus,
   Clock, CheckCircle2, Archive, AlertCircle, X,
   Send, Loader2, ImagePlus, Camera, Save, Star,
 } from "lucide-react";
@@ -57,6 +57,7 @@ function WriterLogin() {
   const { login, isLoading, error, clearError } = useWriterStore();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +89,12 @@ function WriterLogin() {
           </div>
           <div>
             <label className="text-[#5C6B7A] block mb-1.5" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Password</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required className={inputClass} style={{ fontSize: "13px", fontWeight: 500 }} />
+            <div className="relative">
+              <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required className={`${inputClass} pr-10`} style={{ fontSize: "13px", fontWeight: 500 }} />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#98A3B0] hover:text-[#5C6B7A] transition-colors">
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
 
           {error && (

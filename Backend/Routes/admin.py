@@ -577,6 +577,19 @@ def admin_delete_sublet(sublet_id: int, db: Session = Depends(get_db), admin: Us
     db.commit()
     return None
 
+@admin_router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_comment(comment_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Soft-delete a Bubble comment (moderation). Resolves any pending flags on it."""
+    comment = db.query(PostComment).filter(PostComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+    comment.status = "deleted"
+    db.query(Flag).filter(Flag.post_comment_id == comment_id, Flag.status == FlagStatus.PENDING).update(
+        {Flag.status: FlagStatus.RESOLVED}, synchronize_session=False
+    )
+    db.commit()
+    return None
+
 @admin_router.patch("/sublets/{sublet_id}/expire", status_code=status.HTTP_200_OK)
 def admin_expire_sublet(sublet_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     """Force a sublet to EXPIRED status and email the owner so they can clean it up."""
@@ -630,9 +643,15 @@ def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(requ
         elif f.sublet_id:
             flag_type = "sublet"
             target_path = f"/sublets/{f.sublet_id}"
+        elif f.post_comment_id:
+            flag_type = "post_comment"
+            if f.post_comment:
+                post = db.query(Post).filter(Post.id == f.post_comment.post_id).first()
+                if post:
+                    target_path = f"/the-bubble/{post.slug}"
         else:
             flag_type = "unknown"
- 
+
         flagged_title = None
         if f.listing_id and f.listing:
             flagged_title = f.listing.property.title if f.listing.property else f"Listing #{f.listing_id}"
@@ -642,6 +661,9 @@ def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(requ
             flagged_title = f.marketplace_item.title
         elif f.sublet_id and f.sublet:
             flagged_title = f.sublet.title
+        elif f.post_comment_id and f.post_comment:
+            snippet = (f.post_comment.content or "")[:80]
+            flagged_title = f'Comment: "{snippet}"' if f.post_comment.status == "active" else "Comment (already deleted)"
 
         reporter = db.query(User).filter(User.id == f.reporter_id).first()
         reporter_name = f"{reporter.first_name} {reporter.last_name}" if reporter else f"User #{f.reporter_id}"
@@ -655,6 +677,7 @@ def list_pending_flags(db: Session = Depends(get_db), admin: User = Depends(requ
             "review_id": f.review_id,
             "marketplace_item_id": f.marketplace_item_id,
             "sublet_id": f.sublet_id,
+            "post_comment_id": f.post_comment_id,
             "flagged_title": flagged_title,
             "target_path": target_path,
             "reason": f.reason,

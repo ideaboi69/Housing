@@ -24,6 +24,7 @@ from Routes.landlord_invite import landlord_invite_router
 from Routes.ai import ai_router
 from Routes.group_chat import group_chat_router
 from Routes.auth import auth_router
+from Routes.notification import notification_router
 from dataclasses import dataclass
 from apscheduler.schedulers.background import BackgroundScheduler
 from Utils.scheduler import send_viewing_reminders
@@ -104,6 +105,7 @@ app.include_router(landlord_invite_router, prefix="/api/roommates", tags=["Landl
 app.include_router(group_chat_router, prefix="/api/roommates", tags=["Group Chat"])
 app.include_router(ai_router, prefix="/api/ai", tags=["AI"])
 app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
+app.include_router(notification_router, prefix="/api/notifications", tags=["Notifications"])
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: str):

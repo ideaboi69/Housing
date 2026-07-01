@@ -692,6 +692,14 @@ def get_listing_owned_by(listing_id: int, landlord_id: int, db: Session) -> List
 
     return listing
 
+def create_notification(db: Session, *, user_id: int, type: str, title: str, body: str = None, link: str = None, actor_name: str = None):
+    """Add an in-app notification for a student. Caller commits."""
+    from tables import Notification
+    n = Notification(user_id=user_id, type=type, title=title, body=body, link=link, actor_name=actor_name)
+    db.add(n)
+    return n
+
+
 def org_member_ids(landlord: Landlord, db: Session) -> list[int]:
     """Landlord ids whose conversations this landlord may access.
 

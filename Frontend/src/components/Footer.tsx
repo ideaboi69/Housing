@@ -2,9 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Instagram } from "lucide-react";
+import { ContactModal } from "@/components/ui/ContactModal";
 
 export function Footer() {
   const pathname = usePathname();
+  const [contactOpen, setContactOpen] = useState(false);
   if (pathname === "/") return null;
 
   const year = new Date().getFullYear();
@@ -44,11 +48,22 @@ export function Footer() {
           <Link href="/accessibility" className={linkClass}>
             Accessibility
           </Link>
-          <a href="mailto:hello@findyourcribb.com" className={linkClass}>
+          <button type="button" onClick={() => setContactOpen(true)} className={linkClass}>
             Contact
+          </button>
+          <a
+            href="https://www.instagram.com/findyourcribb/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="cribb on Instagram"
+            className={`${linkClass} inline-flex items-center gap-1.5`}
+          >
+            <Instagram className="w-4 h-4" />
+            <span className="sm:hidden">Instagram</span>
           </a>
         </nav>
       </div>
+      <ContactModal isOpen={contactOpen} onClose={() => setContactOpen(false)} />
     </footer>
   );
 }

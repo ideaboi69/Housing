@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import { motion } from "framer-motion";
 import {
   Building2, Phone, Shield, Upload, FileText, X, Check,
-  ArrowLeft, ArrowRight, User, Mail, Lock, AlertCircle, Loader2,
+  ArrowLeft, ArrowRight, User, Mail, Lock, AlertCircle, Loader2, Eye, EyeOff,
 } from "lucide-react";
 import { TurnstileWidget } from "@/components/ui/TurnstileWidget";
 
@@ -152,6 +152,8 @@ function LandlordSignupPageContent() {
   const [error, setError] = useState("");
 
   const [account, setAccount] = useState({ first_name: "", last_name: "", email: "", password: "", confirm_password: "" });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [business, setBusiness] = useState({ company_name: "", phone: "", num_properties: "1", is_company_team: false });
   const [idType, setIdType] = useState<string>("drivers_license");
   const [documentType, setDocumentType] = useState<string>("property_tax_bill");
@@ -400,13 +402,23 @@ function LandlordSignupPageContent() {
               <label htmlFor="landlord-password" className="text-[#1B2D45] flex items-center gap-1.5" style={{ fontSize: "13px", fontWeight: 600 }}>
                 <Lock className="w-3.5 h-3.5 text-[#1B2D45]/40" /> Password
               </label>
-              <input id="landlord-password" type="password" value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="Create a strong password" required className={inputCls} style={{ fontSize: "14px" }} />
+              <div className="relative">
+                <input id="landlord-password" type={showPassword ? "text" : "password"} value={account.password} onChange={(e) => setAccount({ ...account, password: e.target.value })} placeholder="Create a strong password" required className={`${inputCls} pr-11`} style={{ fontSize: "14px" }} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B2D45]/30 hover:text-[#1B2D45]/60 transition-colors">
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               <PasswordChecklist password={account.password} />
             </div>
 
             <div>
               <label htmlFor="landlord-confirm-password" className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>Confirm password</label>
-              <input id="landlord-confirm-password" type="password" value={account.confirm_password} onChange={(e) => setAccount({ ...account, confirm_password: e.target.value })} placeholder="Re-enter password" required className={inputCls} style={{ fontSize: "14px" }} />
+              <div className="relative">
+                <input id="landlord-confirm-password" type={showConfirm ? "text" : "password"} value={account.confirm_password} onChange={(e) => setAccount({ ...account, confirm_password: e.target.value })} placeholder="Re-enter password" required className={`${inputCls} pr-11`} style={{ fontSize: "14px" }} />
+                <button type="button" onClick={() => setShowConfirm(!showConfirm)} aria-label={showConfirm ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#1B2D45]/30 hover:text-[#1B2D45]/60 transition-colors">
+                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {account.confirm_password && (
                 <p className={account.password === account.confirm_password ? "text-[#2EC4B6] mt-1" : "text-[#E71D36] mt-1"} style={{ fontSize: "11px", fontWeight: 600 }}>
                   {account.password === account.confirm_password ? "Passwords match." : "Passwords do not match yet."}
