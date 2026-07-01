@@ -38,17 +38,50 @@ def _get_optional_user_id(request: Request) -> Optional[int]:
 def _attach_upvote_state(posts: list[Post], user_id: Optional[int], db: Session) -> list[dict]:
     """Serialize posts with upvote_count and user_has_upvoted."""
     voted_ids: set[int] = set()
+    post_ids = [p.id for p in posts]
     if user_id:
         voted_ids = {
             row[0] for row in
             db.query(PostVote.post_id)
-            .filter(PostVote.user_id == user_id, PostVote.post_id.in_([p.id for p in posts]))
+            .filter(PostVote.user_id == user_id, PostVote.post_id.in_(post_ids))
             .all()
         }
+
+    comment_counts: dict[int, int] = {}
+    top_comments: dict[int, str] = {}
+    if post_ids:
+        comment_counts = {
+            post_id: count
+            for post_id, count in (
+                db.query(PostComment.post_id, func.count(PostComment.id))
+                .filter(PostComment.post_id.in_(post_ids), PostComment.status == "active")
+                .group_by(PostComment.post_id)
+                .all()
+            )
+        }
+
+        top_rows = (
+            db.query(PostComment.post_id, PostComment.content, func.count(PostCommentLike.id).label("like_count"))
+            .outerjoin(PostCommentLike, PostCommentLike.comment_id == PostComment.id)
+            .filter(
+                PostComment.post_id.in_(post_ids),
+                PostComment.status == "active",
+                PostComment.parent_comment_id.is_(None),
+            )
+            .group_by(PostComment.id, PostComment.post_id, PostComment.content, PostComment.created_at)
+            .order_by(PostComment.post_id.asc(), func.count(PostCommentLike.id).desc(), PostComment.created_at.desc())
+            .all()
+        )
+        for post_id, content, _ in top_rows:
+            if post_id not in top_comments:
+                top_comments[post_id] = content
+
     results = []
     for p in posts:
         data = PostListResponse.model_validate(p).model_dump()
         data["user_has_upvoted"] = p.id in voted_ids
+        data["comment_count"] = comment_counts.get(p.id, 0)
+        data["top_comment"] = top_comments.get(p.id)
         results.append(data)
     return results
 

@@ -111,6 +111,8 @@ class PostListResponse(BaseModel):
     featured_order: Optional[int] = None
     featured_until: Optional[date] = None
     images: list[PostImageResponse] = []
+    comment_count: int = 0
+    top_comment: Optional[str] = None
     created_at: datetime
 
     class Config:

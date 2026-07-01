@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Heart, CornerUpLeft, Trash2, Loader2, Send, Flag } from "lucide-react";
+import { ChevronUp, CornerUpLeft, Trash2, Loader2, Send, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
@@ -141,7 +141,7 @@ export function CommentThread({ postId }: { postId: number }) {
                   className={`flex items-center gap-1 transition-colors ${c.liked_by_me ? "text-[#FF6B35]" : "text-[#1B2D45]/40 hover:text-[#1B2D45]/70"}`}
                   style={{ fontSize: "12px", fontWeight: 600 }}
                 >
-                  <Heart className={`w-3.5 h-3.5 ${c.liked_by_me ? "fill-[#FF6B35]" : ""}`} />
+                  <ChevronUp className="w-3.5 h-3.5" />
                   {c.like_count > 0 && c.like_count}
                 </button>
                 {!isReply && (
@@ -231,11 +231,8 @@ export function CommentThread({ postId }: { postId: number }) {
 
       {/* Composer */}
       {isStudent ? (
-        <div className="flex gap-3 mb-6">
-          <div className="w-8 h-8 rounded-full bg-[#FF6B35]/15 flex items-center justify-center shrink-0 text-[#FF6B35]" style={{ fontSize: "11px", fontWeight: 800 }}>
-            {((user?.first_name?.[0] ?? "") + (user?.last_name?.[0] ?? "")).toUpperCase() || "?"}
-          </div>
-          <div className="flex-1">
+        <div className="mb-6">
+          <div>
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -251,7 +248,7 @@ export function CommentThread({ postId }: { postId: number }) {
                 className="px-4 py-2 rounded-xl bg-[#FF6B35] text-white hover:bg-[#e55e2e] disabled:opacity-50 transition-colors flex items-center gap-1.5"
                 style={{ fontSize: "13px", fontWeight: 700 }}
               >
-                {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Post
+                {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Post comment
               </button>
             </div>
           </div>

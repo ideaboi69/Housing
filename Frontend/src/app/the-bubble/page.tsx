@@ -52,6 +52,8 @@ interface Post {
   isFeatured?: boolean;
   featuredOrder?: number | null;
   featuredUntil?: string | null;
+  commentCount?: number;
+  topComment?: string | null;
 }
 
 function formatRelativeTimestamp(dateStr: string): string {
@@ -113,6 +115,8 @@ function buildLivePost(post: PostListResponse): Post {
     isFeatured: Boolean(post.is_featured),
     featuredOrder: post.featured_order ?? null,
     featuredUntil: post.featured_until ?? null,
+    commentCount: post.comment_count ?? 0,
+    topComment: post.top_comment ?? null,
   };
 }
 
@@ -401,6 +405,27 @@ function PostCard({
           </div>
         )}
 
+        {post.commentCount && post.commentCount > 0 && post.topComment && (
+          <motion.div
+            initial={{ opacity: 0, x: 16, y: 8 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            transition={{ duration: 0.22, delay: 0.08 }}
+            className="mb-3 flex justify-end"
+          >
+            <Link
+              href={`/the-bubble/${post.slug}#comments`}
+              className="group max-w-[88%] rounded-2xl rounded-br-md border border-[#FF6B35]/10 bg-[#FF6B35]/[0.045] px-3 py-2 text-right hover:bg-[#FF6B35]/[0.075] transition-colors"
+            >
+              <span className="block text-[#FF6B35]" style={{ fontSize: "10px", fontWeight: 800 }}>
+                Top comment
+              </span>
+              <span className="mt-0.5 block truncate text-[#1B2D45]/70 group-hover:text-[#1B2D45]" style={{ fontSize: "12px", fontWeight: 600 }}>
+                {post.topComment}
+              </span>
+            </Link>
+          </motion.div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center justify-between pt-2 border-t border-black/[0.04]">
           <div className="relative">
@@ -432,7 +457,7 @@ function PostCard({
                 style={{ fontSize: "11px", fontWeight: 700 }}
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-                Reply
+                Join conversation{post.commentCount ? ` · ${post.commentCount}` : ""}
               </Link>
             )}
             {post.authorType && post.authorId && user?.role === "student" && !post.isOfficial && (

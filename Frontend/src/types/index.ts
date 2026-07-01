@@ -1110,6 +1110,8 @@ export interface PostListResponse {
   featured_order?: number | null;
   featured_until?: string | null;
   images?: PostImageResponse[];
+  comment_count?: number;
+  top_comment?: string | null;
   created_at: string;
 }
 
