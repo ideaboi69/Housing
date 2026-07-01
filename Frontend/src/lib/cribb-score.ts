@@ -25,6 +25,7 @@ const GROCERIES = [
   { lat: 43.546, lng: -80.231 }, // FreshCo (Eramosa)
   { lat: 43.542, lng: -80.271 }, // Metro (Paisley)
   { lat: 43.558, lng: -80.253 }, // Food Basics (Speedvale)
+  { lat: 43.5015, lng: -80.2238 }, // Zehrs/Longos (Pergola Commons — south end)
 ];
 
 // Rough Guelph sublet/room market baseline used for the price sub-score in

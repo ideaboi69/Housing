@@ -9,7 +9,7 @@ from Schemas.subletSchema import SubletStatus
 from Schemas.flagSchema import FlagStatus
 from Schemas.writerSchema import WriterStatus, WriterResponse
 from Schemas.postSchema import PostResponse, PostListResponse, PostFeatureUpdate, PostStatus
-from helpers import require_admin, cascade_delete_landlord, get_account_or_404, log_security_event, compute_and_save
+from helpers import require_admin, cascade_delete_landlord, get_account_or_404, log_security_event, compute_and_save, refresh_property_nearby
 from Utils.security import hash_password, create_access_token, verify_password, validate_password, create_refresh_token_for_user
 from Schemas.authSchema import SecurityEventType
 from Utils.cloudinary import delete_image_from_cloudinary
@@ -388,17 +388,35 @@ def recompute_all_health_scores(
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
     only_active: bool = Query(True, description="Only recompute ACTIVE listings (default). Set false for every listing."),
+    refresh_nearby: bool = Query(False, description="Also backfill cached Google Places POIs per property before recomputing (uses Places quota)."),
 ):
     """Recompute the Cribb Score for every listing using the current formula.
 
     Existing scores are stored, not recalculated per request — run this once
     after changing the scoring weights so live listings reflect the new formula.
+    Pass refresh_nearby=true to also backfill each property's cached nearest
+    grocery/gym from Google Places (one lookup per unique property).
     """
     query = db.query(Listing)
     if only_active:
-        query = query.filter(Listing.status == ListingStatus.ACTIVE.value)
+        query = query.filter(Listing.status == ListingStatus.ACTIVE)
 
     listings = query.all()
+
+    # Optionally backfill cached POIs once per unique property before scoring,
+    # so the grocery sub-score picks up the real nearest store.
+    nearby_refreshed = 0
+    if refresh_nearby:
+        seen_props: set[int] = set()
+        for listing in listings:
+            if listing.property_id in seen_props:
+                continue
+            seen_props.add(listing.property_id)
+            prop = db.query(Property).filter(Property.id == listing.property_id).first()
+            if prop is not None:
+                refresh_property_nearby(prop, db)
+                nearby_refreshed += 1
+
     recomputed = 0
     failed = []
     for listing in listings:
@@ -412,6 +430,7 @@ def recompute_all_health_scores(
     return {
         "total": len(listings),
         "recomputed": recomputed,
+        "nearby_refreshed": nearby_refreshed,
         "failed_count": len(failed),
         "failed": failed,
     }

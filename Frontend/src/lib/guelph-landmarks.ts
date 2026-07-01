@@ -53,11 +53,14 @@ export const GUELPH_LANDMARKS: Array<{
   { name: "FreshCo (Eramosa)", lat: 43.546, lng: -80.231, emoji: "🥬", type: "grocery" },
   { name: "Metro (Paisley)", lat: 43.542, lng: -80.271, emoji: "🥬", type: "grocery" },
   { name: "Food Basics (Speedvale)", lat: 43.558, lng: -80.253, emoji: "🥬", type: "grocery" },
+  // South-end (Gordon/Clair). Pergola Commons — approx plaza coords, verify if needed.
+  { name: "Zehrs (Pergola Commons)", lat: 43.5015, lng: -80.2238, emoji: "🥬", type: "grocery" },
 
   { name: "GoodLife Fitness", lat: 43.546, lng: -80.234, emoji: "💪", type: "gym" },
   { name: "Movati Athletic", lat: 43.518, lng: -80.258, emoji: "💪", type: "gym" },
   { name: "Fit4Less (Edinburgh)", lat: 43.523, lng: -80.241, emoji: "💪", type: "gym" },
   { name: "Crunch Fitness", lat: 43.519, lng: -80.25, emoji: "💪", type: "gym" },
+  { name: "GoodLife (Pergola Commons)", lat: 43.5008, lng: -80.2232, emoji: "💪", type: "gym" },
 
   { name: "Stone Road Mall", lat: 43.5195, lng: -80.249, emoji: "🛍️", type: "shopping" },
   { name: "Canadian Tire", lat: 43.515, lng: -80.26, emoji: "🔧", type: "shopping" },

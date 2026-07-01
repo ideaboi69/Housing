@@ -102,6 +102,16 @@ const [smokingPolicy, setSmokingPolicy] = useState<SmokingPolicy>((property.smok
 
   const handleSave = async () => {
     if (findBlockedField({ Title: title, Address: address })) { setError(BLOCKED_CONTENT_MESSAGE); return; }
+    // If the address text was changed by hand, latLng is cleared (see the
+    // AddressAutocomplete onChange). Saving now would update the address string
+    // but keep the OLD coordinates, so every distance-based part of the Cribb
+    // Score (campus/grocery/downtown) — and the "what's nearby" map — would be
+    // computed against the previous location. Force a dropdown re-selection so
+    // the coords + proximity times get refreshed together.
+    if (address.trim() !== property.address.trim() && !latLng) {
+      setError("Please pick your new address from the dropdown so we can map it correctly.");
+      return;
+    }
     // Active listings present? Confirm once, then orchestrate redraft.
     if (hasActiveListings && !confirmRedraft) { setConfirmRedraft(true); return; }
     setSaving(true);

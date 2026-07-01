@@ -138,6 +138,7 @@ class PropertyResponse(BaseModel):
     drive_time_minutes: int
     bus_time_minutes: int
     nearest_bus_route: Optional[str] = None
+    nearby_places: Optional[dict] = None
     amenities: SpaceAmenities
     policies: ListingPolicies
     images: list[PropertyImageResponse] = []

@@ -1019,6 +1019,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 lat={listing.latitude != null ? Number(listing.latitude) : undefined}
                 lng={listing.longitude != null ? Number(listing.longitude) : undefined}
                 address={listing.address}
+                nearbyPlaces={listing.nearby_places}
                 height="200px"
                 zoom={15}
               />

@@ -208,6 +208,10 @@ class Property(Base):
     drive_time_minutes = Column(Integer, nullable=False)
     bus_time_minutes = Column(Integer, nullable=False)
     nearest_bus_route = Column(String(100), nullable=True)
+    # Cached nearest real POIs from Google Places Nearby Search, refreshed
+    # whenever the address/coords change. Shape:
+    #   {"grocery": {"name","lat","lng","distance_km"}, "gym": {...}}
+    nearby_places = Column(JSON, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now())
 

@@ -7,6 +7,7 @@ import {
   GUELPH_LANDMARKS,
   type LandmarkType,
 } from "@/lib/guelph-landmarks";
+import type { NearbyPlaces } from "@/types";
 
 /* ════════════════════════════════════════════════════════
    Helpers
@@ -48,8 +49,18 @@ function propertyMarkerIcon() {
 
 type NearbyRow = { key: string; emoji: string; name: string; distanceKm: number };
 
-function NearbyLandmarksList({ lat, lng }: { lat: number; lng: number }) {
-  // Downtown / closest grocery / closest gym from the curated Guelph set.
+function NearbyLandmarksList({
+  lat,
+  lng,
+  nearbyPlaces,
+}: {
+  lat: number;
+  lng: number;
+  nearbyPlaces?: NearbyPlaces | null;
+}) {
+  // Downtown / closest grocery / closest gym. Grocery & gym prefer the real
+  // cached Google Places result for this property; if unavailable we fall back
+  // to the nearest from the curated Guelph set. Downtown is always curated.
   // (Campus is shown separately in "Getting to Campus", so it's excluded here.)
   const rows = useMemo<NearbyRow[]>(() => {
     const closestOfType = (type: LandmarkType): NearbyRow | null => {
@@ -61,12 +72,18 @@ function NearbyLandmarksList({ lat, lng }: { lat: number; lng: number }) {
       return { key: candidate.lm.name, emoji: candidate.lm.emoji, name: candidate.lm.name, distanceKm: candidate.distanceKm };
     };
 
+    const fromCache = (key: "grocery" | "gym", emoji: string): NearbyRow | null => {
+      const p = nearbyPlaces?.[key];
+      if (!p) return null;
+      return { key: `${key}:${p.name}`, emoji, name: p.name, distanceKm: p.distance_km };
+    };
+
     return [
-      closestOfType("area"),    // Downtown Guelph
-      closestOfType("grocery"), // closest grocer
-      closestOfType("gym"),     // closest gym
+      closestOfType("area"),                              // Downtown Guelph
+      fromCache("grocery", "🥬") ?? closestOfType("grocery"),
+      fromCache("gym", "💪") ?? closestOfType("gym"),
     ].filter(Boolean) as NearbyRow[];
-  }, [lat, lng]);
+  }, [lat, lng, nearbyPlaces]);
 
   if (rows.length === 0) return null;
 
@@ -99,6 +116,7 @@ interface CribbMapProps {
   lng?: number;
   address?: string;
   showLandmarks?: boolean;
+  nearbyPlaces?: NearbyPlaces | null;
   height?: string;
   zoom?: number;
 }
@@ -108,6 +126,7 @@ export function CribbMap({
   lng,
   address,
   showLandmarks = true,
+  nearbyPlaces,
   height = "280px",
   zoom = 14,
 }: CribbMapProps) {
@@ -180,7 +199,7 @@ export function CribbMap({
       </div>
 
       {showLandmarks && lat != null && lng != null && (
-        <NearbyLandmarksList lat={lat} lng={lng} />
+        <NearbyLandmarksList lat={lat} lng={lng} nearbyPlaces={nearbyPlaces} />
       )}
 
       {expanded && (

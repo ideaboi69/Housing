@@ -25,6 +25,10 @@ class Settings(BaseSettings):
 
     FORMSPREE_ENDPOINT: str
     ANTHROPIC_API_KEY: str
+    # Server-side Google Maps key for Places Nearby Search (cached per property).
+    # Optional — if unset, nearby-place caching is skipped and the grocery
+    # sub-score falls back to the curated Guelph landmark list.
+    GOOGLE_MAPS_API_KEY: str = ""
     SENTRY_DSN: str = ""
     SENTRY_ENV: str = "development"
 

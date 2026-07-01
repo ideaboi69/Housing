@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Pin, ZoomIn, ZoomOut, Bed, Bath, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
 import { ScoreRing } from "@/components/ui/ScoreRing";
@@ -10,10 +11,41 @@ import {
   GOOGLE_MAPS_KEY,
   GUELPH_CENTER,
   loadGoogleMaps,
-  projectLngLatToContainer,
 } from "@/lib/google-maps";
-import type { ListingDetailResponse } from "@/types";
+import type { ListingDetailResponse, NearbyPlaces } from "@/types";
 import { groupBrowseItems, type BrowseItem, type BuildingGroup } from "@/lib/buildings";
+
+function formatNearbyKm(km: number) {
+  if (km < 1) return `${Math.round(km * 1000)} m`;
+  return `${km.toFixed(1)} km`;
+}
+
+// Compact grocery + gym readout for a rail card. Renders nothing when the
+// property has no cached POIs (e.g. GOOGLE_MAPS_API_KEY unset on the backend).
+function NearbyChips({ places }: { places?: NearbyPlaces | null }) {
+  if (!places) return null;
+  const rows: Array<{ emoji: string; name: string; km: number }> = [];
+  if (places.grocery) rows.push({ emoji: "🥬", name: places.grocery.name, km: places.grocery.distance_km });
+  if (places.gym) rows.push({ emoji: "💪", name: places.gym.name, km: places.gym.distance_km });
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+      {rows.map((row) => (
+        <span
+          key={row.emoji}
+          className="inline-flex items-center gap-1 rounded-full bg-[#FAF8F4] px-2 py-0.5 max-w-full"
+          style={{ fontSize: "10px", fontWeight: 700, color: "#1B2D45" }}
+          title={`${row.name} · ${formatNearbyKm(row.km)}`}
+        >
+          <span>{row.emoji}</span>
+          <span className="truncate max-w-[110px]">{row.name}</span>
+          <span className="text-[#1B2D45]/45">· {formatNearbyKm(row.km)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
 
 type SortKey = "recommended" | "price_low" | "price_high" | "closest";
 
@@ -24,13 +56,31 @@ interface MapViewProps {
   onTogglePin: (id: number) => void;
 }
 
-function MapScoreLegend() {
+// Map pins are colour-coded by property type (score still shows on the list
+// cards + score rings). Every apartment building uses the apartment colour.
+const PROPERTY_TYPE_COLORS: Record<string, string> = {
+  house: "#FF6B35",     // primary orange
+  apartment: "#2EC4B6", // teal
+  townhouse: "#FFB627", // amber
+  room: "#4ADE80",      // green
+};
+const PROPERTY_TYPE_LABELS: Record<string, string> = {
+  house: "House",
+  apartment: "Apartment",
+  townhouse: "Townhouse",
+  room: "Room",
+};
+function propertyTypeColor(type?: string): string {
+  return PROPERTY_TYPE_COLORS[type ?? ""] ?? "#1B2D45";
+}
+
+function MapTypeLegend() {
   return (
-    <div className="mt-2 flex items-center gap-2 sm:gap-3">
-      {[{ color: "#4ADE80", label: "85+" }, { color: "#FFB627", label: "65-84" }, { color: "#E71D36", label: "<65" }].map((item) => (
-        <div key={item.label} className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full" style={{ background: item.color }} />
-          <span className="text-[#1B2D45]/45" style={{ fontSize: "9px", fontWeight: 600 }}>{item.label}</span>
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      {Object.entries(PROPERTY_TYPE_LABELS).map(([type, label]) => (
+        <div key={type} className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full" style={{ background: PROPERTY_TYPE_COLORS[type] }} />
+          <span className="text-[#1B2D45]/45" style={{ fontSize: "9px", fontWeight: 600 }}>{label}</span>
         </div>
       ))}
     </div>
@@ -56,7 +106,7 @@ function BrowseMapSummary({ listings, avgRent }: { listings: ListingDetailRespon
       <div className="mt-0.5 text-[#1B2D45]/45" style={{ fontSize: "10px", fontWeight: 600 }}>
         {listings.length} listings · Avg {formatPrice(avgRent)}/room
       </div>
-      <MapScoreLegend />
+      <MapTypeLegend />
     </div>
   );
 }
@@ -156,6 +206,8 @@ function ListingRailCard({
             <span className="flex items-center gap-1"><Bath className="w-3.5 h-3.5" /> {listing.bathrooms} bath</span>
             <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {formatPropertyType(listing.property_type)}</span>
           </div>
+
+          <NearbyChips places={listing.nearby_places} />
 
           <div className="flex items-center gap-2 mt-4">
             <Link
@@ -265,6 +317,8 @@ function BuildingRailCard({
             <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> Apartment</span>
           </div>
 
+          <NearbyChips places={building.listings[0]?.nearby_places} />
+
           <div className="flex items-center gap-2 mt-4">
             <Link
               href={`/browse/building/${building.propertyId}`}
@@ -285,11 +339,33 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
 
+  // Google OverlayView that hosts the price pins. Positioning happens inside the
+  // overlay's draw() (called by the map every paint frame), so pins stay glued
+  // to their coordinates while panning/zooming instead of snapping on idle.
+  const overlayRef = useRef<any>(null);
+  const markersRef = useRef<Map<string, { el: HTMLElement; lat: number; lng: number }>>(new Map());
+  const [layerEl, setLayerEl] = useState<HTMLDivElement | null>(null);
+
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [mapZoom, setMapZoom] = useState(13.8);
   const [mapCenter, setMapCenter] = useState(GUELPH_CENTER);
-  const [mapSize, setMapSize] = useState({ width: 960, height: 720 });
   const [sortKey, setSortKey] = useState<SortKey>("recommended");
+
+  // Reposition every pin from the map's live projection. Kept in a ref so the
+  // OverlayView's draw() always calls the latest closure.
+  const reposition = useCallback(() => {
+    const projection = overlayRef.current?.getProjection?.();
+    const google = typeof window !== "undefined" ? window.google : undefined;
+    if (!projection || !google) return;
+    markersRef.current.forEach(({ el, lat, lng }) => {
+      const p = projection.fromLatLngToDivPixel(new google.maps.LatLng(lat, lng));
+      if (!p) return;
+      el.style.left = `${p.x}px`;
+      el.style.top = `${p.y}px`;
+    });
+  }, []);
+  const repositionRef = useRef(reposition);
+  repositionRef.current = reposition;
 
   const avgRent = listings.length > 0
     ? Math.round(listings.reduce((total, listing) => total + Number(listing.rent_per_room), 0) / listings.length)
@@ -321,20 +397,6 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
     }
   }, [selectedId, sortedListings]);
 
-  useEffect(() => {
-    if (!mapContainerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      setMapSize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
-      });
-    });
-    observer.observe(mapContainerRef.current);
-    return () => observer.disconnect();
-  }, []);
-
   // Initialize Google Map
   useEffect(() => {
     if (typeof window === "undefined" || !mapContainerRef.current || !GOOGLE_MAPS_KEY) return;
@@ -361,6 +423,33 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
           if (c) setMapCenter({ lat: c.lat(), lng: c.lng() });
           if (z != null) setMapZoom(z);
         });
+
+        // Pin layer as a native map overlay — draw() fires on every map paint,
+        // keeping pins locked to their coordinates during pan/zoom.
+        class PinOverlay extends google.maps.OverlayView {
+          div: HTMLDivElement | null = null;
+          onAdd() {
+            const div = document.createElement("div");
+            div.style.position = "absolute";
+            div.style.top = "0";
+            div.style.left = "0";
+            div.style.pointerEvents = "none"; // map stays draggable between pins
+            this.div = div;
+            this.getPanes().overlayMouseTarget.appendChild(div);
+            setLayerEl(div);
+          }
+          draw() {
+            repositionRef.current();
+          }
+          onRemove() {
+            this.div?.parentNode?.removeChild(this.div);
+            this.div = null;
+            setLayerEl(null);
+          }
+        }
+        const overlay = new PinOverlay();
+        overlay.setMap(map);
+        overlayRef.current = overlay;
       } catch (err) {
         console.error("Google Maps init failed:", err);
       }
@@ -369,6 +458,8 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
 
     return () => {
       cancelled = true;
+      overlayRef.current?.setMap(null);
+      overlayRef.current = null;
       mapInstanceRef.current = null;
     };
     // intentionally only on mount
@@ -389,22 +480,26 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
   // once per unit.
   const items = useMemo(() => groupBrowseItems(sortedListings), [sortedListings]);
 
-  const markerPoints = useMemo(() => {
+  const markerData = useMemo(() => {
     return items.map((item) => {
       const lat = item.kind === "building" ? item.building.latitude : item.listing.latitude;
       const lng = item.kind === "building" ? item.building.longitude : item.listing.longitude;
       if (lat == null || lng == null) return null;
-      const point = projectLngLatToContainer({
-        lat: Number(lat),
-        lng: Number(lng),
-        center: mapCenter,
-        zoom: mapZoom,
-        width: mapSize.width,
-        height: mapSize.height,
-      });
-      return { item, point };
-    }).filter(Boolean) as { item: BrowseItem; point: { x: number; y: number } }[];
-  }, [items, mapCenter, mapSize.height, mapSize.width, mapZoom]);
+      const repId = item.kind === "building" ? item.building.listings[0].id : item.listing.id;
+      const minRent = Math.round(item.kind === "building" ? item.building.priceMin : Number(item.listing.rent_per_room));
+      const isMulti = item.kind === "building" && item.building.unitCount > 1;
+      const count = item.kind === "building" ? item.building.unitCount : 1;
+      const key = item.kind === "building" ? `b-${item.building.propertyId}` : `l-${item.listing.id}`;
+      const propertyType = item.kind === "building" ? "apartment" : String(item.listing.property_type);
+      return { key, lat: Number(lat), lng: Number(lng), repId, minRent, isMulti, count, propertyType, item };
+    }).filter(Boolean) as Array<{ key: string; lat: number; lng: number; repId: number; minRent: number; isMulti: boolean; count: number; propertyType: string; item: BrowseItem }>;
+  }, [items]);
+
+  // Re-apply pin positions whenever the set of pins, the selection, or the
+  // overlay layer changes (the map itself repositions on pan/zoom via draw()).
+  useEffect(() => {
+    reposition();
+  }, [markerData, selectedListing, layerEl, reposition]);
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 md:px-6 py-4 md:py-5">
@@ -413,7 +508,7 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
         style={{ boxShadow: "0 22px 55px rgba(27,45,69,0.08)" }}
       >
         <div className="grid xl:h-full xl:grid-cols-[minmax(0,1.18fr)_430px]">
-          <div className="relative min-h-[54vh] bg-[#EDF2EF] xl:h-full">
+          <div className="relative min-h-[54vh] overflow-hidden bg-[#EDF2EF] xl:h-full">
             <div ref={mapContainerRef} className="absolute inset-0" />
 
             <BrowseMapSummary listings={listings} avgRent={avgRent} />
@@ -423,26 +518,22 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
             />
             <MapHintCard text="Tap a price pin to preview that listing in the panel beside the map." />
 
-            <div className="pointer-events-none absolute inset-0 z-[5]">
-              {markerPoints.map(({ item, point }) => {
-                const repId = item.kind === "building" ? item.building.listings[0].id : item.listing.id;
-                const score = healthScores[repId] ?? 0;
-                const color = score >= 85 ? "#4ADE80" : score >= 65 ? "#FFB627" : "#E71D36";
-                const isSelected = item.kind === "building"
-                  ? (selectedListing != null && item.building.listings.some((l) => l.id === selectedListing.id))
-                  : selectedListing?.id === item.listing.id;
-                const minRent = Math.round(item.kind === "building" ? item.building.priceMin : Number(item.listing.rent_per_room));
-                const isMulti = item.kind === "building" && item.building.unitCount > 1;
-                const count = item.kind === "building" ? item.building.unitCount : 1;
-                const key = item.kind === "building" ? `b-${item.building.propertyId}` : `l-${item.listing.id}`;
+            {layerEl && createPortal(
+              markerData.map((m) => {
+                const color = propertyTypeColor(m.propertyType);
+                const isSelected = m.item.kind === "building"
+                  ? (selectedListing != null && m.item.building.listings.some((l) => l.id === selectedListing.id))
+                  : selectedListing?.id === m.item.listing.id;
                 return (
                   <button
-                    key={key}
-                    onClick={() => focusListing(repId)}
-                    className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-all"
+                    key={m.key}
+                    ref={(el) => {
+                      if (el) markersRef.current.set(m.key, { el, lat: m.lat, lng: m.lng });
+                      else markersRef.current.delete(m.key);
+                    }}
+                    onClick={() => focusListing(m.repId)}
+                    className="pointer-events-auto absolute rounded-full border-2 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-[0_2px_12px_rgba(0,0,0,0.15)] transition-transform"
                     style={{
-                      left: point.x,
-                      top: point.y,
                       borderColor: color,
                       transform: `translate(-50%, -50%) scale(${isSelected ? 1.08 : 1})`,
                       background: isSelected ? "#1B2D45" : "white",
@@ -452,21 +543,22 @@ export function MapView({ listings, healthScores, pinnedIds, onTogglePin }: MapV
                     <span className="flex items-center gap-1.5">
                       <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />
                       <span style={{ fontSize: "11px", fontWeight: 800, color: isSelected ? "white" : "#FF6B35" }}>
-                        {isMulti ? `From $${minRent}` : `$${minRent}`}
+                        {m.isMulti ? `From $${m.minRent}` : `$${m.minRent}`}
                       </span>
-                      {isMulti && (
+                      {m.isMulti && (
                         <span
                           className="rounded-full px-1.5"
                           style={{ fontSize: "9px", fontWeight: 800, background: isSelected ? "rgba(255,255,255,0.2)" : "#1B2D45", color: "white" }}
                         >
-                          {count}
+                          {m.count}
                         </span>
                       )}
                     </span>
                   </button>
                 );
-              })}
-            </div>
+              }),
+              layerEl
+            )}
 
           </div>
 

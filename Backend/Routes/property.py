@@ -4,7 +4,7 @@ from tables import get_db, User, Landlord, Property, Listing, ListingImage, Revi
 from Schemas.propertySchema import PropertyCreate, PropertyUpdate, PropertyResponse, PropertyImageResponse, PropertyImageReorder
 from Schemas.listingSchema import ListingStatus, BuildingResponse
 from Utils.cloudinary import delete_image_from_cloudinary, upload_image_to_cloudinary
-from helpers import build_property_response, build_building_response, require_landlord, get_landlord_for_user, get_property_owned_by, get_primary_listing_for_property
+from helpers import build_property_response, build_building_response, require_landlord, get_landlord_for_user, get_property_owned_by, get_primary_listing_for_property, recompute_scores_for_property, refresh_property_nearby
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_PROPERTY_IMAGES = 10
@@ -55,6 +55,11 @@ def create_property(payload: PropertyCreate, db: Session = Depends(get_db), curr
     db.add(prop)
     db.commit()
     db.refresh(prop)
+
+    # Cache nearest real POIs, then keep the Cribb Score fresh (it reads the
+    # cached grocery distance) for any listings under this property.
+    refresh_property_nearby(prop, db)
+    recompute_scores_for_property(prop.id, db)
 
     return build_property_response(prop)
 
@@ -125,6 +130,8 @@ def update_property(property_id: int, payload: PropertyUpdate, db: Session = Dep
                 detail="Cannot change room count while you have active or rented listings. Edit individual listings to add/remove rooms instead."
             )
 
+    coords_changed = "latitude" in update_data or "longitude" in update_data
+
     for field, value in update_data.items():
         if hasattr(value, "value"):
             value = value.value
@@ -132,6 +139,14 @@ def update_property(property_id: int, payload: PropertyUpdate, db: Session = Dep
 
     db.commit()
     db.refresh(prop)
+
+    # Only hit Google Places when the location actually moved.
+    if coords_changed:
+        refresh_property_nearby(prop, db)
+
+    # Address/coords/amenities/distances all feed the Cribb Score — recompute
+    # every listing on this property so stored scores reflect the edit.
+    recompute_scores_for_property(prop.id, db)
 
     return build_property_response(prop)
 

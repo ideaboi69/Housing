@@ -8,7 +8,7 @@ from tables import get_db, User, Landlord, Property, Listing, ListingImage, Revi
 from Schemas.listingSchema import *
 from Schemas.propertySchema import PropertyType
 from Utils.cloudinary import upload_image_to_cloudinary, delete_image_from_cloudinary
-from helpers import get_landlord_for_user, require_landlord, build_listing_detail, get_listing_owned_by, build_listing_response
+from helpers import get_landlord_for_user, require_landlord, build_listing_detail, get_listing_owned_by, build_listing_response, recompute_scores_for_property
 from Utils.cache import cached, invalidate
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
@@ -101,6 +101,8 @@ def create_listing(payload: ListingCreate, db: Session = Depends(get_db), curren
 
     db.commit()
     db.refresh(listing)
+
+    recompute_scores_for_property(listing.property_id, db)
 
     invalidate("listings:list")
     invalidate("listings:popular")
@@ -352,6 +354,8 @@ def publish_listing(listing_id: int, db: Session = Depends(get_db),landlord: Lan
     db.commit()
     db.refresh(listing)
 
+    recompute_scores_for_property(listing.property_id, db)
+
     invalidate("listings:list")
     invalidate("listings:popular")
     return build_listing_response(listing)
@@ -372,6 +376,8 @@ def unpublish_listing(listing_id: int, db: Session = Depends(get_db), landlord: 
     listing.status = ListingStatus.DRAFT
     db.commit()
     db.refresh(listing)
+
+    recompute_scores_for_property(listing.property_id, db)
 
     invalidate("listings:list")
     invalidate("listings:popular")
@@ -444,6 +450,8 @@ def update_listing(listing_id: int, payload: ListingUpdate, db: Session = Depend
     db.commit()
     db.refresh(listing)
 
+    recompute_scores_for_property(listing.property_id, db)
+
     invalidate("listings:list")
     invalidate("listings:popular")
     return build_listing_response(listing)
@@ -467,6 +475,8 @@ def convert_to_sublet(
 
     db.commit()
     db.refresh(listing)
+
+    recompute_scores_for_property(listing.property_id, db)
 
     invalidate("listings:list")
     invalidate("listings:popular")
@@ -546,6 +556,7 @@ def update_listing_room(listing_id: int, room_id: int, payload: ListingRoomUpdat
 
     db.commit()
     db.refresh(room)
+    recompute_scores_for_property(listing.property_id, db)
     invalidate("listings:list")
     invalidate("listings:popular")
     return ListingRoomResponse.model_validate(room)
@@ -573,6 +584,7 @@ def add_listing_room(listing_id: int, payload: ListingRoomCreate, db: Session = 
 
     db.commit()
     db.refresh(room)
+    recompute_scores_for_property(listing.property_id, db)
     invalidate("listings:list")
     invalidate("listings:popular")
     return ListingRoomResponse.model_validate(room)
@@ -598,5 +610,6 @@ def delete_listing_room(listing_id: int, room_id: int, db: Session = Depends(get
     listing.rent_total = sum(remaining_rents)
 
     db.commit()
+    recompute_scores_for_property(listing.property_id, db)
     invalidate("listings:list")
     invalidate("listings:popular")

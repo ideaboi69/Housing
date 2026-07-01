@@ -192,6 +192,7 @@ class ListingDetailResponse(BaseModel):
     bus_time_minutes: Optional[int] = None
     drive_time_minutes: Optional[int] = None
     nearest_bus_route: Optional[str] = None
+    nearby_places: Optional[dict] = None
     amenities: SpaceAmenities
     policies: ListingPolicies
     terms: ListingTerms

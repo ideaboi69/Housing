@@ -1,4 +1,5 @@
 import math
+import logging
 from fastapi import HTTPException, Depends, status, UploadFile, File, Form
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -10,11 +11,12 @@ from Schemas.userSchema import UserRole
 from Utils.security import get_current_user, decode_access_token
 from fastapi import Depends, HTTPException, status
 from Schemas.featureSchema import AmenityValue, ListingPolicies, ListingTerms, PetPolicy, SmokingPolicy, SpaceAmenities, SubletTerms
-from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse, ListingRoomResponse, ListingResponse, BuildingResponse, BuildingUnitResponse
+from Schemas.listingSchema import ListingDetailResponse, ListingImageResponse, ListingRoomResponse, ListingResponse, BuildingResponse, BuildingUnitResponse, ListingStatus
 from Schemas.propertySchema import PropertyResponse, PropertyImageResponse
 from Schemas.adminSchema import AccountType
 from Schemas.subletSchema import SubletListResponse, SubletResponse, SubletImageResponse
 from Utils.cloudinary import delete_image_from_cloudinary
+from Utils.places import fetch_nearby_places
 from Schemas.roommateSchema import *
 from Schemas.viewingSchema import BookingResponse
 from sqlalchemy.orm import Session
@@ -390,6 +392,7 @@ def build_property_response(prop: Property) -> PropertyResponse:
         drive_time_minutes=prop.drive_time_minutes,
         bus_time_minutes=prop.bus_time_minutes,
         nearest_bus_route=prop.nearest_bus_route,
+        nearby_places=prop.nearby_places,
         amenities=build_space_amenities(
             furnished=prop.is_furnished,
             utilities_included=prop.utilities_included,
@@ -781,6 +784,7 @@ def build_listing_detail(listing: Listing, prop: Property, landlord: Landlord) -
         drive_time_minutes=prop.drive_time_minutes,
         bus_time_minutes=prop.bus_time_minutes,
         nearest_bus_route=prop.nearest_bus_route,
+        nearby_places=prop.nearby_places,
         amenities=build_space_amenities(
             furnished=prop.is_furnished,
             utilities_included=prop.utilities_included,
@@ -859,10 +863,16 @@ def compute_price_vs_market(listing: Listing, db: Session) -> float:
     if not prop:
         return 50.0
 
-    # get average rent for active listings on same property type
-    avg_rent = db.query(sql_func.avg(Listing.rent_per_room)).join( Property, Listing.property_id == Property.id).filter(
+    # get average rent for OTHER active listings on the same property type.
+    # NOTE: filter on the ListingStatus enum member, not the raw string "active".
+    # SQLAlchemy's Enum column stores the member NAME ("ACTIVE"), so comparing
+    # against "active" matched nothing and this always fell through to the
+    # neutral 50.0 default — silently killing the 30%-weighted price component.
+    avg_rent = db.query(sql_func.avg(Listing.rent_per_room)).join(Property, Listing.property_id == Property.id).filter(
         Property.property_type == prop.property_type,
-        Listing.status == "active",
+        Listing.status == ListingStatus.ACTIVE,
+        Listing.id != listing.id,
+        Listing.rent_per_room > 0,
     ).scalar()
 
     if not avg_rent or float(avg_rent) == 0:
@@ -929,29 +939,59 @@ def compute_lease_clarity(listing: Listing, prop: Property) -> float:
 
     return round((score / total_checks) * 100, 1)
 
+# Per-amenity weights for the amenity sub-score (mirror of cribb-score.ts
+# AMENITY_WEIGHTS). Reflects what actually matters for Guelph student rentals:
+# laundry and climate control lead; furnished is a bonus that never penalizes;
+# gym and smoking are intentionally excluded (informational only).
+_AMENITY_WEIGHTS = {
+    "has_laundry": 20,
+    "has_air_conditioning": 22,  # AC + heating share this signal
+    "is_furnished": 12,          # bonus only — see scoring note below
+    "utilities_included": 10,
+    "has_wifi": 8,
+    "has_dishwasher": 8,
+    "has_parking": 5,
+    "pet_friendly": 4,           # derived from pet_policy on the backend
+    "has_elevator": 3,
+    "has_backyard": 3,
+    "has_balcony": 2,
+    "wheelchair_accessible": 3,
+}
+
+
 def compute_amenity_score(prop: Property) -> float:
-    """Score based on how many amenities the property offers. 0-100.
-    Base score of 20 (having a roof counts for something)."""
-    # Gym is intentionally excluded from the Cribb Score (informational only).
-    amenity_fields = [
-        "is_furnished", "has_parking", "has_laundry",
-        "utilities_included", "has_wifi", "has_air_conditioning",
-        "has_dishwasher", "has_elevator",
-        "has_backyard", "has_balcony", "wheelchair_accessible",
-    ]
- 
-    total = len(amenity_fields)
-    count = sum(1 for field in amenity_fields if getattr(prop, field, False))
- 
-    # Also check pet_policy (not a boolean)
-    if getattr(prop, "pet_policy", "unknown") not in ("unknown", "no_pets"):
-        count += 1
-        total += 1
-    else:
-        total += 1
- 
-    score = 20 + (count / total) * 80
-    return round(score, 1)
+    """Weighted amenity score, 0-100 (mirror of cribb-score.ts).
+
+    Each amenity earns its weight when present; the score is
+    ``earned / earnable * 100``. The one trick: a missing ``is_furnished`` is
+    excluded from BOTH sides, so an unfurnished place (the Guelph norm) can still
+    reach 100 by nailing the rest of the list — it isn't capped just for matching
+    the norm. The old flat "20 + count/total*80" model under-rewarded listings
+    that had the amenities students actually care about (laundry, HVAC).
+    """
+    earned = 0.0
+    earnable = 0.0
+
+    for key, weight in _AMENITY_WEIGHTS.items():
+        if key == "pet_friendly":
+            present = getattr(prop, "pet_policy", "unknown") not in ("unknown", "no_pets")
+        else:
+            present = bool(getattr(prop, key, False))
+
+        if key == "is_furnished":
+            # Furnished: pure bonus — counts toward both sides only when present.
+            if present:
+                earned += weight
+                earnable += weight
+            continue
+
+        earnable += weight
+        if present:
+            earned += weight
+
+    if earnable == 0:
+        return 0.0
+    return round((earned / earnable) * 100, 1)
 
 # Fixed Guelph reference points for the composite Location score.
 _GUELPH_DOWNTOWN = (43.5448, -80.2482)
@@ -962,6 +1002,7 @@ _GUELPH_GROCERIES = [
     (43.5460, -80.2310),  # FreshCo (Eramosa)
     (43.5420, -80.2710),  # Metro (Paisley)
     (43.5580, -80.2530),  # Food Basics (Speedvale)
+    (43.5015, -80.2238),  # Zehrs/Longos (Pergola Commons, Gordon/Clair — south end)
 ]
 
 
@@ -992,21 +1033,49 @@ def _distance_score_km(km: float) -> float:
     return 20.0
 
 
+def _bus_score(minutes: float) -> float:
+    """Bus-time → 0-100 campus-access score (mirror of cribb-score.ts busScore).
+
+    Bus time is the universal student commute measure in Guelph, so it anchors
+    campus access. The curve is deliberately forgiving — even a 40-min bus ride
+    is a normal Guelph commute, not a failing grade:
+
+      ≤ 12 min → 95 (golden zone, near-campus)
+      ≤ 15 min → 90
+      ≤ 22 min → 82
+      ≤ 30 min → 75
+      ≤ 40 min → 68
+      41 min+  → 50 (capped — doesn't keep falling)
+    """
+    if minutes <= 12:
+        return 95.0
+    elif minutes <= 15:
+        return 90.0
+    elif minutes <= 22:
+        return 82.0
+    elif minutes <= 30:
+        return 75.0
+    elif minutes <= 40:
+        return 68.0
+    return 50.0
+
+
 def _campus_score(prop: Property) -> float:
-    """Campus access — walk_time first, then stored distance, then haversine."""
-    if prop.walk_time_minutes is not None:
-        walk = prop.walk_time_minutes
-        if walk <= 10:
-            return 100.0
-        elif walk <= 15:
-            return 90.0
-        elif walk <= 20:
-            return 75.0
-        elif walk <= 30:
-            return 60.0
-        elif walk <= 45:
-            return 40.0
-        return 20.0
+    """Campus access. Bus time is the PRIMARY signal (matches cribb-score.ts).
+
+    Walking to campus isn't realistic in Guelph — the closest off-campus housing
+    is a ~30 min walk in the best case — so the old walk-time-first logic pinned
+    almost every real listing at 20-40 and, since campus is 60% of Location and
+    Location is 40% of the score, quietly capped the whole Cribb Score in the
+    40s-50s. We now use bus time first, fall back to a short walk, then stored
+    distance, then a haversine estimate from coordinates.
+    """
+    if prop.bus_time_minutes is not None and prop.bus_time_minutes > 0:
+        return _bus_score(prop.bus_time_minutes)
+    if prop.walk_time_minutes is not None and 0 < prop.walk_time_minutes <= 20:
+        # A very short walk is effectively the golden zone — treat it like a
+        # short bus ride instead of punishing it on a harsh walk curve.
+        return _bus_score(max(8, prop.walk_time_minutes - 4))
     if prop.distance_to_campus_km is not None:
         return _distance_score_km(float(prop.distance_to_campus_km))
     if prop.latitude is not None and prop.longitude is not None:
@@ -1029,10 +1098,24 @@ def compute_proximity_score(prop: Property) -> float:
 
     if prop.latitude is not None and prop.longitude is not None:
         lat, lng = float(prop.latitude), float(prop.longitude)
-        nearest_grocery_km = min(
-            _haversine_km(lat, lng, g_lat, g_lng) for g_lat, g_lng in _GUELPH_GROCERIES
-        )
-        grocery = _distance_score_km(nearest_grocery_km)
+
+        # Prefer the REAL nearest grocery from cached Google Places data; fall
+        # back to the curated Guelph store list when it isn't available.
+        cached_grocery_km = None
+        nearby = getattr(prop, "nearby_places", None)
+        if isinstance(nearby, dict):
+            g = nearby.get("grocery")
+            if isinstance(g, dict) and g.get("distance_km") is not None:
+                cached_grocery_km = float(g["distance_km"])
+
+        if cached_grocery_km is not None:
+            grocery = _distance_score_km(cached_grocery_km)
+        else:
+            nearest_grocery_km = min(
+                _haversine_km(lat, lng, g_lat, g_lng) for g_lat, g_lng in _GUELPH_GROCERIES
+            )
+            grocery = _distance_score_km(nearest_grocery_km)
+
         downtown = _distance_score_km(_haversine_km(lat, lng, *_GUELPH_DOWNTOWN))
     else:
         # No coordinates — fall back to neutral for the location extras.
@@ -1129,6 +1212,52 @@ def compute_and_save(listing_id: int, db: Session) -> HousingHealthScore:
         db.refresh(health_score)
         return health_score
  
+_score_logger = logging.getLogger(__name__)
+
+
+def refresh_property_nearby(prop: Property, db: Session) -> None:
+    """Refresh a property's cached nearest POIs (grocery/gym) via Google Places.
+
+    Call this after the address/coords are set or changed, BEFORE recomputing
+    the score (the grocery sub-score reads the cached distance). Best-effort:
+    a no-op when coords or the API key are missing, and any failure leaves the
+    existing cache untouched without breaking the request.
+    """
+    if prop.latitude is None or prop.longitude is None:
+        return
+    try:
+        places = fetch_nearby_places(prop.latitude, prop.longitude)
+    except Exception as exc:
+        _score_logger.warning("Nearby refresh failed for property %s: %s", prop.id, exc)
+        return
+    if places is not None:
+        prop.nearby_places = places
+        db.commit()
+        db.refresh(prop)
+
+
+def recompute_scores_for_property(property_id: int, db: Session) -> None:
+    """Recompute the Cribb Score for every listing under ``property_id``.
+
+    Call this after any change to a property's or its listings' scoring inputs
+    (address/coords, amenities, distances, rent, status, etc.) so the stored
+    HousingHealthScore never goes stale. Best-effort by design: a scoring error
+    must never break the create/update request that triggered the recompute.
+    """
+    try:
+        listings = db.query(Listing).filter(Listing.property_id == property_id).all()
+    except Exception as exc:
+        _score_logger.warning("Score recompute lookup failed for property %s: %s", property_id, exc)
+        return
+
+    for listing in listings:
+        try:
+            compute_and_save(listing.id, db)
+        except Exception as exc:
+            db.rollback()
+            _score_logger.warning("Score recompute failed for listing %s: %s", listing.id, exc)
+
+
 def compute_listing_rent_stats(rooms):
     """Returns (rent_min, rent_max, rent_total). Defaults to 0 if no rooms."""
     if not rooms:

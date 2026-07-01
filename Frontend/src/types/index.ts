@@ -241,6 +241,15 @@ export interface LandlordNotificationPreferencesResponse {
 
 // ── Property ───────────────────────────────────────────
 
+// Nearest real POIs cached per property from Google Places Nearby Search.
+export interface NearbyPlace {
+  name: string;
+  lat: number;
+  lng: number;
+  distance_km: number;
+}
+export type NearbyPlaces = Partial<Record<"grocery" | "gym", NearbyPlace>>;
+
 export interface PropertyResponse {
   id: number;
   landlord_id: number;
@@ -273,6 +282,7 @@ export interface PropertyResponse {
   drive_time_minutes: number;
   bus_time_minutes: number;
   nearest_bus_route: string;
+  nearby_places?: NearbyPlaces | null;
   amenities?: SpaceAmenities;
   policies?: ListingPolicies;
   images?: PropertyImageResponse[];
@@ -439,6 +449,7 @@ export interface ListingDetailResponse {
   bus_time_minutes: number | null;
   drive_time_minutes?: number | null;
   nearest_bus_route?: string | null;
+  nearby_places?: NearbyPlaces | null;
   amenities?: SpaceAmenities;
   policies?: ListingPolicies;
   terms?: ListingTermsSummary;
