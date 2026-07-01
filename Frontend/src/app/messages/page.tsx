@@ -17,7 +17,6 @@ import {
   Send,
   ShoppingBag,
   Sparkles,
-  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
@@ -342,28 +341,18 @@ function ConversationItem({
   );
 }
 
-function MessageBubble({ message, isMe, onDelete }: { message: UnifiedMessage; isMe: boolean; onDelete?: () => void }) {
+function MessageBubble({ message, isMe }: { message: UnifiedMessage; isMe: boolean }) {
   return (
-    <div className={`group mb-1 flex items-center gap-1.5 ${isMe ? "justify-end" : "justify-start"}`}>
-      {isMe && onDelete && (
-        <button
-          onClick={onDelete}
-          aria-label="Delete message"
-          title="Delete message"
-          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-[#1B2D45]/25 hover:text-[#E71D36] shrink-0"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      )}
+    <div className={`group mb-1 flex w-full items-center gap-1.5 ${isMe ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[75%] px-3.5 py-2.5 ${
+        className={`min-w-0 max-w-[75%] px-3.5 py-2.5 ${
           isMe
             ? "rounded-2xl rounded-br-md bg-[#FF6B35] text-white"
             : "rounded-2xl rounded-bl-md border border-black/[0.04] bg-white text-[#1B2D45]"
         }`}
         style={{ boxShadow: isMe ? undefined : "0 1px 3px rgba(0,0,0,0.03)" }}
       >
-        <p style={{ fontSize: "13px", lineHeight: 1.5, wordBreak: "break-word" }}>{message.content}</p>
+        <p style={{ fontSize: "13px", lineHeight: 1.5, overflowWrap: "anywhere", wordBreak: "break-word" }}>{message.content}</p>
         <div className={`mt-1 flex items-center gap-1 ${isMe ? "justify-end" : "justify-start"}`}>
           <span className={isMe ? "text-white/50" : "text-[#98A3B0]"} style={{ fontSize: "9px" }}>
             {formatTime(message.created_at)}
@@ -436,19 +425,6 @@ function ChatThread({
       setLoading(false);
     }
   }, [conversation, currentUserId, applyDetail]);
-
-  // Delete one of your own messages (housing threads only — the only type with a
-  // delete endpoint). Optimistically remove, then re-sync on failure.
-  const handleDeleteMessage = useCallback(async (messageId: number) => {
-    if (conversation.type !== "housing") return;
-    setDetail((prev) => (prev ? { ...prev, messages: prev.messages.filter((m) => m.id !== messageId) } : prev));
-    try {
-      await api.messages.deleteMessage(conversation.id, messageId);
-      await onRefreshConversations();
-    } catch {
-      void fetchConversation();
-    }
-  }, [conversation.type, conversation.id, onRefreshConversations, fetchConversation]);
 
   useEffect(() => {
     setLoading(true);
@@ -540,7 +516,7 @@ function ChatThread({
         </div>
       </div>
 
-      <div className="relative flex-1 overflow-y-auto px-4 py-4 md:px-5" style={{ background: "#FAF8F4" }}>
+      <div className="relative flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 md:px-5" style={{ background: "#FAF8F4" }}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,107,53,0.10),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(46,196,182,0.08),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.55)_0%,rgba(250,248,244,0.6)_100%)]" />
         <div className="pointer-events-none absolute inset-0 opacity-55" style={{ backgroundImage: "radial-gradient(rgba(27,45,69,0.05) 1px, transparent 1px)", backgroundSize: "22px 22px" }} />
         <div className="relative">
@@ -558,7 +534,6 @@ function ChatThread({
                   key={`${msg.conversation_id}-${msg.id}`}
                   message={msg}
                   isMe={isMessageFromMe(msg, currentUserId)}
-                  onDelete={conversation.type === "housing" && isMessageFromMe(msg, currentUserId) ? () => handleDeleteMessage(msg.id) : undefined}
                 />
               ))}
             </div>

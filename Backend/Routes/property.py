@@ -168,11 +168,6 @@ def delete_property(property_id: int, db: Session = Depends(get_db), current_use
 
 
 # ── Property photos ──
-# Property-level photos reuse the existing per-listing image storage by
-# operating on the property's *primary* listing (lowest id, photos only —
-# excludes floor-plan diagrams). This matches the data that already powers
-# the browse card cover image. Cover = display_order 0.
-
 def _primary_listing_images(prop: Property, db: Session) -> tuple[Listing, list[ListingImage]]:
     listing = get_primary_listing_for_property(prop.id, db)
     if not listing:

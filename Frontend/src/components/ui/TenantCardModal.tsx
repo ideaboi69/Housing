@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { X, Cigarette, PawPrint, Sparkles, Users, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
+import AvatarLightbox from "@/components/ui/AvatarLightbox";
 import type { TenantCardResponse } from "@/types";
 
 /* ════════════════════════════════════════════════════════
@@ -77,7 +78,9 @@ export function TenantCardModal({ isOpen, onClose, userId }: TenantCardModalProp
                   {/* Avatar */}
                   <div className="absolute -bottom-8 left-5">
                     {card.profile_photo_url ? (
-                      <img src={card.profile_photo_url} alt="" className="w-16 h-16 rounded-2xl object-cover border-[3px] border-white shadow-[0_4px_12px_rgba(27,45,69,0.1)]" />
+                      <AvatarLightbox photoUrl={card.profile_photo_url} alt={card.first_name} className="!rounded-2xl">
+                        <img src={card.profile_photo_url} alt="" className="w-16 h-16 rounded-2xl object-cover border-[3px] border-white shadow-[0_4px_12px_rgba(27,45,69,0.1)]" />
+                      </AvatarLightbox>
                     ) : (
                       <div className="w-16 h-16 rounded-2xl bg-[#1B2D45]/[0.06] border-[3px] border-white shadow-[0_4px_12px_rgba(27,45,69,0.1)] flex items-center justify-center">
                         <span className="text-[#1B2D45]/40" style={{ fontSize: "20px", fontWeight: 700 }}>{card.first_name[0]}</span>

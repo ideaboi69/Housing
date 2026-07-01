@@ -11,6 +11,7 @@ import { api, ApiError } from "@/lib/api";
 import type { SecurityEvent } from "@/types";
 import { toast } from "sonner";
 import { PhotoCropper } from "@/components/PhotoCropper";
+import AvatarLightbox from "@/components/ui/AvatarLightbox";
 
 /* ═══════════════════════════════════════════════════════
    TYPES
@@ -195,22 +196,24 @@ function ProfileTab() {
       <SectionCard title="Profile Photo">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <div className="relative">
-            {profilePhotoUrl ? (
-              <img
-                src={profilePhotoUrl}
-                alt={`${firstName} ${lastName}`}
-                className="h-20 w-20 rounded-full object-cover border border-black/[0.06]"
-              />
-            ) : (
-              <div
-                className="w-20 h-20 rounded-full flex items-center justify-center text-white"
-                style={{ background: "linear-gradient(135deg, #FF6B35, #FFB627)", fontSize: "28px", fontWeight: 700 }}
-              >
-                {(firstName?.[0] || "").toUpperCase()}
-                {(lastName?.[0] || "").toUpperCase()}
-              </div>
-            )}
-            <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border border-black/[0.08] flex items-center justify-center shadow-sm hover:bg-[#FAF8F4] transition-colors cursor-pointer">
+            <AvatarLightbox photoUrl={profilePhotoUrl} alt={`${firstName} ${lastName}`}>
+              {profilePhotoUrl ? (
+                <img
+                  src={profilePhotoUrl}
+                  alt={`${firstName} ${lastName}`}
+                  className="h-20 w-20 rounded-full object-cover border border-black/[0.06]"
+                />
+              ) : (
+                <div
+                  className="w-20 h-20 rounded-full flex items-center justify-center text-white"
+                  style={{ background: "linear-gradient(135deg, #FF6B35, #FFB627)", fontSize: "28px", fontWeight: 700 }}
+                >
+                  {(firstName?.[0] || "").toUpperCase()}
+                  {(lastName?.[0] || "").toUpperCase()}
+                </div>
+              )}
+            </AvatarLightbox>
+            <label className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-white border border-black/[0.08] flex items-center justify-center shadow-sm hover:bg-[#FAF8F4] transition-colors cursor-pointer z-10">
               {photoUploading ? (
                 <div className="w-3.5 h-3.5 border-2 border-[#1B2D45]/15 border-t-[#FF6B35] rounded-full animate-spin" />
               ) : (
@@ -229,27 +232,10 @@ function ProfileTab() {
             </label>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 600 }}>Upload a photo</p>
-            <p className="text-[#98A3B0] mt-0.5" style={{ fontSize: "11px" }}>JPG, PNG up to 5MB. This will be visible on your roommate profile.</p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <label
-                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[#FF6B35] px-3.5 py-2 text-white hover:bg-[#e55e2e] transition-all"
-                style={{ fontSize: "12px", fontWeight: 700, boxShadow: "0 2px 12px rgba(255,107,53,0.24)" }}
-              >
-                <Camera className="w-3.5 h-3.5" />
-                {profilePhotoUrl ? "Replace photo" : "Upload photo"}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setPendingPhotoFile(file);
-                    e.currentTarget.value = "";
-                  }}
-                />
-              </label>
-              {profilePhotoUrl && (
+            <p className="text-[#1B2D45]" style={{ fontSize: "14px", fontWeight: 600 }}>Profile photo</p>
+            <p className="text-[#98A3B0] mt-0.5" style={{ fontSize: "11px" }}>Tap the camera badge to upload. JPG, PNG up to 5MB.</p>
+            {profilePhotoUrl && (
+              <div className="mt-3">
                 <button
                   type="button"
                   onClick={() => void handlePhotoRemove()}
@@ -264,8 +250,8 @@ function ProfileTab() {
                   )}
                   Remove
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </SectionCard>

@@ -204,6 +204,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             identity_verified: res.identity_verified,
             company_name: res.company_name,
             phone: res.phone,
+            profile_photo_url: res.profile_photo_url ?? null,
           };
           cacheLandlordProfile(landlordUser);
           set({ user: landlordUser, token, isLoading: false });

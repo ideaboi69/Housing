@@ -9,6 +9,7 @@ import { Users, Shield, ChevronRight, MapPin, Home, Send, Check, Link2, Camera }
 import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
 import { type LifestyleProfile, type RoommateGroup, TAG_SHORT_LABELS, getRoommateGroupByInviteCode } from "@/components/roommates/roommate-data";
+import AvatarLightbox from "@/components/ui/AvatarLightbox";
 
 /* ── Member Preview ── */
 
@@ -16,13 +17,15 @@ function MemberPreview({ member }: { member: LifestyleProfile }) {
   const tags = Object.entries(member.tags).slice(0, 3).map(([_, v]) => TAG_SHORT_LABELS[v] || v);
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-black/[0.04]">
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden">
-        {member.avatar ? (
-          <img src={member.avatar} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
-        )}
-      </div>
+      <AvatarLightbox photoUrl={member.avatar} alt={member.firstName} className="shrink-0">
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden">
+          {member.avatar ? (
+            <img src={member.avatar} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+          )}
+        </div>
+      </AvatarLightbox>
       <div className="flex-1 min-w-0">
         <div className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>{member.firstName} {member.initial}</div>
         <div className="text-[#1B2D45]/30" style={{ fontSize: "10px" }}>{member.year} · {member.program}</div>
@@ -303,15 +306,23 @@ export default function JoinGroupPage({ params }: { params: Promise<{ code: stri
 
               <div className="p-5">
                 <div className="flex items-start gap-4">
-                  <div className="relative h-[92px] w-[108px] shrink-0 overflow-hidden rounded-[22px] border border-black/[0.05] bg-[#FAF8F4]">
-                    {heroImage ? (
-                      <img src={heroImage} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[#FF6B35]/55" style={{ background: group.bannerGradient || "linear-gradient(135deg, #FFE6DA 0%, #FFF8F2 100%)" }}>
-                        <Camera className="h-5 w-5" />
+                  {group.groupImage ? (
+                    <AvatarLightbox photoUrl={group.groupImage} alt={group.name} className="!rounded-[22px] shrink-0">
+                      <div className="relative h-[92px] w-[108px] shrink-0 overflow-hidden rounded-[22px] border border-black/[0.05] bg-[#FAF8F4]">
+                        <img src={group.groupImage} alt="" className="h-full w-full object-cover" />
                       </div>
-                    )}
-                  </div>
+                    </AvatarLightbox>
+                  ) : (
+                    <div className="relative h-[92px] w-[108px] shrink-0 overflow-hidden rounded-[22px] border border-black/[0.05] bg-[#FAF8F4]">
+                      {heroImage ? (
+                        <img src={heroImage} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[#FF6B35]/55" style={{ background: group.bannerGradient || "linear-gradient(135deg, #FFE6DA 0%, #FFF8F2 100%)" }}>
+                          <Camera className="h-5 w-5" />
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-[#1B2D45]/38" style={{ fontSize: "12px", fontWeight: 600 }}>

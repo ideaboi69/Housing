@@ -8,6 +8,7 @@ import { Users, Shield, ShieldCheck, ChevronLeft, ChevronRight, MessageCircle, L
 import { useAuthStore } from "@/lib/auth-store";
 import { api, ApiError } from "@/lib/api";
 import { SmartBackLink } from "@/components/ui/SmartBackLink";
+import AvatarLightbox from "@/components/ui/AvatarLightbox";
 import {
   type LifestyleProfile, type RoommateGroup, type GroupHousing,
   TAG_SHORT_LABELS, computeGroupCompatibility,
@@ -46,13 +47,15 @@ function MemberCard({ member }: { member: LifestyleProfile }) {
   return (
     <div className="bg-white rounded-2xl border border-black/[0.06] p-4" style={{ boxShadow: "0 12px 28px rgba(27,45,69,0.04)" }}>
       <div className="flex items-center gap-3 mb-2.5">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden border border-[#1B2D45]/10">
-          {(member as typeof member & { avatar?: string }).avatar ? (
-            <img src={(member as typeof member & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <span style={{ fontSize: "14px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
-          )}
-        </div>
+        <AvatarLightbox photoUrl={(member as typeof member & { avatar?: string }).avatar} alt={member.firstName} className="shrink-0">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden border border-[#1B2D45]/10">
+            {(member as typeof member & { avatar?: string }).avatar ? (
+              <img src={(member as typeof member & { avatar?: string }).avatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span style={{ fontSize: "14px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+            )}
+          </div>
+        </AvatarLightbox>
         <div>
           <h4 className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>{member.firstName} {member.initial}</h4>
           <p className="text-[#1B2D45]/35" style={{ fontSize: "10px" }}>{member.year} · {member.program}</p>
@@ -470,8 +473,9 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     : group.housing?.status === "pending"
       ? group.housing.selfReportedUtilitiesIncluded
       : undefined;
+  const groupPhotoImage = (group as RoommateGroup & { groupImage?: string }).groupImage || null;
   const heroImage =
-    (group as RoommateGroup & { groupImage?: string }).groupImage ||
+    groupPhotoImage ||
     group.housing?.linkedListingImage ||
     group.housing?.selfReportedPhotos?.[0] ||
     null;
@@ -608,15 +612,21 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
               </p>
             </div>
             <div className="flex items-start gap-3 shrink-0">
-              <div
-                className="hidden sm:block w-[92px] h-[82px] rounded-2xl overflow-hidden border border-black/[0.05] bg-[#FAF8F4]"
-              >
-                {heroImage ? (
-                  <img src={heroImage} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.18) 0%, rgba(255,182,39,0.18) 100%)" }} />
-                )}
-              </div>
+              {groupPhotoImage ? (
+                <AvatarLightbox photoUrl={groupPhotoImage} alt={group.name} className="!rounded-2xl">
+                  <div className="hidden sm:block w-[92px] h-[82px] rounded-2xl overflow-hidden border border-black/[0.05] bg-[#FAF8F4]">
+                    <img src={groupPhotoImage} alt="" className="w-full h-full object-cover" />
+                  </div>
+                </AvatarLightbox>
+              ) : (
+                <div className="hidden sm:block w-[92px] h-[82px] rounded-2xl overflow-hidden border border-black/[0.05] bg-[#FAF8F4]">
+                  {heroImage ? (
+                    <img src={heroImage} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full" style={{ background: "linear-gradient(135deg, rgba(255,107,53,0.18) 0%, rgba(255,182,39,0.18) 100%)" }} />
+                  )}
+                </div>
+              )}
               <div className="flex items-center gap-1.5 bg-[#FAF8F4] px-3 py-2 rounded-xl border border-black/[0.04]">
                 {Array.from({ length: group.groupSize }, (_, i) => (
                   <div key={i} className={`w-3.5 h-3.5 rounded-full ${i < filled ? "bg-[#4ADE80]" : "bg-[#1B2D45]/[0.08] border-2 border-dashed border-[#1B2D45]/10"}`} />

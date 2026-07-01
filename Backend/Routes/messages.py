@@ -402,39 +402,6 @@ def get_landlord_unread_count(db: Session = Depends(get_db), landlord: Landlord 
 
     return {"unread_count": total_unread}
 
-# Delete a single message (sender only)
-@message_router.delete("/conversations/{conversation_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_message(conversation_id: int, message_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-
-    # Verify access — determine the viewer's role by TYPE first (student and
-    # landlord ids can collide across tables).
-    is_landlord = isinstance(current_user, Landlord)
-    in_conversation = (
-        (is_landlord and conversation.landlord_id in org_member_ids(current_user, db))
-        or (not is_landlord and conversation.user_id == current_user.id)
-    )
-    if not in_conversation:
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    # You may only delete your OWN messages — match sender_type too so a student
-    # and a landlord that share a numeric id can't delete each other's messages.
-    expected_sender_type = SenderType.LANDLORD if is_landlord else SenderType.STUDENT
-    message = db.query(Message).filter(
-        Message.id == message_id,
-        Message.conversation_id == conversation_id,
-        Message.sender_id == current_user.id,
-        Message.sender_type == expected_sender_type,
-    ).first()
-
-    if not message:
-        raise HTTPException(status_code=404, detail="Message not found or you are not the sender")
-
-    db.delete(message)
-    db.commit()
-
 # User removes a conversation from their inbox
 @message_router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_student)):

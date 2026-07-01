@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
 import { ReportModal } from "@/components/ui/ReportModal";
+import AvatarLightbox from "@/components/ui/AvatarLightbox";
 import type { PostComment } from "@/types";
 
 type SortKey = "top" | "newest";
@@ -112,14 +113,16 @@ export function CommentThread({ postId }: { postId: number }) {
     return (
       <div key={c.id} className={isReply ? "" : "border-b border-[#1B2D45]/[0.05] pb-4"}>
         <div className="flex gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#1B2D45]/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
-            {c.author?.profile_photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={c.author.profile_photo_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-[#1B2D45]/60" style={{ fontSize: "11px", fontWeight: 700 }}>{authorInitials(c.author)}</span>
-            )}
-          </div>
+          <AvatarLightbox photoUrl={c.author?.profile_photo_url} alt={c.author?.first_name} className="shrink-0">
+            <div className="w-8 h-8 rounded-full bg-[#1B2D45]/[0.06] flex items-center justify-center shrink-0 overflow-hidden">
+              {c.author?.profile_photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.author.profile_photo_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[#1B2D45]/60" style={{ fontSize: "11px", fontWeight: 700 }}>{authorInitials(c.author)}</span>
+              )}
+            </div>
+          </AvatarLightbox>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 700 }}>

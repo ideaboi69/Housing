@@ -13,6 +13,7 @@ import {
 import { useAuthStore } from "@/lib/auth-store";
 import { api } from "@/lib/api";
 import { SmartBackLink } from "@/components/ui/SmartBackLink";
+import AvatarLightbox from "@/components/ui/AvatarLightbox";
 import {
   type LifestyleProfile, type RoommateGroup, type GroupRequest,
   TAG_SHORT_LABELS, MOCK_PROFILES, getRoommateGroupById, removeStoredRoommateGroup, upsertStoredRoommateGroup,
@@ -77,13 +78,15 @@ function ApiRequestCard({
 function MemberRow({ member, isOwner, onRemove }: { member: LifestyleProfile; isOwner: boolean; onRemove?: () => void }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white border border-black/[0.04]">
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden">
-        {member.avatar ? (
-          <img src={member.avatar} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
-        )}
-      </div>
+      <AvatarLightbox photoUrl={member.avatar} alt={member.firstName} className="shrink-0">
+        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 overflow-hidden">
+          {member.avatar ? (
+            <img src={member.avatar} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <span style={{ fontSize: "13px", fontWeight: 800, color: "#FF6B35" }}>{member.firstName[0]}</span>
+          )}
+        </div>
+      </AvatarLightbox>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 600 }}>{member.firstName} {member.initial}</span>

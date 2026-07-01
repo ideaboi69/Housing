@@ -857,6 +857,7 @@ export const landlords = {
       no_of_property: string;
       company_name: string | null;
       identity_verified: boolean;
+      profile_photo_url?: string | null;
     }>("/api/landlords/me"),
 
   updateProfile: (data: { first_name?: string; last_name?: string; company_name?: string; phone?: string }) =>
@@ -871,6 +872,33 @@ export const landlords = {
   requestVerification: () =>
     request<{ message: string }>("/api/landlords/me/verify", {
       method: "POST",
+    }),
+
+  uploadProfilePhoto: async (file: File) => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch(`${API_URL}/api/landlords/me/profile-photo`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: "Request failed" }));
+      throw new ApiError(res.status, body.detail || "Request failed");
+    }
+
+    return res.json() as Promise<{ profile_photo_url: string }>;
+  },
+
+  deleteProfilePhoto: () =>
+    request<{ message: string }>("/api/landlords/me/profile-photo", {
+      method: "DELETE",
     }),
 
   logoutAll: () =>
@@ -1266,12 +1294,6 @@ export const messages = {
   // Unread count (landlord)
   getLandlordUnreadCount: () =>
     request<{ unread_count: number }>("/api/messages/landlord/unread-count"),
-
-  // Delete message
-  deleteMessage: (conversationId: number, messageId: number) =>
-    request<null>(`/api/messages/conversations/${conversationId}/messages/${messageId}`, {
-      method: "DELETE",
-    }),
 
   // Remove conversation from inbox (student)
   deleteConversation: (id: number) =>

@@ -14,6 +14,7 @@ import { getLandlordClaimState, type LandlordClaimState } from "@/lib/landlord-c
 import { IndividualDetailModal } from "@/components/roommates/IndividualDetailModal";
 import { RoommateGridSkeleton } from "@/components/ui/Skeletons";
 import { FirstVisitTip } from "@/components/ui/FirstVisitTip";
+import AvatarLightbox from "@/components/ui/AvatarLightbox";
 import type { GroupCardResponse, GroupDetailResponse } from "@/types";
 import {
   type LifestyleProfile, type RoommateGroup,
@@ -330,13 +331,15 @@ function IndividualCard({ profile, canInvite, inviteReason, invited, onInvite, o
       whileHover={{ boxShadow: "0 18px 40px rgba(27,45,69,0.1)" }}
     >
       <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 border border-[#1B2D45]/10 overflow-hidden" style={{ boxShadow: "0 8px 18px rgba(27,45,69,0.08)" }}>
-          {profile.avatar ? (
-            <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <span style={{ fontSize: "15px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
-          )}
-        </div>
+        <AvatarLightbox photoUrl={profile.avatar} alt={profile.firstName} className="shrink-0">
+          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FF6B35]/20 to-[#FFB627]/20 flex items-center justify-center shrink-0 border border-[#1B2D45]/10 overflow-hidden" style={{ boxShadow: "0 8px 18px rgba(27,45,69,0.08)" }}>
+            {profile.avatar ? (
+              <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span style={{ fontSize: "15px", fontWeight: 800, color: "#FF6B35" }}>{profile.firstName[0]}</span>
+            )}
+          </div>
+        </AvatarLightbox>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">

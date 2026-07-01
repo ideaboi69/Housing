@@ -11,6 +11,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useWriterStore } from "@/lib/store";
 import { api, ApiError } from "@/lib/api";
 import { VerifiedWriterBadge } from "@/components/ui/Badges";
+import { PhotoCropper } from "@/components/PhotoCropper";
+import AvatarLightbox from "@/components/ui/AvatarLightbox";
 import type { PostListResponse, PostResponse, PostCategory, WriterResponse } from "@/types";
 
 /** An image in the editor: either already saved on the server, or a staged local file. */
@@ -437,6 +439,7 @@ function WriterProfileEditor({
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState(writer.profile_photo_url || "");
   const [removePhoto, setRemovePhoto] = useState(false);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -453,12 +456,17 @@ function WriterProfileEditor({
 
   const handlePhotoSelect = (file: File | null) => {
     if (!file) return;
+    setPendingPhotoFile(file);
+  };
+
+  const handleCroppedPhoto = (file: File) => {
     if (photoPreview.startsWith("blob:")) {
       URL.revokeObjectURL(photoPreview);
     }
     setPhotoFile(file);
     setRemovePhoto(false);
     setPhotoPreview(URL.createObjectURL(file));
+    setPendingPhotoFile(null);
   };
 
   const handleRemovePhoto = () => {
@@ -535,34 +543,54 @@ function WriterProfileEditor({
 
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
           <div className="flex items-center gap-4 rounded-2xl border border-black/[0.04] bg-[#FAF8F4] p-4">
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[#1B2D45]/10">
-              {photoPreview ? (
-                <img src={photoPreview} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-[#1B2D45]" style={{ fontSize: "22px", fontWeight: 900 }}>
-                  {initials}
-                </div>
-              )}
+            <div className="relative shrink-0">
+              <AvatarLightbox photoUrl={photoPreview || null} alt={`${firstName} ${lastName}`}>
+                {photoPreview ? (
+                  <img src={photoPreview} alt="" className="h-20 w-20 rounded-full object-cover border border-black/[0.06]" />
+                ) : (
+                  <div
+                    className="flex h-20 w-20 items-center justify-center rounded-full text-white"
+                    style={{ background: "linear-gradient(135deg, #FF6B35, #FFB627)", fontSize: "22px", fontWeight: 900 }}
+                  >
+                    {initials}
+                  </div>
+                )}
+              </AvatarLightbox>
+              <label className="absolute -bottom-1 -right-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-black/[0.08] bg-white shadow-sm transition-colors hover:bg-[#FAF8F4] z-10">
+                <Camera className="h-3.5 w-3.5 text-[#5C6B7A]" />
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(event) => {
+                    handlePhotoSelect(event.target.files?.[0] ?? null);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[#1B2D45]" style={{ fontSize: "13px", fontWeight: 800 }}>Profile photo</p>
               <p className="mt-0.5 text-[#98A3B0]" style={{ fontSize: "11px", lineHeight: 1.45 }}>
-                Used on writer, business, and organization bylines.
+                Tap the camera badge to upload. Used on writer, business, and organization bylines.
               </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#1B2D45] px-3 py-2 text-white transition-colors hover:bg-[#152438]" style={{ fontSize: "12px", fontWeight: 700 }}>
-                  <Camera className="h-3.5 w-3.5" />
-                  Upload
-                  <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => handlePhotoSelect(event.target.files?.[0] ?? null)} />
-                </label>
-                {photoPreview && (
+              {photoPreview && (
+                <div className="mt-3">
                   <button type="button" onClick={handleRemovePhoto} className="rounded-xl border border-[#E71D36]/15 px-3 py-2 text-[#E71D36]/75 transition-colors hover:bg-[#E71D36]/5" style={{ fontSize: "12px", fontWeight: 700 }}>
                     Remove
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
+          {pendingPhotoFile && (
+            <PhotoCropper
+              file={pendingPhotoFile}
+              shape="circle"
+              onConfirm={handleCroppedPhoto}
+              onCancel={() => setPendingPhotoFile(null)}
+            />
+          )}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>

@@ -1106,18 +1106,6 @@ function MessagesTab({
     finally { setSending(false); }
   }
 
-  // Delete one of your own (landlord) messages. Optimistic; re-sync on failure.
-  async function handleDeleteMessage(messageId: number) {
-    if (!activeConvo) return;
-    setMessages((prev) => prev.filter((m) => m.id !== messageId));
-    try {
-      await api.messages.deleteMessage(activeConvo, messageId);
-      await onRefreshConversations();
-    } catch {
-      void loadMessages(activeConvo, true);
-    }
-  }
-
   async function handleArchiveActiveConversation() {
     if (!activeConvo || !activeConvoData) return;
 
@@ -1306,7 +1294,7 @@ function MessagesTab({
           </div>
 
           {/* Message view */}
-          <div className={`flex-1 flex flex-col bg-[radial-gradient(circle_at_top_left,rgba(27,45,69,0.08),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(47,111,237,0.08),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f7f9fc_100%)] ${!activeConvo ? "hidden md:flex" : "flex"}`}>
+          <div className={`min-w-0 flex-1 flex flex-col bg-[radial-gradient(circle_at_top_left,rgba(27,45,69,0.08),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(47,111,237,0.08),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f7f9fc_100%)] ${!activeConvo ? "hidden md:flex" : "flex"}`}>
             {!activeConvo ? (
               <div className="flex-1 flex items-center justify-center px-8">
                 <div className="max-w-[320px] text-center">
@@ -1425,26 +1413,16 @@ function MessagesTab({
                 )}
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto px-4 py-5 space-y-3">
+                <div className="flex-1 overflow-x-hidden overflow-y-auto px-4 py-5 space-y-3">
                   {loadingMessages ? (
                     <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#1B2D45]/20" /></div>
                   ) : messages.map((m) => (
-                    <div key={m.id} className={`group flex items-center gap-1.5 ${m.sender_type === "landlord" ? "justify-end" : "justify-start"}`}>
-                      {m.sender_type === "landlord" && (
-                        <button
-                          onClick={() => handleDeleteMessage(m.id)}
-                          aria-label="Delete message"
-                          title="Delete message"
-                          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-[#1B2D45]/25 hover:text-[#E71D36] shrink-0"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      <div className={`max-w-[75%] px-3 py-2 rounded-xl ${
+                    <div key={m.id} className={`group flex w-full items-center gap-1.5 ${m.sender_type === "landlord" ? "justify-end" : "justify-start"}`}>
+                      <div className={`min-w-0 max-w-[75%] px-3 py-2 rounded-xl ${
                         m.sender_type === "landlord"
                           ? "bg-[#1B2D45] text-white"
                           : "bg-[#F7F9FC] text-[#1B2D45]"
-                      }`} style={{ fontSize: "12px", lineHeight: 1.5 }}>
+                      }`} style={{ fontSize: "12px", lineHeight: 1.5, overflowWrap: "anywhere", wordBreak: "break-word" }}>
                         {m.content}
                         <div className={`mt-1 ${m.sender_type === "landlord" ? "text-white/30" : "text-[#1B2D45]/20"}`} style={{ fontSize: "9px" }}>
                           {new Date(m.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
@@ -1625,7 +1603,7 @@ function LandlordSecurityLog() {
   );
 }
 
-function SettingsTab({ user }: { user: { email: string; first_name: string; last_name: string; identity_verified?: boolean; company_name?: string | null; phone?: string | null } }) {
+function SettingsTab({ user }: { user: { email: string; first_name: string; last_name: string; identity_verified?: boolean; company_name?: string | null; phone?: string | null; profile_photo_url?: string | null } }) {
   const router = useRouter();
   const { logout, loadUser } = useAuthStore();
 
@@ -1758,7 +1736,19 @@ function SettingsTab({ user }: { user: { email: string; first_name: string; last
       <div className={sectionCls} style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.02)" }}>
         <h3 className="text-[#1B2D45] mb-3" style={{ fontSize: "14px", fontWeight: 700 }}>Profile Photo</h3>
         <ProfilePhotoUpload
-          initials={`${user.first_name[0]}${user.last_name[0]}`}
+          currentPhotoUrl={user.profile_photo_url}
+          initials={`${user.first_name[0] ?? ""}${user.last_name[0] ?? ""}`.toUpperCase()}
+          fullName={`${user.first_name} ${user.last_name}`}
+          onUploaded={(url) => {
+            useAuthStore.setState((s) => ({
+              user: s.user ? { ...s.user, profile_photo_url: url } : s.user,
+            }));
+          }}
+          onRemoved={() => {
+            useAuthStore.setState((s) => ({
+              user: s.user ? { ...s.user, profile_photo_url: null } : s.user,
+            }));
+          }}
         />
       </div>
 
